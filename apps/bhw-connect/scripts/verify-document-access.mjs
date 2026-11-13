@@ -41,6 +41,10 @@ try {
     ids.admin,
     ids.editor,
   ]);
+  await db.query(
+    "insert into analysis_users(user_id,approved,updated_by) values($1,true,$1),($2,true,$1),($3,true,$1)",
+    [ids.admin, ids.editor, ids.member],
+  );
   source = (
     await db.query(
       `insert into doc_source(key,title,source_path,source_sha256,page_count,char_count,extractor,status) values ('browser-synthetic-policy','Synthetic browser policy','synthetic.pdf',repeat('d',64),1,28,'test','approved') returning doc_id`,
@@ -110,7 +114,7 @@ try {
       const text = await page.locator("body").innerText();
       const marker = path.includes("/source/")
         ? "SYNTHETIC PRIVATE POLICY TEXT"
-        : "Internal assistant";
+        : "Your sharing ID";
       assert.equal(text.includes(marker), role === "admin", `${role}: ${path}`);
       results.push({ role, path, visible: role === "admin" });
     }
@@ -119,7 +123,11 @@ try {
       const response = await context.request.post(`http://127.0.0.1:53100/bhw-connect/${path}`, {
         data: {},
       });
-      assert.equal(response.status(), role === "admin" ? 400 : 401, `${role}: ${path}`);
+      assert.equal(
+        response.status(),
+        role === "admin" ? 400 : path === "api/ai/assistant" && role !== "signed_out" ? 403 : 401,
+        `${role}: ${path}`,
+      );
       results.push({ role, path, status: response.status() });
     }
     await context.close();

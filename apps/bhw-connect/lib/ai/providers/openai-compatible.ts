@@ -92,7 +92,11 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
           }),
         });
       } catch (cause) {
-        throw new ProviderRequestError(config.id, null, cause instanceof Error ? cause.message : "network error");
+        throw new ProviderRequestError(
+          config.id,
+          null,
+          cause instanceof Error ? cause.message : "network error",
+        );
       }
 
       if (response.status === 429) {
@@ -100,13 +104,26 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
         throw new ProviderRateLimitedError(config.id, retryAfter ? Number(retryAfter) : null);
       }
       if (!response.ok) {
-        throw new ProviderRequestError(config.id, response.status, await response.text().catch(() => ""));
+        throw new ProviderRequestError(
+          config.id,
+          response.status,
+          await response.text().catch(() => ""),
+        );
       }
 
       const json = await response.json();
       const choice = json.choices?.[0]?.message;
       return {
         content: choice?.content ?? null,
+        model: json.model ?? config.model,
+        ...(json.usage
+          ? {
+              usage: {
+                inputTokens: json.usage.prompt_tokens,
+                outputTokens: json.usage.completion_tokens,
+              },
+            }
+          : {}),
         toolCalls: parseToolCalls(choice?.tool_calls),
       };
     },

@@ -115,6 +115,7 @@ export function renderCitation(row: {
 
 export async function executeSearchDocuments(
   rawArgs: Record<string, unknown>,
+  { allowUploads = false }: { allowUploads?: boolean } = {},
 ): Promise<SearchDocumentsResult | SearchDocumentsError> {
   const parsed = searchDocumentsArgsSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -146,7 +147,9 @@ export async function executeSearchDocuments(
 
     if (error) return { error: `Document search failed: ${error.message}` };
 
-    const rows = (data ?? []) as SearchRow[];
+    const rows = ((data ?? []) as SearchRow[]).filter(
+      (row) => allowUploads || !row.doc_key.startsWith("upload:"),
+    );
     const results: DocumentHit[] = rows.map((row) => {
       const truncated = row.content.length > MAX_EXCERPT_CHARS;
       return {
@@ -223,7 +226,7 @@ export async function executeSearchDocuments(
 }
 
 /** The tool as the model sees it. Internal only: it reads doc_chunk, which is service-role only. */
-export function createSearchDocumentsTool(): Tool {
+export function createSearchDocumentsTool(access: { allowUploads?: boolean } = {}): Tool {
   return {
     definition: {
       name: "searchDocuments",
@@ -251,7 +254,7 @@ export function createSearchDocumentsTool(): Tool {
       },
     },
     async execute(args) {
-      return executeSearchDocuments(args);
+      return executeSearchDocuments(args, access);
     },
   };
 }

@@ -66,6 +66,7 @@ const ADMIN_TRAILS: Record<string, Crumb[]> = {
   "/admin/ingestion": [BHW_CRUMB, ADMIN_CRUMB, { label: "Ingestion history" }],
   "/admin/ai-quota": [BHW_CRUMB, ADMIN_CRUMB, { label: "AI quota" }],
   "/admin/answer-bank": [BHW_CRUMB, ADMIN_CRUMB, { label: "Answer bank" }],
+  "/admin/analysis-users": [BHW_CRUMB, ADMIN_CRUMB, { label: "Analysis access" }],
   "/admin/assistant": [BHW_CRUMB, ADMIN_CRUMB, { label: "Assistant" }],
   "/admin/kb-review": [BHW_CRUMB, ADMIN_CRUMB, { label: "KB review" }],
   "/admin/district-corrections": [BHW_CRUMB, ADMIN_CRUMB, { label: "District corrections" }],
@@ -92,6 +93,7 @@ const FACILITIES_TRAILS: Record<string, Crumb[]> = {
 };
 
 const STATIC_TRAILS: Record<string, Crumb[]> = {
+  "/ask-the-data": [{ label: "Ask the Data" }],
   "/map": [{ label: "Dataset maps" }],
   "/catalog": [{ label: "Dataset catalog" }],
   "/health-services": [HEALTH_SERVICES_CRUMB],
@@ -113,6 +115,12 @@ const STATIC_TRAILS: Record<string, Crumb[]> = {
  */
 export function trailForPathname(pathname: string): Crumb[] | null {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+
+  if (path.startsWith("/ask-the-data/projects/"))
+    return [PORTAL_CRUMB, { label: "Ask the Data", href: "/ask-the-data" }, { label: "Project" }];
+  if (path.startsWith("/ask-the-data/source/")) {
+    return [PORTAL_CRUMB, { label: "Ask the Data", href: "/ask-the-data" }, { label: "Source" }];
+  }
 
   // The admin source viewer is dynamic but its label never is — the chunk id it
   // is keyed by is not something to show in a trail.

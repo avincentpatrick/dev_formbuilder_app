@@ -163,12 +163,14 @@ export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly s
  * which is what makes "the number in the answer matches the number on screen" true for internal
  * users too. `queryDataset` covers everything they do not.
  */
-export function createInternalTools(): Tool[] {
+export function createInternalTools({
+  allowLibraryDocuments = false,
+}: { allowLibraryDocuments?: boolean } = {}): Tool[] {
   return [
     ...TOOLS,
     ...createDatasetTools("internal"),
     createTraversalTool(),
-    createSearchDocumentsTool(),
+    createSearchDocumentsTool({ allowUploads: allowLibraryDocuments }),
     ...createAnalysisTools(),
   ];
 }

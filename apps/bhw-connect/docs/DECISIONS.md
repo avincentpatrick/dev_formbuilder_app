@@ -9861,3 +9861,42 @@ types, migration lint and prefixed build passed. No live provider calls occurred
 Worker process model/prerequisites/settings/licenses and pending Windows/operator
 checks are in `POLICY_DOCUMENT_WORKER.md`. Phase 3 upload library is next; no worker
 was installed on the server and no shared deployment paths were changed.
+
+## 2026-11-12 — Unified Ask the Data Phase 0 design
+
+Completed the design-only phase requested by the owner. See [build plan](ASK_THE_DATA_BUILD_PLAN.md) and [technical design](ASK_THE_DATA_PHASE_0_DESIGN.md). Confirmed removal of anonymous Ask the Data in Phase 1; approved dashboard users share one dataset catalogue, while projects/files remain private unless shared. Approval does not grant administrator privileges. Selected a PostgreSQL-backed durable queue and typed Python statistical worker as the design direction, subject to actual Windows-host compatibility verification. Existing raw-number auditing must evolve to validate computed results rather than be disabled.
+
+Reviewed current WPSAR guidance, including its distinction between figure/table notes and bibliographic references and its AI-use restrictions; automated narrative is not represented as a submission-ready manuscript. Added synthetic numerical/geographic acceptance fixtures and independently checked their reference arithmetic, JSON, local document links, and whitespace. No application code, dependencies, schema, settings, or deployment changed. Application/browser/CI tests were not run for this documentation-only phase. Phase 1 has not started. The checkout has no origin/main ref, so no compliant branch/PR is claimed. Worker compatibility, search vendor, and an undecided operating budget remain recorded gates.
+
+## 2026-11-12 — Ask the Data Phase 1 implementation
+
+Phase 0 merged in PR #509. Added an explicit `analysis_users` approval boundary independent of Meridian identity and administrator privileges. True administrators approve/revoke by existing Meridian UUID; editors cannot manage approvals, and administrators have no implicit analysis bypass. All three chat APIs use one approved-user engine before request parsing or any answer path. The old public answer cache/log is bypassed; per-user message quotas are removed while provider capacity handling remains.
+
+Public launchers now navigate to the private workspace, carrying dataset/place context. The old admin assistant entry redirects there. Approved users share registry/graph/document tools, checked narrative, figures and follow-ups. The analyst citation viewer returns reviewed document sources only. Regression administration remains under the existing admin boundary. Long conversations send a bounded recent context rather than stopping after a message quota. Online research, attachments, saved projects and expanded statistics remain later phases.
+
+Additive migration: `20261112100000_analysis_users.sql`; deny public-role access with RLS and explicit service-role grants. No shared deployment settings or external subscriptions changed. Validation and release status are recorded in ASK_THE_DATA_BUILD_PLAN.md. After this migration is deployed, refresh the committed development copy with the existing BHW dev-copy workflow as required by CLAUDE.md.
+
+
+## 2026-11-12 — Ask the Data Phase 2 saved projects and jobs
+
+Phase 1 merged in PR #510. Implemented private saved projects with owner-controlled viewer/editor sharing, approval checks on all project/job/result access, optimistic revisions, idempotent requests and a durable PostgreSQL lease queue. Result publication is fenced by lease identity and fresh project/approval checks; cancelled, deleted or unshared work cannot publish stale results. Deletion scrubs active conversation/results/evidence and memberships while keeping minimal tombstones to fence old workers.
+
+Phase 2 stores artifacts as private database JSON, including evidence and per-attempt usage; uploads/file indexes remain Phase 3. A standalone Node runner calls the local bearer-protected worker endpoint using existing CRON_SECRET. It requires operator installation as a separate Windows service; this change touches no shared deployment scripts. Provider model/token metadata feeds per-analysis AsyncLocalStorage accounting. Missing prices, tokens or interrupted-attempt usage remain unknown, never assumed free. No user quotas or hard budget were introduced. See ASK_THE_DATA_PROJECTS_OPERATIONS.md for service, backup, pricing and release gates.
+
+
+## 2026-11-13 — Ask the Data Phase 3 private sources and research
+
+Phase 2 merged as PR #511. Source originals now live outside public assets under BHW_STORAGE_DIR/analysis-projects, with fresh approved-user/project authorization and immutable project-scoped SHA-256 identity. Extracted content, profile/preparation, provenance and leases live in service-only PostgreSQL tables/RPCs. The existing Node worker launches a bounded bundled parser child; no arbitrary analysis code runs in this phase. Direct parsers cover the agreed modern document/table/geographic families; optional LibreOffice is required for legacy Office, and absent OCR/converter/unreadable content is labelled honestly.
+
+Selected optional Brave Web Search with request accounting and safe HTTPS retrieval; this makes the vendor choice concrete without purchasing a subscription or setting a budget. Missing credentials report search unavailable. Search snippets are not page evidence. Explicit user/search URLs alone authorize navigation, with DNS-pinned public destinations and original TLS checks even through a proxy. Private project graph context augments existing curated tools without promoting uploads globally. Source comparison preserves definitions, join keys, denominators, periods, units and geographic versions, and flags conflicting measurements before combining.
+
+Deleting sources invalidates dependent saved results and removes raw/extracted content, with fenced work and retryable disk cleanup; project deletion cascades the same lifecycle. Originals require filesystem ACLs and coordinated backups. Target Windows worker/restart, paid search, optional converter and storage/backup setup remain operator release gates, documented in ASK_THE_DATA_SOURCES_OPERATIONS.md. Local synthetic tests/browser builds do not establish production completion. Phase 4 is not started.
+
+
+## 2026-11-13 — Ask the Data Phase 4 reproducible statistics
+
+Phase 3 merged in PR #512. Selected the planned fixed Python/NumPy/SciPy/pandas/statsmodels execution path, invoked by the existing approved project worker through an absolute server-owned BHW_STATISTICS_PYTHON path. Only allowlisted methods run; no model code, arbitrary SQL or shell execution is accepted. Optional runtime absence produces an explicit unavailable result. Windows Server 2016 compatibility remains an operator release gate, not a claimed local proof.
+
+Calculations consume complete, filtered immutable input snapshots and retain parameters, source/definition hashes, diagnostics, software versions and random seeds. Sampling tests require documented independent sample units; census/aggregate descriptions do not gain p-values by default. Field references replace raw-number membership validation for calculated prose, while citation checks remain. One structured result powers the deterministic explanatory narrative, scientific tables, figures and CSV/XLSX/SVG/PNG/JSON exports. Saved-manifest replay compares result hashes without rewriting history. All data/exports/replays remain project-private and use the Phase 3 source/project deletion lifecycle.
+
+No schema/shared deployment changes, subscriptions or per-user quotas were added. Numerical reference tests, method limitations, reproducibility and actual host setup are documented in ASK_THE_DATA_STATISTICS_OPERATIONS.md. Maps/spatial analysis and reports/decks remain later phases.

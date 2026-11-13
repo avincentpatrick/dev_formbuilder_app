@@ -27,6 +27,12 @@
  */
 
 export type Citation = {
+  sourceId?: string;
+  sourceKind?: string;
+  url?: string | null;
+  originalHash?: string;
+  derivedHash?: string;
+  retrievedAt?: string;
   chunkId: number;
   document: string;
   documentTitle: string;
@@ -46,6 +52,12 @@ export type Citation = {
 };
 
 type SearchHitShape = {
+  sourceId?: string;
+  sourceKind?: string;
+  url?: string | null;
+  originalHash?: string;
+  derivedHash?: string;
+  retrievedAt?: string;
   chunkId: number;
   document: string;
   documentTitle: string;
@@ -96,6 +108,16 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
       // since a quote came from one of them and not the other.
       if (byChunk.has(hit.chunkId)) continue;
       byChunk.set(hit.chunkId, {
+        ...(hit.sourceId
+          ? {
+              sourceId: hit.sourceId,
+              sourceKind: hit.sourceKind,
+              url: hit.url,
+              originalHash: hit.originalHash,
+              derivedHash: hit.derivedHash,
+              retrievedAt: hit.retrievedAt,
+            }
+          : {}),
         chunkId: hit.chunkId,
         document: hit.document,
         documentTitle: hit.documentTitle,
@@ -120,7 +142,8 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
  * A range contributes both endpoints, so "slides 160-168" against a retrieval of 160 alone is
  * caught — the model would be attributing to a slide it was never shown.
  */
-const PAGE_REFERENCE_RE = /\b(?:slides?|pages?|pp?\.?)\s*(\d{1,4})(?:\s*(?:[–—-]|to)\s*(\d{1,4}))?\b/gi;
+const PAGE_REFERENCE_RE =
+  /\b(?:slides?|pages?|pp?\.?)\s*(\d{1,4})(?:\s*(?:[–—-]|to)\s*(\d{1,4}))?\b/gi;
 
 export function extractPageReferences(text: string): number[] {
   const pages: number[] = [];

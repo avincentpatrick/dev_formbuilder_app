@@ -27,7 +27,12 @@ export type ChatMessage =
   | { role: "assistant"; content: string | null; toolCalls?: ToolCall[] }
   | { role: "tool"; toolCallId: string; name: string; content: string };
 
-export type ProviderCompletion = { content: string | null; toolCalls: ToolCall[] };
+export type ProviderCompletion = {
+  content: string | null;
+  toolCalls: ToolCall[];
+  model?: string;
+  usage?: { inputTokens: number; outputTokens: number };
+};
 
 export const PROVIDER_IDS = ["gemini", "groq", "openrouter", "mistral"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];

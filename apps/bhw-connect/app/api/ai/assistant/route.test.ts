@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssistantRoute } from "@/lib/ai/route";
 
 const {
-  getAdminUser,
+  getAnalysisAuthResult,
+  getStrictAdminUser,
   runToolLoop,
   isInternalAssistantRateLimited,
   recordInternalAssistantMessage,
   internalTools,
   routeRequest,
 } = vi.hoisted(() => ({
-  getAdminUser: vi.fn(),
+  getAnalysisAuthResult: vi.fn(),
+  getStrictAdminUser: vi.fn(),
   runToolLoop: vi.fn(),
   isInternalAssistantRateLimited: vi.fn(),
   recordInternalAssistantMessage: vi.fn(),
@@ -33,7 +35,8 @@ const {
   })),
 }));
 
-vi.mock("@/lib/db/require-admin", () => ({ getAdminUser }));
+vi.mock("@/lib/db/require-admin", () => ({ getStrictAdminUser }));
+vi.mock("@/lib/db/require-analysis", () => ({ getAnalysisAuthResult }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop }));
 vi.mock("@/lib/ai/rate-limit", () => ({
   isInternalAssistantRateLimited,
@@ -81,7 +84,8 @@ async function eventsOf(response: Response): Promise<Record<string, unknown>[]> 
 }
 
 beforeEach(() => {
-  getAdminUser.mockReset().mockResolvedValue(ADMIN);
+  getStrictAdminUser.mockReset().mockResolvedValue(ADMIN);
+  getAnalysisAuthResult.mockReset().mockResolvedValue({ status: "approved", user: ADMIN });
   runToolLoop.mockReset();
   isInternalAssistantRateLimited.mockReset().mockResolvedValue(false);
   recordInternalAssistantMessage.mockReset().mockResolvedValue(undefined);
@@ -93,9 +97,9 @@ beforeEach(() => {
   });
 });
 
-describe("POST /api/ai/assistant — the admin boundary", () => {
+describe("POST /api/ai/assistant — approved-user boundary", () => {
   it("refuses an anonymous request with 401 and never reaches a provider", async () => {
-    getAdminUser.mockResolvedValue(null);
+    getAnalysisAuthResult.mockResolvedValue({ status: "signed_out" });
 
     const response = await POST(ask());
 
@@ -106,9 +110,9 @@ describe("POST /api/ai/assistant — the admin boundary", () => {
     expect(recordInternalAssistantMessage).not.toHaveBeenCalled();
   });
 
-  it("checks the admin session on the route itself, not only on the page", async () => {
+  it("checks dashboard approval on the route itself, not only on the page", async () => {
     await POST(ask());
-    expect(getAdminUser).toHaveBeenCalled();
+    expect(getAnalysisAuthResult).toHaveBeenCalled();
   });
 
   it("rejects a malformed body with 400", async () => {
@@ -121,14 +125,17 @@ describe("POST /api/ai/assistant — the admin boundary", () => {
 });
 
 describe("POST /api/ai/assistant — limits and tool set", () => {
-  it("returns 429 once the admin's own limit is reached, without calling a provider", async () => {
+  it("does not enforce the old per-user quota", async () => {
     isInternalAssistantRateLimited.mockResolvedValue(true);
-
-    const response = await POST(ask());
-
-    expect(response.status).toBe(429);
-    expect(isInternalAssistantRateLimited).toHaveBeenCalledWith(ADMIN.id);
-    expect(runToolLoop).not.toHaveBeenCalled();
+    runToolLoop.mockResolvedValue({
+      finalText: "Available.",
+      toolPayloads: [],
+      provider: "gemini",
+      allCapped: false,
+    });
+    expect((await POST(ask())).status).toBe(200);
+    expect(isInternalAssistantRateLimited).not.toHaveBeenCalled();
+    expect(runToolLoop).toHaveBeenCalled();
   });
 
   it("runs the loop with the internal tool set and the internal system prompt", async () => {
@@ -638,9 +645,49 @@ describe("POST /api/ai/assistant — figures (Increment 5.5)", () => {
   });
 });
 
-it("refuses editors before using internal evidence", async () => {
-  getAdminUser.mockResolvedValue({ ...ADMIN, role: "editor" });
-  const response = await POST(ask());
-  expect(response.status).toBe(401);
+it("renders computed field references and emits the same structured result while rejecting invented calculations", async () => {
+  const result = {
+    kind: "statistical-result",
+    id: "0123456789abcdef",
+    claims: { mean: { value: 2.2, display: "2.200", label: "mean", unit: "people" } },
+    rows: [],
+    plot: [],
+    title: "Synthetic summary",
+  };
+  runToolLoop.mockResolvedValue({
+    finalText: "The mean is [[0123456789abcdef:mean]] people. The mean is 98 people.",
+    toolPayloads: [result],
+    provider: "gemini",
+    allCapped: false,
+  });
+  const events = await eventsOf(await POST(ask()));
+  expect(eventOfType(events, "message").content).toBe("The mean is 2.200 people.");
+  expect(eventOfType(events, "statistics").results).toEqual([result]);
+});
+
+it("retains verified calculations when the final provider explanation is unavailable", async () => {
+  const result = {
+    kind: "statistical-result",
+    id: "0123456789abcdef",
+    claims: {},
+    rows: [],
+    plot: [],
+    title: "Synthetic summary",
+  };
+  runToolLoop.mockResolvedValue({
+    finalText: null,
+    toolPayloads: [result],
+    provider: null,
+    allCapped: true,
+  });
+  const events = await eventsOf(await POST(ask()));
+  expect(eventOfType(events, "statistics").results).toEqual([result]);
+  expect(eventOfType(events, "message").content).toContain("calculations completed");
+  expect(events.some((e) => e.type === "capacity")).toBe(false);
+});
+
+it("denies approved editors on the admin compatibility API", async () => {
+  getStrictAdminUser.mockResolvedValue(null);
+  expect((await POST(ask())).status).toBe(403);
   expect(runToolLoop).not.toHaveBeenCalled();
 });

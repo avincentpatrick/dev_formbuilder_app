@@ -84,3 +84,7 @@ ingestion/data/agg_population_citymun.csv
 
 # local storage for feedback screenshots in development (lib/db/admin.ts, from P3)
 /.local-storage/
+
+# Python bytecode from statistical worker checks
+__pycache__/
+*.pyc

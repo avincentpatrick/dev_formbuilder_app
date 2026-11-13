@@ -351,7 +351,7 @@ application foundation is ready for Phase 2 extraction/OCR/worker implementation
 
 ### Phase 2 implementation (2026-11-13)
 
-Added `20261113090000_document_processing.sql`: per-job extraction uniqueness,
+Added `20261113110000_document_processing.sql`: per-job extraction uniqueness,
 current-revision pointer, separate extraction/embedding job kinds and active-job
 indexes, plus service-only strict-admin enqueue RPC. Existing source/chunk IDs
 remain valid. `ingestion/document_extract.py` preserves native text and detects

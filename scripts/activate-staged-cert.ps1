@@ -48,7 +48,7 @@
 [CmdletBinding()]
 param(
     [string] $ApacheRoot  = 'C:\Apache24',
-    [string] $Domain      = 'staging.pitahc.gov.ph',
+    [string] $Domain      = 'iconnect.com.de',
     [string] $ServiceName = 'Apache2.4',
     [string] $StagingRoot = '',
     [string] $ConfigFile  = '',

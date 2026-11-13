@@ -56,13 +56,13 @@ function row(over: Record<string, unknown> = {}) {
 }
 
 async function ok(args: Record<string, unknown>) {
-  const result = await executeSearchDocuments(args);
+  const result = await executeSearchDocuments(args, { allowUploads: true });
   if ("error" in result) throw new Error(`expected a result, got refusal: ${result.error}`);
   return result;
 }
 
 async function refusal(args: Record<string, unknown>) {
-  const result = await executeSearchDocuments(args);
+  const result = await executeSearchDocuments(args, { allowUploads: true });
   if (!("error" in result)) throw new Error("expected a refusal, got a result");
   return result.error;
 }
@@ -244,4 +244,13 @@ it("reports unknown uploaded extraction quality instead of claiming completeness
   const result = await ok({ query: "referral" });
   expect(result.results).toHaveLength(1);
   expect(result.warnings.join(" ")).toContain("quality could not be checked");
+});
+
+it("excludes library uploads unless the trusted caller enables admin access", async () => {
+  response = {
+    data: [row({ doc_key: "upload:11111111-1111-4111-8111-111111111111" })],
+    error: null,
+  };
+  const result = await executeSearchDocuments({ query: "policy" });
+  expect("results" in result && result.results).toEqual([]);
 });

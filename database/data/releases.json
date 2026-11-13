@@ -1,5 +1,19 @@
 [
     {
+        "version": "0.20.1",
+        "title": "Meridian has a new address: iconnect.com.de",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "The testing site now lives at https://iconnect.com.de, and the old address no longer opens it. Sign in there with the same email, password and authenticator app as before. BHW Connect moved with it, to https://iconnect.com.de/bhw-connect."
+            },
+            {
+                "kind": "fixed",
+                "text": "Settings → Access now shows the address where people can sign up to join your workspace. Before the move it would have shown an address that does not open anything."
+            }
+        ]
+    },
+    {
         "version": "0.20.0",
         "title": "Explore: build your own charts",
         "items": [

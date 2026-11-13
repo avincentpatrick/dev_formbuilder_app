@@ -44,6 +44,12 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["document_extraction"]["Insert"]>;
         Relationships: [];
       };
+      analysis_users: {
+        Row: { user_id: string; approved: boolean; updated_at: string; updated_by: string };
+        Insert: { user_id: string; approved?: boolean; updated_at?: string; updated_by: string };
+        Update: { user_id?: string; approved?: boolean; updated_at?: string; updated_by?: string };
+        Relationships: [];
+      };
       fact_fhsis_indicator: {
         Row: {
           id: number;
@@ -3583,6 +3589,22 @@ export type Database = {
       };
     };
     Functions: {
+      analysis_source_api: {
+        Args: { p_actor: string; p_project: string; p_operation: string; p_payload?: Json };
+        Returns: Json;
+      };
+      analysis_source_worker_api: {
+        Args: { p_operation: string; p_source?: string; p_lease?: string; p_payload?: Json };
+        Returns: Json;
+      };
+      analysis_project_api: {
+        Args: { p_actor: string; p_operation: string; p_project?: string; p_payload?: Json };
+        Returns: Json;
+      };
+      analysis_worker_api: {
+        Args: { p_operation: string; p_job?: string; p_lease?: string; p_payload?: Json };
+        Returns: Json;
+      };
       district_dataset_gaps: {
         Args: never;
         Returns: {

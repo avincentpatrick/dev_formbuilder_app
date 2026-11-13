@@ -169,15 +169,11 @@ export default function FacilitiesMethodology() {
       <section id="ask" className="flex flex-col gap-2 scroll-mt-6">
         <h2 className="text-lg font-semibold">Asking this data a question</h2>
         <p className="text-sm text-muted">
-          The <strong>Ask the data</strong> box on these pages is an AI assistant with no knowledge
-          of its own. Every number it gives you comes from a query it ran against this registry
-          while answering, and any sentence carrying a number it cannot trace back to one of those
-          queries is removed before you see it. It reads only this registry — not the BHW
-          Headcount 2025 or BHW Profiles 2025 data, which has its own dashboard at{" "}
-          <Link href="/bhw" className="underline hover:text-accent">
-            BHW 2025
-          </Link>
-          .
+          Ask the Data requires sign-in and explicit dashboard approval. Public chat and
+          anonymous cached answers have been removed. Dashboard links carry the current dataset
+          and place into the private workspace, which can use the shared catalogue and document
+          sources. Numerical and citation checks remain in place. Conversations are not added
+          to the public answer bank.
         </p>
         <p className="text-sm text-muted">
           <strong>There is one trap it is built to catch rather than fall into.</strong> A blank

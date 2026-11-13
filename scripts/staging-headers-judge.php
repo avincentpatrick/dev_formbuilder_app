@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * WHY THIS EXISTS.
  *
- * The only thing keeping `staging.pitahc.gov.ph` out of search results is ONE line of Apache
+ * The only thing keeping `iconnect.com.de` out of search results is ONE line of Apache
  * configuration on ONE box: `Header always set X-Robots-Tag "noindex, nofollow, noarchive"`. It is in
  * no tracked file — `git grep` finds no `VirtualHost` anywhere in this repository, and the two
  * web-server files that ARE tracked (`docker/nginx/default.conf`, `public/.htaccess`) do not set this
@@ -85,7 +85,7 @@ const STAGING_EXIT_BLOCKED = 1;
 const STAGING_EXIT_CANNOT_MEASURE = 2;
 
 /** The host the probes are fetched from. Here rather than in `ci.yml` so there is one authority. */
-const STAGING_HOST = 'staging.pitahc.gov.ph';
+const STAGING_HOST = 'iconnect.com.de';
 
 /**
  * Header => the policy every probe's response must satisfy. All tokens lower-cased.

@@ -7,7 +7,7 @@
 
 ## 1. What's Already Decided (not repeated in full)
 
-Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: a **web server** — ADR-0005 decided **nginx**, and the testing site behind `staging.pitahc.gov.ph` runs **Apache 2.4 with `mod_proxy_fcgi`** under `D46` (§8.3) — → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows** (a dedicated instance per site; the testing site runs PostgreSQL 15, §8 step 2), **no Redis** (ADR-0007 moved the queue to the `database` driver and cache and sessions use it too, so ADR-0005's Memurai is not installed — it returns only with Redis + Horizon), exactly one `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS by **ACME** (win-acme on an nginx host, Apache's own `mod_md` on the testing site — §8 step 8), and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. ⚠️ **And it said "TLS via win-acme" without qualification until `M100` (2026-09-19), which is the web-server half of the same defect.** Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
+Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: a **web server** — ADR-0005 decided **nginx**, and the testing site behind `iconnect.com.de` runs **Apache 2.4 with `mod_proxy_fcgi`** under `D46` (§8.3) — → PHP 8.4 FastCGI, **self-managed PostgreSQL for Windows** (a dedicated instance per site; the testing site runs PostgreSQL 15, §8 step 2), **no Redis** (ADR-0007 moved the queue to the `database` driver and cache and sessions use it too, so ADR-0005's Memurai is not installed — it returns only with Redis + Horizon), exactly one `queue:work` worker as a Windows service, the scheduler via Windows Task Scheduler, TLS by **ACME** (win-acme on an nginx host, Apache's own `mod_md` on the testing site — §8 step 8), and **git-driven deploys through a self-hosted GitHub Actions runner**. ⚠️ **This sentence listed "Horizon/Reverb as Windows services" until Increment M46 (2026-08-29): neither is built.** Horizon was declined by ADR-0007 §D1 in favour of a plain worker; Reverb is Track B and ships no artisan command in this tree, so a service pointing at it cannot start. ⚠️ **And it said "TLS via win-acme" without qualification until `M100` (2026-09-19), which is the web-server half of the same defect.** Docker Compose remains the source of truth for local-dev/CI parity regardless of the production host; the CI pipeline stages are in `docs/testing-strategy.md` §6.
 
 **No open hosting due-diligence item.** Because Postgres is now self-managed, Row-Level Security and PostGIS are **guaranteed** available — but the PostGIS binaries must be installed **before the first migrate**, because a migration already runs `CREATE EXTENSION postgis` (§8 step 2) — and the ADR-0003 "confirm the managed platform supports RLS/PostGIS" question is eliminated, not deferred.
 
@@ -21,7 +21,7 @@ Per **ADR-0005**, production runs on the owner's **Windows Server 2016**: a **we
 |---|---|---|
 | **Local development** | Individual dev machines | Docker Compose (Laravel, Postgres, Redis, Mailpit) — the committed parity source. Native PHP + Postgres on Windows/Laragon is an accepted alternative for developers who don't run Docker. |
 | **CI** | Automated tests (`docs/testing-strategy.md`) | GitHub-hosted **Linux** runners with PostgreSQL 17 + PostGIS 3.5 and Redis service containers. (Note the Linux-CI vs Windows-prod parity gap, ADR-0005, and a version gap too: the testing site runs PostgreSQL 15, §8 step 2.) |
-| **Staging** — **built, and it is the testing site** | Pre-production validation and tester access | **`staging.pitahc.gov.ph` on the owner's Windows Server 2016, built 2026-09-17 under `D46`** — one workspace at the root, served by **Apache** (not a second nginx server block), its own **PostgreSQL 15** instance, worker service `meridian-test-worker` and scheduler task, app at `C:\meridian\test-app`. Isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). §8.3 is its runbook; §8 step 2 says why a separate database on a shared instance is not enough. A second application, BHW Connect, is served at `/bhw-connect` from the same box, with its own service and database (ADR-0024, §8.4). |
+| **Staging** — **built, and it is the testing site** | Pre-production validation and tester access | **`iconnect.com.de` on the owner's Windows Server 2016, built 2026-09-17 under `D46` as `staging.pitahc.gov.ph` and moved to its own name under `D216`** — one workspace at the root, served by **Apache** (not a second nginx server block), its own **PostgreSQL 15** instance, worker service `meridian-test-worker` and scheduler task, app at `C:\meridian\test-app`. Isolated synthetic/seeded data, never real respondent PII (`docs/data-privacy-gdpr-compliance.md`). §8.3 is its runbook; §8 step 2 says why a separate database on a shared instance is not enough. A second application, BHW Connect, is served at `/bhw-connect` from the same box, with its own service and database (ADR-0024, §8.4). |
 | **Production** | Live tenant traffic | **Self-hosted Windows Server 2016**, per ADR-0005. |
 
 **Promotion path**: `main` is the deployable branch. A green CI run on `main` triggers the deploy workflow (self-hosted runner) → production. If a staging site is configured, validate there first and promote to production as a deliberate act, given the blast radius against live tenant data.
@@ -189,9 +189,13 @@ The concrete pieces to stand one site up (companion to `deploy.ps1`). Each step 
      it writes, `server_name <CENTRAL_DOMAIN> *.<CENTRAL_DOMAIN>;` and `client_max_body_size 30m;`
      (step 1's `post_max_size`).
    - **A single named host on Apache (the testing site, `D46`/`D49`).** One `A` record, no wildcard, and the
-     certificate is issued and renewed by Apache's own **`mod_md`** over **`tls-alpn-01`** on port 443. There is
-     no DNS plugin for this zone — DICT runs the name servers for `pitahc.gov.ph` and offers no API — and
-     **inbound 80 is closed**, so `http-01` is unavailable and DNS-01 cannot be automated. `D49` answered this:
+     certificate is issued and renewed by Apache's own **`mod_md`** over **`tls-alpn-01`** on port 443. Under
+     `D46` there was no DNS plugin for the zone — DICT ran the name servers for `pitahc.gov.ph` and offered no
+     API. Since `D216` the name is `iconnect.com.de`, whose zone is on Cloudflare, which has one, and nothing
+     uses it: its record is **DNS only** (the grey cloud). ⛔ **Never switch that record to Proxied** without
+     replanning both halves: Cloudflare's proxy would end TLS before the box, so `tls-alpn-01` could not
+     validate, and it would put its own address on every request, which the app does not trust (§8.2 step 1).
+     **Inbound 80 is closed**, so `http-01` is unavailable. `D49` answered this:
      inbound **443 is open**, measured from outside the agency network, and `tls-alpn-01` is the challenge.
      ⛔ **Do not count a win-acme installation on this box as a working renewal** — its `http-01` could
      never validate through a closed port 80. The directives, the three traps and the **activation task Windows
@@ -389,14 +393,20 @@ refuse to create an account without a console.
 10. **Expose the site.** Publish the `A` record for the site's host name — and `*.<CENTRAL_DOMAIN>` too **only**
     if the site serves workspaces as subdomains. **Open inbound 443.**
     - ✅ **On the testing site this is DONE, and it is what `D49` answered.** Inbound 443 to `121.58.210.237`
-      is open, measured from **outside the agency network** on 2026-09-18 and again on 2026-09-19: TLS 1.3
+      was open, measured from **outside the agency network** on 2026-09-18 and again on 2026-09-19: TLS 1.3
       completes, `/up` and `/login` answer 200. **It must stay open**, because `mod_md` renews over it
       (§8 step 8, §8.3). **Inbound 80 stays closed.**
+    - **Since `D216` the site answers on a public address of its own, `121.58.210.233`**, which the network
+      team gave `iconnect.com.de` and forwards to the box's 443. `121.58.210.237` stays with `staging.pitahc.gov.ph`,
+      which no longer serves Meridian. ⛔ **The forward must carry no source NAT**, as the network team made
+      the first one on 2026-09-18: every per-address limit, the login lockout and the audit trail read the
+      client address Apache sees.
     - ⛔ **DO NOT remove the on-box `hosts` entries.** `M100` measured it: a TCP connect from the server to
       its own public address `121.58.210.237:443` gets **no connection within 8 seconds**, so **this network
-      does not hairpin**. The two entries — `127.0.0.1 pitahc.gov.ph` and `127.0.0.1 staging.pitahc.gov.ph`
-      — are the only route by which the certificate check, the `/up` check, `Require local` and the
-      operator's own browser reach the site from the box. Removing them breaks every check they protect.
+      does not hairpin**. The two entries — `127.0.0.1 com.de` and `127.0.0.1 iconnect.com.de` since `D216`
+      (`pitahc.gov.ph` and `staging.pitahc.gov.ph` before it) — are the only route by which the certificate
+      check, the `/up` check, `Require local`, BHW's sign-in call and the operator's own browser reach the
+      site from the box. Removing them breaks every check they protect.
       *(This was a conditional instruction resting on an unmeasured fact until `R-98682188` was closed on the
       measurement above; the Testing Server Checklist's "remove the hosts entry" step is wrong and is
       corrected there too.)*
@@ -452,15 +462,20 @@ refuse to create an account without a console.
 
 ### 8.3 The testing site as built — Apache, `mod_md`, and the activation task Windows requires
 
-**This is the runbook for `staging.pitahc.gov.ph` (`D46`, `D49`), and until `M100` none of it was written
-down anywhere in this repository.** It lived as configuration on the box and as chat history, which is why
+**This is the runbook for the testing site, `iconnect.com.de` since `D216` and `staging.pitahc.gov.ph`
+before it (`D46`, `D49`), and until `M100` none of it was written down anywhere in this repository.** It lived as configuration on the box and as chat history, which is why
 `§8` described a server that does not exist for four increments. Everything below was read off the box or
 measured against it, and the measurement is named wherever one was taken.
 
-**The layout.** One workspace at the root of `staging.pitahc.gov.ph` (121.58.210.237), served by
+**The layout.** One workspace at the root of `iconnect.com.de`, served by
 **Apache 2.4.66 (Win64)**, service name **`Apache2.4`**, root `C:\Apache24`, site config
-`conf\extra\meridian.conf`. `CENTRAL_DOMAIN=pitahc.gov.ph`, and `pitahc.gov.ph` itself is the agency
-website on a different machine — so **no wildcard, no subdomain workspaces, and no path-prefixed deploy**.
+`conf\extra\meridian.conf`. Since `D216`, `CENTRAL_DOMAIN=com.de` and `APP_URL=https://com.de`, and the
+workspace's `domains` row reads `iconnect` while its slug stays `staging`. So `iconnect.com.de` is the
+workspace, and `com.de`, someone else's website from outside, is the operator console, reached only on the
+box through its hosts file. That is `D46`'s arrangement kept, where `CENTRAL_DOMAIN=pitahc.gov.ph` and that
+name was the agency website on a different machine — so **no wildcard, no subdomain workspaces, and no
+path-prefixed deploy**. ⚠️ Every outbound workspace link takes its host from the `domains` label, never the
+slug (`TenantUrl`), so the label and the slug may differ, and on this box they do.
 App at `C:\meridian\test-app`, PHP 8.4.27 x64 NTS at `C:\php` (8.4.25 until 2026-10-22, when the box was patched by swapping that folder, every path unchanged) behind `php-cgi-9000`/`9001`, PostgreSQL 15
 + PostGIS, worker `meridian-test-worker`, scheduler `meridian-test-scheduler` (every minute). Nightly database backup `meridian-test-db-backup` (Task Scheduler, SYSTEM, 01:30), rebuilt per §8.2 step 12 on 2026-11-09 (`M216`, `D212`, `D213`). It runs `C:\meridian\nightly-backup.ps1`, a copy of `scripts/nightly-backup.ps1` kept outside the app tree, with `-OffBoxDir "\\192.168.1.119\MeridianBackup$"`. That is a hidden, encrypted share on `D:\MeridianBackup`, the user's always-on office desktop's own hard disk. The task keeps 30 dumps in `C:\meridian\backups\nightly\` and 30 on the share, and SYSTEM reaches the share with a credential saved in its own vault. The first run returned 0, and the copy's SHA-256 matched on both machines. It restored into a scratch database with no messages, and all 70 tables matched the live counts except the sessions that had expired since. The old task's definition is kept in `C:\meridian\meridian-test-db-backup.pre-M216.xml`. Its 14 `staging-*.dump` files stay in that folder: the new script prunes only its own `deploy-*.dump`. ⚠️ The desktop's address comes from DHCP (`backup-target-dhcp`), and a failed copy alerts no one (`R-91237328`).
 Main `ErrorLog` is `logs\error_log` — **no extension** — and the vhost writes
@@ -473,14 +488,17 @@ MDContactEmail        <operator address>
 MDCertificateAgreement accepted
 MDCAChallenges        tls-alpn-01
 MDPrivateKeys         secp256r1
-<MDomain staging.pitahc.gov.ph>
+<MDomain iconnect.com.de>
     MDMembers  manual
     MDRenewMode always
 </MDomain>
 ...
-SSLCertificateFile    "C:/Apache24/conf/certs/staging.pitahc.gov.ph-chain.pem"
-SSLCertificateKeyFile "C:/Apache24/conf/certs/staging.pitahc.gov.ph-key.pem"
+SSLCertificateFile    "C:/Apache24/conf/certs/iconnect.com.de-chain.pem"
+SSLCertificateKeyFile "C:/Apache24/conf/certs/iconnect.com.de-key.pem"
 ```
+
+Until `D216` the `<MDomain>` and the floor's files named `staging.pitahc.gov.ph`. **How the move was made**
+is the last subsection of §8.3; repeat it for any later change of name.
 
 ⛔ **Four traps govern this arrangement. Three of them take the site down or silently stop renewing, and
 each was paid for once already.**
@@ -512,7 +530,9 @@ each was paid for once already.**
 **The activation task, which is the answer to trap 4.**
 `scripts/activate-staged-cert.ps1` in this repository is the source of truth; it is installed on the box at
 `C:\meridian\activate-staged-cert.ps1` and registered as the scheduled task **`meridian-certificate-activate`**,
-daily at **03:20**, as **SYSTEM** at `runlevel=Highest`, `StartWhenAvailable`, ten-minute limit.
+daily at **03:20**, as **SYSTEM** at `runlevel=Highest`, `StartWhenAvailable`, ten-minute limit. Since `D216`
+the task's arguments name the domain, `-Domain iconnect.com.de`, so a change of name never depends on which
+copy of the script's default is installed.
 
 ```powershell
 # install/refresh the operational copy from the repository, then re-register if the task is absent
@@ -542,8 +562,10 @@ refused · `3` Apache restarted but the activation could not be proved — **che
 **What a renewal looks like when it works.** `mod_md` renews at roughly 30 days before expiry. The staged
 certificate lands in `md\staging\<domain>\`, the error log records
 `AH10059 … activated on next (graceful) server restart`, and the **next 03:20 task run** performs that
-restart and logs the new serial and expiry. The served leaf as of 2026-09-19 is serial `05F10E…53AE`, valid
-**2026-09-18 → 2026-12-17**, so the next renewal falls due around **2026-11-17**.
+restart and logs the new serial and expiry. The old name's leaf (as of 2026-09-19, serial `05F10E…53AE`, valid
+**2026-09-18 → 2026-12-17**) stopped mattering when `D216` removed its `<MDomain>`. `iconnect.com.de`'s first
+leaf was issued at the move (2026-11-12, serial `05C594…D6E0`, EC P-256 from Let's Encrypt `YE1`, valid until
+**2027-02-10**); `mod_md` renews it about 30 days before it expires.
 
 ⚠️ **`httpd -t` on this box no longer prints `AH00558`, and that is a change `M102` made rather than a fact
 it found.** `httpd.conf` now carries a global `ServerName localhost`, appended with a six-line comment giving
@@ -590,7 +612,7 @@ could not be proved by any gate this repository has, which is the same reason `R
 `.htaccess` arm. A response header can be: `scripts/staging-headers-judge.php` reads that one from outside, on
 the two static probes, every night. Why that header is there and the other three are not is in `AppSecurityHeaders`.
 
-⚠️ **Also on the box, unfiled against any step here:** a `*:80` vhost for `staging.pitahc.gov.ph` in
+⚠️ **Also on the box, unfiled against any step here:** a `*:80` vhost for the site's name in
 `conf\extra\httpd-vhosts.conf`, carrying a bare `Redirect permanent` to the `https://` origin and **no
 `Header` directive of its own**. `httpd.conf` carries an uncommented `Listen 80`, so there *is* a listener —
 the 21-second timeout measured from outside on 2026-09-19 was the agency firewall, not an absent server.
@@ -640,8 +662,8 @@ the `X-Robots-Tag` line in the same `*:443` vhost, and it is served on every res
 **host**-scoped rather than response-scoped — one response carrying it covers the origin, which is the
 property that separates it from the crawl header above and the reason it needed no per-path argument.
 
-⚠️ **THE SHORT `max-age` IS THE WHOLE POINT AND IS NOT A PLACEHOLDER TO BE TIDIED UP LATER.** On a
-`.gov.ph` name HSTS is a promise made to the **browser**, not to us: once sent, a failed certificate
+⚠️ **THE SHORT `max-age` IS THE WHOLE POINT AND IS NOT A PLACEHOLDER TO BE TIDIED UP LATER.** On this
+name HSTS is a promise made to the **browser**, not to us: once sent, a failed certificate
 renewal becomes a hard block with **no click-through**, for as long as the `max-age` says. This box's
 renewal has already failed eleven times in one day (`D49`) and rests on a scheduled task that has still
 never activated a genuinely renewed certificate. Five minutes buys the posture while bounding the blast
@@ -665,6 +687,47 @@ from outside on 2026-09-19 was the **agency firewall**, not an absent listener.
   while carrying it. `M106` replaced the map's values with a `separator` / `require` / `forbid` policy.
   **Read this before pricing any future header as one line.**
 
+#### Moving the testing site to a new name (`D216`)
+
+`D216` moved the site from `staging.pitahc.gov.ph` to `iconnect.com.de` on the same box. The order is what
+keeps it safe: the new name gets its certificate while the old one still serves, the switch is one `.env`
+edit and one `domains` value, and the old name goes last.
+
+1. **Outside the box.** The network team gives the new name a public address and forwards its 443 to the box,
+   with no source NAT. One `A` record for the name, DNS only. From outside, `nslookup <name>` returns that
+   address.
+2. **Alongside, with testers unaffected.**
+   - Hosts entries `127.0.0.1 <name>` and `127.0.0.1 <its central domain>`.
+   - A second `*:443` vhost, copied from the first, with `ServerName <name>` and the same `X-Robots-Tag`,
+     HSTS and BHW proxy lines. Its floor `SSLCertificateFile` points at the CURRENT certificate's files,
+     because a vhost with no floor serves a 503 (trap 2).
+   - A `<MDomain <name>>` beside the first.
+   - `httpd -t`, restart, wait for `AH10059`, then restart again (trap 4). At `D216` the line came ten
+     seconds after the first restart, and the second restart served the new leaf.
+   - ⚠️ Wrap any guarded block pasted into the box's console in `& { … }`. Pasted bare, it runs line by
+     line, so a `throw` prints and the next line still runs: at `D216` a block pasted twice restarted
+     Apache after every one of its guards had fired.
+   - From outside, `openssl s_client -connect <name>:443 -servername <name>` must show Let's Encrypt and the
+     new name.
+3. **The switch, inside one `artisan down --render=deploy-window` window.**
+   - Back up `.env`, then set `CENTRAL_DOMAIN` and `APP_URL`.
+   - Change the workspace's `domains` value.
+   - Run `config:cache`, `route:cache` (the console's `Route::domain` is baked into it), `view:cache`,
+     `event:cache` and `queue:restart`, then `artisan up`.
+   - BHW: set `NEXT_PUBLIC_SITE_URL` and `MERIDIAN_INTERNAL_URL` in `C:\meridian\bhw\.env`. Run
+     `deploy-bhw.ps1 -BuildOnly`, because a `NEXT_PUBLIC_` value is compiled in, then `deploy-bhw.ps1`.
+   - The activation task gets `-Domain <name>`.
+4. **The old name goes last.**
+   - Remove its vhost and `<MDomain>`.
+   - Copy the new certificate into `conf\certs\<name>-{chain,key}.pem` and point the floor there.
+   - Point the `*:80` vhost's redirect at the new name.
+   - Drop the old hosts entries.
+
+**Rollback before step 4:** restore the `.env` backup and run the same cache commands, set the `domains`
+value back, and run `deploy-bhw.ps1 -Rollback`. **Everyone signs in again after a move**, because the session
+cookie is host-only (`SESSION_DOMAIN=null`, §8.2 step 3). A guest's offline queue stays with the old origin, so
+testers send it before the switch.
+
 ### 8.4 A second application under the same host — BHW Connect (ADR-0024)
 
 **MEASURED ON THE BOX.** `M192` wrote this as a design, before anything was on the box. Each part has since
@@ -678,7 +741,7 @@ The decisions are `D172`–`D206` in `docs/claims/decisions.md`. The working agr
 developers is `docs/working-agreement.md`.
 
 **What it is.** BHW Connect — a second developer's Next.js 16 application — lives in this repository at
-`apps/bhw-connect/` and is served at **`https://staging.pitahc.gov.ph/bhw-connect`** (`D172`). Meridian
+`apps/bhw-connect/` and is served at **`https://iconnect.com.de/bhw-connect`** (`D172`; the host is `D216`'s). Meridian
 stays at the root and is unchanged by it. The trade that one address carries — BHW's pages share
 Meridian's origin, so Meridian's session cookie reaches them — is ADR-0024's, with its mitigations: a
 strict Content-Security-Policy on every BHW page (`apps/bhw-connect/lib/csp.ts`) and Meridian's API-key
@@ -714,8 +777,8 @@ The two services:
 
 **Sign-in** (`D178`, ADR-0024 §D5). BHW has no password of its own. Its server forwards the browser's
 `meridian-session` cookie to Meridian's `GET /api/v1/auth/whoami` at
-`MERIDIAN_INTERNAL_URL=https://staging.pitahc.gov.ph`. ⛔ That call relies on the box's hosts entry sending
-`staging.pitahc.gov.ph` to `127.0.0.1` (the box has no route back to its own public address), so the entry
+`MERIDIAN_INTERNAL_URL=https://iconnect.com.de`. ⛔ That call relies on the box's hosts entry sending
+`iconnect.com.de` to `127.0.0.1` (the box has no route back to its own public address), so the entry
 stays. Meridian answers only for an active, verified member of the workspace; BHW's `admin_users` decides who
 administers BHW. **Adding a BHW admin:** the person signs in to Meridian and opens
 `/api/v1/auth/whoami`, which shows their id; the operator then runs, as `bhw_app` on `bhw_connect`,

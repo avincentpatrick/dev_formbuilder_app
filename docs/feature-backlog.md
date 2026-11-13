@@ -10027,6 +10027,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   reach it. CI's E2E job has set it to the central origin since `I11b`, and the comment in
   `tests/e2e/global-setup.ts` saying otherwise is stale. **Latent.** — needs `APP_URL` to differ from the
   request's origin. Filed by `M96`. **Tier: during-testing.**
+  ⚠️ **Premise moved by `D216` (2026-11-12, `M235`):** on the testing site `APP_URL` is now `https://com.de`, which
+  differs from the workspace's origin `iconnect.com.de` by design, and which nobody here owns.
+  `app-url-fallback-third-party` covers where this redirect lands for a visitor.
 - ✅ **CLOSED BY `M109` (2026-09-25) — `minor` · ~~A deploy deletes the previous build's chunks, so an open tab can fail to load a script it needs.~~**
   Found by `M96` (2026-09-15) while verifying the deploy-window row. Every build empties `public/build`, so the
   hashed chunks the previous release served are gone once a deploy swaps the new build in. Inertia's version
@@ -10340,9 +10343,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   §4.1 also forbids per-tenant redirect URIs, since Google rejects wildcards and the workspace travels in the
   signed state. `D46`'s consequences name three `APP_URL`-derived links and not this one, and no row covers it.
   ⚠️ Derive the redirect and the failure bounce from the host that actually serves the app rather than from
-  `APP_URL`, register that one URI in the Google client, and say in §4.1 that sign-in is unavailable wherever
   `APP_URL` is not the app's own host. **Latent.** — needs the Google client id and secret to be configured, which
   the checklist leaves empty. Filed by `M98`. **Tier: before-launch.**
+  ⚠️ **Premise moved by `D216` (2026-11-12, `M235`):** the testing site's `APP_URL` is now `https://com.de`, a site
+  nobody here owns, rather than the agency's. The callback and the failure bounce would leave for that third party's
+  site. The defect and its remedy are unchanged; `app-url-fallback-third-party` covers the other redirects.
 - **`minor` · Making the repository private breaks the server's fetch, starts billing the CI minutes and may silently disarm the merge gate.**
   Found by `M98` (2026-09-17) while recording `D48`, which keeps the repository public with fake data through
   testing and private before any real data. Four obligations fall due before the flip. (1) The server has no
@@ -15990,6 +15995,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live** — an idle tab past the session expiry, or a dropped mobile connection, reaches it. Filed by `M234`. **Tier: during-testing.**
 
+- ✅ **CLOSED BY `M235` (2026-11-13) — ****`minor` · `iconnect-domain-move` — The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one.**
+  Found by `M235` (2026-11-12), at the user's request in chat: they bought `iconnect.com.de` in Cloudflare, and `D216` records how it replaces the old name.
+  - The Settings card's sign-up line is built from the workspace's slug and `tenancy.central_domain` (`AppSettingsPresenter`). On `D216`'s layout, `CENTRAL_DOMAIN=com.de` with the label `iconnect`, it would read `staging.com.de`, a host nothing serves.
+  - The nightly headers judge's `STAGING_HOST`, the activation script's `-Domain` default and BHW's two CI placeholders for `NEXT_PUBLIC_SITE_URL` name the old host.
+  - `docs/deployment-infrastructure.md` §8 and §8.3–§8.4 and `docs/working-agreement.md` describe the old host.
+  The remedy: build the sign-up line by the rule every outbound link uses (`TenantUrl::appHost()`), point the three at the new host, and write the move into the runbook. The box's half (the hosts entries, a second vhost and its certificate, the `.env` switch, the `domains` value, BHW's settings) is the operator's, in chat, in the sitting that merges this.
+
+  **Latent** — the card goes wrong only when the box switches. Filed by `M235`. **Tier: during-testing.**
+  ✅ **Closed by `M235` (2026-11-13), at the cutover sitting that merged it (PR #505, `39ff605e`):** the card's sign-up host comes from `TenantUrl::appHost()`, pinned by `BareDomainLayoutTest` (its mutation CAUGHT); the judge, the activation default and BHW's CI placeholders name `iconnect.com.de`; the runbook carries the move, the new leaf (serial `05C594…D6E0`, until 2027-02-10) and the box's pasted-block trap. The box half was done in chat the same night: `121.58.210.233`, its own leaf, `CENTRAL_DOMAIN=com.de`, the label `iconnect`, BHW rebuilt for its URL, the old name's vhost, `<MDomain>` and hosts entries removed, and the activation task given `-Domain iconnect.com.de` (a test run returned 0 on the new leaf).
+
+- **`nit` · `app-url-fallback-third-party` — On the `iconnect.com.de` layout, every fallback redirect to `APP_URL` sends the visitor to `https://com.de`, a site nobody here owns.**
+  Found by `M235` (2026-11-12). `D216` puts the operator console's central domain on `com.de`, which reaches the box only through its hosts file, as `D46` did with `pitahc.gov.ph`. From outside, `com.de` is another organisation's website, where `pitahc.gov.ph` was at least the agency's own.
+  - The redirects that reach it: `bootstrap/app.php`'s rendering of a failed identification (a host whose label names no workspace, the apex, a tenant page on a custom host), Google sign-in's failure bounce (`R-4c1eef27`), and the cross-origin case `R-aa783cba` describes.
+  - None fires for a tester on `iconnect.com.de` today: that label resolves, Google sign-in is off, and no custom domain is live. A host someone else points at the box, with a label that names no workspace, does reach it.
+  The remedy, when taken: send those fallbacks to the one workspace's own host when the deployment has exactly one, or answer them with a plain page rather than a redirect.
+
+  **Latent.** Filed by `M235`. **Tier: during-testing.**
+
 - ✅ **CLOSED BY `M236` (2026-11-12) — ****`minor` · `data-explorer` — A member cannot build their own chart over the workspace's data; `/analytics` answers a fixed set of questions with fixed cards.**
   Found by `M236` (2026-11-11), from the user's request: *"can you build a module in here separate from the built in cards where i can utilize all available data sources to do my own visual analysis like a powerbi or a tableau"*. `/analytics` lets a reader choose one of five axes and nothing else, and reaches `submissions` only.
 
@@ -16050,3 +16073,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Found by `M236` (2026-11-12). `DemoSeeder` builds the Patient Intake form without the personal flag on its name question. `AnswersSource` withholds every question flagged personal or sensitive in any version (ADR `0025-data-explorer.md` §D6), so on the demo workspace a reader can chart responses by patient name. The remedy, when taken: flag the question in the seeder, idempotently, so a reseed corrects an existing demo.
 
   **Not live** — demo data, with invented names. Filed by `M236`. **Tier: during-testing.**
+
+- **`nit` · `box-mail-ehlo-old-host` — The testing server's `MAIL_EHLO_DOMAIN` still names the old `pitahc.gov.ph` host after `D216`.**
+  Found by `M235` (2026-11-13), by the switch's own check of the box's `.env`, which listed every setting naming `pitahc` (names only) before changing `CENTRAL_DOMAIN` and `APP_URL`.
+  - `config/mail.php` sends it as the SMTP greeting's domain (`local_domain`). Unset, it would default to `APP_URL`'s host, which is now `com.de`, a host nobody here owns, so deleting the line is not the remedy either.
+  - Only the mail server reads it, and mail has gone out with it since `D46`.
+  The remedy, when taken: set it on the box to `iconnect.com.de`, then `config:cache` and `queue:restart`. The operator's, in chat.
+
+  **Live**, with no failure seen. Filed by `M235`. **Tier: during-testing.**

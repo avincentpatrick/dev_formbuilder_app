@@ -1,6 +1,5 @@
-import { AssistantChat } from "@/components/admin/assistant-chat";
+import { ProjectWorkspace } from "@/components/analysis/project-workspace";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
-import { getAdminUser } from "@/lib/db/require-admin";
 import { getGeoByCode } from "@/lib/db/geo";
 import { isDatasetScopeId } from "@/lib/ai/scope-id";
 import { meridianUrl } from "@/lib/meridian-url";
@@ -52,23 +51,26 @@ export default async function AskTheDataPage({
     typeof params.geoCode === "string" && params.geoCode.length <= 20
       ? await getGeoByCode(params.geoCode).catch(() => null)
       : null;
-  const admin = await getAdminUser();
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-8">
       <h1 className="text-xl font-semibold">Ask the Data</h1>
       <p className="text-sm text-muted">
         Explore dashboard data, document sources and their relationships. Answers include source
-        evidence and checked figures. Online research, attachments and saved projects will be added
-        in later phases.
+        evidence and checked figures. Conversations are saved as private projects. Online research
+        and attachments will be added in later phases.
       </p>
       {dataset && <p className="text-sm">Dashboard context: {dataset}</p>}
       {geo && <p className="text-sm">Starting place: {geo.geoName}</p>}
-      <AssistantChat
-        dataset={dataset}
-        initialScope={
-          geo ? { geoCode: geo.geoCode, geoLevel: geo.geoLevel, geoName: geo.geoName } : null
-        }
-        canReport={admin !== null}
+      <p className="break-all text-xs text-muted">Your sharing ID: {auth.user.id}</p>
+      <ProjectWorkspace
+        key={typeof params.projectId === "string" ? params.projectId : "new"}
+        projectId={typeof params.projectId === "string" ? params.projectId : undefined}
+        context={{
+          dataset,
+          carriedScope: geo
+            ? { geoCode: geo.geoCode, geoLevel: geo.geoLevel, geoName: geo.geoName }
+            : null,
+        }}
       />
     </section>
   );

@@ -3553,6 +3553,14 @@ export type Database = {
       };
     };
     Functions: {
+      analysis_project_api: {
+        Args: { p_actor: string; p_operation: string; p_project?: string; p_payload?: Json };
+        Returns: Json;
+      };
+      analysis_worker_api: {
+        Args: { p_operation: string; p_job?: string; p_lease?: string; p_payload?: Json };
+        Returns: Json;
+      };
       district_dataset_gaps: {
         Args: never;
         Returns: {

@@ -3553,6 +3553,14 @@ export type Database = {
       };
     };
     Functions: {
+      analysis_source_api: {
+        Args: { p_actor: string; p_project: string; p_operation: string; p_payload?: Json };
+        Returns: Json;
+      };
+      analysis_source_worker_api: {
+        Args: { p_operation: string; p_source?: string; p_lease?: string; p_payload?: Json };
+        Returns: Json;
+      };
       analysis_project_api: {
         Args: { p_actor: string; p_operation: string; p_project?: string; p_payload?: Json };
         Returns: Json;

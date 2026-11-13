@@ -30,3 +30,20 @@ describe("analysis usage and cost estimates", () => {
     expect(summariseUsage([]).estimatedCostUsd).toBeNull();
   });
 });
+
+it("keeps request-priced search costs unknown until a matching rate is configured", () => {
+  const calls: ProviderUse[] = [
+    {
+      provider: "brave-search",
+      model: "web-v1",
+      billingUnit: "request",
+      inputTokens: null,
+      outputTokens: null,
+    },
+  ];
+  expect(summariseUsage(calls).estimatedCostUsd).toBeNull();
+  expect(
+    summariseUsage(calls, JSON.stringify({ "brave-search/web-v1": { perRequest: 0.001 } }))
+      .estimatedCostUsd,
+  ).toBe(0.001);
+});

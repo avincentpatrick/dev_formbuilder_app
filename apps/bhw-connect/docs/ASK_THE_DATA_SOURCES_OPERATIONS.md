@@ -1,0 +1,49 @@
+# Ask the Data sources and research operations
+
+Phase 3 adds project-private originals, extraction and source-aware tools to Phase 2's saved projects. Approved users retain the shared dashboard catalogue; attachments and retrieved web copies remain inside their project permissions. No anonymous Ask the Data endpoint is restored. Reproducible statistical execution, new map analysis, reports and presentation export remain Phases 4–6.
+
+## Install and storage
+
+Apply additive migration `20261113090000_analysis_sources.sql` through the existing BHW migration runner. It enables RLS, denies public/anonymous/authenticated table and RPC access, and grants the service role only. Server handlers derive the actor from fresh approved Meridian access; each RPC checks project ownership/membership again. Administrators cannot read other users' unshared files. Viewers read/download; editors and owners attach, document definitions, retry and delete.
+
+The existing separate Node 24 worker service is required: see [worker operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Each worker pass cleans deleted originals, processes one queued source, or claims an analysis. Uploads do not depend on an open browser. Sources have leased attempts and fenced publication; revoked editors cannot publish extraction. Source jobs currently run before analysis jobs, so a sustained upload backlog can delay analyses. Add scheduling fairness if observed usage warrants it.
+
+Originals are stored under `BHW_STORAGE_DIR/analysis-projects/<project UUID>/<source UUID>.bin`, outside public assets; the default development root is `.local-storage`. Downloads require approved project access, use attachment/octet-stream/no-store headers and verify SHA-256. Originals are immutable and extraction/preparation records live in PostgreSQL. A changed original produces a different source ID/hash. Deduplication is project-scoped, never a cross-project lookup. Treat filenames and extracted text as private content.
+
+**Operator release prerequisites:** back up this private storage directory together with the database; restrict its filesystem ACL to the BHW service/backup accounts; check free space and restoration. Existing screenshot-only backup assumptions are insufficient. Confirm the active backup retention (documented server default: 14 nightly copies), and respect deletion tombstones when restoring. Refresh the committed development schema copy through the established dev-copy workflow after deployment. This change does not edit shared `ops/` or `.github/` infrastructure.
+
+`npm run build` now runs `scripts/build-analysis-extractor.mjs` after Next's build, placing `analysis-extractor.mjs` in standalone output. Release packaging must preserve that sidecar, the traced `unpdf` and `exceljs` dependencies, and the existing worker script. The web process launches the sidecar with its own Node executable, a 512 MiB heap limit and a 90-second timeout. It receives file paths and CRS settings as arguments, never provider credentials. This is bounded parser isolation, not an OS sandbox for arbitrary code. No generated/user-authored code is executed.
+
+## Supported extraction and preparation
+
+CSV, XLSX, PDF, DOCX, PPTX, GeoJSON and a zipped SHP/SHX/DBF set are parsed directly. Shapefiles also need PRJ or a supplied CRS override. Coordinates are normalized to WGS84 with recorded preparation; basic coordinate/ring checks are not full geographic topology validation. Phase 3 reads geographic attributes/evidence; it does not implement Phase 5 spatial analysis.
+
+Optional server-owned `BHW_OFFICE_CONVERTER` is the absolute path to a trusted LibreOffice executable for legacy DOC/PPT/XLS. Conversion uses a fresh temporary profile, disables macros and has a 60-second timeout. Do not enable it without testing the actual converter version/service account on the Windows host. Conversion may recalculate spreadsheet formulas; this is labelled in preparation notes and originals remain downloadable. Without the converter, legacy formats are explicitly blocked rather than treated as analyzed. Encrypted/malformed content is reported as blocked. No OCR is installed: scanned images and figures are not interpreted; blank PDF pages and text-only limitations are disclosed.
+
+Operational processing bounds are 25 MiB per upload, 64 MiB expanded archives, 2,000 archive entries, two million table cells, two million text characters and 64 MiB extracted JSON. Path traversal and macro-bearing Office archives are rejected. These are execution bounds, not per-user message quotas or spending caps. Large/unreadable sources are labelled, never silently represented as fully analyzed.
+
+Preparation trims surrounding whitespace, makes blank cells null and converts unambiguous numeric measurements. Codes/leading zeros and ambiguous dates are preserved. Duplicate rows are retained and flagged, as are category capitalization and possible mixed units. XLSX reads cached formula results without evaluating formulas. Document/slide extraction provides text evidence, not faithful reconstruction of every table, image or layout. Originals and preparation notes support review and re-extraction.
+
+The private source viewer shows extracted pages and a labelled 20-row table preview. Retrieval/table tools identify selected excerpts or truncated previews; a preview is not an exact aggregate. Whole-table reproducible statistics belong in Phase 4.
+
+## Online research and source grounding
+
+Optional `BHW_WEB_SEARCH_API_KEY` enables Brave Web Search. This is server-owned; do not put it in public settings, uploads, chat or logs. No subscription was purchased or credentials configured by this implementation. Without it, search reports unavailable; explicitly supplied public HTTPS URLs can still be retrieved. Current paid search and the target host's outbound network/proxy access need operator verification before announcing automatic search as operational.
+
+The assistant may search automatically when useful and read URLs returned by search or explicitly included in the user's latest question. Uploaded-page instructions cannot authorize arbitrary tool navigation or change project access. Search uses the public question/topic; the assistant is instructed not to send private attachment text or identifiers to search. Search snippets are labelled unread and are not represented as retrieved page evidence.
+
+Retrieval accepts public HTTPS on port 443 only. Each DNS answer/redirect is checked, validated addresses are pinned for the HTTPS connection, original TLS hostname/certificate checking is preserved, and local/private/metadata destinations are rejected. Standard HTTPS/HTTP proxy and NO_PROXY settings are honored. No session cookies or application keys are forwarded; the search credential is limited to the exact search API origin. Downloads have redirect, timeout and decompressed-size bounds. HTML/text/PDF originals are saved privately and extracted before being cited. Login-only, blocked or unreadable pages are reported honestly.
+
+Source records carry URL, publisher/retrieval timestamp, original hash, derived extraction hash, locations and any publisher-stated date. Unknown reporting periods are not inferred from publication dates. Citation excerpts/versions are captured per analysis; re-extraction can change the current viewer, which warns when the requested cited version differs. The original hash remains available for verification.
+
+Project graph context adds observed columns, source lineage, definitions and inferred aliases while retaining existing curated catalogue/graph tools. Inferred hints are labelled; they are not source definitions. No private upload is promoted into the global graph. Shared knowledge still requires the existing explicit administrator curation workflow; this phase adds no automatic promotion or global upload index.
+
+Source comparison tools inspect documented grain, units, periods, boundary versions and unique join keys, retain separate fields in aligned previews, and flag conflicting values. Missing definitions require qualification or clarification. Dashboard snapshot dates are not assumed to be reporting periods. The assistant explains incompatible measures rather than silently pooling them. This is source alignment context, not a substitute for Phase 4 statistical validation.
+
+## Usage, deletion and release checks
+
+Search request usage joins Phase 2 attempt accounting. Optional `BHW_AI_PRICES_JSON` can include `"brave-search/web-v1":{"perRequest":0.001}`; that is an illustrative rate, not a vendor price. Set current contracted prices only. Missing rates remain unknown. The budget remains undecided and no per-user quotas were added.
+
+Deleting a source immediately scrubs its extracted content/metadata/URL/provenance, cancels queued/running project analyses and invalidates saved result JSON that references its source ID. Other saved runs retain their own evidence. Project deletion scrubs all source rows through a trigger. Both APIs remove raw originals immediately where possible; worker housekeeping retries failed physical deletions. Tombstones deny downloads even before disk cleanup completes. Backup copies expire under backup policy; deletion cannot rewrite existing backups.
+
+Before release, verify uploads, byte-identical private downloads, viewer/editor/owner permissions, revocation, project isolation, source/result invalidation, physical cleanup, extraction statuses and mobile review. Confirm the packaged extractor works from the release directory, including PDF/Excel. Test source extraction after browser closure and interrupted lease recovery. Real paid search, optional legacy Office conversion, filesystem ACL/backups and target Windows worker restart remain operator checks. Local synthetic tests are not evidence of those production steps.

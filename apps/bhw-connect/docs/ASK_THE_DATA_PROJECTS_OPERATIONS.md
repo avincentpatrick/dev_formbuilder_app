@@ -1,5 +1,7 @@
 # Ask the Data projects and worker operations
 
+This document describes the Phase 2 foundation. Phase 3 extends it with files and research; see [source operations](ASK_THE_DATA_SOURCES_OPERATIONS.md).
+
 Phase 2 adds private saved projects, owner-managed viewer/editor sharing, durable analysis jobs, attempt-level usage records, and protected JSON analysis records. It does not add uploads, online research, new statistical methods, or publication exports.
 
 ## Storage and authorization
@@ -10,7 +12,7 @@ Questions are saved when submitted. The worker stores the answer, sources, figur
 
 Owners manage sharing and deletion, editors add analyses and rename, and viewers read/download. Sharing is limited to approved users by their sharing ID. Revocation/unsharing is checked again by the database before claiming a job, on worker heartbeats, on publication, and on each API/download request. Cancellation discards results; an already-started provider request may finish and incur charges. Old worker leases cannot publish after replacement, cancellation or deletion.
 
-Deleting a project immediately denies all further project/result access and removes active conversation text, state, evidence, results, memberships and usage records. A minimal deleted-project/job tombstone remains for durable-job fencing and audit integrity. There are no user-uploaded files or private disk artifacts in this phase. Phase 3 must connect file/index deletion to this same lifecycle when attachments are introduced. Existing database backup retention still applies: deletion does not rewrite prior backups. The documented server default is 14 nightly backups; the operator must confirm the active retention configuration. Restoration must respect deleted-project tombstones and must not reopen deleted content to users.
+Deleting a project immediately denies all further project/result access and removes active conversation text, state, evidence, results, memberships and usage records. A minimal deleted-project/job tombstone remains for durable-job fencing and audit integrity. The Phase 2 implementation had no private disk artifacts. Phase 3 now connects attachment/index deletion and private original cleanup to this lifecycle; see source operations. Existing database backup retention still applies: deletion does not rewrite prior backups. The documented server default is 14 nightly backups; the operator must confirm the active retention configuration. Restoration must respect deleted-project tombstones and must not reopen deleted content to users.
 
 ## Run the separate worker service
 
@@ -40,7 +42,7 @@ Optional server-owned `BHW_AI_PRICES_JSON` maps exact `provider/model` IDs to US
 {"provider/exact-model-id":{"inputPerMillion":1,"outputPerMillion":2}}
 ```
 
-These example prices are not real provider prices. Set rates only from the chosen plan's current prices. If the model/rate/token counts are unavailable or invalid, the estimate is null and the UI says cost unavailable. The download contains all attempt records. Estimates do not replace provider invoices or include external-service fees; the monthly operating budget remains undecided.
+These example prices are not real provider prices. Set rates only from the chosen plan's current prices. If the model/rate/token counts are unavailable or invalid, the estimate is null and the UI says cost unavailable. The download contains all attempt records. Estimates do not replace provider invoices or include unrecorded external-service fees; the monthly operating budget remains undecided.
 
 ## Release verification
 

@@ -51,6 +51,7 @@ export async function getDocChunk(chunkId: number, approvedOnly = false): Promis
       status: string;
     } | null;
     if (!source || (approvedOnly && source.status !== "approved")) return null;
+    if (source.key.startsWith("upload:") && !(await getStrictAdminUser())) return null;
 
     return {
       chunkId: data.chunk_id,

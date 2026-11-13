@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-const { row } = vi.hoisted(() => ({ row: { status: "approved" } }));
+const { row } = vi.hoisted(() => ({ row: { status: "approved", key: "synthetic" } }));
+vi.mock("./require-admin", () => ({ getStrictAdminUser: async () => null }));
 vi.mock("./service-client", () => ({
   createSupabaseServiceClient: () => ({
     from: () => ({
@@ -8,7 +9,7 @@ vi.mock("./service-client", () => ({
           maybeSingle: async () => ({
             data: {
               chunk_id: 1,
-              doc_source: { key: "synthetic", title: "Synthetic document", status: row.status },
+              doc_source: { key: row.key, title: "Synthetic document", status: row.status },
             },
           }),
         }),
@@ -27,4 +28,10 @@ describe("analyst source visibility", () => {
     expect(await getDocChunk(1, true)).toBeNull();
     expect((await getDocChunk(1))?.document).toBe("synthetic");
   });
+});
+
+it("denies an uploaded library citation to an approved non-admin", async () => {
+  row.status = "approved"; row.key = "upload:11111111-1111-4111-8111-111111111111";
+  expect(await getDocChunk(1, true)).toBeNull();
+  row.key = "synthetic";
 });

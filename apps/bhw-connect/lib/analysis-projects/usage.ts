@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { ProviderCompletion } from "@/lib/ai/providers/types";
 export type ProviderUse = {
   provider: string;
+  billingUnit?: "tokens" | "request";
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -17,7 +18,10 @@ export function observeProviderUse(provider: string, completion: ProviderComplet
   });
 }
 export function summariseUsage(calls: ProviderUse[], pricesText = process.env.BHW_AI_PRICES_JSON) {
-  let prices: Record<string, { inputPerMillion: number; outputPerMillion: number }> = {};
+  let prices: Record<
+    string,
+    { inputPerMillion?: number; outputPerMillion?: number; perRequest?: number }
+  > = {};
   try {
     prices = JSON.parse(pricesText ?? "{}");
   } catch {
@@ -27,8 +31,21 @@ export function summariseUsage(calls: ProviderUse[], pricesText = process.env.BH
   let known = calls.length > 0;
   for (const c of calls) {
     const p = prices?.[`${c.provider}/${c.model}`];
+    if (c.billingUnit === "request") {
+      if (
+        p &&
+        typeof p.perRequest === "number" &&
+        Number.isFinite(p.perRequest) &&
+        p.perRequest >= 0
+      )
+        cost += p.perRequest;
+      else known = false;
+      continue;
+    }
     if (
       !p ||
+      typeof p.inputPerMillion !== "number" ||
+      typeof p.outputPerMillion !== "number" ||
       c.inputTokens === null ||
       c.outputTokens === null ||
       !Number.isFinite(p.inputPerMillion) ||
@@ -46,7 +63,7 @@ export function summariseUsage(calls: ProviderUse[], pricesText = process.env.BH
     calls,
     estimatedCostUsd: known ? cost : null,
     note: known
-      ? "Estimate using configured model prices; excludes external service charges."
+      ? "Estimate using configured provider prices; excludes unrecorded hosting and other service charges."
       : "Cost unavailable: provider usage or matching model prices are missing. This does not mean usage is free.",
   };
 }

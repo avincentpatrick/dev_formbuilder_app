@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { SourcePanel } from "./source-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withBasePath } from "@/lib/base-path";
 import { AnswerMarkdown } from "@/components/admin/answer-markdown";
@@ -152,6 +153,23 @@ export function ProjectWorkspace({
         ))}
       </nav>
       {error && <p role="alert">{error}</p>}
+      {!activeId && !deleted && (
+        <button
+          disabled={busy}
+          className="rounded border border-border p-2"
+          onClick={() => {
+            setBusy(true);
+            createKey.current ??= crypto.randomUUID();
+            void api({ operation: "create", requestId: createKey.current, context })
+              .then((created) => setActiveId(created.id))
+              .catch((e) => setError(e.message))
+              .finally(() => setBusy(false));
+          }}
+        >
+          Create a project to attach files
+        </button>
+      )}
+      {project && !deleted && <SourcePanel projectId={project.id} canEdit={canEdit} />}
       {deleted ? (
         <p role="status">
           Project deleted. Its active content and results have been removed. Backup copies expire
@@ -315,13 +333,41 @@ export function ProjectWorkspace({
                           <details key={i}>
                             <summary>Source passages</summary>
                             {(
-                              e.citations as Array<{ chunkId: number; label: string; text: string }>
+                              e.citations as Array<{
+                                chunkId: number;
+                                sourceId?: string;
+                                sourceKind?: string;
+                                url?: string;
+                                asOf?: string;
+                                retrievedAt?: string;
+                                derivedHash?: string;
+                                label: string;
+                                text: string;
+                              }>
                             ).map((citation) => (
                               <div key={citation.chunkId} className="my-3 text-sm">
                                 <p className="font-medium">{citation.label}</p>
+                                {citation.sourceId && (
+                                  <p className="text-xs text-muted">
+                                    {citation.sourceKind === "web"
+                                      ? "Online evidence"
+                                      : "Project attachment"}{" "}
+                                    · Reporting period: {citation.asOf ?? "not documented"} ·
+                                    Retrieved/stored: {citation.retrievedAt ?? "not recorded"}
+                                  </p>
+                                )}
+                                {citation.url && (
+                                  <a href={citation.url} className="break-all text-xs underline">
+                                    Original online location
+                                  </a>
+                                )}
                                 <p className="whitespace-pre-wrap">{citation.text}</p>
                                 <Link
-                                  href={`/ask-the-data/source/${citation.chunkId}`}
+                                  href={
+                                    citation.sourceId
+                                      ? `/ask-the-data/projects/${project.id}/sources/${citation.sourceId}?version=${citation.derivedHash ?? ""}`
+                                      : `/ask-the-data/source/${citation.chunkId}`
+                                  }
                                   className="underline"
                                 >
                                   Read source

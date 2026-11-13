@@ -1,6 +1,6 @@
 # Unified Ask the Data phased build plan
 
-**Status:** Phase 0 merged in PR #509. Phase 1 merged in PR #510. Phase 2 is implemented and locally verified on 2026-11-12 in PR #511; server worker setup is a release prerequisite. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
+**Status:** Phase 0 merged in PR #509. Phase 1 merged in PR #510. Phase 2 merged in PR #511 on 2026-11-13; server worker setup remains a release prerequisite. Phase 3 is implemented and locally verified, pending PR checks and target-host setup. See [Phase 0 technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) for the component inventory, architecture, method matrix, WPSAR checklist, fixtures, and deployment gates.
 **Owner decisions recorded:** 2026-11-07.
 **Application:** BHW Connect, under `apps/bhw-connect/`.
 
@@ -196,8 +196,8 @@ Ask the owner necessary questions one at a time. Do not reopen confirmed choices
 | --- | --- | --- |
 | 0 — Foundations and design | Design complete, 2026-11-12 | [Technical design](ASK_THE_DATA_PHASE_0_DESIGN.md) and [synthetic acceptance fixtures](fixtures/ask-the-data-phase-0.json). Code/source inspection complete; runtime and deployment unverified. |
 | 1 — Approved access and unified workspace | Merged, PR #510 | Separate approval/admin controls, shared protected chat APIs, public-chat removal, source viewer and context-aware navigation. See the Phase 1 entry below. |
-| 2 — Projects, sharing, and jobs | Locally verified; PR #511 | Private projects, sharing, durable queue, result downloads and attempt usage. See [operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Target-server worker setup remains required. |
-| 3 — Sources, files, and graph | Not started | — |
+| 2 — Projects, sharing, and jobs | Merged; PR #511 | Private projects, sharing, durable queue, result downloads and attempt usage. See [operations](ASK_THE_DATA_PROJECTS_OPERATIONS.md). Target-server worker setup remains required. |
+| 3 — Sources, files, and graph | Locally verified; PR pending | Private originals, extraction/preparation, source graph/alignment, optional automatic web search/retrieval. See [source operations](ASK_THE_DATA_SOURCES_OPERATIONS.md). Target-host gates remain open. |
 | 4 — Statistics and narrative | Not started | — |
 | 5 — Geographic analysis | Not started | — |
 | 6 — Reports and presentations | Not started | — |
@@ -231,3 +231,16 @@ Focused database/API/usage tests passed. Full local lint/typecheck and the synth
 Local Phase 2 evidence: lint and typecheck passed; the synthetic-PostgreSQL suite passed with 1,757 tests and 11 skips before the final JSON-media-type coverage addition. Migration lint and both production configurations passed. The standalone worker script is present and passes Node syntax checking. Browser tests verified project autosave/reopen, owner/viewer/editor permissions, private-project denial, cancellation, unsharing, deletion, stored narrative rendering, and authorized versus unauthorized result downloads. The actual bundled Node worker processed a queued job after the browser page closed; without AI keys it saved a retryable capacity failure and an unknown-cost usage record. Successful result rendering/download used an explicitly synthetic database fixture, not a live provider claim. Expired-lease recovery and stale-worker publication rejection passed deterministic PostgreSQL tests. Runtime browser testing used synthetic whoami identities and made-up data only.
 
 PR #511 contains the complete reviewable change. Required CI must pass before merge. Target Windows service installation, live-provider execution and target-host recovery remain unverified; the operator action is to run the bundled worker service with the existing BHW environment and CRON_SECRET before release. No Phase 3 implementation has begun.
+
+
+### 2026-11-13 — Phase 3 sources and research implementation
+
+Merged Phase 2 PR #511 after required CI passed. Added project-private originals, queued bounded child-process extraction, protected original/evidence viewing, SHA-256 provenance, extraction versions, preparation notes and source definitions. CSV/XLSX/PDF/DOCX/PPTX/GeoJSON and zipped shapefiles have direct parsers; legacy DOC/PPT/XLS require an optional tested LibreOffice binary. Unreadable/encrypted files, missing CRS, absent converter and scanned text limitations remain explicit. There is no OCR claim.
+
+Added automatic optional Brave search and public HTTPS retrieval with DNS/address pinning, redirect checks, proxy support and private saved originals. Search snippets remain unread until page extraction succeeds. Source tools are bound to the saved project's actor and permissions. Private evidence is not promoted to the shared graph. Local graph hints/lineage and dataset/source comparison check documented grain, periods, units, denominators, boundary versions, unique join keys and conflicting values. Table previews are labelled; full reproducible statistical computation remains Phase 4.
+
+Source deletion scrubs content/definitions/provenance, invalidates dependent saved results, fences current analyses and removes original files with worker cleanup retries. Project deletion covers every source. Search request accounting supports optional configured per-request prices; missing rates are unknown, with no new per-user quota.
+
+Local verification: full synthetic PostgreSQL suite passed with 1,782 tests and 11 skips before the final denominator comparison fixture; lint/typecheck, migration lint and both production build configurations passed. Browser checks verified uploads through the packaged extractor (CSV, DOCX, PPTX, GeoJSON, PDF and XLSX), honest blocking without the legacy converter, byte-identical downloads, private project isolation, viewer/editor permissions, unsharing, source review on a phone-sized screen and physical source/project deletion. The separate bundled worker processed extraction independently of browser requests. Anonymous page/API regression passed. A real public W3C PDF retrieval through the configured proxy passed; paid Brave search and live AI orchestration were not exercised. Final CI evidence belongs in the PR.
+
+Release gates: operator must install/verify the Phase 2 Windows worker, retain the new extractor sidecar/dependencies, back up and restrict the private originals directory, configure/test search if desired, and test legacy Office conversion before enabling it. Refresh the schema dev copy after deployed migration. No shared infrastructure, subscription or production configuration was changed. Phase 3 is not claimed deployed/operationally complete. Phase 4 has not started.

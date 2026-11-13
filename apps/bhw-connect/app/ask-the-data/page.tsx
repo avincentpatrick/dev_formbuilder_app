@@ -56,8 +56,9 @@ export default async function AskTheDataPage({
       <h1 className="text-xl font-semibold">Ask the Data</h1>
       <p className="text-sm text-muted">
         Explore dashboard data, document sources and their relationships. Answers include source
-        evidence and checked figures. Conversations are saved as private projects. Online research
-        and attachments will be added in later phases.
+        evidence and checked figures. Conversations are saved as private projects. Relevant
+        attachments and online evidence can be included. Source availability and preparation notes
+        are shown in the project.
       </p>
       {dataset && <p className="text-sm">Dashboard context: {dataset}</p>}
       {geo && <p className="text-sm">Starting place: {geo.geoName}</p>}

@@ -5,6 +5,10 @@ vi.mock("@/lib/ai/analysis-chat", () => ({
   analysisInputSchema: { parse: (v: unknown) => v },
   analysisResponse: execute,
 }));
+vi.mock("@/lib/analysis-sources/process", () => ({
+  cleanupDeletedSources: vi.fn(),
+  processNextSource: vi.fn(async () => false),
+}));
 const { POST } = await import("./route");
 const ask = (secret?: string) =>
   new Request("http://localhost/api/analysis/worker", {

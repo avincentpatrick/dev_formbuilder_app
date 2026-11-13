@@ -57,13 +57,18 @@ export async function runToolLoop(
   initialMessages: ChatMessage[],
   onToolCall?: (event: ToolCallEvent) => void,
   tools: Tool[] = TOOLS,
+  options?: { maxRounds: number },
 ): Promise<ToolLoopResult> {
   const toolDefinitions = tools.map((tool) => tool.definition);
   const messages: ChatMessage[] = [...initialMessages];
   const toolPayloads: unknown[] = [];
   let providerUsed: ProviderId | null = null;
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  for (
+    let round = 0;
+    round < Math.min(12, Math.max(1, options?.maxRounds ?? MAX_TOOL_ROUNDS));
+    round++
+  ) {
     const result = await completeWithCascade(messages, toolDefinitions);
     if (result.allCapped) return { finalText: null, toolPayloads, provider: null, allCapped: true };
 

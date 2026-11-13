@@ -1,3 +1,5 @@
+import { cleanupDeletedSources, processNextSource } from "@/lib/analysis-sources/process";
+import { createProjectSourceTools } from "@/lib/analysis-sources/tools";
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { analysisInputSchema, analysisResponse } from "@/lib/ai/analysis-chat";
@@ -11,8 +13,12 @@ export async function POST(request: Request) {
   const supplied = Buffer.from(request.headers.get("authorization") ?? "");
   if (!secret || expected.length !== supplied.length || !timingSafeEqual(expected, supplied))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await cleanupDeletedSources();
+  if (await processNextSource()) return NextResponse.json({ worked: true });
   const claimed = (await workerCall("claim")) as {
     id: string;
+    project_id: string;
+    actor_id: string;
     lease_id: string;
     input: unknown;
   } | null;
@@ -50,6 +56,11 @@ export async function POST(request: Request) {
           progress =
             event.type === "tool_call" ? "Looking up data and sources" : "Composing the answer";
         },
+        createProjectSourceTools(
+          claimed.actor_id,
+          claimed.project_id,
+          input.messages.filter((m) => m.role === "user").at(-1)?.content ?? "",
+        ),
       );
       return response.text();
     });

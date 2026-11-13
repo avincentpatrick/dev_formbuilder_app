@@ -21,6 +21,19 @@ test("Ask the Data has no anonymous page or API answering path", async ({
     expect(response.status()).toBe(401);
     expect(await response.json()).toEqual({ error: "Approved dashboard access required." });
   }
+  const projectId = "00000000-0000-4000-8000-000000000001";
+  const sourceUrl = new URL(`api/analysis/sources?projectId=${projectId}`, baseURL!).toString();
+  expect((await request.get(sourceUrl)).status()).toBe(401);
+  expect((await request.post(sourceUrl, { data: "synthetic" })).status()).toBe(401);
+  expect(
+    (
+      await request.get(
+        new URL(`api/analysis/sources/${projectId}?projectId=${projectId}`, baseURL!).toString(),
+      )
+    ).status(),
+  ).toBe(401);
+  await page.goto(`ask-the-data/projects/${projectId}/sources/${projectId}`);
+  await expect(page).toHaveURL(/ask-the-data$/);
   await page.goto("ask-the-data/source/1");
   await expect(page).toHaveURL(/ask-the-data$/);
   await expect(page.getByRole("textbox")).toHaveCount(0);

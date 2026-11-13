@@ -1,3 +1,4 @@
+import { deleteOriginal } from "@/lib/analysis-sources/storage";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
@@ -71,9 +72,10 @@ async function handle(request?: Request) {
       return NextResponse.json({ error: "Invalid project request." }, { status: 400, headers });
     const input = parsed.data;
     const projectId = "projectId" in input ? input.projectId : undefined;
-    return NextResponse.json(await projectCall(auth.user.id, input.operation, projectId, input), {
-      headers,
-    });
+    const result = await projectCall(auth.user.id, input.operation, projectId, input);
+    if (input.operation === "delete" && projectId)
+      await deleteOriginal(projectId).catch(() => undefined);
+    return NextResponse.json(result, { headers });
   } catch (error) {
     const code = (error as { code?: string }).code;
     const status = code === "42501" ? 403 : code === "40001" ? 409 : code === "22023" ? 400 : 503;

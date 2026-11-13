@@ -15995,7 +15995,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live** — an idle tab past the session expiry, or a dropped mobile connection, reaches it. Filed by `M234`. **Tier: during-testing.**
 
-- **`minor` · `iconnect-domain-move` — The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one.**
+- ✅ **CLOSED BY `M235` (2026-11-13) — ****`minor` · `iconnect-domain-move` — The testing site moves from `staging.pitahc.gov.ph` to `iconnect.com.de`, and four things in the repository name the old host or would name a wrong one.**
   Found by `M235` (2026-11-12), at the user's request in chat: they bought `iconnect.com.de` in Cloudflare, and `D216` records how it replaces the old name.
   - The Settings card's sign-up line is built from the workspace's slug and `tenancy.central_domain` (`AppSettingsPresenter`). On `D216`'s layout, `CENTRAL_DOMAIN=com.de` with the label `iconnect`, it would read `staging.com.de`, a host nothing serves.
   - The nightly headers judge's `STAGING_HOST`, the activation script's `-Domain` default and BHW's two CI placeholders for `NEXT_PUBLIC_SITE_URL` name the old host.
@@ -16003,6 +16003,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy: build the sign-up line by the rule every outbound link uses (`TenantUrl::appHost()`), point the three at the new host, and write the move into the runbook. The box's half (the hosts entries, a second vhost and its certificate, the `.env` switch, the `domains` value, BHW's settings) is the operator's, in chat, in the sitting that merges this.
 
   **Latent** — the card goes wrong only when the box switches. Filed by `M235`. **Tier: during-testing.**
+  ✅ **Closed by `M235` (2026-11-13), at the cutover sitting that merged it (PR #505, `39ff605e`):** the card's sign-up host comes from `TenantUrl::appHost()`, pinned by `BareDomainLayoutTest` (its mutation CAUGHT); the judge, the activation default and BHW's CI placeholders name `iconnect.com.de`; the runbook carries the move, the new leaf (serial `05C594…D6E0`, until 2027-02-10) and the box's pasted-block trap. The box half was done in chat the same night: `121.58.210.233`, its own leaf, `CENTRAL_DOMAIN=com.de`, the label `iconnect`, BHW rebuilt for its URL, the old name's vhost, `<MDomain>` and hosts entries removed, and the activation task given `-Domain iconnect.com.de` (a test run returned 0 on the new leaf).
 
 - **`nit` · `app-url-fallback-third-party` — On the `iconnect.com.de` layout, every fallback redirect to `APP_URL` sends the visitor to `https://com.de`, a site nobody here owns.**
   Found by `M235` (2026-11-12). `D216` puts the operator console's central domain on `com.de`, which reaches the box only through its hosts file, as `D46` did with `pitahc.gov.ph`. From outside, `com.de` is another organisation's website, where `pitahc.gov.ph` was at least the agency's own.
@@ -16072,3 +16073,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Found by `M236` (2026-11-12). `DemoSeeder` builds the Patient Intake form without the personal flag on its name question. `AnswersSource` withholds every question flagged personal or sensitive in any version (ADR `0025-data-explorer.md` §D6), so on the demo workspace a reader can chart responses by patient name. The remedy, when taken: flag the question in the seeder, idempotently, so a reseed corrects an existing demo.
 
   **Not live** — demo data, with invented names. Filed by `M236`. **Tier: during-testing.**
+
+- **`nit` · `box-mail-ehlo-old-host` — The testing server's `MAIL_EHLO_DOMAIN` still names the old `pitahc.gov.ph` host after `D216`.**
+  Found by `M235` (2026-11-13), by the switch's own check of the box's `.env`, which listed every setting naming `pitahc` (names only) before changing `CENTRAL_DOMAIN` and `APP_URL`.
+  - `config/mail.php` sends it as the SMTP greeting's domain (`local_domain`). Unset, it would default to `APP_URL`'s host, which is now `com.de`, a host nobody here owns, so deleting the line is not the remedy either.
+  - Only the mail server reads it, and mail has gone out with it since `D46`.
+  The remedy, when taken: set it on the box to `iconnect.com.de`, then `config:cache` and `queue:restart`. The operator's, in chat.
+
+  **Live**, with no failure seen. Filed by `M235`. **Tier: during-testing.**

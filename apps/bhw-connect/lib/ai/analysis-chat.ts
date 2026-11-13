@@ -20,7 +20,7 @@ import type { ChatMessage } from "@/lib/ai/providers/types";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
 import { DATASET_SCOPE_IDS } from "@/lib/ai/scope-id";
 
-const bodySchema = z.object({
+export const analysisInputSchema = z.object({
   dataset: z.enum(DATASET_SCOPE_IDS).optional(),
   messages: z
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) }))
@@ -92,21 +92,30 @@ export async function analysisChat(request: Request) {
   }
 
   const json = await request.json().catch(() => null);
-  const parsed = bodySchema.safeParse(json);
+  const parsed = analysisInputSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
   await recordInternalAssistantMessage(auth.user.id);
 
+  return analysisResponse(parsed.data);
+}
+
+/** The caller must authorize a user or an active durable-job lease before execution. */
+export async function analysisResponse(
+  input: z.infer<typeof analysisInputSchema>,
+  captureEvidence?: (payloads: unknown[]) => void,
+  onProgress?: (event: AssistantStreamEvent) => void,
+) {
   // Increment 5.1. Routed off the latest user turn — the route describes the question being asked,
   // not the conversation, and a follow-up ("and its training coverage?") gets its scope from the
   // pin the client carries forward rather than from re-reading the history.
-  const lastUserTurn = [...parsed.data.messages].reverse().find((m) => m.role === "user");
+  const lastUserTurn = [...input.messages].reverse().find((m) => m.role === "user");
   const route = await routeRequest(
     lastUserTurn?.content ?? "",
-    parsed.data.pinnedRoute,
-    parsed.data.carriedScope,
+    input.pinnedRoute,
+    input.carriedScope,
   );
 
   // Concatenated into the single system message, never appended as a second one:
@@ -119,14 +128,18 @@ export async function analysisChat(request: Request) {
       content:
         INTERNAL_SYSTEM_PROMPT +
         routeSystemFacts(route) +
-        (parsed.data.dataset
-          ? `\nThe user arrived from the ${parsed.data.dataset} dashboard. Use it as context, not a restriction on which datasets can answer the question.`
+        (input.dataset
+          ? `\nThe user arrived from the ${input.dataset} dashboard. Use it as context, not a restriction on which datasets can answer the question.`
           : ""),
     },
-    ...parsed.data.messages.map((m): ChatMessage => ({ role: m.role, content: m.content })),
+    ...input.messages.map((m): ChatMessage => ({ role: m.role, content: m.content })),
   ];
 
-  return ndjsonStream(async (send) => {
+  return ndjsonStream(async (sendRaw) => {
+    const send = (event: AssistantStreamEvent) => {
+      onProgress?.(event);
+      sendRaw(event);
+    };
     send({ type: "route", route });
     try {
       const result = await runToolLoop(
@@ -135,6 +148,7 @@ export async function analysisChat(request: Request) {
         createInternalTools(),
       );
 
+      captureEvidence?.(result.toolPayloads);
       if (result.allCapped) {
         send({
           type: "capacity",

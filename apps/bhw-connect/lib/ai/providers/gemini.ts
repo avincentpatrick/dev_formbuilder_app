@@ -55,7 +55,10 @@ function toGeminiRequest(messages: ChatMessage[], tools: ToolDefinition[]) {
       } catch {
         response = { result: message.content };
       }
-      contents.push({ role: "user", parts: [{ functionResponse: { name: message.name, response } }] });
+      contents.push({
+        role: "user",
+        parts: [{ functionResponse: { name: message.name, response } }],
+      });
     }
   }
 
@@ -94,7 +97,10 @@ function parseToolCalls(parts: GeminiPart[]): ToolCall[] {
 
 function parseText(parts: GeminiPart[]): string | null {
   const text = parts
-    .filter((part): part is { text: string; thought?: boolean } => "text" in part && part.thought !== true)
+    .filter(
+      (part): part is { text: string; thought?: boolean } =>
+        "text" in part && part.thought !== true,
+    )
     .map((part) => part.text)
     .join("");
   return text || null;
@@ -115,19 +121,41 @@ export function createGeminiProvider(): AIProvider {
           body: JSON.stringify(toGeminiRequest(messages, tools)),
         });
       } catch (cause) {
-        throw new ProviderRequestError("gemini", null, cause instanceof Error ? cause.message : "network error");
+        throw new ProviderRequestError(
+          "gemini",
+          null,
+          cause instanceof Error ? cause.message : "network error",
+        );
       }
 
       if (response.status === 429) {
         throw new ProviderRateLimitedError("gemini");
       }
       if (!response.ok) {
-        throw new ProviderRequestError("gemini", response.status, await response.text().catch(() => ""));
+        throw new ProviderRequestError(
+          "gemini",
+          response.status,
+          await response.text().catch(() => ""),
+        );
       }
 
       const json = await response.json();
       const parts: GeminiPart[] = json.candidates?.[0]?.content?.parts ?? [];
-      return { content: parseText(parts), toolCalls: parseToolCalls(parts) };
+      return {
+        content: parseText(parts),
+        toolCalls: parseToolCalls(parts),
+        model: json.modelVersion,
+        ...(json.usageMetadata
+          ? {
+              usage: {
+                inputTokens: json.usageMetadata.promptTokenCount,
+                outputTokens:
+                  (json.usageMetadata.candidatesTokenCount ?? 0) +
+                  (json.usageMetadata.thoughtsTokenCount ?? 0),
+              },
+            }
+          : {}),
+      };
     },
   };
 }

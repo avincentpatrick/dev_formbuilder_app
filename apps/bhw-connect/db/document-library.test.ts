@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { loadDev } from "./load-dev.mjs";
 import { migrate } from "./migrate.mjs";
 
 const database = process.env.BHW_TEST_DATABASE_URL;
@@ -15,12 +18,23 @@ const tables = [
 
 // Run only on the disposable development database, never the deployment.
 describe.skipIf(!database)("document library PostgreSQL contract", () => {
-  const client = new pg.Client({ connectionString: database });
+  let client: pg.Client;
+  const admin = new pg.Client({ connectionString: database });
+  const testDatabase = `bhw_docs_${randomUUID().replaceAll("-", "")}`;
   beforeAll(async () => {
+    await admin.connect();
+    await admin.query(`CREATE DATABASE ${testDatabase}`);
+    const connection = new URL(database!);
+    connection.pathname = `/${testDatabase}`;
+    client = new pg.Client({ connectionString: connection.toString() });
     await client.connect();
-  });
+    await client.query(readFileSync(new URL("./bootstrap-roles.sql", import.meta.url), "utf8"));
+    await loadDev(client);
+  }, 30000);
   afterAll(async () => {
-    await client.end();
+    await client?.end();
+    await admin.query(`DROP DATABASE IF EXISTS ${testDatabase}`);
+    await admin.end();
   });
 
   it("has applied the migration once and keeps existing citation records resolvable", async () => {

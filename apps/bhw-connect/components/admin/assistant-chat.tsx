@@ -1,4 +1,6 @@
 "use client";
+import { PolicySourceControls, type PolicyOptions } from "./policy-source-controls";
+import type { PolicySources } from "@/lib/policy-analysis/schema";
 
 import Link from "next/link";
 import { useRef, useState } from "react";
@@ -90,13 +92,18 @@ export function AssistantChat({
   canReport = false,
   libraryVersion,
   libraryCollection,
+  policyOptions,
+  initialPolicySources,
 }: {
   initialScope?: RouteScope | null;
   dataset?: string;
   canReport?: boolean;
   libraryVersion?: string;
   libraryCollection?: string;
+  policyOptions?: PolicyOptions;
+  initialPolicySources?: PolicySources;
 }) {
+  const [policySources, setPolicySources] = useState(initialPolicySources);
   const [turns, setTurns] = useState<Turn[]>([]);
   // Increment 5.1. Three separate pieces of state, because they have three different lifetimes.
   // `route` is what the server decided for the last question and is replaced every turn.
@@ -213,8 +220,9 @@ export function AssistantChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dataset,
-          libraryVersion,
-          libraryCollection,
+          libraryVersion: policySources ? undefined : libraryVersion,
+          libraryCollection: policySources ? undefined : libraryCollection,
+          policySources,
           messages: history.filter((t) => t.role !== "system").slice(-30),
           // Omitted entirely when nothing is pinned, so the server's schema sees `undefined`
           // rather than an empty object it would have to treat as cleared fields.
@@ -311,6 +319,14 @@ export function AssistantChat({
 
   return (
     <PresentationProvider meta={deckMeta}>
+      {policyOptions && policySources && (
+        <PolicySourceControls
+          options={policyOptions}
+          value={policySources}
+          onChange={setPolicySources}
+          disabled={status === "sending"}
+        />
+      )}
       <div className="flex flex-col gap-3">
         <div
           ref={listRef}
@@ -548,7 +564,15 @@ export function AssistantChat({
           />
           <button
             type="submit"
-            disabled={status === "sending" || input.trim().length === 0}
+            disabled={
+              status === "sending" ||
+              input.trim().length === 0 ||
+              Boolean(
+                policySources?.mode === "selected" &&
+                !policySources.versions.length &&
+                !policySources.revisions.length,
+              )
+            }
             className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
           >
             Ask

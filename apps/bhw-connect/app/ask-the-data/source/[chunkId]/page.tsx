@@ -36,6 +36,20 @@ export default async function AssistantSourcePage({
         {chunk.heading && <p className="text-sm text-muted">{chunk.heading}</p>}
       </div>
 
+      {chunk.versionId && (
+        <section className="grid gap-2 rounded border p-3 text-xs">
+          <p className="break-all">Immutable version: {chunk.versionId}</p>
+          <p className="break-all">
+            Extraction: {chunk.extractionId} · revision {chunk.revision}
+          </p>
+          <Link
+            className="underline"
+            href={`/admin/documents/${chunk.versionId}?extraction=${chunk.extractionId}&page=${chunk.pageFrom}`}
+          >
+            Read this exact extraction and its page warnings
+          </Link>
+        </section>
+      )}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-lg border border-border p-4 text-xs sm:grid-cols-4">
         <div>
           <dt className="text-muted">Document</dt>

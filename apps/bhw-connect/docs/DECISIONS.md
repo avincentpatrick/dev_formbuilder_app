@@ -9935,3 +9935,28 @@ Final Phase 3 checks: 1,828 app tests passed, 13 skipped; 16 Python tests and te
 browser acceptance groups passed. Types, lint, migration lint and the prefixed
 build passed. Library DB tests provision their own disposable schema/database;
 facade permissions and transactional queued/duplicate attempt history are tested.
+
+
+## 2026-11-13 — Phase 4 combined policy and dataset analysis
+
+Windows configuration remains deferred per the owner. Reused the shared Ask the
+Data engine/component for active/selected policy controls, explicit historical
+revisions, exact registered-table restrictions and policy-only analysis. Online
+research is off/unavailable until Phase 6; it cannot be enabled by source text or
+forged settings. Scoped tools expose metadata, lexical hits and full stored
+passages/neighbors. Policy citations carry immutable version/extraction/chunk/page
+identities and source viewers link to the exact revision.
+
+The policy audit checks identity, known title/page swaps, direct quotations,
+source dates and documentary versus dataset numbers, plus common unsupported
+supersession/noncompliance assertions. It is not semantic or legal verification.
+Registered dictionary/query tools remain the only policy-mode numeric dataset
+path; alternative tools cannot bypass table restrictions. No public caches/logs
+or inferred-KB review states were changed. The contract and ingester plan record
+verification and the remaining deployment dependencies. Phase 5 is next.
+
+Verification: 1,853 app tests passed, 13 skipped; 20 focused policy cases plus four
+PostgreSQL policy cases are included. Thirteen mobile browser acceptance groups
+passed against real local DB/query/OCR with synthetic identity/provider transport.
+Lint/types/migration lint/prefixed build passed. No live provider calls, Windows
+configuration, ops changes or operator messages were made. Phase 5 is next.

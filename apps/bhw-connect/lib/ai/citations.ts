@@ -27,6 +27,10 @@
  */
 
 export type Citation = {
+  versionId?: string;
+  extractionId?: string;
+  evidenceToken?: string;
+  revision?: number;
   sourceId?: string;
   sourceKind?: string;
   url?: string | null;
@@ -52,6 +56,10 @@ export type Citation = {
 };
 
 type SearchHitShape = {
+  versionId?: string;
+  extractionId?: string;
+  evidenceToken?: string;
+  revision?: number;
   sourceId?: string;
   sourceKind?: string;
   url?: string | null;
@@ -106,7 +114,8 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
       // First retrieval wins. The same slide can surface in two searches in one turn, and the
       // UUC distribution is byte-identical on slides 37 and 141 — which must stay two citations,
       // since a quote came from one of them and not the other.
-      if (byChunk.has(hit.chunkId)) continue;
+      if (byChunk.has(hit.chunkId) && (!byChunk.get(hit.chunkId)!.truncated || hit.truncated))
+        continue;
       byChunk.set(hit.chunkId, {
         ...(hit.sourceId
           ? {
@@ -118,6 +127,10 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
               retrievedAt: hit.retrievedAt,
             }
           : {}),
+        versionId: hit.versionId,
+        extractionId: hit.extractionId,
+        evidenceToken: hit.evidenceToken,
+        revision: hit.revision,
         chunkId: hit.chunkId,
         document: hit.document,
         documentTitle: hit.documentTitle,

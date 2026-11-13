@@ -16,6 +16,9 @@ import { createSupabaseServiceClient } from "@/lib/db/service-client";
 
 export type DocChunk = {
   chunkId: number;
+  versionId?: string;
+  extractionId?: string;
+  revision?: number;
   document: string;
   documentTitle: string;
   asOf: string | null;
@@ -35,7 +38,7 @@ export async function getDocChunk(chunkId: number, approvedOnly = false): Promis
     const { data, error } = await supabase
       .from("doc_chunk")
       .select(
-        "chunk_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor, status)",
+        "chunk_id, doc_id, page_from, page_to, char_start, char_end, heading, content, doc_source (key, title, as_of, source_path, extractor, status)",
       )
       .eq("chunk_id", chunkId)
       .maybeSingle();
@@ -55,7 +58,22 @@ export async function getDocChunk(chunkId: number, approvedOnly = false): Promis
     if (uploaded && !(await getStrictAdminUser())) return null;
     if (approvedOnly && source.status !== "approved" && !uploaded) return null;
 
+    let evidence: { versionId: string; extractionId: string; revision: number } | undefined;
+    if (uploaded) {
+      const { data: extraction, error: evidenceError } = await supabase
+        .from("document_extraction")
+        .select("id,version_id,revision,source_id")
+        .eq("id", source.key.slice(7))
+        .maybeSingle();
+      if (evidenceError || !extraction || extraction.source_id !== data.doc_id) return null;
+      evidence = {
+        versionId: extraction.version_id,
+        extractionId: extraction.id,
+        revision: extraction.revision,
+      };
+    }
     return {
+      ...evidence,
       chunkId: data.chunk_id,
       document: source.key,
       documentTitle: source.title,

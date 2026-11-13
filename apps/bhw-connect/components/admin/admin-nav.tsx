@@ -5,6 +5,7 @@ const LINKS = [
   { href: "/admin/feedback", label: "Feedback" },
   { href: "/admin/usage", label: "Usage" },
   { href: "/admin/changelog", label: "Changelog" },
+  { href: "/admin/documents", label: "Document library" },
   { href: "/admin/ingestion", label: "Ingestion history" },
   { href: "/admin/ai-quota", label: "AI quota" },
   { href: "/admin/answer-bank", label: "Answer bank" },
@@ -18,10 +19,10 @@ const LINKS = [
   { href: "/admin/regressions", label: "Regressions" },
 ];
 
-export function AdminNav() {
+export function AdminNav({ showDocuments = false }: { showDocuments?: boolean } = {}) {
   return (
     <nav className="flex w-40 shrink-0 flex-col gap-1 sm:w-48">
-      {LINKS.map((link) => (
+      {LINKS.filter((link) => link.href !== "/admin/documents" || showDocuments).map((link) => (
         <Link
           key={link.href}
           href={link.href}

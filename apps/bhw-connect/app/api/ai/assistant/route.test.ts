@@ -4,6 +4,7 @@ import type { AssistantRoute } from "@/lib/ai/route";
 const {
   getAnalysisAuthResult,
   getStrictAdminUser,
+  libraryCall,
   runToolLoop,
   isInternalAssistantRateLimited,
   recordInternalAssistantMessage,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   getAnalysisAuthResult: vi.fn(),
   getStrictAdminUser: vi.fn(),
+  libraryCall: vi.fn(),
   runToolLoop: vi.fn(),
   isInternalAssistantRateLimited: vi.fn(),
   recordInternalAssistantMessage: vi.fn(),
@@ -35,6 +37,7 @@ const {
   })),
 }));
 
+vi.mock("@/lib/documents/library", () => ({ libraryCall }));
 vi.mock("@/lib/db/require-admin", () => ({ getStrictAdminUser }));
 vi.mock("@/lib/db/require-analysis", () => ({ getAnalysisAuthResult }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop }));
@@ -85,6 +88,7 @@ async function eventsOf(response: Response): Promise<Record<string, unknown>[]> 
 
 beforeEach(() => {
   getStrictAdminUser.mockReset().mockResolvedValue(ADMIN);
+  libraryCall.mockReset().mockResolvedValue(["upload:11111111-1111-4111-8111-111111111111"]);
   getAnalysisAuthResult.mockReset().mockResolvedValue({ status: "approved", user: ADMIN });
   runToolLoop.mockReset();
   isInternalAssistantRateLimited.mockReset().mockResolvedValue(false);
@@ -689,5 +693,24 @@ it("retains verified calculations when the final provider explanation is unavail
 it("denies approved editors on the admin compatibility API", async () => {
   getStrictAdminUser.mockResolvedValue(null);
   expect((await POST(ask())).status).toBe(403);
+  expect(runToolLoop).not.toHaveBeenCalled();
+});
+
+it("revalidates the library version server-side and refuses archived/unavailable selections", async () => {
+  libraryCall.mockRejectedValue(new Error("Unavailable"));
+  const response = await POST(
+    new Request("http://localhost/api/ai/assistant", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "referral" }],
+        libraryVersion: "11111111-1111-4111-8111-111111111111",
+      }),
+    }),
+  );
+  expect(response.status).toBe(400);
+  expect(libraryCall).toHaveBeenCalledWith(ADMIN.id, "selection", {
+    version: "11111111-1111-4111-8111-111111111111",
+    collection: undefined,
+  });
   expect(runToolLoop).not.toHaveBeenCalled();
 });

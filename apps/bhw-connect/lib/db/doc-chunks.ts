@@ -50,8 +50,10 @@ export async function getDocChunk(chunkId: number, approvedOnly = false): Promis
       extractor: string;
       status: string;
     } | null;
-    if (!source || (approvedOnly && source.status !== "approved")) return null;
-    if (source.key.startsWith("upload:") && !(await getStrictAdminUser())) return null;
+    if (!source) return null;
+    const uploaded = source.key.startsWith("upload:");
+    if (uploaded && !(await getStrictAdminUser())) return null;
+    if (approvedOnly && source.status !== "approved" && !uploaded) return null;
 
     return {
       chunkId: data.chunk_id,

@@ -18,10 +18,11 @@ export default async function AssistantSourcePage({
   const chunk = await getDocChunk(id, true);
   if (!chunk) notFound();
 
+  const uploaded = chunk.document.startsWith("upload:");
   const pageLabel =
     chunk.pageTo > chunk.pageFrom
-      ? `Slides ${chunk.pageFrom}–${chunk.pageTo}`
-      : `Slide ${chunk.pageFrom}`;
+      ? `${uploaded ? "PDF pages" : "Slides"} ${chunk.pageFrom}–${chunk.pageTo}`
+      : `${uploaded ? "PDF page" : "Slide"} ${chunk.pageFrom}`;
 
   return (
     <div className="flex flex-col gap-4">

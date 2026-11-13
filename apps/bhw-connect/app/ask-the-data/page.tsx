@@ -1,3 +1,7 @@
+import { AssistantChat } from "@/components/admin/assistant-chat";
+import { getStrictAdminUser } from "@/lib/db/require-admin";
+import { libraryCall } from "@/lib/documents/library";
+import { z } from "zod";
 import { ProjectWorkspace } from "@/components/analysis/project-workspace";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
 import { getGeoByCode } from "@/lib/db/geo";
@@ -46,6 +50,36 @@ export default async function AskTheDataPage({
     );
   }
   const params = await searchParams;
+  if (params.libraryVersion || params.libraryCollection) {
+    const admin = await getStrictAdminUser();
+    if (!admin) return <p className="p-6">Admin role required for the document library.</p>;
+    const version = typeof params.libraryVersion === "string" ? params.libraryVersion : undefined;
+    const collection =
+      typeof params.libraryCollection === "string" ? params.libraryCollection : undefined;
+    if (
+      (version && !z.uuid().safeParse(version).success) ||
+      (collection && collection.length > 100)
+    )
+      return <p className="p-6">Invalid document selection.</p>;
+    try {
+      await libraryCall(admin.id, "selection", { version, collection });
+    } catch {
+      return (
+        <p className="p-6">Selected documents are unavailable, archived, or still processing.</p>
+      );
+    }
+    return (
+      <section className="mx-auto grid max-w-4xl gap-4 p-4">
+        <h1 className="text-xl font-semibold">Ask the Data</h1>
+        <p>
+          Policy source: {collection ? `collection ${collection}` : "selected document"}. Dataset
+          tools remain available. This is a search-based question, not an exhaustive review of every
+          policy.
+        </p>
+        <AssistantChat libraryVersion={version} libraryCollection={collection} canReport />
+      </section>
+    );
+  }
   const dataset = isDatasetScopeId(params.dataset) ? params.dataset : undefined;
   const geo =
     typeof params.geoCode === "string" && params.geoCode.length <= 20

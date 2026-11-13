@@ -165,12 +165,22 @@ export function createDatasetTools(exposure: Exposure, datasetSlugs?: readonly s
  */
 export function createInternalTools({
   allowLibraryDocuments = false,
-}: { allowLibraryDocuments?: boolean } = {}): Tool[] {
+  libraryKeys,
+  libraryActor,
+}: {
+  allowLibraryDocuments?: boolean;
+  libraryKeys?: string[];
+  libraryActor?: string;
+} = {}): Tool[] {
   return [
     ...TOOLS,
     ...createDatasetTools("internal"),
     createTraversalTool(),
-    createSearchDocumentsTool({ allowUploads: allowLibraryDocuments }),
+    createSearchDocumentsTool({
+      allowUploads: allowLibraryDocuments,
+      libraryKeys,
+      actor: libraryActor,
+    }),
     ...createAnalysisTools(),
   ];
 }

@@ -19,6 +19,7 @@ import {
 import { routeRequest } from "@/lib/ai/route-request";
 import { recordInternalAssistantMessage } from "@/lib/ai/rate-limit";
 import type { ChatMessage } from "@/lib/ai/providers/types";
+import { libraryCall } from "@/lib/documents/library";
 import { getStrictAdminUser } from "@/lib/db/require-admin";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
 import type { Tool } from "@/lib/ai/tools";
@@ -26,6 +27,8 @@ import { DATASET_SCOPE_IDS } from "@/lib/ai/scope-id";
 
 export const analysisInputSchema = z.object({
   dataset: z.enum(DATASET_SCOPE_IDS).optional(),
+  libraryVersion: z.uuid().optional(),
+  libraryCollection: z.string().trim().min(1).max(100).optional(),
   messages: z
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) }))
     .min(1)
@@ -111,9 +114,36 @@ async function analysisChatWithAccess(request: Request, adminOnly: boolean) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
+  let libraryKeys: string[] | undefined;
+  if (parsed.data.libraryVersion || parsed.data.libraryCollection) {
+    if (!libraryAdmin)
+      return NextResponse.json(
+        { error: "Admin role required for the document library." },
+        { status: 403 },
+      );
+    try {
+      libraryKeys = await libraryCall<string[]>(libraryAdmin.id, "selection", {
+        version: parsed.data.libraryVersion,
+        collection: parsed.data.libraryCollection,
+      });
+    } catch {
+      return NextResponse.json(
+        { error: "Selected documents are unavailable, archived, or still processing." },
+        { status: 400 },
+      );
+    }
+  }
   await recordInternalAssistantMessage(auth.user.id);
 
-  return analysisResponse(parsed.data, undefined, undefined, [], Boolean(libraryAdmin));
+  return analysisResponse(
+    parsed.data,
+    undefined,
+    undefined,
+    [],
+    Boolean(libraryAdmin),
+    libraryKeys,
+    libraryAdmin?.id,
+  );
 }
 
 /** The caller must authorize a user or an active durable-job lease before execution. */
@@ -123,7 +153,18 @@ export async function analysisResponse(
   onProgress?: (event: AssistantStreamEvent) => void,
   sourceTools: Tool[] = [],
   allowLibraryDocuments = false,
+  libraryKeys?: string[],
+  libraryActor?: string,
 ) {
+  if (
+    (input.libraryVersion || input.libraryCollection) &&
+    (!allowLibraryDocuments || !libraryKeys?.length || !libraryActor)
+  ) {
+    return NextResponse.json(
+      { error: "Document selection requires a validated admin context." },
+      { status: 403 },
+    );
+  }
   // Increment 5.1. Routed off the latest user turn — the route describes the question being asked,
   // not the conversation, and a follow-up ("and its training coverage?") gets its scope from the
   // pin the client carries forward rather than from re-reading the history.
@@ -161,7 +202,7 @@ export async function analysisResponse(
     };
     send({ type: "route", route });
     try {
-      const baseTools = createInternalTools({ allowLibraryDocuments });
+      const baseTools = createInternalTools({ allowLibraryDocuments, libraryKeys, libraryActor });
       const availableTools = sourceTools.length ? [...baseTools, ...sourceTools] : baseTools;
       const result = await runToolLoop(
         messages,

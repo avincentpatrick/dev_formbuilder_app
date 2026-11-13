@@ -1,4 +1,5 @@
 "use client";
+import { PolicyReviewPanel } from "./policy-review-panel";
 import { PolicySourceControls, type PolicyOptions } from "./policy-source-controls";
 import type { PolicySources } from "@/lib/policy-analysis/schema";
 
@@ -103,6 +104,7 @@ export function AssistantChat({
   policyOptions?: PolicyOptions;
   initialPolicySources?: PolicySources;
 }) {
+  const [fullReview, setFullReview] = useState(false);
   const [policySources, setPolicySources] = useState(initialPolicySources);
   const [turns, setTurns] = useState<Turn[]>([]);
   // Increment 5.1. Three separate pieces of state, because they have three different lifetimes.
@@ -327,7 +329,22 @@ export function AssistantChat({
           disabled={status === "sending"}
         />
       )}
-      <div className="flex flex-col gap-3">
+      {policySources && (
+        <label className="my-3 block">
+          Analysis mode
+          <select
+            className="ml-2 rounded border p-2"
+            value={fullReview ? "full" : "quick"}
+            onChange={(e) => setFullReview(e.target.value === "full")}
+            disabled={status === "sending"}
+          >
+            <option value="quick">Quick question · search based</option>
+            <option value="full">Review all policies · full coverage</option>
+          </select>
+        </label>
+      )}
+      {fullReview && policySources && <PolicyReviewPanel sources={policySources} />}
+      <div className={fullReview ? "hidden" : "flex flex-col gap-3"}>
         <div
           ref={listRef}
           className="flex max-h-[60vh] min-h-[16rem] flex-col gap-3 overflow-y-auto rounded-lg border border-border p-4"

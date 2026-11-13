@@ -200,15 +200,15 @@ document cannot be cited as the same-numbered page of another.
 
 ## Phase 5 — Explicit full-collection analysis
 
-- [ ] Add an explicit “Review all policies” mode in the same assistant. Ordinary retrieval remains
+- [x] Add an explicit “Review all policies” mode in the same assistant. Ordinary retrieval remains
   a quick question-answer path; top search results must not be labeled an exhaustive review.
-- [ ] Snapshot eligible versions at run start, with an inventory of excluded, failed, processing,
+- [x] Snapshot eligible versions at run start, with an inventory of excluded, failed, processing,
   and unreadable material. Later uploads must not silently change an ongoing run's scope.
-- [ ] Process every selected document in bounded sections; persist evidence-backed findings and
+- [x] Process every selected document in bounded sections; persist evidence-backed findings and
   consolidate across documents without replacing source text with summaries.
-- [ ] Track coverage per document and section, with retries, resumable progress, cancellation, and
+- [x] Track coverage per document and section, with retries, resumable progress, cancellation, and
   resource budgets. An interrupted or budget-limited run returns a partial result explicitly.
-- [ ] Present synthesis, conflicts, relevant dataset findings, gaps, citations, and a coverage
+- [x] Present synthesis, conflicts, relevant dataset findings, gaps, citations, and a coverage
   report. Distinguish “examined with no relevant finding” from “not examined.”
 
 **Acceptance:** A synthetic policy collection includes a decisive clause in a low-similarity
@@ -275,7 +275,7 @@ assistant, and request a verifiable full-collection review with optional online 
 | 2 — Extraction and OCR | Implemented; Windows acceptance pending | Generic parser, local OCR, leased queue, atomic lexical activation, separate embeddings; 16 synthetic Python/DB tests pass. See POLICY_DOCUMENT_WORKER.md. Operator must validate Windows runtime/languages/process limits before deployment. |
 | 3 — Admin library | Implemented and locally verified | Upload/catalog/detail/downloads/retries/versions/archives and validated shared Ask the Data selection. Ten browser acceptance groups passed with synthetic identity/provider. Windows worker setup remains deployment work. |
 | 4 — Combined analysis | Implemented; local verification complete | Shared source controls, scoped full passages, exact version/extraction citations, registered-table restrictions and evidence audits. Online is off/unavailable until Phase 6. Windows configuration remains deferred. |
-| 5 — Full-collection review | Not started | Requires durable runs and explicit coverage accounting. |
+| 5 — Full-collection review | Implemented; local acceptance verified | Private durable runs, immutable section inventory, coverage, budgets, leases/retries/cancel/resume, all-finding subject consolidation and exact source viewer. 13 PostgreSQL cases and 18 mobile browser groups passed. Windows scheduling/provider validation remains deferred. |
 | 6 — Online research | Not started | Per-question opt-in; provider not selected. |
 | 7 — Deployment and verification | Not started | Coordinate worker, OCR dependencies, and backups. |
 
@@ -486,3 +486,41 @@ were synthetic; PostgreSQL/PostgREST, registry queries and OCR were real locally
 Lint (one existing deliberate-fixture warning), typecheck, migration lint, the
 prefixed production build and whitespace checks passed. CI results accompany the
 pull request. Windows worker installation/configuration remains explicitly deferred.
+
+
+### Phase 5 — full-collection review (2026-11-13)
+
+The existing policy assistant now offers explicit quick-question/full-review modes.
+The additive `policy_review_*` schema freezes the inventory and bounded canonical
+section hashes at run creation, records all exclusions and quality warnings,
+and enforces private owner/strict-admin/analysis-approval checks. Every selected
+section is examined independently of retrieval rank. Accepted structured findings,
+source quotations, dataset query evidence and usage persist alongside per-section
+coverage. The report consolidates all accepted subjects and flags differing quoted
+requirements as human comparison candidates, without claiming legal conflict
+resolution. `POLICY_REVIEW_CONTRACT.md` describes limits and the worker contract.
+
+One secret-authenticated existing analysis-worker dispatch processes one section
+attempt; browser polling never runs the job. Leases, bounded retries, per-run
+section-attempt budgets, cancellation, explicit retry/resume and provider aborts
+prevent stale or interrupted work from reporting completion. Dataset dictionary
+snapshots are frozen; data rows are queried live and retained with timestamps,
+not represented as a start-time dataset snapshot. Exact extraction text remains
+canonical and the private source viewer verifies its section hash.
+
+Verification: 1,892 app tests passed / 13 skipped, including 13 new disposable
+PostgreSQL review cases, worker/request-boundary tests and provider cancellation
+checks. Eighteen mobile Chromium acceptance groups passed against real local
+PostgreSQL/PostgREST/OCR with synthetic identity/provider transports. The full
+review finds a low-similarity exception annex omitted by the single top search
+hit, continues with the tab closed, resumes after a budget pause and opens an
+exact hash-verified citation. Clean source coverage can complete; OCR warnings,
+blank/unreadable pages and missing/failed/processing documents prevent false
+completeness. Lint (one pre-existing deliberate-fixture warning), types, migration
+lint, the prefixed production build and whitespace checks passed.
+
+Phase 4 PR #517 is merged. Next application phase is Phase 6 optional online
+research. Windows configuration, scheduling, backups and live-provider semantic
+acceptance remain explicitly deferred; no operator messages or shared ops files
+were changed. Schema snapshot refresh remains a deployment follow-up after the
+new schema reaches the box, alongside the prior phases' pending Windows checks.

@@ -10,13 +10,21 @@ const { runToolLoop } = await import("./agent-loop");
  * through a real round without depending on any real tool's behavior. */
 const ECHO_TOOLS = [
   {
-    definition: { name: "echo", description: "", parameters: { type: "object" as const, properties: {} } },
+    definition: {
+      name: "echo",
+      description: "",
+      parameters: { type: "object" as const, properties: {} },
+    },
     execute: vi.fn(async (args: Record<string, unknown>) => ({ echoed: args })),
   },
 ];
 
 function completion(content: string | null, toolCalls: unknown[] = []) {
-  return { allCapped: false as const, provider: "gemini" as const, completion: { content, toolCalls } };
+  return {
+    allCapped: false as const,
+    provider: "gemini" as const,
+    completion: { content, toolCalls },
+  };
 }
 
 function toolCall(name: string, args: Record<string, unknown> = {}) {
@@ -187,5 +195,37 @@ describe("runToolLoop", () => {
     const result = await runToolLoop([{ role: "user", content: "hi" }], undefined, ECHO_TOOLS);
     expect(result.allCapped).toBe(true);
     expect(result.finalText).toBeNull();
+  });
+});
+
+describe("tool-loop cancellation", () => {
+  it("does not contact a provider with an already aborted signal", async () => {
+    const signal = AbortSignal.abort(new Error("Stopped"));
+    await expect(runToolLoop([], undefined, ECHO_TOOLS, { maxRounds: 1, signal })).rejects.toThrow(
+      "Stopped",
+    );
+    expect(mocks.completeWithCascade).not.toHaveBeenCalled();
+  });
+  it("threads the signal through the forced wrap-up and empty-answer retry", async () => {
+    const controller = new AbortController();
+    mocks.completeWithCascade
+      .mockResolvedValueOnce(completion(null, [toolCall("echo")]))
+      .mockResolvedValueOnce(completion(null))
+      .mockResolvedValueOnce(completion("done"));
+    await runToolLoop([], undefined, ECHO_TOOLS, { maxRounds: 1, signal: controller.signal });
+    expect(mocks.completeWithCascade.mock.calls).toHaveLength(3);
+    for (const call of mocks.completeWithCascade.mock.calls)
+      expect(call[3]).toBe(controller.signal);
+  });
+  it("does not execute more tools after cancellation", async () => {
+    const controller = new AbortController();
+    mocks.completeWithCascade.mockImplementationOnce(async () => {
+      controller.abort(new Error("Stopped"));
+      return completion(null, [toolCall("echo")]);
+    });
+    await expect(
+      runToolLoop([], undefined, ECHO_TOOLS, { maxRounds: 1, signal: controller.signal }),
+    ).rejects.toThrow("Stopped");
+    expect(ECHO_TOOLS[0].execute).not.toHaveBeenCalled();
   });
 });

@@ -9960,3 +9960,31 @@ PostgreSQL policy cases are included. Thirteen mobile browser acceptance groups
 passed against real local DB/query/OCR with synthetic identity/provider transport.
 Lint/types/migration lint/prefixed build passed. No live provider calls, Windows
 configuration, ops changes or operator messages were made. Phase 5 is next.
+
+
+## 2026-11-13 — Phase 5 explicit full-policy review
+
+Added full-review mode beside quick retrieval in the same policy assistant.
+Reviews are private to the requesting approved strict admin; shared library access
+does not expose another admin's question or dataset evidence. At start, snapshot
+the version/extraction inventory, metadata, warnings and every bounded canonical
+section hash. Later uploads/revisions do not alter the scope. Missing, failed,
+processing, archived and unreadable material remains visible as coverage gaps.
+
+Use the existing secret-authenticated Node analysis worker for one bounded section
+attempt per dispatch, with PostgreSQL leases, attempt budgets, retries, cancellation
+and explicit resume. No browser-owned processing. Reuse the provider cascade and
+registered dataset query tools; propagate aborts for deadline/lease loss. Freeze
+dictionary definitions, retain actual query-time results/timestamps, and do not
+claim dataset rows were frozen at review start. Consolidate every accepted subject
+and flag differing exact requirement quotes as comparison candidates rather than
+certified conflicts. Coverage is server-computed operational examination, not
+semantic/legal verification. Canonical extraction text remains the source of truth.
+
+Verification: 1,892 app tests passed / 13 skipped; 13 real PostgreSQL review cases
+and 18 mobile browser acceptance groups are included. Lint/types/migration lint
+and the prefixed build passed. Identity/provider responses were synthetic, while
+local database, registry queries and OCR were real. Windows setup, scheduler,
+backup changes and live-provider acceptance remain deferred by the owner. No
+shared ops changes or operator messages. See POLICY_REVIEW_CONTRACT.md. Phase 6
+optional online research is next.

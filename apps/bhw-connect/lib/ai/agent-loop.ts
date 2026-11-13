@@ -57,7 +57,7 @@ export async function runToolLoop(
   initialMessages: ChatMessage[],
   onToolCall?: (event: ToolCallEvent) => void,
   tools: Tool[] = TOOLS,
-  options?: { maxRounds: number },
+  options?: { maxRounds: number; signal?: AbortSignal },
 ): Promise<ToolLoopResult> {
   const toolDefinitions = tools.map((tool) => tool.definition);
   const messages: ChatMessage[] = [...initialMessages];
@@ -69,7 +69,10 @@ export async function runToolLoop(
     round < Math.min(12, Math.max(1, options?.maxRounds ?? MAX_TOOL_ROUNDS));
     round++
   ) {
-    const result = await completeWithCascade(messages, toolDefinitions);
+    options?.signal?.throwIfAborted();
+    const result = options?.signal
+      ? await completeWithCascade(messages, toolDefinitions, new Date(), options.signal)
+      : await completeWithCascade(messages, toolDefinitions);
     if (result.allCapped) return { finalText: null, toolPayloads, provider: null, allCapped: true };
 
     providerUsed = result.provider;
@@ -81,6 +84,7 @@ export async function runToolLoop(
 
     messages.push({ role: "assistant", content, toolCalls });
     for (const call of toolCalls) {
+      options?.signal?.throwIfAborted();
       onToolCall?.({ name: call.name, args: call.arguments });
       const payload = await executeToolFrom(tools, call.name, call.arguments);
       toolPayloads.push(payload);
@@ -98,7 +102,10 @@ export async function runToolLoop(
   // tools was already true; what was missing is telling the model that this turn is the one that
   // must produce text, which is the gap that let a clean, error-free completion come back blank.
   messages.push({ role: "user", content: WRAP_UP_NUDGE });
-  const finalAttempt = await completeWithCascade(messages, []);
+  options?.signal?.throwIfAborted();
+  const finalAttempt = options?.signal
+    ? await completeWithCascade(messages, [], new Date(), options.signal)
+    : await completeWithCascade(messages, []);
   if (finalAttempt.allCapped)
     return { finalText: null, toolPayloads, provider: providerUsed, allCapped: true };
   if (finalAttempt.completion.content?.trim()) {
@@ -121,7 +128,10 @@ export async function runToolLoop(
     toolCalls: finalAttempt.completion.toolCalls,
   });
   messages.push({ role: "user", content: RETRY_NUDGE });
-  const retryAttempt = await completeWithCascade(messages, []);
+  options?.signal?.throwIfAborted();
+  const retryAttempt = options?.signal
+    ? await completeWithCascade(messages, [], new Date(), options.signal)
+    : await completeWithCascade(messages, []);
   if (retryAttempt.allCapped)
     return { finalText: null, toolPayloads, provider: finalAttempt.provider, allCapped: true };
   return {

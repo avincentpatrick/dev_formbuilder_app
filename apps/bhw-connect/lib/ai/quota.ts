@@ -165,21 +165,27 @@ export async function completeWithCascade(
   messages: ChatMessage[],
   tools: ToolDefinition[],
   now: Date = new Date(),
+  signal?: AbortSignal,
 ): Promise<CascadeResult> {
   for (const providerId of PROVIDER_CASCADE) {
+    signal?.throwIfAborted();
     const check = await checkQuota(providerId, now);
     if (!check.available) continue;
 
     let attempted = false;
     try {
       await reserveRequest(providerId, now);
+      signal?.throwIfAborted();
       attempted = true;
-      const completion = await getProvider(providerId).complete(messages, tools);
+      const completion = signal
+        ? await getProvider(providerId).complete(messages, tools, signal)
+        : await getProvider(providerId).complete(messages, tools);
       observeProviderUse(providerId, completion);
       return { allCapped: false, provider: providerId, completion };
     } catch (err) {
       if (attempted && !(err instanceof ProviderUnavailableError))
         observeProviderUse(providerId, { content: null, toolCalls: [] });
+      signal?.throwIfAborted();
       if (err instanceof ProviderRateLimitedError) {
         console.warn(
           `[ai] ${providerId} rate-limited (retryAfter=${err.retryAfterSeconds ?? "n/a"}s) — pausing`,

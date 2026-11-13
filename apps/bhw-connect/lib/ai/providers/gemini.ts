@@ -109,7 +109,7 @@ function parseText(parts: GeminiPart[]): string | null {
 export function createGeminiProvider(): AIProvider {
   return {
     id: "gemini",
-    async complete(messages, tools) {
+    async complete(messages, tools, signal) {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) throw new ProviderUnavailableError("gemini");
 
@@ -117,6 +117,7 @@ export function createGeminiProvider(): AIProvider {
       try {
         response = await fetch(`${BASE_URL}?key=${apiKey}`, {
           method: "POST",
+          ...(signal ? { signal } : {}),
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(toGeminiRequest(messages, tools)),
         });

@@ -41,7 +41,11 @@ export type ProviderId = (typeof PROVIDER_IDS)[number];
  * quota cascade (lib/ai/quota.ts) never needs to know which provider it's talking to. */
 export type AIProvider = {
   id: ProviderId;
-  complete(messages: ChatMessage[], tools: ToolDefinition[]): Promise<ProviderCompletion>;
+  complete(
+    messages: ChatMessage[],
+    tools: ToolDefinition[],
+    signal?: AbortSignal,
+  ): Promise<ProviderCompletion>;
 };
 
 /** Thrown when a provider has no API key configured — treated the same as "capped" by the cascade. */

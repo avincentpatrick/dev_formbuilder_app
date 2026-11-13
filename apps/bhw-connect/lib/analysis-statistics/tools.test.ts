@@ -83,3 +83,9 @@ it("keeps generated tool schema compatible with the existing Gemini adapter", ()
   expect(schema).not.toContain('"default"');
   expect(schema).toContain('"method"');
 });
+it("describes filters with explicit array items rather than an unsupported dynamic object schema", () => {
+  const filters = createStatisticalTools("a", "p", vi.fn())[0].definition.parameters.properties
+    .filters as { type: string; items: { properties: { column: { type: string } } } };
+  expect(filters.type).toBe("array");
+  expect(filters.items.properties.column.type).toBe("string");
+});

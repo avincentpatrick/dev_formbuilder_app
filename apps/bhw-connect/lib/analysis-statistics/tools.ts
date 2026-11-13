@@ -15,8 +15,14 @@ const input = z.object({
     .regex(/^[a-z][a-z0-9_]*$/)
     .optional(),
   filters: z
-    .record(z.string(), z.union([z.string().max(200), z.number(), z.boolean()]))
-    .default({}),
+    .array(
+      z.object({
+        column: z.string().min(1).max(100),
+        value: z.union([z.string().max(200), z.number(), z.boolean()]),
+      }),
+    )
+    .max(20)
+    .default([]),
   spec: statisticSpec,
 });
 // The existing Gemini adapter accepts the common OpenAPI schema subset, not JSON Schema's
@@ -120,7 +126,7 @@ export function createStatisticalTools(
                   parsed.spec.pairId,
                   parsed.spec.exposure,
                   ...(parsed.spec.predictors ?? []),
-                  ...Object.keys(parsed.filters),
+                  ...parsed.filters.map((filter) => filter.column),
                 ].filter((c): c is string => Boolean(c)),
               ),
             ];
@@ -135,7 +141,7 @@ export function createStatisticalTools(
               .from(dataset.tableName as "dim_geo")
               .select(columns.join(","), { count: "exact" })
               .range(0, 49999);
-            for (const [key, value] of Object.entries(parsed.filters)) query = query.eq(key, value);
+            for (const { column, value } of parsed.filters) query = query.eq(column, value);
             const { data, error, count } = await query;
             if (error || count === null || count > 50000 || data?.length !== count)
               throw new Error(
@@ -154,9 +160,9 @@ export function createStatisticalTools(
               },
             };
           }
-          if (Object.keys(parsed.filters).length && parsed.sourceId)
+          if (parsed.filters.length && parsed.sourceId)
             rows = rows.filter((row) =>
-              Object.entries(parsed.filters).every(([k, v]) => row[k] === v),
+              parsed.filters.every(({ column, value }) => row[column] === value),
             );
           if (rows.length > 50000) throw new Error("Too many input rows; specify narrower filters");
           const manifest: StatisticalManifest = { spec: parsed.spec, rows, provenance };

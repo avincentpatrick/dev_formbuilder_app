@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { StatisticalResults } from "./statistical-results";
+import type { StatisticalResult } from "@/lib/analysis-statistics/types";
 import { SourcePanel } from "./source-panel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withBasePath } from "@/lib/base-path";
@@ -322,6 +324,16 @@ export function ProjectWorkspace({
                   {job.result && (
                     <>
                       <AnswerMarkdown text={job.result.answer} />
+                      {job.result.events
+                        .filter((e) => e.type === "statistics")
+                        .map((e, i) => (
+                          <StatisticalResults
+                            key={i}
+                            projectId={project.id}
+                            jobId={job.id}
+                            results={e.results as StatisticalResult[]}
+                          />
+                        ))}
                       {job.result.events
                         .filter((e) => e.type === "figure")
                         .map((e, i) => (

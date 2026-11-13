@@ -640,3 +640,44 @@ describe("POST /api/ai/assistant — figures (Increment 5.5)", () => {
     expect(types.indexOf("message")).toBeLessThan(types.indexOf("figure"));
   });
 });
+
+it("renders computed field references and emits the same structured result while rejecting invented calculations", async () => {
+  const result = {
+    kind: "statistical-result",
+    id: "0123456789abcdef",
+    claims: { mean: { value: 2.2, display: "2.200", label: "mean", unit: "people" } },
+    rows: [],
+    plot: [],
+    title: "Synthetic summary",
+  };
+  runToolLoop.mockResolvedValue({
+    finalText: "The mean is [[0123456789abcdef:mean]] people. The mean is 98 people.",
+    toolPayloads: [result],
+    provider: "gemini",
+    allCapped: false,
+  });
+  const events = await eventsOf(await POST(ask()));
+  expect(eventOfType(events, "message").content).toBe("The mean is 2.200 people.");
+  expect(eventOfType(events, "statistics").results).toEqual([result]);
+});
+
+it("retains verified calculations when the final provider explanation is unavailable", async () => {
+  const result = {
+    kind: "statistical-result",
+    id: "0123456789abcdef",
+    claims: {},
+    rows: [],
+    plot: [],
+    title: "Synthetic summary",
+  };
+  runToolLoop.mockResolvedValue({
+    finalText: null,
+    toolPayloads: [result],
+    provider: null,
+    allCapped: true,
+  });
+  const events = await eventsOf(await POST(ask()));
+  expect(eventOfType(events, "statistics").results).toEqual([result]);
+  expect(eventOfType(events, "message").content).toContain("calculations completed");
+  expect(events.some((e) => e.type === "capacity")).toBe(false);
+});

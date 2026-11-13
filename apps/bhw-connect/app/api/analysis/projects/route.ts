@@ -46,6 +46,19 @@ const schema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("cancel"), projectId: z.uuid(), jobId: z.uuid() }),
   z.object({ operation: z.literal("retry"), projectId: z.uuid(), jobId: z.uuid() }),
 ]);
+function projectView(value: unknown) {
+  const project = value as { jobs?: Array<{ result?: Record<string, unknown> | null }> };
+  if (!Array.isArray(project?.jobs)) return value;
+  return {
+    ...project,
+    jobs: project.jobs.map((job) => {
+      if (!job.result) return job;
+      const result = { ...job.result };
+      delete result.statistics;
+      return { ...job, result };
+    }),
+  };
+}
 const headers = { "Cache-Control": "private, no-store" };
 export async function GET() {
   return handle();
@@ -75,7 +88,7 @@ async function handle(request?: Request) {
     const result = await projectCall(auth.user.id, input.operation, projectId, input);
     if (input.operation === "delete" && projectId)
       await deleteOriginal(projectId).catch(() => undefined);
-    return NextResponse.json(result, { headers });
+    return NextResponse.json(input.operation === "get" ? projectView(result) : result, { headers });
   } catch (error) {
     const code = (error as { code?: string }).code;
     const status = code === "42501" ? 403 : code === "40001" ? 409 : code === "22023" ? 400 : 503;

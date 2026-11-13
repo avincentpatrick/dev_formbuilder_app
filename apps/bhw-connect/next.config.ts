@@ -28,7 +28,17 @@ const nextConfig: NextConfig = {
   // serverless function — without this include the tracer wouldn't bundle
   // public/ files into the function and the locator would silently vanish.
   outputFileTracingIncludes: {
-    "/api/analysis/worker": ["./scripts/analysis-worker.mjs", "./node_modules/unpdf/**/*"],
+    "/api/analysis/projects/[projectId]/statistics/[jobId]/[index]": [
+      "./scripts/statistics/*.py",
+      "./scripts/statistics/requirements.txt",
+      "./lib/exports/fonts/**/*",
+    ],
+    "/api/analysis/worker": [
+      "./scripts/analysis-worker.mjs",
+      "./scripts/statistics/*.py",
+      "./scripts/statistics/requirements.txt",
+      "./node_modules/unpdf/**/*",
+    ],
     "/place/[geoLevel]/[geoCode]": ["./public/geo/**/*"],
     // Server-side PNG/PPTX exports rasterize with @resvg/resvg-js, which needs
     // real font files at runtime (lib/exports/render-png.ts) — Vercel's

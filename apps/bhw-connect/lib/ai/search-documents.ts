@@ -113,10 +113,13 @@ export function renderCitation(row: {
   return `${row.doc_title}, ${page}`;
 }
 
+export type DocumentAccess = { allowUploads?: boolean; libraryKeys?: string[]; actor?: string };
+
 export async function executeSearchDocuments(
   rawArgs: Record<string, unknown>,
-  { allowUploads = false }: { allowUploads?: boolean } = {},
+  access: DocumentAccess = {},
 ): Promise<SearchDocumentsResult | SearchDocumentsError> {
+  const { allowUploads = false, libraryKeys, actor } = access;
   const parsed = searchDocumentsArgsSchema.safeParse(rawArgs);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -129,21 +132,35 @@ export async function executeSearchDocuments(
   const args = parsed.data;
   const limit = args.limit ?? DEFAULT_SEARCH_RESULTS;
 
-  const embedded = await embedQuery(args.query);
+  const embedded = libraryKeys
+    ? { ok: false as const, reason: "no-corpus-embedding" as const }
+    : await embedQuery(args.query);
   const warnings: string[] = [];
-  if (!embedded.ok) warnings.push(EMBEDDING_UNAVAILABLE_NOTE[embedded.reason]);
+  if (!embedded.ok && !libraryKeys) warnings.push(EMBEDDING_UNAVAILABLE_NOTE[embedded.reason]);
 
   try {
     const supabase = createSupabaseServiceClient();
-    const { data, error } = await supabase
-      .rpc("search_documents", {
-        p_query: args.query,
-        p_limit: limit,
-        p_embedding: embedded.ok ? embedded.value.embedding : null,
-        p_model: embedded.ok ? embedded.value.model : null,
-        p_doc_key: args.document ?? null,
-      } as never)
-      .abortSignal(AbortSignal.timeout(SEARCH_TIMEOUT_MS));
+    const { data, error } = libraryKeys
+      ? await supabase
+          .rpc(
+            "search_library_documents" as never,
+            {
+              p_actor: actor,
+              p_keys: libraryKeys,
+              p_query: args.query,
+              p_limit: limit,
+            } as never,
+          )
+          .abortSignal(AbortSignal.timeout(SEARCH_TIMEOUT_MS))
+      : await supabase
+          .rpc("search_documents", {
+            p_query: args.query,
+            p_limit: limit,
+            p_embedding: embedded.ok ? embedded.value.embedding : null,
+            p_model: embedded.ok ? embedded.value.model : null,
+            p_doc_key: args.document ?? null,
+          } as never)
+          .abortSignal(AbortSignal.timeout(SEARCH_TIMEOUT_MS));
 
     if (error) return { error: `Document search failed: ${error.message}` };
 
@@ -226,7 +243,7 @@ export async function executeSearchDocuments(
 }
 
 /** The tool as the model sees it. Internal only: it reads doc_chunk, which is service-role only. */
-export function createSearchDocumentsTool(access: { allowUploads?: boolean } = {}): Tool {
+export function createSearchDocumentsTool(access: DocumentAccess = {}): Tool {
   return {
     definition: {
       name: "searchDocuments",

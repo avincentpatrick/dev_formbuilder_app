@@ -254,3 +254,27 @@ it("excludes library uploads unless the trusted caller enables admin access", as
   const result = await executeSearchDocuments({ query: "policy" });
   expect("results" in result && result.results).toEqual([]);
 });
+
+it("uses only the server-validated library selection even when the model names another document", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  response = { data: [row({ doc_key: `upload:${id}` })], error: null };
+  qualityResponse = { data: [{ id, warnings: [] }], error: null };
+  const result = await executeSearchDocuments(
+    { query: "referral", document: "unselected-document" },
+    {
+      allowUploads: true,
+      actor: id,
+      libraryKeys: [`upload:${id}`],
+    },
+  );
+  expect("results" in result && result.results).toHaveLength(1);
+  expect(calls[0]).toEqual({
+    fn: "search_library_documents",
+    params: {
+      p_actor: id,
+      p_keys: [`upload:${id}`],
+      p_query: "referral",
+      p_limit: DEFAULT_SEARCH_RESULTS,
+    },
+  });
+});

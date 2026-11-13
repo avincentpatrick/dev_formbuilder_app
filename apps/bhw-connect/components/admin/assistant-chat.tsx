@@ -88,10 +88,14 @@ export function AssistantChat({
   initialScope = null,
   dataset,
   canReport = false,
+  libraryVersion,
+  libraryCollection,
 }: {
   initialScope?: RouteScope | null;
   dataset?: string;
   canReport?: boolean;
+  libraryVersion?: string;
+  libraryCollection?: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   // Increment 5.1. Three separate pieces of state, because they have three different lifetimes.
@@ -209,6 +213,8 @@ export function AssistantChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dataset,
+          libraryVersion,
+          libraryCollection,
           messages: history.filter((t) => t.role !== "system").slice(-30),
           // Omitted entirely when nothing is pinned, so the server's schema sees `undefined`
           // rather than an empty object it would have to treat as cleared fields.

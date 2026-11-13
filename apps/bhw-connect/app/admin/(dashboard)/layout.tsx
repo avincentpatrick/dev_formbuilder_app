@@ -48,7 +48,7 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
       </div>
 
       <div className="flex flex-col gap-6 sm:flex-row">
-        <AdminNav />
+        <AdminNav showDocuments={admin.role === "admin"} />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>

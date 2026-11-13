@@ -48,3 +48,8 @@ export async function saveDocument(bytes: Uint8Array, root?: string): Promise<st
 export async function readDocument(key: string, root?: string): Promise<Buffer> {
   return readFile(/*turbopackIgnore: true*/ locate(key, root));
 }
+
+/** Only remove a newly written exact-duplicate original after DB confirms reuse. */
+export async function removeDocument(key: string, root?: string): Promise<void> {
+  await unlink(/*turbopackIgnore: true*/ locate(key, root));
+}

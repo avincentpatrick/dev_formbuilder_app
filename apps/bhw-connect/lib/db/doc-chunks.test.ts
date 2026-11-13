@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-const { row } = vi.hoisted(() => ({ row: { status: "approved", key: "synthetic" } }));
-vi.mock("./require-admin", () => ({ getStrictAdminUser: async () => null }));
+const { row } = vi.hoisted(() => ({ row: { status: "approved", key: "synthetic", admin: false } }));
+vi.mock("./require-admin", () => ({
+  getStrictAdminUser: async () => (row.admin ? { id: "synthetic-admin", role: "admin" } : null),
+}));
 vi.mock("./service-client", () => ({
   createSupabaseServiceClient: () => ({
     from: () => ({
@@ -31,7 +33,18 @@ describe("analyst source visibility", () => {
 });
 
 it("denies an uploaded library citation to an approved non-admin", async () => {
-  row.status = "approved"; row.key = "upload:11111111-1111-4111-8111-111111111111";
+  row.status = "approved";
+  row.key = "upload:11111111-1111-4111-8111-111111111111";
   expect(await getDocChunk(1, true)).toBeNull();
   row.key = "synthetic";
+});
+
+it("keeps retired upload citations readable to strict admins", async () => {
+  row.status = "rejected";
+  row.key = "upload:11111111-1111-4111-8111-111111111111";
+  row.admin = true;
+  expect((await getDocChunk(1, true))?.document).toBe(row.key);
+  row.status = "approved";
+  row.key = "synthetic";
+  row.admin = false;
 });

@@ -63,6 +63,7 @@ const ADMIN_TRAILS: Record<string, Crumb[]> = {
   "/admin/feedback": [BHW_CRUMB, ADMIN_CRUMB, { label: "Feedback" }],
   "/admin/usage": [BHW_CRUMB, ADMIN_CRUMB, { label: "Usage" }],
   "/admin/changelog": [BHW_CRUMB, ADMIN_CRUMB, { label: "Changelog" }],
+  "/admin/documents": [BHW_CRUMB, ADMIN_CRUMB, { label: "Document library" }],
   "/admin/ingestion": [BHW_CRUMB, ADMIN_CRUMB, { label: "Ingestion history" }],
   "/admin/ai-quota": [BHW_CRUMB, ADMIN_CRUMB, { label: "AI quota" }],
   "/admin/answer-bank": [BHW_CRUMB, ADMIN_CRUMB, { label: "Answer bank" }],
@@ -134,6 +135,14 @@ export function trailForPathname(pathname: string): Crumb[] | null {
     ];
   }
 
+  if (path.startsWith("/admin/documents/"))
+    return [
+      PORTAL_CRUMB,
+      BHW_CRUMB,
+      ADMIN_CRUMB,
+      { label: "Document library", href: "/admin/documents" },
+      { label: "Document" },
+    ];
   const trail = STATIC_TRAILS[path];
   return trail ? [PORTAL_CRUMB, ...trail] : null;
 }

@@ -38,7 +38,7 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   const admin = await getAdminUser();
-  if (!admin) {
+  if (!admin || admin.role !== "admin") {
     return NextResponse.json({ error: "Admin session required." }, { status: 401 });
   }
 

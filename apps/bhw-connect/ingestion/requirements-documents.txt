@@ -1,0 +1,3 @@
+# Reproducible worker dependencies (Python 3.12 x64); local Tesseract is installed separately.
+PyMuPDF==1.26.6
+psycopg2-binary==2.9.13

@@ -123,3 +123,10 @@ describe("POST /api/ai/assistant/regression — what a case stores", () => {
     expect((await response.json()).error).toContain("nothing was saved");
   });
 });
+
+it("refuses editors before using internal evidence", async () => {
+  getAdminUser.mockResolvedValue({ ...ADMIN, role: "editor" });
+  const response = await POST(post(report()));
+  expect(response.status).toBe(401);
+  expect(recordRegressionCase).not.toHaveBeenCalled();
+});

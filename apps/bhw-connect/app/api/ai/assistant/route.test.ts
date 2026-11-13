@@ -637,3 +637,10 @@ describe("POST /api/ai/assistant — figures (Increment 5.5)", () => {
     expect(types.indexOf("message")).toBeLessThan(types.indexOf("figure"));
   });
 });
+
+it("refuses editors before using internal evidence", async () => {
+  getAdminUser.mockResolvedValue({ ...ADMIN, role: "editor" });
+  const response = await POST(ask());
+  expect(response.status).toBe(401);
+  expect(runToolLoop).not.toHaveBeenCalled();
+});

@@ -8,10 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const calls: { fn: string; params: Record<string, unknown> }[] = [];
 let response: { data: unknown; error: { message: string } | null } = { data: [], error: null };
+let qualityResponse: { data: unknown[]; error: unknown } = { data: [], error: null };
 let embedResult: unknown = { ok: false, reason: "no-corpus-embedding" };
 
 vi.mock("@/lib/db/service-client", () => ({
   createSupabaseServiceClient: () => ({
+    from: () => ({ select: () => ({ in: () => ({ abortSignal: async () => qualityResponse }) }) }),
     rpc: (fn: string, params: Record<string, unknown>) => {
       calls.push({ fn, params });
       return { abortSignal: () => Promise.resolve(response) };
@@ -67,6 +69,7 @@ async function refusal(args: Record<string, unknown>) {
 
 beforeEach(() => {
   calls.length = 0;
+  qualityResponse = { data: [], error: null };
   response = { data: [], error: null };
   embedResult = { ok: false, reason: "no-corpus-embedding" };
 });
@@ -217,4 +220,28 @@ describe("searchDocuments — the tool the model is shown", () => {
   it("returns a refusal through execute rather than throwing", async () => {
     await expect(tool.execute({})).resolves.toHaveProperty("error");
   });
+});
+
+it("includes uploaded extraction limitations without blocking keyword hits", async () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+  response = { data: [row({ doc_key: `upload:${id}` })], error: null };
+  qualityResponse = {
+    data: [{ id, warnings: [{ page: 1, code: "ocr_failed_page_incomplete" }] }],
+    error: null,
+  };
+  const result = await ok({ query: "referral" });
+  expect(result.results).toHaveLength(1);
+  expect(result.results[0].citation).toContain("PDF page 27");
+  expect(result.warnings.join(" ")).toContain("must not be treated as completely reviewed");
+});
+
+it("reports unknown uploaded extraction quality instead of claiming completeness", async () => {
+  response = {
+    data: [row({ doc_key: "upload:11111111-1111-4111-8111-111111111111" })],
+    error: null,
+  };
+  qualityResponse = { data: [], error: { message: "offline" } };
+  const result = await ok({ query: "referral" });
+  expect(result.results).toHaveLength(1);
+  expect(result.warnings.join(" ")).toContain("quality could not be checked");
 });

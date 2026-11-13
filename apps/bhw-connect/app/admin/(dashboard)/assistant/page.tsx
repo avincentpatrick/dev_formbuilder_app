@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import { getStrictAdminUser } from "@/lib/db/require-admin";
 import { AssistantChat } from "@/components/admin/assistant-chat";
 import { listRegisteredDatasets } from "@/lib/db/dataset-registry";
 import { listOpenRegressionCases } from "@/lib/db/regression-cases";
@@ -14,6 +16,7 @@ import { withBasePath } from "@/lib/base-path";
  * before asking anything, not something to discover by being refused.
  */
 export default async function AdminAssistantPage() {
+  if (!(await getStrictAdminUser())) notFound();
   const [datasets, openCases] = await Promise.all([
     listRegisteredDatasets("internal"),
     listOpenRegressionCases(),

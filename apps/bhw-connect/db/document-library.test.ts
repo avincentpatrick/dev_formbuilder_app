@@ -195,4 +195,75 @@ describe.skipIf(!database)("document library PostgreSQL contract", () => {
       await client.query("rollback");
     }
   });
+  it("protects the library facade from browser roles and records queued/duplicate attempts transactionally", async () => {
+    await client.query("begin");
+    try {
+      for (const role of ["anon", "authenticated"]) {
+        await client.query(`set local role ${role}`);
+        await client.query("savepoint denied_rpc");
+        await expect(
+          client.query("select document_library_api(gen_random_uuid(),'list')"),
+        ).rejects.toMatchObject({ code: "42501" });
+        await client.query("rollback to savepoint denied_rpc");
+        await client.query("reset role");
+      }
+      const actor = randomUUID();
+      await client.query("insert into admin_users values($1,'admin')", [actor]);
+      await client.query("set local role service_role");
+      const attempt = async () =>
+        (
+          await client.query("select document_library_api($1,'attempt',$2) as data", [
+            actor,
+            JSON.stringify({ filename: "synthetic.pdf", outcome: "receiving" }),
+          ])
+        ).rows[0].data.id;
+      const register = async () =>
+        (
+          await client.query("select document_library_api($1,'register',$2) as data", [
+            actor,
+            JSON.stringify({
+              attempt: await attempt(),
+              title: "Synthetic API policy",
+              storageKey: `${randomUUID()}.pdf`,
+              bytes: 100,
+              sha256: "f".repeat(64),
+              tags: [],
+            }),
+          ])
+        ).rows[0].data;
+      const first = await register();
+      expect(first.duplicate).toBe(false);
+      const duplicate = await register();
+      expect(duplicate).toEqual({ duplicate: true, versionId: first.versionId });
+      const listed = (await client.query("select document_library_api($1,'list') as data", [actor]))
+        .rows[0].data;
+      expect(
+        listed.versions.some(
+          (v: { id: string; stage: string }) => v.id === first.versionId && v.stage === "queued",
+        ),
+      ).toBe(true);
+      expect(listed.attempts.some((a: { outcome: string }) => a.outcome === "duplicate")).toBe(
+        true,
+      );
+      await client.query("select document_library_api($1,'archive',$2)", [
+        actor,
+        JSON.stringify({ version: first.versionId, archived: true }),
+      ]);
+      const hidden = (
+        await client.query("select document_library_api($1,'list',$2) as data", [
+          actor,
+          JSON.stringify({ archived: "false" }),
+        ])
+      ).rows[0].data;
+      expect(hidden.versions.some((v: { id: string }) => v.id === first.versionId)).toBe(false);
+      await client.query("update admin_users set role='editor' where user_id=$1", [actor]);
+      await client.query("savepoint denied_editor");
+      await expect(
+        client.query("select document_library_api($1,'list')", [actor]),
+      ).rejects.toMatchObject({ code: "42501" });
+      await client.query("rollback to savepoint denied_editor");
+    } finally {
+      await client.query("rollback");
+    }
+  });
 });

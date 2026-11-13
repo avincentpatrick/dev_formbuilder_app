@@ -159,16 +159,16 @@ leaves keyword search usable. OCR is not presented as guaranteed accurate.
 
 ## Phase 3 — Admin document library
 
-- [ ] Add `/admin/documents` and an admin navigation entry, respecting the application base path.
-- [ ] Provide mobile-usable upload, progress, retry, and catalog views, with search and filters by
+- [x] Add `/admin/documents` and an admin navigation entry, respecting the application base path.
+- [x] Provide mobile-usable upload, progress, retry, and catalog views, with search and filters by
   title, issuer, type, tags, dates, and processing state.
-- [ ] Display document/version detail: metadata, original download, complete extracted text,
+- [x] Display document/version detail: metadata, original download, complete extracted text,
   per-page warnings, processing history, and search availability.
-- [ ] Support version replacement, supersession metadata, archive/unarchive, and duplicate feedback.
+- [x] Support version replacement, supersession metadata, archive/unarchive, and duplicate feedback.
   Archive excludes a document from default future retrieval while retaining historical citations.
-- [ ] Activate usable source text automatically after persistence and lexical indexing; no approval
+- [x] Activate usable source text automatically after persistence and lexical indexing; no approval
   button or mandatory reviewer step. Keep OCR warnings visible after activation.
-- [ ] Provide “Ask about this document/collection” through the shared admin assistant with source
+- [x] Provide “Ask about this document/collection” through the shared admin assistant with source
   selection carried server-side or validated by the server.
 
 **Acceptance:** An admin uploads a PDF, sees it cataloged, waits for processing, reads its text,
@@ -273,7 +273,7 @@ assistant, and request a verifiable full-collection review with optional online 
 | --- | --- | --- |
 | 1 — Contracts and access | In progress | Additive schema, strict assistant/API/source guards, private atomic storage, and contracts in POLICY_DOCUMENT_STORAGE.md. Upload endpoints remain later phases. Local migration/RLS checks passed (80 related tests); 16 local browser/API checks passed; scanned/mixed synthetic probes completed. Windows acceptance and worker enforcement remain. |
 | 2 — Extraction and OCR | Implemented; Windows acceptance pending | Generic parser, local OCR, leased queue, atomic lexical activation, separate embeddings; 16 synthetic Python/DB tests pass. See POLICY_DOCUMENT_WORKER.md. Operator must validate Windows runtime/languages/process limits before deployment. |
-| 3 — Admin library | Not started | No general upload UI in inspected checkout. |
+| 3 — Admin library | Implemented and locally verified | Upload/catalog/detail/downloads/retries/versions/archives and validated shared Ask the Data selection. Ten browser acceptance groups passed with synthetic identity/provider. Windows worker setup remains deployment work. |
 | 4 — Combined analysis | Not started | Reuse existing assistant and document/dataset tools. |
 | 5 — Full-collection review | Not started | Requires durable runs and explicit coverage accounting. |
 | 6 — Online research | Not started | Per-question opt-in; provider not selected. |
@@ -390,3 +390,56 @@ prefixed production build after the PDF-source viewer update. The final Python
 suite now includes 16 tests; JavaScript/PostgreSQL code-point checks explicitly
 include an astral character as well as café. Lint/types and the production build
 passed after those final changes. Local test containers were stopped afterward.
+
+### Phase 3 implementation (2026-11-13)
+
+Phase 1/2 PR #514 merged with all required checks passing, commit
+`bba719b08f414d4eceae40a3912fdd7bd9c6fd34`. Reconciled the current `/ask-the-data`
+workspace and its separate dashboard approval with strict BHW-admin-only library
+access. Other approved analysis users cannot retrieve uploads through generic
+search or guessed citation IDs. Existing dataset/project capabilities remain.
+
+Added `/admin/documents` and role-aware navigation; bounded PDF upload, catalog
+filters (title, agency, type, tags, dates, state), attempts/duplicate feedback,
+version details, physical-page text and quality warnings, original/complete-text
+downloads, processing history, retries/reprocessing, metadata correction,
+new-version uploads, supersession metadata, archive/unarchive and revision history.
+Successful worker publication activates text without approval or embeddings.
+Archive removes future default search eligibility but retains old citation text.
+
+`20261113120000_document_library_api.sql` checks strict admin on each operation,
+serializes exact-hash duplicate registration, queues transactionally and scopes
+lexical search to validated active current versions. Ask links pass a version or
+collection to the existing shared engine/component; the server resolves eligible
+keys again on every question, and model arguments cannot widen that scope.
+Quick collection questions explicitly do not promise exhaustive review (Phase 5).
+
+API requests have byte bounds, same-origin mutation checks, safe rejection
+history and private/no-store attachment downloads. Uncertain DB responses retain
+possibly registered originals for later reconciliation. Canonical text is viewed
+one physical page at a time or downloaded completely; the metadata-editor client
+does not receive the whole canonical text through serialized props.
+
+`scripts/verify-document-library.mjs` passed ten Chromium acceptance groups at
+390px width using real local PostgreSQL/PostgREST/OCR, fake Meridian identities
+and a synthetic provider transport. It verified upload after tab close, mixed
+OCR/text/warnings, originals/full-text download, duplicates, a second admin,
+signed-out/editor/member direct denial, a scoped answer with a real retrieved
+citation, metadata/filters, archive/history/unarchive and immutable reprocessing.
+No live Meridian, external research or paid AI-provider call was made.
+Focused tests also cover file/DB failures, invalid bytes/dates, duplicate cleanup,
+cross-origin rejection and validated source scope. Final counts follow below.
+
+Live Windows worker/language/ACL/process-limit verification and real-provider
+upload-to-answer acceptance remain Phase 7 operator requirements. This increment
+does not claim the box is ready to process uploads. Next application work is
+Phase 4 combined policy/dataset analysis.
+
+Final Phase 3 verification: full app suite 1,828 passed / 13 skipped; 16 Python
+parser/worker tests passed; ten browser acceptance groups passed. The seven
+library PostgreSQL tests include a dedicated disposable DB and direct function
+permission checks for anon/authenticated/editor roles. Lint passed with one
+existing deliberate-fixture warning; types, migration lint, prefixed production
+build and whitespace checks passed. Worker errors now preserve only allowlisted,
+fixed parser reasons (e.g. encrypted PDF, page limit, missing OCR language data)
+for useful catalog failures without retaining parser stderr or document text.

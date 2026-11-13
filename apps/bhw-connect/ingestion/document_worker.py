@@ -24,6 +24,10 @@ MAX_TEXT_BYTES = 64 * 1024 * 1024
 KEY = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf")
 
 
+class ExtractionFailure(Exception):
+    """Only fixed local failure messages, safe to show in the catalog."""
+
+
 class LostLease(Exception):
     pass
 
@@ -199,14 +203,30 @@ def process(conn, job, storage, languages="eng", tesseract="tesseract"):
                         last_heartbeat = now
                     time.sleep(.2)
                 if child.returncode != 0:
-                    # No parser stderr or document passages in job errors.
-                    raise ValueError("Local extraction failed; PDF may be empty, encrypted, corrupt or OCR unavailable")
+                    # Parser stdout contains fixed control messages only. Never retain stderr.
+                    allowed = {"PDF exceeds 25 MiB", "PDF could not be opened", "Only PDF files are accepted",
+                               "Encrypted PDF is not supported", "PDF must contain 1 to 300 pages",
+                               "Local OCR is unavailable", "Required OCR language data is missing",
+                               "Extracted text exceeds resource limit", "PDF contains no readable text"}
+                    reason = "Local extraction failed; check PDF integrity, limits and OCR installation"
+                    for line in reversed(progress_file.read_text(encoding="utf-8").splitlines()):
+                        try:
+                            message = json.loads(line).get("error")
+                            if message in allowed:
+                                reason = message
+                                break
+                        except json.JSONDecodeError:
+                            continue
+                    raise ExtractionFailure(reason)
                 if output.stat().st_size > MAX_TEXT_BYTES:
                     raise ValueError("Extracted text exceeds resource limit")
                 result = json.loads(output.read_text(encoding="utf-8"))
                 heartbeat(conn, job, "indexing", 95)
                 publish(conn, job, result)
     except LostLease:
+        return False
+    except ExtractionFailure as exc:
+        fail(conn, job, str(exc))
         return False
     except TimeoutError:
         fail(conn, job, "Extraction exceeded 600 seconds")

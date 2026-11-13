@@ -9913,3 +9913,25 @@ on either citation path. Existing approved-user access to other dataset/project
 features is unchanged. The new processing migration uses a distinct timestamp
 from main's analysis-source migration. Reconciliation checks: 1,796 tests passed,
 33 database-dependent cases skipped; types, prefixed build and migration lint pass.
+
+
+## 2026-11-13 — Phase 3 private shared document library
+
+Added strict-admin library pages/APIs, bounded uploads with exact-duplicate reuse,
+durable progress/retry history, metadata and version management, archive/unarchive,
+per-page warnings, and private original/complete-text downloads. Document and
+collection questions reuse the shared Ask the Data engine with source keys
+resolved and checked on the server, including revocation/archive checks on every
+question. Model document arguments cannot widen a selected library scope.
+
+Ten mobile Chromium acceptance groups passed against real local DB/PostgREST/OCR
+with synthetic identity/provider transports, including closed-tab processing,
+retrieved citations, duplicates, historical citation retention, reprocessing,
+shared admins and direct denial of other roles. No live provider was called.
+Phase 1/2 PR #514 merged with green required checks. Windows worker installation
+and real-provider acceptance remain deployment work; the plan records details.
+
+Final Phase 3 checks: 1,828 app tests passed, 13 skipped; 16 Python tests and ten
+browser acceptance groups passed. Types, lint, migration lint and the prefixed
+build passed. Library DB tests provision their own disposable schema/database;
+facade permissions and transactional queued/duplicate attempt history are tested.

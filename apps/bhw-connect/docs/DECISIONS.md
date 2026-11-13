@@ -9900,3 +9900,16 @@ Phase 3 merged in PR #512. Selected the planned fixed Python/NumPy/SciPy/pandas/
 Calculations consume complete, filtered immutable input snapshots and retain parameters, source/definition hashes, diagnostics, software versions and random seeds. Sampling tests require documented independent sample units; census/aggregate descriptions do not gain p-values by default. Field references replace raw-number membership validation for calculated prose, while citation checks remain. One structured result powers the deterministic explanatory narrative, scientific tables, figures and CSV/XLSX/SVG/PNG/JSON exports. Saved-manifest replay compares result hashes without rewriting history. All data/exports/replays remain project-private and use the Phase 3 source/project deletion lifecycle.
 
 No schema/shared deployment changes, subscriptions or per-user quotas were added. Numerical reference tests, method limitations, reproducibility and actual host setup are documented in ASK_THE_DATA_STATISTICS_OPERATIONS.md. Maps/spatial analysis and reports/decks remain later phases.
+
+### Reconcile with the newer Ask the Data workspace before merging
+
+Main moved the assistant into the shared `/ask-the-data` engine with dashboard
+approval and private projects. Preserve that workspace and its statistical/source
+features. The admin compatibility page/API still require strict admin access;
+the engine only enables uploaded-library retrieval after resolving a strict admin
+server-side. Default tool creation excludes uploaded-library sources (including
+background project jobs), and uploaded chunk lookup independently rechecks admin
+on either citation path. Existing approved-user access to other dataset/project
+features is unchanged. The new processing migration uses a distinct timestamp
+from main's analysis-source migration. Reconciliation checks: 1,796 tests passed,
+33 database-dependent cases skipped; types, prefixed build and migration lint pass.

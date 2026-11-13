@@ -95,16 +95,27 @@ export type SearchDocumentsError = { error: string };
  */
 export function renderCitation(row: {
   doc_title: string;
+  doc_key?: string;
   page_from: number;
   page_to: number;
 }): string {
   const page =
-    row.page_to > row.page_from ? `slides ${row.page_from}–${row.page_to}` : `slide ${row.page_from}`;
+    row.page_to > row.page_from
+      ? `slides ${row.page_from}–${row.page_to}`
+      : `slide ${row.page_from}`;
+  if (row.doc_key?.startsWith("upload:")) {
+    const physical =
+      row.page_to > row.page_from
+        ? `PDF pages ${row.page_from}–${row.page_to}`
+        : `PDF page ${row.page_from}`;
+    return `${row.doc_title}, ${physical}`;
+  }
   return `${row.doc_title}, ${page}`;
 }
 
 export async function executeSearchDocuments(
   rawArgs: Record<string, unknown>,
+  { allowUploads = false }: { allowUploads?: boolean } = {},
 ): Promise<SearchDocumentsResult | SearchDocumentsError> {
   const parsed = searchDocumentsArgsSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -136,7 +147,9 @@ export async function executeSearchDocuments(
 
     if (error) return { error: `Document search failed: ${error.message}` };
 
-    const rows = (data ?? []) as SearchRow[];
+    const rows = ((data ?? []) as SearchRow[]).filter(
+      (row) => allowUploads || !row.doc_key.startsWith("upload:"),
+    );
     const results: DocumentHit[] = rows.map((row) => {
       const truncated = row.content.length > MAX_EXCERPT_CHARS;
       return {
@@ -156,11 +169,42 @@ export async function executeSearchDocuments(
       };
     });
 
+    const uploaded = [
+      ...new Set(
+        rows.map((row) => row.doc_key).filter((key) => /^upload:[0-9a-f-]{36}$/.test(key)),
+      ),
+    ];
+    if (uploaded.length) {
+      try {
+        const quality = await supabase
+          .from("document_extraction")
+          .select("id,warnings")
+          .in(
+            "id",
+            uploaded.map((key) => key.slice(7)),
+          )
+          .abortSignal(AbortSignal.timeout(SEARCH_TIMEOUT_MS));
+        if (quality.error || quality.data?.length !== uploaded.length)
+          throw new Error("Unavailable quality record");
+        for (const extraction of quality.data ?? []) {
+          if (Array.isArray(extraction.warnings) && extraction.warnings.length) {
+            warnings.push(
+              `Document upload:${extraction.id} has OCR, layout or unreadable-page warnings. OCR may be inaccurate and this source must not be treated as completely reviewed. The stored extraction warnings identify the affected PDF pages.`,
+            );
+          }
+        }
+      } catch {
+        warnings.push(
+          "Uploaded document extraction quality could not be checked; do not assume accurate OCR or complete coverage.",
+        );
+      }
+    }
+
     if (results.length === 0) {
       // A refusal that teaches, as queryDataset's do: "no rows" invites the model to state the
       // emptiness as a finding, which for a document search is an assertion about the corpus.
       warnings.push(
-        "No chunk matched. This means the words were not found, not that the corpus lacks the topic — try a distinctive phrase from the document, an exact code (\"DC No. 2025-0549\"), or a different wording.",
+        'No chunk matched. This means the words were not found, not that the corpus lacks the topic — try a distinctive phrase from the document, an exact code ("DC No. 2025-0549"), or a different wording.',
       );
     }
 
@@ -182,7 +226,7 @@ export async function executeSearchDocuments(
 }
 
 /** The tool as the model sees it. Internal only: it reads doc_chunk, which is service-role only. */
-export function createSearchDocumentsTool(): Tool {
+export function createSearchDocumentsTool(access: { allowUploads?: boolean } = {}): Tool {
   return {
     definition: {
       name: "searchDocuments",
@@ -210,7 +254,7 @@ export function createSearchDocumentsTool(): Tool {
       },
     },
     async execute(args) {
-      return executeSearchDocuments(args);
+      return executeSearchDocuments(args, access);
     },
   };
 }

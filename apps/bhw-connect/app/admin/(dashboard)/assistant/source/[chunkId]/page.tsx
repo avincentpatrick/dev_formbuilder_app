@@ -1,3 +1,4 @@
+import { getStrictAdminUser } from "@/lib/db/require-admin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDocChunk } from "@/lib/db/doc-chunks";
@@ -24,6 +25,7 @@ export default async function AssistantSourcePage({
 }: {
   params: Promise<{ chunkId: string }>;
 }) {
+  if (!(await getStrictAdminUser())) notFound();
   const { chunkId } = await params;
   const id = Number(chunkId);
   if (!Number.isInteger(id) || id < 1) notFound();
@@ -31,8 +33,11 @@ export default async function AssistantSourcePage({
   const chunk = await getDocChunk(id);
   if (!chunk) notFound();
 
+  const uploaded = chunk.document.startsWith("upload:");
   const pageLabel =
-    chunk.pageTo > chunk.pageFrom ? `Slides ${chunk.pageFrom}–${chunk.pageTo}` : `Slide ${chunk.pageFrom}`;
+    chunk.pageTo > chunk.pageFrom
+      ? `${uploaded ? "PDF pages" : "Slides"} ${chunk.pageFrom}–${chunk.pageTo}`
+      : `${uploaded ? "PDF page" : "Slide"} ${chunk.pageFrom}`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -75,15 +80,16 @@ export default async function AssistantSourcePage({
         <p className="mt-2 text-xs text-muted">
           Read from <span className="font-mono">doc_chunk</span> by id just now — not the copy the
           answer was built from. A quotation that does not appear above did not come from this
-          slide.
+          source passage.
         </p>
       </div>
 
       <p className="text-xs text-muted">
         Extracted by <span className="font-mono">{chunk.extractor}</span> from{" "}
-        <span className="font-mono">{chunk.sourcePath}</span>. Slide numbering is the PDF&apos;s, which
-        is what the plan cites by; the deck&apos;s own printed numbers are absent from most slides and
-        offset from the PDF page by a varying amount.
+        <span className="font-mono">{chunk.sourcePath}</span>. Numbers refer to physical PDF pages,
+        which may differ from printed page labels.{" "}
+        {uploaded &&
+          "Local OCR may be inaccurate; extraction and layout warnings remain part of this source's evidence limitations."}
       </p>
     </div>
   );

@@ -28,7 +28,11 @@ vi.mock("./service-client", () => ({ createSupabaseServiceClient }));
 
 const { getAdminAuthResult, getAdminUser } = await import("./require-admin");
 
-const MEMBER = { id: "0195f3c4-1a2b-7c3d-8e4f-5a6b7c8d9e0f", name: "Ana Reyes", email: "ana@example.test" };
+const MEMBER = {
+  id: "0195f3c4-1a2b-7c3d-8e4f-5a6b7c8d9e0f",
+  name: "Ana Reyes",
+  email: "ana@example.test",
+};
 
 beforeEach(() => {
   identity.current = { status: "signed_out" };
@@ -79,4 +83,16 @@ describe("getAdminAuthResult", () => {
     });
     expect(await getAdminAuthResult()).toEqual({ status: "signed_out" });
   });
+});
+
+it("restricts the library and assistant to the strict admin role", async () => {
+  const { getStrictAdminUser } = await import("./require-admin");
+  expect(await getStrictAdminUser()).toBeNull();
+  identity.current = { status: "signed_in", user: MEMBER };
+  for (const role of ["editor", "member", "unexpected"]) {
+    fakeAdminRow.current = { role };
+    expect(await getStrictAdminUser()).toBeNull();
+  }
+  fakeAdminRow.current = { role: "admin" };
+  expect((await getStrictAdminUser())?.id).toBe(MEMBER.id);
 });

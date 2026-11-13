@@ -8,6 +8,42 @@ export type Database = {
   };
   public: {
     Tables: {
+      document_extraction: {
+        Row: {
+          id: string;
+          version_id: string;
+          revision: number;
+          canonical_text: string;
+          page_map: Json;
+          page_count: number;
+          parser_version: string;
+          ocr_version: string | null;
+          languages: string[];
+          warnings: Json;
+          source_id: number | null;
+          activation_origin: "successful_upload" | null;
+          created_at: string;
+          job_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          version_id: string;
+          revision: number;
+          canonical_text: string;
+          page_map: Json;
+          page_count: number;
+          parser_version: string;
+          ocr_version?: string | null;
+          languages?: string[];
+          warnings?: Json;
+          source_id?: number | null;
+          activation_origin?: "successful_upload" | null;
+          created_at?: string;
+          job_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction"]["Insert"]>;
+        Relationships: [];
+      };
       analysis_users: {
         Row: { user_id: string; approved: boolean; updated_at: string; updated_by: string };
         Insert: { user_id: string; approved?: boolean; updated_at?: string; updated_by: string };

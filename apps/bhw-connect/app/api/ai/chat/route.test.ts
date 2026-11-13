@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const { auth, loop, cache } = vi.hoisted(() => ({ auth: vi.fn(), loop: vi.fn(), cache: vi.fn() }));
+vi.mock("@/lib/db/require-admin", () => ({
+  getStrictAdminUser: async () => ({ id: "synthetic", role: "admin" }),
+}));
 vi.mock("@/lib/db/require-analysis", () => ({ getAnalysisAuthResult: auth }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop: loop }));
 vi.mock("@/lib/ai/ask-cache", () => ({ lookupAskCache: cache, lookupAskCacheNearMatch: cache }));

@@ -3,6 +3,7 @@ import type { AssistantRoute } from "@/lib/ai/route";
 
 const {
   getAnalysisAuthResult,
+  getStrictAdminUser,
   runToolLoop,
   isInternalAssistantRateLimited,
   recordInternalAssistantMessage,
@@ -10,6 +11,7 @@ const {
   routeRequest,
 } = vi.hoisted(() => ({
   getAnalysisAuthResult: vi.fn(),
+  getStrictAdminUser: vi.fn(),
   runToolLoop: vi.fn(),
   isInternalAssistantRateLimited: vi.fn(),
   recordInternalAssistantMessage: vi.fn(),
@@ -33,6 +35,7 @@ const {
   })),
 }));
 
+vi.mock("@/lib/db/require-admin", () => ({ getStrictAdminUser }));
 vi.mock("@/lib/db/require-analysis", () => ({ getAnalysisAuthResult }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop }));
 vi.mock("@/lib/ai/rate-limit", () => ({
@@ -81,6 +84,7 @@ async function eventsOf(response: Response): Promise<Record<string, unknown>[]> 
 }
 
 beforeEach(() => {
+  getStrictAdminUser.mockReset().mockResolvedValue(ADMIN);
   getAnalysisAuthResult.mockReset().mockResolvedValue({ status: "approved", user: ADMIN });
   runToolLoop.mockReset();
   isInternalAssistantRateLimited.mockReset().mockResolvedValue(false);
@@ -680,4 +684,10 @@ it("retains verified calculations when the final provider explanation is unavail
   expect(eventOfType(events, "statistics").results).toEqual([result]);
   expect(eventOfType(events, "message").content).toContain("calculations completed");
   expect(events.some((e) => e.type === "capacity")).toBe(false);
+});
+
+it("denies approved editors on the admin compatibility API", async () => {
+  getStrictAdminUser.mockResolvedValue(null);
+  expect((await POST(ask())).status).toBe(403);
+  expect(runToolLoop).not.toHaveBeenCalled();
 });

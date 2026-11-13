@@ -31,8 +31,13 @@ export async function getAdminAuthResult(): Promise<AdminAuthResult> {
 
     const { user } = identity;
     const service = createSupabaseServiceClient();
-    const { data } = await service.from("admin_users").select("role").eq("user_id", user.id).maybeSingle();
-    if (!data) return { status: "not_admin", email: user.email };
+    const { data } = await service
+      .from("admin_users")
+      .select("role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!data || !["admin", "editor"].includes(data.role))
+      return { status: "not_admin", email: user.email };
 
     return { status: "ok", admin: { id: user.id, email: user.email, role: data.role } };
   } catch {
@@ -43,4 +48,10 @@ export async function getAdminAuthResult(): Promise<AdminAuthResult> {
 export async function getAdminUser(): Promise<AdminUser | null> {
   const result = await getAdminAuthResult();
   return result.status === "ok" ? result.admin : null;
+}
+
+/** Document library and shared assistant: editors have no corpus access. */
+export async function getStrictAdminUser(): Promise<AdminUser | null> {
+  const admin = await getAdminUser();
+  return admin?.role === "admin" ? admin : null;
 }

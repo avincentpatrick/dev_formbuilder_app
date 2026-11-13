@@ -19,6 +19,7 @@ import {
 import { routeRequest } from "@/lib/ai/route-request";
 import { recordInternalAssistantMessage } from "@/lib/ai/rate-limit";
 import type { ChatMessage } from "@/lib/ai/providers/types";
+import { getStrictAdminUser } from "@/lib/db/require-admin";
 import { getAnalysisAuthResult } from "@/lib/db/require-analysis";
 import type { Tool } from "@/lib/ai/tools";
 import { DATASET_SCOPE_IDS } from "@/lib/ai/scope-id";
@@ -84,7 +85,13 @@ function ndjsonStream(
 }
 
 /** Shared approved-user engine. No public cache/log or per-user message quota. */
-export async function analysisChat(request: Request) {
+export function analysisChat(request: Request) {
+  return analysisChatWithAccess(request, false);
+}
+export function adminAnalysisChat(request: Request) {
+  return analysisChatWithAccess(request, true);
+}
+async function analysisChatWithAccess(request: Request, adminOnly: boolean) {
   const auth = await getAnalysisAuthResult();
   if (auth.status !== "approved") {
     return NextResponse.json(
@@ -95,6 +102,9 @@ export async function analysisChat(request: Request) {
     );
   }
 
+  const libraryAdmin = await getStrictAdminUser();
+  if (adminOnly && !libraryAdmin)
+    return NextResponse.json({ error: "Admin role required." }, { status: 403 });
   const json = await request.json().catch(() => null);
   const parsed = analysisInputSchema.safeParse(json);
   if (!parsed.success) {
@@ -103,7 +113,7 @@ export async function analysisChat(request: Request) {
 
   await recordInternalAssistantMessage(auth.user.id);
 
-  return analysisResponse(parsed.data);
+  return analysisResponse(parsed.data, undefined, undefined, [], Boolean(libraryAdmin));
 }
 
 /** The caller must authorize a user or an active durable-job lease before execution. */
@@ -112,6 +122,7 @@ export async function analysisResponse(
   captureEvidence?: (payloads: unknown[]) => void,
   onProgress?: (event: AssistantStreamEvent) => void,
   sourceTools: Tool[] = [],
+  allowLibraryDocuments = false,
 ) {
   // Increment 5.1. Routed off the latest user turn — the route describes the question being asked,
   // not the conversation, and a follow-up ("and its training coverage?") gets its scope from the
@@ -150,7 +161,7 @@ export async function analysisResponse(
     };
     send({ type: "route", route });
     try {
-      const baseTools = createInternalTools();
+      const baseTools = createInternalTools({ allowLibraryDocuments });
       const availableTools = sourceTools.length ? [...baseTools, ...sourceTools] : baseTools;
       const result = await runToolLoop(
         messages,

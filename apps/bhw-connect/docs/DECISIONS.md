@@ -9793,6 +9793,75 @@ which reads no figures. Income classes stay on their own map. District pages lin
 outlines and totals need a reviewed roster attesting complete membership (owner), the barangay package installed
 (operator), and boundaries for the 19 (outside data).
 
+## 2026-11-12 — Policy ingester Phase 1 foundation
+
+Added private catalog/file/version/extraction/job/upload-attempt/audit contracts in
+`20261112090000_document_library_contracts.sql`. Each immutable extraction will map
+to one existing `doc_source`, preserving old chunk IDs. Successful uploaded text
+will use `approved` plus explicit upload activation provenance; inferred KB review
+remains unchanged. Activation and worker transactions are Phase 2 work.
+
+Restricted shared assistant pages and APIs to role `admin`, excluding editors.
+Added private generated-key PDF storage with atomic publication, containment and
+byte limits. `POLICY_DOCUMENT_STORAGE.md` records budgets and recovery contracts.
+
+Verification: lint, types, full unit suite (1,734 passed, 16 skipped), migration
+lint and the prefixed no-database production build passed. Final focused access
+and storage suite: 48 passed. No live database migration, database/RLS integration
+checks, browser checks or Windows validation performed. Phase 1 acceptance remains
+incomplete; see the ingester plan for outstanding measurements and checks.
+
+
+## Policy ingester — local database verification follow-up
+
+Applied the committed development baseline, made-up seed and library migration
+inside an isolated PostgreSQL 15/pgvector 0.8.2 container on loopback port 55442.
+Added six real PostgreSQL contract tests in `db/document-library.test.ts` covering
+private-role permissions, RLS, service writes, revision/duplicate/audit records,
+page constraints and synthetic citation resolution. Together with existing DB
+and assistant access tests: 80 passed, none skipped. Lint and types passed
+(one existing warning in the deliberate base-path defect fixture). No production
+data or infrastructure was used. Remaining Phase 1 acceptance checks are tracked
+in `POLICY_DOCUMENT_INGESTER_PLAN.md`.
+
+
+## 2026-11-13 — Document ingester browser and synthetic OCR checks
+
+Local Chromium verified 16 prefixed assistant/source/API checks against the
+practice DB/PostgREST and fake Meridian identities: only admin sees private
+assistant/citation content; other roles receive API denial. Added repeatable
+`scripts/verify-document-access.mjs` with synthetic fixture cleanup.
+`ingestion/measure_document_limits.py` measured local English OCR on scanned and
+mixed synthetic PDFs (0.246–0.417 s/page); native extraction misses the embedded
+scan even if a selectable header exists. Retain conservative initial limits;
+Windows performance and Filipino language data remain operator checks. No live
+service calls or AI-provider calls were used. See the ingester storage contract.
+
+
+## 2026-11-13 — Policy ingester Phase 2: local extraction and durable jobs
+
+Added generic PyMuPDF/local Tesseract parsing; image-bearing pages receive OCR
+regardless of an existing text layer. Full canonical text, physical-page maps,
+quality limitations and bounded chunks are persisted in one activation transaction.
+No deck font rules or inferred-fact approval gate apply to uploaded source text.
+Each new revision gets an immutable source/chunk identity; old sources retire from
+default search via status while citations remain addressable. Retrieval reports
+OCR/layout/unreadable-page limits and uses PDF page labels for uploaded sources.
+
+Added atomic queue submission with strict-admin checks; SKIP LOCKED claims,
+heartbeats, lease tokens, three-attempt retries, crash recovery and safe errors.
+Subprocesses have size/page/time/raster/memory budgets; parser/OCR children receive
+no provider/database credentials. Windows Job Object enforcement is implemented
+but remains unverified on the deployment. Embedding uses separate opt-in jobs and
+stored measured dimensions; provider failure cannot remove keyword availability.
+
+Local verification: 16 synthetic parser/real-DB worker tests passed, including
+SIGTERM recovery and timeout cleanup. App suite: 1,748 passed, 11 skipped; lint,
+types, migration lint and prefixed build passed. No live provider calls occurred.
+Worker process model/prerequisites/settings/licenses and pending Windows/operator
+checks are in `POLICY_DOCUMENT_WORKER.md`. Phase 3 upload library is next; no worker
+was installed on the server and no shared deployment paths were changed.
+
 ## 2026-11-12 — Unified Ask the Data Phase 0 design
 
 Completed the design-only phase requested by the owner. See [build plan](ASK_THE_DATA_BUILD_PLAN.md) and [technical design](ASK_THE_DATA_PHASE_0_DESIGN.md). Confirmed removal of anonymous Ask the Data in Phase 1; approved dashboard users share one dataset catalogue, while projects/files remain private unless shared. Approval does not grant administrator privileges. Selected a PostgreSQL-backed durable queue and typed Python statistical worker as the design direction, subject to actual Windows-host compatibility verification. Existing raw-number auditing must evolve to validate computed results rather than be disabled.
@@ -9831,3 +9900,16 @@ Phase 3 merged in PR #512. Selected the planned fixed Python/NumPy/SciPy/pandas/
 Calculations consume complete, filtered immutable input snapshots and retain parameters, source/definition hashes, diagnostics, software versions and random seeds. Sampling tests require documented independent sample units; census/aggregate descriptions do not gain p-values by default. Field references replace raw-number membership validation for calculated prose, while citation checks remain. One structured result powers the deterministic explanatory narrative, scientific tables, figures and CSV/XLSX/SVG/PNG/JSON exports. Saved-manifest replay compares result hashes without rewriting history. All data/exports/replays remain project-private and use the Phase 3 source/project deletion lifecycle.
 
 No schema/shared deployment changes, subscriptions or per-user quotas were added. Numerical reference tests, method limitations, reproducibility and actual host setup are documented in ASK_THE_DATA_STATISTICS_OPERATIONS.md. Maps/spatial analysis and reports/decks remain later phases.
+
+### Reconcile with the newer Ask the Data workspace before merging
+
+Main moved the assistant into the shared `/ask-the-data` engine with dashboard
+approval and private projects. Preserve that workspace and its statistical/source
+features. The admin compatibility page/API still require strict admin access;
+the engine only enables uploaded-library retrieval after resolving a strict admin
+server-side. Default tool creation excludes uploaded-library sources (including
+background project jobs), and uploaded chunk lookup independently rechecks admin
+on either citation path. Existing approved-user access to other dataset/project
+features is unchanged. The new processing migration uses a distinct timestamp
+from main's analysis-source migration. Reconciliation checks: 1,796 tests passed,
+33 database-dependent cases skipped; types, prefixed build and migration lint pass.

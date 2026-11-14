@@ -129,7 +129,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | ~~**A stacked dialog over the drawer strands focus on `<body>`**~~ ✅ **CLOSED IN J6, AND IT WAS TWO DEFECTS PLUS A THIRD UNDERNEATH.** Filed 2026-08-13 from J4b1, masked at the time by the dead-key row above, which is why the two had to ship together. (1) The palette's private visibility predicate asked `checkVisibility()`, which answers about **rendering** and knows nothing about `inert` — so with the drawer holding the page it handed back a top-nav control `.focus()` cannot move to, silently. **That is the same class of failure the selector *list* was created to fix in J1a**, blind to `inert` instead of blind to layout; the predicate now lives once in the design system and answers both. (2) `MdsModal.closePage()` **trusted** `opener.focus()` while `takePage()` twelve lines above verifies religiously; it is now tried-then-verified, with a `returnFocus` prop. (3) Strengthening the test for (2) uncovered a **pre-existing** defect neither row named: a modal mounted already-open with nothing focused captured `<body>` as its opener, and `document.body.focus()` is **not** the no-op two docblocks asserted — the body is the document's default focus target, so closing such a modal actively **took** focus, including out of an upper dialog still open. See DSR §4.5 | should | 2 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
 | ~~**`useInertBackground` never re-pushes if `root` changes identity**~~ ✅ **CLOSED IN J6.** Filed 2026-08-13 from J4b1. The only watcher was on `active`, and `ownedRoot` is captured once, so a root replaced while active left the stack holding the element that had gone: the `inert` walk is then computed from a node that may not be in the document, and the live surface — an off-path sibling of the stale one — can be marked inert by its own seam. **Latent rather than live**, since the sidebar's root is stable; filed and fixed anyway because this is **exported API** and the next consumer is where a `v-if`-swapped root would find it. The fix distinguishes three transitions rather than two, and its own adversarial case is that `[active, root]` fires on every patch and must not re-run initial focus on a re-render that keeps the same element | nice | 1 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
 | ~~**The tooltip's capture-phase Escape is page-global**~~ ✅ **CLOSED IN J6, WITH A REPRODUCTION THE FILING DID NOT PREDICT.** Filed 2026-08-13 from J4b1 as "a hovered rail tooltip can eat one Escape aimed at an unrelated open menu" — which understated it. A capture listener on `document` runs before **every** Escape claimant on the page whichever mechanism they chose, and `useDismissable` — whose consumers are **NotificationBell and FeedbackButton**, *not* the account menu, which moved to `MdsMenu` — binds Escape on `document` in the **bubble** phase, so it never ran at all. Measured in the running app at 800px against **both** shell mechanisms: pointer resting on a collapsed rail item with a popover open, Escape → tooltip hides, **popover stays open**. `MdsModal`'s panel handler loses the key the same way. **The rule now is that dismissal is unconditional and consumption is scoped** to wherever focus is; the deliberate trade for a hovered-in-dialog tooltip is recorded in DSR §3.4a, and §3.4.1's "family that must not be aligned" paragraph gains the governing priority rule, because three different binding sites are not a priority scheme | should | 1 | ⚠️ **This row was never in this file until the increment that closed it.** Filed 2026-08-13 from J4b1's adversarial pass into `PROGRESS.md`'s status block and nowhere else, so it was invisible to every search of the backlog — which is why J6 files and strikes it in one edit. **File a deliberately-unfixed finding here at the moment you decide not to fix it** |
-| **`analytics-axe` and `scopes-axe` still scope a modal scan to `[role="dialog"]`** | nice | 1–3 | Filed 2026-08-08 from I10a. I10a widened `builder-axe.spec.ts`'s two share-panel scans back to whole-page and deleted `scan()`'s `within` parameter, because `MdsModal` no longer leaks its background into axe. `analytics-axe.spec.ts:150` and `scopes-axe.spec.ts:83` are the same pattern and could now follow — but they were left alone deliberately, because those two files scope **every** scan, modal or not, for the separate G9b reason recorded in their headers (a whole-page scan there re-flags pre-existing violations elsewhere on those pages, which cost G9b three follow-up pushes). Widening only their dialog call is therefore a different change with a different risk, and worth doing only together with an audit of what those pages actually fail whole-page ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Two accessibility specs still scan only the open dialog rather than the whole page." |
+| **`analytics-axe` and `scopes-axe` still scope a modal scan to `[role="dialog"]`** | nice | 1–3 | Filed 2026-08-08 from I10a. I10a widened `builder-axe.spec.ts`'s two share-panel scans back to whole-page and deleted `scan()`'s `within` parameter, because `MdsModal` no longer leaks its background into axe. `analytics-axe.spec.ts:156` and `scopes-axe.spec.ts:83` are the same pattern and could now follow — but they were left alone deliberately, because those two files scope **every** scan, modal or not, for the separate G9b reason recorded in their headers (a whole-page scan there re-flags pre-existing violations elsewhere on those pages, which cost G9b three follow-up pushes). Widening only their dialog call is therefore a different change with a different risk, and worth doing only together with an audit of what those pages actually fail whole-page ➡️ **Filed as a ledger row by `M94` (2026-09-14):** "Two accessibility specs still scan only the open dialog rather than the whole page." |
 | Auth/session events in the audit trail (login success/failure, logout, reset, token issue/revoke, MFA enrol/challenge) | should | 1–2 | `AuditEvent` covers business mutations only; brute-force/takeover leaves no tenant-visible trace. Laravel already fires these events |
 | ~~Breached-password (HIBP) check~~ ✅ **ALREADY SHIPPED — Phase 0 B1 (`e4253fa`)** · admin-configurable password policy still open | should | 1 | ASVS L1/L2 (NFR §4) mandates a breached-password check. ⚠️ **THIS ROW WAS STALE AND COST I8 A PLANNED WORK ITEM.** `FortifyServiceProvider:42` has carried `Password::defaults(fn () => Password::min(12)->uncompromised())` since Phase 0, inherited by registration, password reset, profile update and invitation-accept — so I8's scope listed "HIBP" as work that was already done, discovered only by reading the provider. I8a additionally **faked the live HTTPS call to `api.pwnedpasswords.com`** that `AuthenticationTest` was making on every CI run, and added a test that exercises the breach check specifically (the framework early-returns on a length failure, so the pre-existing test never reached the verifier). What genuinely remains is the **admin-configurable** half: no `SettingKey` exists for a per-workspace password policy, and PRD Feature #14 does not ask for one |
 | Session lifecycle controls (idle/absolute timeout + step-up re-auth; later: session inventory / "log out everywhere") | should | 1 (timeout+step-up) → 2 (inventory) | Enumerators share field devices; step-up partly delivered with Feature #14 |
@@ -12683,6 +12683,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   answered. `docs/xlsform-interop-spec.md` says the condition is "folded into the field's own `relevant`", which the
   exporter does not do — and which would be wrong if it did, because `relevant` HIDES a question while conditional
   requiredness only requires it. XLSForm's `required` column takes an expression, which is the faithful export.
+  **Measured again by `M237` (2026-11-14) on the NHETE module:** exported, re-imported and published, the copy refuses a full
+  response the original takes, on all 30 of its unanswered "Required when…" comment boxes (`NheteBuilderRouteTest`, step 6c).
   **Live.** Filed by `M124`. **Tier: during-testing.**
 
 - **`minor` · No seeded form contains a page break, so no end-to-end spec can see pagination.** Measured by `M124`.
@@ -12899,7 +12901,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and publish refuses an image the form does not own, which is the only check that stops one form from displaying
   another form's file. The copy paths carry `config` verbatim, so the attachment ids come along and the copy is
   refused at publish with a message naming the note. The remedy is to copy the image rows when a note is copied, or
-  to refuse at copy time. Nothing is reachable until `M129` ships the first content-block image. **Latent.** Filed by `M129`. **Tier: during-testing.**
+  to refuse at copy time. Nothing was reachable until `M129` shipped the first content-block image. **Reached by `M237` (2026-11-14):** the NHETE
+  module saved as a template and started again was refused at publish on its three diagrams (*"block 7’s image is missing,
+  belongs to another form, or failed its virus check — upload it again"*) and published once each was uploaded again, with
+  all 808 questions and every rule intact (`NheteBuilderRouteTest`, step 6a). **Live.** Filed by `M129`. **Tier: during-testing.**
 
 - **`nit` · On the scan review screen a scanned PDF is a download link, not pages shown beside the form.** Found by
   `M129`. Tenant pages send `X-Frame-Options: DENY` and `frame-ancestors 'none'` (`AppSecurityHeaders`), the
@@ -16081,3 +16086,197 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: set it on the box to `iconnect.com.de`, then `config:cache` and `queue:restart`. The operator's, in chat.
 
   **Live**, with no failure seen. Filed by `M235`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M237` (2026-11-14) — ****`minor` · `nhete-stress-test` — The NHETE TWG pre-work module (about 45 screens, 35 indicator rows of five questions, 74 conditional part rows) has never been built in the app; the biggest form ever seeded has about eight questions, and nothing has been measured at that size.**
+  Found by `M237` (2026-11-14), at the user's request in chat: *"check every details if this can really be made in our form builder … if done manually, kobo import style and all our other options on creating forms"*. `D220` makes it a test case, `D221` keeps the review copy's wording out of the repository (`tests/fixtures/nhete/nhete-shape.json` is a same-shape copy), and `D222` files every NHETE row `during-testing`, taken next.
+  - **By hand it builds, publishes and answers.** `NheteBuilderRouteTest` drives the builder's own routes: 1,725 requests for 808 questions in 49 sections. Publish takes about 3.7 s, and the frozen version is 897 KB. Three region branches are answered, and ten refusals land on exactly the right question and rule: the word cap, "up to two", the exclusive choice, all three required-when reasons, the parts, and consent.
+  - **It needs nine kinds of workaround**, counted by `NhetePlan`: 25 grid rows as separate questions, 35 indicator blocks, 35 parts blocks, 115 glossary words left as plain text, 30 research panels drawn open, 10 tiles, 3 bullet lists, 35 piped placeholders and 4 label-only notes.
+  - **Kobo-style import**, the copy routes and the defects they found are the rows filed below, plus two older rows they measured again: `R-0ceefbb4` (export makes "Required when…" always required) and `R-06e31180` (a template copy's images), now **Live**.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M239` (2026-11-14) — ****`minor` · `nhete-browser-walk` — The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder.**
+  Found by `M237` (2026-11-14). Phase 1's browser half was not built, for two reasons.
+  - The local database holds no E2E seed, and seeding it would overwrite the user's local workspace.
+  - Seeding inside `E2eSeeder` would slow every Pest test that runs it, and `AuthScanFixturesTest` runs it five times.
+
+  What it should measure:
+  - boot time and download size on the 897 KB version;
+  - the 141-question parts page;
+  - sideways scroll at 375, 834 and 1440 px;
+  - an axe scan on the welcome, indicator, parts and red-flag pages;
+  - "Save and finish later", then resume.
+
+  The remedy, when taken:
+  - a `NheteE2eSeeder` that imports the Meridian-dialect workbook (`NheteWorkbook`), run by CI's E2E seeding step after `E2eSeeder`;
+  - a spec that answers each page with a generic filler. It picks the first choice everywhere, so "keep" is Yes and every parts page appears;
+  - a builder spec that clicks one indicator block into being.
+
+  **Not live** — work not yet done. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M239` (2026-11-14), on its branch, stacked on #519.** Built as the remedy says. `D223` (the user, in planning): it runs on every CI run, at all three widths.
+  - **`NheteE2eSeeder`** imports the Meridian workbook into `acme` and publishes it at `/f/nhete`: one screen per page, save-and-resume on. CI runs it in the E2E job's existing seed step, after `E2eSeeder`, so the job's step count does not move. `NheteE2eSeederTest` pins one form, stepped, resumable, and the plan's 49 sections.
+  - **`nhete-walk.spec.ts`** answers all 49 pages with the first choice and a few words, and submits. On every page it checks for sideways scroll. It runs axe in light and dark on the welcome, the first indicator table (`mx_a`), the 141-row parts page (`cp_d`) and red flags (`s8_rf`). It saves on the first parts page, opens the resume link in a fresh browser, and checks it lands there with an earlier answer back.
+  - **`nhete-builder-block.spec.ts`** clicks one indicator block into being. It adds a note with a heading and a paragraph, four dropdowns (three typed choices and three Yes-and-No sets), and a long-text comment shown and required when *keep* is *change*. It proves both rules in the preview and keeps them through a reload.
+  - **Measured against a scratch database at the three widths, one worker, `artisan serve`:**
+    - 6 passed in 9.0 minutes: the walk 40–49 s, the builder spec about 2.6 min.
+    - Boot to the first page 4.7–10.1 s.
+    - Downloaded about 1.47 MB, of which the form's schema is 864,619 bytes. The row's "897 KB" was the builder-route version's; this is the import's.
+    - The parts page draws its 141 rows at once, and its 75 visible questions are answered in about 2.6 s.
+    - Submit 5–9 s.
+    - No sideways scroll at any width, and axe clean in both themes.
+  - **In CI (run 43568612961), all six NHETE cases passed:** the walk about 22 s and the builder spec about 20 s per width, so about 2 minutes on the E2E job in all. Boot to the first page took about 0.2 s, and submit 0.8–1.4 s. The local figures above are Docker on Windows.
+  - **The same run found two things this branch then fixed:**
+    - `analytics-axe.spec.ts`'s suppressed-tiles case read `'0%'` across the whole page. The question picker lists every form's questions, and NHETE's labels carry figures like "70%", so it counted 20. The read is now scoped to the tiles, with the two retention notes counted inside the same scope to show it holds both tiles. All 39 analytics cases pass locally at the three widths.
+    - `NheteE2eSeederTest` read the guest page through Vite, and CI's Pest job builds no assets, so it got a 500. It now reads without Vite, and passes with the manifest moved aside.
+  - **Proved:** 5 of 5 mutants caught.
+    - The seeder made single-page: `mutate.php`.
+    - A field row 420 px wide: red at 375 only, tablet still green.
+    - *Add option* hidden: the builder spec stops at it.
+    - Resume restoring no answers: the link lands on `mx_a`, not `cp_a`.
+    - An unavailable tile drawing `0%`: the scoped analytics read finds 2, after its notes guard passed.
+  - **Found and filed:**
+    - `xlsform-default-language-name`: the walk's first axe scan failed `html-lang-valid`. The seeder sets `en`, naming the row, and `NheteXlsformImportTest` pins what the import stores.
+    - The row's premise that the local database held no E2E seed was false; it holds `acme` from earlier runs. The walk ran against a scratch database anyway, and `docs/TESTING-GUIDE.md` now gives the recipe, and corrects its claim that the suite seeds itself.
+
+- **`minor` · `xlsform-import-long-label` — An XLSForm whose note or question label is longer than 500 characters fails the import with a server error instead of a message.**
+  Found by `M237` (2026-11-14). `form_fields.label` is `string('label', 500)`, and `XlsformImportParser` checks the length of `appearance` only, never a label. So the INSERT fails with `22001` (value too long). `docs/xlsform-interop-spec.md` §6 promises the opposite: validation fully upfront, with an actionable error.
+  - The draft is untouched, so nothing is lost.
+  - The author sees a 500 page and no reason. In the debug error renderer, that page takes about two minutes on the dev host.
+  - Kobo authors commonly keep a long note in one cell, and the NHETE module in the Kobo dialect fails exactly so.
+
+  The remedy, when taken: check every label and hint against its column upfront and refuse the file naming the row. Or, for a note, carry the overflow into note content blocks.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-import-odk-functions` — Kobo and ODK formula spellings import, then publish refuses them with a parser code, not their name.**
+  Found by `M237` (2026-11-14). `FunctionRegistry` holds thirteen functions, with none of `count-selected`, `regex` or `string-length`.
+  - `count-selected(.) <= 2` imports, then publish says *"The expression on “pick” is invalid (unexpected_token)"*. The hyphen is read as a minus.
+  - `regex(…)` says `unknown_function`.
+
+  There is no warning at import. A Kobo form's "choose up to two" and its word caps are therefore a publish failure the author cannot read.
+
+  The remedy, when taken: read `count-selected` as `count`, warn on import for every function this product does not have (naming it), and decide whether `regex`/`string-length` join the grammar. The latter needs both engines and golden vectors.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-required-when` — "Required when…" cannot come in by XLSForm: a `required` formula is dropped without a warning, and a stand-in constraint never runs on a blank answer.**
+  Found by `M237` (2026-11-14).
+  - `XlsformImportParser` reads `required` as yes or blank. A formula such as `${cut} = 'change'` imports as **optional**, with an empty warnings list.
+  - The stand-in an author would reach for next, `not(<when>) or . != ''` as a constraint, is never run on a blank answer. So a missing comment is accepted (`NheteXlsformImportTest`).
+
+  The NHETE module has 35 such comment boxes.
+
+  The remedy, when taken: import a `required` formula as `conditional` with its `required_if` rows when it is a plain or-of-equalities, and warn naming the question when it is not.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-export-note-content` — XLSForm export drops every note's content blocks, so headings, paragraphs, callouts, images and links do not survive a round trip.**
+  Found by `M237` (2026-11-14). `docs/xlsform-interop-spec.md` §3 lists `note → note` as **Full** fidelity, written before note content existed (`M125`). The exporter writes a note's label only. Re-imported, NHETE's 136 notes come back with no content at all (`NheteBuilderRouteTest`, step 6c).
+
+  The remedy, when taken: export content as markdown in the label, which ODK renders, and teach the importer to read it back. The pair with `xlsform-import-markdown`. Otherwise mark the row in §3 lossy.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-import-markdown` — Markdown in an imported label is shown to respondents as literal `#` and `**` characters.**
+  Found by `M237` (2026-11-14). ODK and Kobo render `# Heading`, `**bold**` and `[text](url)` in labels. This product stores the label as plain text, so `# Heading\n\nSome **bold** words` is exactly what a respondent reads. The remedy, when taken: turn a note's markdown into content blocks on import (heading, paragraph spans with bold and links), and strip it from question labels with a warning.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-import-media` — An XLSForm `media::image` on a note is dropped without a warning.**
+  Found by `M237` (2026-11-14). The workbook names a file the import does not receive, so it cannot be attached, but the author is not told. NHETE's three diagrams would vanish silently. The export side, the missing media column, is `R-b6e9eac2`. The remedy, when taken: a warning naming each row whose media was not carried, so the author knows to upload it into the note.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `builder-copy-section` — The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand.**
+  Found by `M237` (2026-11-14). `FormBuilderService::duplicateField()` copies one question, and there is no section copy. Building NHETE took 1,725 builder requests (`NheteBuilderRouteTest`), each indicator a note, four dropdowns, a calculation and a comment whose conditions name its siblings.
+
+  The remedy, when taken: copy a whole section with its questions, giving the copies fresh keys and re-pointing every condition, rule and piped reference that names a question inside the copied section.
+
+  **Not live** — a request, not a defect. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
+  Found by `M237` (2026-11-14). NHETE builds today with three workarounds:
+  - a whole-answer pattern for "up to 1,500 words";
+  - `count(.) <= 2` for "choose up to two";
+  - `not(selected(., 'noview')) or count(.) = 1` for "No view or opinion stands alone".
+
+  All three refuse correctly (`NheteBuilderRouteTest`), but none shows a live count, stops a third tick, or clears the other boxes, and none is reachable without writing a pattern or formula.
+
+  The remedy, when taken: minimum/maximum words with a counter, a "most choices" setting, and an exclusive choice that clears and locks the rest, in both engines with golden vectors, the builder's panes, and XLSForm export and import.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `note-details-block` — A note has no collapsible "details" block, so long optional reading is always open.**
+  Found by `M237` (2026-11-14). NHETE keeps each indicator's formula, sources, watch-outs and "Research behind this" under a collapsed *More about this indicator*. Today all 35 are drawn open (`NhetePlan`'s `research-open` count is 30). `ContentBlocks` holds heading, paragraph, callout, divider and image only. Bullet lists are the table item *"Rich-text / media content block (headings, lists, …)"* at the top of this file.
+
+  The remedy, when taken: a `details` block with a summary line and its own blocks, collapsed by default and printed open on paper and PDF.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `form-glossary` — A form has no glossary, so a term cannot open its definition where it is used.**
+  Found by `M237` (2026-11-14). NHETE marks 27 terms and all 35 indicator codes as glossary words, 115 uses in all (`NhetePlan`'s `glossary-plain` count). Today they are plain text, and the definitions would have to sit on a screen of their own. Nothing in `app/` or the respondent app holds a glossary, and the design system's `Tooltip` is used by neither.
+
+  The remedy, when taken: a per-form glossary (term, definition), terms marked in note content and labels, a pop-up in the respondent app, and plain definitions on paper, PDF and exports.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
+  Found by `M237` (2026-11-14). NHETE's Stop 8 is two tables per domain, and today both become blocks of questions.
+  - **The indicator table** has five answer columns, a long-text column, a cut-off cell that six rows cannot answer, and a comment required for three reasons.
+  - **The parts table** has rows shown only for indicators the office keeps.
+
+  The limits, all read in the code:
+  - `ExpressionValidationGate` refuses a grid as a condition operand.
+  - `MatrixColumns::TYPES` has no long text.
+  - A grid's required flag is per column.
+  - A row is a value and a plain label of at most 500 characters.
+
+  Grid cells as operands in conditions, calculations and piping is `R-ffd10da2`, already filed by `M172`. The remedy for the rest, when taken: a show-when per row, required-when and not-applicable per cell, a long-text column, and row details.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
+  Found by `M237` (2026-11-14). `RuntimeShell.vue` caps every respondent page at 44rem, so NHETE's table, drawn true from 900 px, can never be one. Neither grid component uses `position: sticky` for its header row or first column. The explorer cannot chart a grid (`explorer-unchartable-questions`).
+
+  The remedy, when taken: a wide-page option per form or section, a sticky header and first column for wide grids (scrolling inside the table, never the page), and one explorer row per grid row.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `respondent-edit-after-submit` — A respondent cannot change their answers after Submit, even while the form is still open.**
+  Found by `M237` (2026-11-14). NHETE says *"Until the closing date, a person can come back on the same device and change answers"*. Only staff can edit a submission (`SubmissionAnswerEditService`), and a finalized draft cannot be saved again. It pairs with the single-response-only row filed by `M130` and with `D118`'s same-device "Continue where you left off" row.
+
+  The remedy, when taken: a per-form setting that lets the respondent who submitted reopen and amend their response until `closes_at`, with the amendment recorded in the submission's history.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
+  Found by `M237` (2026-11-14). NHETE has 10 named stops over about 45 screens, each screen with its own small progress label. `ProgressIndicator.vue` draws one numbered dot per visible step, and `useFormRuntime` labels a step *"Step X of N: {section title}"*. Sections have no parent.
+
+  The remedy, when taken: an optional chapter name on a section, drawn as the progress bar's groups, and an optional progress label separate from the section title.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`nit` · `dropdown-placeholder` — A dropdown always shows "Select an option" and its full choice text when closed.**
+  Found by `M237` (2026-11-14). NHETE asks for *"Choose…"* and for a closed dropdown to show only the words before a choice's first full stop (*"Include"*), with the full text in the open list. `FieldInput.vue` hard-codes the empty option's text, and a choice has one label.
+
+  The remedy, when taken: the question's placeholder as the empty option's text, and an optional short label per choice for the closed state.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
+  Found by `M237` (2026-11-14). NHETE's rule is that an item goes on the meeting's short list when at least 75% agree and at least six gave a view, with "No view or opinion" left out. The explorer counts a choice question's answers and can exclude a value (`AnswersSource`), for top-level questions only, but it has no agreement share, no threshold and no list across questions.
+
+  The remedy, when taken: a report that, for a chosen set of questions, shows each one's share agreeing over those who gave a view, flags the ones over a threshold with enough views, and exports the list.
+
+  **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
+  Found by `M239` (2026-11-14), on the NHETE walk's first axe scan: `html-lang-valid` on the welcome page, *"<html> element must have a valid value for the lang attribute"*.
+  - The NHETE workbook's settings say `default_language: English`. `XlsformImporter::applySettings()` copies it into `forms.default_locale` as it stands, and `public-runtime.blade.php` writes `<html lang="English">`.
+  - `docs/xlsform-interop-spec.md` §4 maps `default_language` to `forms.default_locale` and says nothing about its form. This product's own export writes a code (`en`), so its own round trip never shows it; a workbook from ODK or Kobo does.
+  - A screen reader reads the page with the wrong voice rules or none, and every page of such a form fails WCAG 3.1.1.
+  - `NheteXlsformImportTest` pins what the import stores today (`English`). `NheteE2eSeeder` sets `en` after its import, naming this row, so the walk measures the respondent app.
+
+  The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
+
+  **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**

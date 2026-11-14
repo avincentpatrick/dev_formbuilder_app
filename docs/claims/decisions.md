@@ -24,10 +24,45 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D219`, the last filed, was asked and answered on 2026-11-12 in `M236`'s session, after its build. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D223`, the last filed, was asked and answered on 2026-11-14 in the planning of `M238` and `M239`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D223 — The NHETE browser walk fills about 49 pages and submits, once per screen width. Where does it run? **A — on every CI run, at all three widths.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M238` and `M239`.** The planning estimate was 6 to 12 more minutes on CI's E2E job, which took about 32 then; `M239` measures the real figure.
+- **A — every CI run, all three widths (chosen, the session's recommendation).** It becomes the standing check for very large forms (`D222`'s *"the standing regression test for complex forms"*).
+- **B — every CI run at phone width only**, with tablet and desktop in the nightly scheduled run. Cheaper, but a break at those widths shows the morning after it merges.
+- **C — the nightly scheduled run only.** Merge points stay as fast as before, and every break shows the morning after.
+
+**What it creates:** `tests/e2e/nhete-walk.spec.ts` runs in every E2E job, at the three projects. Nothing filed.
+
+### D222 — Where do the rows the NHETE stress test finds go in the work queue? **A — the testing tier (`during-testing`), taken next, ahead of the other rows of that tier.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M237`.**
+- **A — `during-testing`, taken next (chosen, the session's recommendation).** Phase 1, the test itself, starts at once. Each improvement follows as its own increment, held for a merge point.
+- **B — `during-testing`, in the line's normal order** among the tier's other rows, by readiness.
+- **C — `before-launch`.** The current testing rows come first. Phase 1 still runs next.
+
+**What it creates:** every row `M237` files is tiered `during-testing`, and the next session takes `nhete-browser-walk`, then the recommendations in the plan's order.
+
+### D221 — The NHETE module is a DOH/SynapTech review copy. What of it goes into the repository as the test fixture? **A — a same-shape copy: every screen, question type, choice, condition and text length kept, its wording replaced.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M237`.**
+- **A — a same-shape copy (chosen, the session's recommendation).** The real-text workbook is generated only in the session's scratchpad, for the user to import themselves.
+- **B — the real text.** The most realistic option, but the review copy would then live in the repository and its history, where the other developer can read it.
+
+**What it creates:** `tests/fixtures/nhete/nhete-shape.json`, derived from the real text by replacing every run of letters with placeholder letters of the same length. Codes, digits, punctuation, `${…}` tokens and conditions are kept. Nothing filed.
+
+### D220 — Will the NHETE pre-work module run in this app for the real TWG meeting (it closes 17 November 2026), or is it a test case for the form builder? **A — a test case.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M237`.** The user added, on how to build it: *"i want you to check every details if this can really be made in our form builder. i cant do it by hand. you can import it but i want to know if that will really pass in our form builder if done manually, kobo import style and all our other options on creating forms."*
+- **A — a test case (chosen, the session's recommendation).** No live deadline; the gaps are built properly, at the usual merge points.
+- **B — a real run by 17 November.** Only what works today, plus workarounds.
+- **C — a real run, at a later date.** The gaps first, then the run.
+
+**What it creates:** `M237` (`nhete-stress-test`): the module built by the builder's own routes, by XLSForm import in two dialects, from a template, through the question library and by export and re-import, each measured. Its findings are filed `during-testing` (`D222`).
+
 ### D219 — Who may share an explorer chart with the whole workspace? **A — any member who can open Explore; a shared chart is read-only to everyone else and runs with each viewer's own access.**
 
 **Asked and answered 2026-11-12 (user decision, in chat), in `M236`'s session, after its build, which was built on the recommendation.** Recorded by ADR `0025-data-explorer.md` §D8.

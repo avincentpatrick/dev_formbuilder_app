@@ -61,9 +61,20 @@ Prediction:
 
 The one most likely wrong: the 141-question parts page at 375 px (a long placeholder word or a dropdown overflowing), or the filler tripping a rule on a first-choice pick.
 
+**Extended mid-build (2026-11-14), before the file was opened.** The walk's first axe scan failed `html-lang-valid` on the welcome page. The import stores the workbook's `default_language` (`English`) as the form's locale, and the guest page writes `<html lang="English">`.
+- It is filed as `xlsform-default-language-name` (`during-testing`).
+- The seeder sets the form's locale to `en`, naming that row, so the walk measures the respondent app and not the import.
+- `tests/Feature/Forms/Nhete/NheteXlsformImportTest.php` joins the files, to pin what the import stores today.
+
 ---
 
-## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520, CI running, waiting for a merge point, where it goes first
+## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520, extended mid-build (below), waiting for a merge point, where it goes first
+
+**Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
+- Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+- Every fixed version is 13.40.0 or later, so pinning lower cannot avoid it.
+- Files added: a new `app/Console/Concerns/ReadsTextInput.php`, and the `ActivateCustomDomain`, `BuildPsgc`, `CreateTenant`, `DeployCensus`, `ExtractTenant`, `OcrBakeoff`, `OcrBakeoffLayout`, `PlatformSuperAdmin` and `SsoDomain` commands under `app/Console/Commands/`.
+- Filed with it: the same blindness takes Larastan's undefined-argument rule with it, as its own row.
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
 Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.

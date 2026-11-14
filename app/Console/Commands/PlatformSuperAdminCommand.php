@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Models\User;
 use App\Services\Admin\SuperAdminProvisioner;
 use App\Services\Auth\OperatorAccounts;
@@ -38,6 +39,8 @@ use RuntimeException;
  */
 final class PlatformSuperAdminCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'platform:super-admin
                             {email : The operator email address (stored lower-case, because sign-in lower-cases what is typed)}
                             {--name= : Display name, required when no account exists yet (at most 150 characters)}';
@@ -46,7 +49,7 @@ final class PlatformSuperAdminCommand extends Command
 
     public function handle(SuperAdminProvisioner $provisioner, OperatorAccounts $accounts): int
     {
-        $email = $accounts->canonicalEmail((string) $this->argument('email'));
+        $email = $accounts->canonicalEmail($this->textArgument('email'));
 
         $errors = $accounts->emailErrors($email);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Enums\BillingInterval;
 use App\Enums\PlanTier;
 use App\Enums\TenantUserStatus;
@@ -97,6 +98,8 @@ use Spatie\Permission\PermissionRegistrar;
  */
 final class CreateTenantCommand extends Command
 {
+    use ReadsTextInput;
+
     /** The catalogs a server seeds BY CLASS, in `DatabaseSeeder`'s order. A bare `db:seed` also runs the demo seeder. */
     public const array CATALOG_SEEDERS = [
         RolePermissionSeeder::class,
@@ -124,9 +127,9 @@ final class CreateTenantCommand extends Command
     public function handle(OperatorAccounts $accounts): int
     {
         // ── Input ───────────────────────────────────────────────────────────────────────────────────────
-        $slug = Str::lower(trim((string) $this->argument('slug')));
-        $name = trim((string) $this->argument('name'));
-        $ownerEmail = $accounts->canonicalEmail((string) $this->argument('owner'));
+        $slug = Str::lower(trim($this->textArgument('slug')));
+        $name = trim($this->textArgument('name'));
+        $ownerEmail = $accounts->canonicalEmail($this->textArgument('owner'));
 
         $planOption = $this->option('plan');
         $planInput = is_string($planOption) ? Str::lower(trim($planOption)) : '';

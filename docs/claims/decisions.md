@@ -24,10 +24,34 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D223`, the last filed, was asked and answered on 2026-11-14 in the planning of `M238` and `M239`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**
+- **A — separate, right after (chosen, the session's recommendation).** `M240` builds the rewriter and the copy; the rename fix follows as its own small pull request on the same engine, and each stays reviewable.
+- **B — fold it in.** One pull request, larger: the builder would also have to take in the other questions the server rewrote on each rename, with undo for them.
+
+**What it creates:** nothing filed. `R-ade0b598` stays `during-testing` and is the next row after `M240`; until it lands, a copy's renamed keys leave its text references to be re-sent by hand.
+
+### D225 — What keys (data names) do copied questions get? **A — the number in the key counts up when the whole copy's next number is free; a key with no number gets `_copy`.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**
+- **A — count the number up (chosen, the session's recommendation).** `a01_use` → `a02_use`, `section_3` → `section_4`. A numbered block like NHETE's needs no renaming when its numbers run in order.
+- **B — always add `_copy`**, as the one-question Duplicate did. Predictable, but every copied block needs its keys renamed by hand.
+
+**What it creates:** `M240`'s `CopyKeys`. The one-question Duplicate follows the same rule, so `q1` copies to `q2`, no longer `q1_copy`. A key some published version ever held, as a question or a section, is never taken, so old answers cannot attach to a copy.
+
+### D224 — NHETE's 35 indicator blocks sit 5 to 12 to a page inside four domain pages, not one to a page, so copying a whole section does not build its real layout. What does the copy action cover? **A — a whole section, and any ticked questions, on one engine.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**
+- **A — section and ticked questions (chosen, the session's recommendation).** *Duplicate section* on each section's heading, and *Duplicate* in the bar that appears when questions are ticked. Every link between the copied questions points at the copies.
+- **B — section copy only**, exactly what `builder-copy-section` asks. Smaller, but NHETE would need one page per indicator, or each copy moved afterwards.
+
+**What it creates:** `M240` builds both. Nothing filed.
+
 ### D223 — The NHETE browser walk fills about 49 pages and submits, once per screen width. Where does it run? **A — on every CI run, at all three widths.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M238` and `M239`.** The planning estimate was 6 to 12 more minutes on CI's E2E job, which took about 32 then; `M239` measures the real figure.

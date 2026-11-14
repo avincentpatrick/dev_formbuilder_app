@@ -16095,7 +16095,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `nhete-browser-walk` — The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder.**
+- ✅ **CLOSED BY `M239` (2026-11-14) — ****`minor` · `nhete-browser-walk` — The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder.**
   Found by `M237` (2026-11-14). Phase 1's browser half was not built, for two reasons.
   - The local database holds no E2E seed, and seeding it would overwrite the user's local workspace.
   - Seeding inside `E2eSeeder` would slow every Pest test that runs it, and `AuthScanFixturesTest` runs it five times.
@@ -16113,6 +16113,25 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - a builder spec that clicks one indicator block into being.
 
   **Not live** — work not yet done. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M239` (2026-11-14), on its branch, stacked on #519.** Built as the remedy says. `D223` (the user, in planning): it runs on every CI run, at all three widths.
+  - **`NheteE2eSeeder`** imports the Meridian workbook into `acme` and publishes it at `/f/nhete`: one screen per page, save-and-resume on. CI runs it in the E2E job's existing seed step, after `E2eSeeder`, so the job's step count does not move. `NheteE2eSeederTest` pins one form, stepped, resumable, and the plan's 49 sections.
+  - **`nhete-walk.spec.ts`** answers all 49 pages with the first choice and a few words, and submits. On every page it checks for sideways scroll. It runs axe in light and dark on the welcome, the first indicator table (`mx_a`), the 141-row parts page (`cp_d`) and red flags (`s8_rf`). It saves on the first parts page, opens the resume link in a fresh browser, and checks it lands there with an earlier answer back.
+  - **`nhete-builder-block.spec.ts`** clicks one indicator block into being. It adds a note with a heading and a paragraph, four dropdowns (three typed choices and three Yes-and-No sets), and a long-text comment shown and required when *keep* is *change*. It proves both rules in the preview and keeps them through a reload.
+  - **Measured against a scratch database at the three widths, one worker, `artisan serve`:**
+    - 6 passed in 9.0 minutes: the walk 40–49 s, the builder spec about 2.6 min.
+    - Boot to the first page 4.7–10.1 s.
+    - Downloaded about 1.47 MB, of which the form's schema is 864,619 bytes. The row's "897 KB" was the builder-route version's; this is the import's.
+    - The parts page draws its 141 rows at once, and its 75 visible questions are answered in about 2.6 s.
+    - Submit 5–9 s.
+    - No sideways scroll at any width, and axe clean in both themes.
+  - **Proved:** 4 of 4 mutants caught.
+    - The seeder made single-page: `mutate.php`.
+    - A field row 420 px wide: red at 375 only, tablet still green.
+    - *Add option* hidden: the builder spec stops at it.
+    - Resume restoring no answers: the link lands on `mx_a`, not `cp_a`.
+  - **Found and filed:**
+    - `xlsform-default-language-name`: the walk's first axe scan failed `html-lang-valid`. The seeder sets `en`, naming the row, and `NheteXlsformImportTest` pins what the import stores.
+    - The row's premise that the local database held no E2E seed was false; it holds `acme` from earlier runs. The walk ran against a scratch database anyway, and `docs/TESTING-GUIDE.md` now gives the recipe, and corrects its claim that the suite seeds itself.
 
 - **`minor` · `xlsform-import-long-label` — An XLSForm whose note or question label is longer than 500 characters fails the import with a server error instead of a message.**
   Found by `M237` (2026-11-14). `form_fields.label` is `string('label', 500)`, and `XlsformImportParser` checks the length of `appearance` only, never a label. So the INSERT fails with `22001` (value too long). `docs/xlsform-interop-spec.md` §6 promises the opposite: validation fully upfront, with an actionable error.

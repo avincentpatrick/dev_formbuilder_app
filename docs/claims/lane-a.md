@@ -16,7 +16,65 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42)
+## Status: ACTIVE CLAIM — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk)
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m239-nhete-browser-walk`, cut from `origin/m237-nhete-stress-test` at `4a918ccb`, so it is **stacked on #519**: the row, the fixture and `tests/Support/Nhete/` exist only there. `origin/main` is merged in for the claim files. PR into main, after #519 at the merge point. **Tests, a test seeder and CI only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
+Row: `nhete-browser-walk`, *"The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder."* The user's answer in planning, recorded as `D223` on this branch: the walk runs on every CI run, at all three widths.
+
+### Evidence verified
+- `AuthScanFixturesTest` runs `E2eSeeder` five times, and `E2eSeederIdempotencyTest` five more, pinning 13 published forms: **held**.
+- `NheteWorkbook::MERIDIAN` imports and publishes: **held** (`NheteXlsformImportTest`, 5.23 s in #519's run 43550232199).
+- CI seeds only in the E2E job's *Migrate + seed the e2e fixture* step, and `docker compose run --rm e2e` seeds nothing: **held**.
+- The row's "897 KB version" is the builder-route build's (`NheteBuilderRouteTest`'s `snapshot_bytes`): **moved**. The walk's form is the Meridian import's, and the walk reports that version's size.
+- The first choice of the `keep` list is `yes`, so a filler that picks the first choice shows every parts page: **held** (the fixture's `lists.keep`).
+
+### Premise verified
+- *"The local database holds no E2E seed"*: **false.** It holds `acme`, with 427 forms (last updated 2026-11-07), and seven `@meridian.test` users, from earlier local e2e runs.
+  - The walk runs anyway against a scratch database, `meridian_e2e`, created and dropped by this session, so nothing in `meridian` changes.
+- Every database connection, the cache, the sessions and the queue read `DB_DATABASE`, and no config cache exists: **held**. So one variable isolates the scratch run.
+- An imported `begin group` becomes a section, and the guest runtime shows one section per page when `single_page_mode` is off: **held** (`XlsformImportParser`, `useFormRuntime.ts`).
+- The import renames the form to the workbook's `form_title` and takes its slug from `form_id` (`XlsformImporter::applySettings`): **held**. So the seeder finds its form by slug, not by title.
+- `.github/` is avincentpatrick's alone (`D211`), and nothing under `apps/` is read or edited: **held**.
+
+### Remedy verdict
+The row's remedy has three parts:
+- a `NheteE2eSeeder` that imports the Meridian workbook, run by CI after `E2eSeeder`;
+- a spec that answers each page with a generic first-choice filler;
+- a builder spec that clicks one indicator block into being.
+
+It **works by reading**, and the specs' first runs against the scratch database measure it. One addition: the filler reads a page again after each answer, because the parts pages reveal questions as they are answered.
+
+Files:
+- new `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/NheteE2eSeederTest.php`;
+- new `tests/e2e/nhete-walk.spec.ts` and `tests/e2e/nhete-builder-block.spec.ts`;
+- `.github/workflows/ci.yml`: one line in the existing seed step;
+- `docs/TESTING-GUIDE.md`: its claim that the suite's setup seeds `acme` is false.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `docs/TESTING-GUIDE.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D223`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- The walk passes at all three widths, with no sideways scroll and clean axe in both themes, and resume restores the answers.
+- The builder spec clicks the block into being, and it survives a reload.
+- CI's E2E job grows by 6 to 12 minutes.
+
+The one most likely wrong: the 141-question parts page at 375 px (a long placeholder word or a dropdown overflowing), or the filler tripping a rule on a first-choice pick.
+
+**Extended mid-build (2026-11-14), before the file was opened.** The walk's first axe scan failed `html-lang-valid` on the welcome page. The import stores the workbook's `default_language` (`English`) as the form's locale, and the guest page writes `<html lang="English">`.
+- It is filed as `xlsform-default-language-name` (`during-testing`).
+- The seeder sets the form's locale to `en`, naming that row, so the walk measures the respondent app and not the import.
+- `tests/Feature/Forms/Nhete/NheteXlsformImportTest.php` joins the files, to pin what the import stores today.
+
+---
+
+## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520, extended mid-build (below), waiting for a merge point, where it goes first
+
+**Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
+- Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+- Every fixed version is 13.40.0 or later, so pinning lower cannot avoid it.
+- Files added: a new `app/Console/Concerns/ReadsTextInput.php`, and the `ActivateCustomDomain`, `BuildPsgc`, `CreateTenant`, `DeployCensus`, `ExtractTenant`, `OcrBakeoff`, `OcrBakeoffLayout`, `PlatformSuperAdmin` and `SsoDomain` commands under `app/Console/Commands/`.
+- Filed with it: the same blindness takes Larastan's undefined-argument rule with it, as its own row.
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
 Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.

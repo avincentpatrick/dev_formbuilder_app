@@ -5,6 +5,7 @@ import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { extractionFailure } from "./failure";
 import { sourceWorker } from "./db";
 import { sourcePath, deleteOriginal, readOriginal } from "./storage";
 import type { Extraction, ProjectSource } from "./types";
@@ -86,11 +87,10 @@ export async function processNextSource(sourceId?: string) {
       await sourceWorker("finish", source.id, source.lease_id, {
         content: content as unknown as Json,
       });
-  } catch {
-    await sourceWorker("fail", source.id, source.lease_id, {
-      error:
-        "Extraction could not complete within the processing limits. Check the file format, encryption and converter configuration.",
-    });
+  } catch (error) {
+    const failure = extractionFailure(error);
+    console.error("analysis_source_extraction_failed", { sourceId: source.id, code: failure.code });
+    await sourceWorker("fail", source.id, source.lease_id, { error: failure.message });
   } finally {
     clearInterval(timer);
   }

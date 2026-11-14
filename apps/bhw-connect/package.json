@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "postbuild": "node scripts/build-analysis-extractor.mjs"
+    "postbuild": "node scripts/build-analysis-extractor.mjs && node scripts/verify-analysis-extractor.mjs"
   },
   "dependencies": {
     "@observablehq/plot": "^0.6.17",

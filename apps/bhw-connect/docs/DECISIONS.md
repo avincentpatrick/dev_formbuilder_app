@@ -9988,3 +9988,10 @@ local database, registry queries and OCR were real. Windows setup, scheduler,
 backup changes and live-provider acceptance remain deferred by the owner. No
 shared ops changes or operator messages. See POLICY_REVIEW_CONTRACT.md. Phase 6
 optional online research is next.
+
+
+## 2026-11-14 — Standalone source-extractor startup fix
+
+The phone verification CSV had its expected 30-byte size but extraction failed before statistical execution. Reproduced missing ExcelJS by copying standalone outside the checkout, and a missing-output failure when launching through a directory junction. Explicitly externalize ExcelJS for Next file tracing, canonicalize the CLI entry path, and gate every build on a detached junction-based CSV/XLSX/PDF/GeoJSON smoke test. This replaces the earlier checkout-only evidence, which could resolve parent development dependencies.
+
+Preserve failed originals and use the existing Retry extraction action after deployment. Separate runtime dependency, permission, timeout and missing-output messages from parser-format failures, log only safe source IDs/codes, and prohibit unsupported file-corruption guesses from file size. No schema, shared ops/workflow or server-setting change is needed. Full local/CI verification and release status belong in the PR; the signed-in production smoke test remains to be completed after deployment.

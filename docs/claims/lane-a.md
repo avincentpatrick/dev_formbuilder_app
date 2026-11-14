@@ -16,7 +16,66 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk)
+## Status: ACTIVE CLAIM — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (m240-builder-copy-section)
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-the-next-nhete-temporal-crab.md`). NHETE Phase 2, recommendation 1 of the NHETE plan, taken next by `D222`. The line shows the row `blocked (precondition: row is not-live)`; that is the generator's rule for every request row (`scripts/pipeline.php`, `read_defects()`), and `D222` is the user's signal to take it.
+Branch `m240-builder-copy-section`, cut from `origin/m239-nhete-browser-walk` at `7d968105`, so it is **stacked on #521 (and through it on #519)**: the row, `tests/Support/Nhete/` and `tests/e2e/nhete-builder-block.spec.ts` exist only there. `origin/main` is merged in for the claim files. PR into main, **fourth at the next merge point** (#520, #519, #521, this). **A change a tester sees: `VERSION` 0.20.1 → 0.21.0 with its release notes.** Held green for a merge point on the user's word (`D137`).
+Row: `builder-copy-section` (`R-cbb9de64`), *"The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand."*
+The user's answers in planning, recorded on this branch:
+- `D224` **A**: two ways in on one engine, **Duplicate section** and **Duplicate** for ticked questions.
+- `D225` **A**: a copy's keys **count up** (`a01_use` → `a02_use`) when the whole copy's next number is free; `_copy` otherwise.
+- `D226` **A**: `R-ade0b598` (a renamed key leaves its references broken) is its own increment, straight after, built on this one's rewriter.
+
+The one-question **Duplicate** becomes the one-question case of the same engine: its key counts up and the copy lands right below the original, as `resources/js/components/help/manual.ts` already says it does.
+
+### Evidence verified
+- `FormBuilderService::duplicateField()` copies one question, and no route copies a section: **held** (`routes/tenant.php`, only `fields/{field}/duplicate`).
+- A copied question's rules keep comparing with the **original's** siblings, and nothing in the backend rewrites a `${key}`: **held** (`duplicateField()` replicates each validation row with `related_form_field_id` unchanged; `ExpressionParser` has no printer, and template instantiation, the library, the XLSForm import and the cloner all keep keys or leave references as written).
+- *"Building NHETE took 1,725 builder requests"*: **held as a recorded figure**, not an assertion. `NheteBuilderRouteTest` writes it to its report (49×2 + 803×2 + 5×4 + 1).
+- *"Each indicator a note, four dropdowns, a calculation and a comment whose conditions name its siblings"*: **moved.**
+  - 29 of 35 blocks have four dropdowns; B03, B08, B19, B20, B21 and D03 have three (no cut-off).
+  - Nothing inside a block has a show-when condition. The comment names its siblings in a "Required when…" rule (stored by id) and in its placeholder `${…_ph}`, and the `_ph` calculation names three siblings in its formula (text).
+
+### Premise verified
+- *"Copy a whole section"* builds NHETE: **false.** The 35 blocks sit 5–12 to a page inside four domain sections (`mx_a`…`mx_d`, `NhetePlan::indicatorTable()`). Hence `D224`: ticked questions too.
+- Counting up gives NHETE's keys: **false.** Its codes run neither consecutively nor in order (A01, A07, A03, …). So the NHETE driver renames each copy's keys and, until `D226`'s increment, re-sends the two text references.
+- `RetiredFieldKeys::for()` is the set of keys a copy must not take: **false.** It omits a key the current published version still holds but the draft deleted, and every section key, yet repeat answers are stored under the section key. A new `everHeld()` reads every published version's field and section keys.
+- Placing copies in the browser and saving the order, the way other builder actions do: **wrong here.** `reorder()` calls `FieldRevisionRecorder::recordMoves()`, which would log "Moved" for the untouched questions below a ticked copy. The server places the copies inside the copy's own transaction.
+- Undoing a section copy by deleting the section: **false.** `deleteSection()` ungroups its questions (`nullOnDelete`); undo needs the questions deleted with it.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+The row's remedy (copy a section, fresh keys, re-point every condition, rule and piped reference inside the copy) **works by reading** the lexer and the template scanner:
+- An expression reference spans exactly `${key}` from the token's byte position, with no whitespace allowed, and string literals carry no escapes. A right-to-left splice is byte-exact.
+- The template scanner can record each hole's offset without changing the segments the golden vectors compare.
+
+Two corrections to the remedy:
+- **It needs a second way in (`D224`).**
+- **The copies are placed by the server, not the browser.**
+
+The tests below measure it before the build closes.
+
+Files:
+- new `app/Services/Expressions/ExpressionKeyRewriter.php`, `app/Services/Forms/KeyReferenceRewriter.php`, `app/Services/Forms/DraftCopier.php`, `app/Support/Forms/CopyKeys.php`;
+- `app/Services/Templates/TemplateParser.php`, `app/Services/Forms/RetiredFieldKeys.php`, `app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/BuilderPresenter.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`, `routes/tenant.php`;
+- `resources/js/components/builder/useBuilderStore.ts`, `BuilderCanvas.vue`, `resources/js/components/help/manual.ts`;
+- tests: new `tests/Feature/Forms/BuilderCopyTest.php`, unit tests for the rewriters and `CopyKeys`, a Vitest store test; `BuilderRoutesTest`, `BuilderDraftGuardTest`, `OtherSpecifyTest`, `PlatformTemplateSeedTest`; `tests/Support/Nhete/NheteBuilderDriver.php` and `tests/Feature/Forms/Nhete/NheteBuilderRouteTest.php`; `tests/e2e/nhete-builder-block.spec.ts`;
+- `VERSION`, `database/data/releases.json`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none (the rewriter is server-side only; the TypeScript engine is unchanged).
+Namespaces spent: `D224`, `D225`, `D226`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- Every copy publishes through both gates with its references re-pointed. Domain B built by copying serialises identically to domain B built by hand.
+- The NHETE builder build needs about 1,555 requests instead of 1,725. Stop 8 goes from 478 to about 308: 6 blocks by hand (80), then 29 copies at one request each, plus one rename per copied question (199). Every copied block's rules come from the copy and are not re-entered.
+- The E2E additions cost under a minute.
+
+The one most likely wrong: the builder store's undo and redo across a section copy, where the section's server id changes on redo and history entries hold section ids.
+
+---
+
+## HELD — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk) — BUILT AND HELD: PR #521, stacked on #519, every job green but Static (audit only, until #520 merges), waiting for a merge point, where it goes third
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m239-nhete-browser-walk`, cut from `origin/m237-nhete-stress-test` at `4a918ccb`, so it is **stacked on #519**: the row, the fixture and `tests/Support/Nhete/` exist only there. `origin/main` is merged in for the claim files. PR into main, after #519 at the merge point. **Tests, a test seeder and CI only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
 Row: `nhete-browser-walk`, *"The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder."* The user's answer in planning, recorded as `D223` on this branch: the walk runs on every CI run, at all three widths.

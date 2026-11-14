@@ -66,5 +66,7 @@ it('publishes the NHETE module once, one screen per page with save-and-resume, a
         ->and(FormSection::query()->where('form_version_id', $form->current_published_version_id)->count())
         ->toBe(count((new NhetePlan)->sections()));
 
-    $this->get('http://acme.meridian.test/f/nhete')->assertOk();
+    // `withoutVite()`: the page's shell names built assets, and CI's Pest job builds none (run 43568612961 failed
+    // here on a missing manifest while every local run, with assets built, passed).
+    $this->withoutVite()->get('http://acme.meridian.test/f/nhete')->assertOk();
 })->group('nhete');

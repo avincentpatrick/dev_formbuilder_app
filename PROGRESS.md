@@ -214,7 +214,7 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Current Status
 
-- **🅰️ `M237` IS BUILT AND HELD FOR A MERGE POINT (`nhete-stress-test`, `D220` to `D222`): THE NHETE TWG PRE-WORK MODULE, BUILT EVERY WAY THE APP OFFERS AND MEASURED. Tests and records only, so nothing a tester sees changes.**
+- **🅰️ `M237` IS BUILT, PR #519, HELD FOR A MERGE POINT (`nhete-stress-test`, `D220` to `D222`): THE NHETE TWG PRE-WORK MODULE, BUILT EVERY WAY THE APP OFFERS AND MEASURED. Tests and records only, so nothing a tester sees changes.**
   - **By hand, through the builder's own routes,** it builds, publishes and answers: 808 questions in 49 sections, 1,725 requests, and ten rule refusals, each on the right question. Copying it as a template works once its three diagrams are uploaded again, and the question library works. Export and re-import lose every note's content and make every "Required when…" box always required.
   - **By Kobo-style import:** the Meridian dialect publishes. The Kobo dialect fails as a server error on a note over 500 characters. `count-selected()` and `regex()` fail at publish, and a `required` formula and `media::image` are dropped without a warning.
   - **17 rows are filed `during-testing`, taken next (`D222`), starting with `nhete-browser-walk`.** Two older rows were measured again: `R-0ceefbb4` (export) and `R-06e31180` (a template copy's images, now **Live**). The record is `M237`'s claim in `docs/claims/lane-a.md`.

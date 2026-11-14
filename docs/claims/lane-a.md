@@ -16,7 +16,39 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test)
+## Status: ACTIVE CLAIM — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42)
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
+Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.
+
+### Evidence verified
+- `composer.lock` holds `laravel/framework` `v13.30.1`: **held**.
+- `composer audit --locked` on the host reports exactly one advisory, `CVE-2026-128083` (GHSA-63hm-g96r-2m2q, *"Laravel: Task Output Injection - Concurrency Process"*, low), affecting `>=13.0.0,<13.40.0|<12.71.0`, reported 2026-11-13T18:54:31Z, and exits 1: **held**.
+- #519's run 43545115637 failed Static at step 23, *Composer audit (SCA)*, and skipped steps 24–30 (Node, npm audit, the staging headers fetch and judge, the secret scan): **held**.
+
+### Premise verified
+- The row exists only on #519's branch (`3f56e2df`), and #519 merges after this: **held**, so the row is filed and closed here.
+- Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade (the two hits are comments): **held**. The advisory does not reach this app's code; the bump is for the gate.
+- The lock's `plugin-api-version` is `2.6.0`, which is what the host's Composer 2.8.12 writes: **held**, so writing the lock on the host leaves that line alone.
+- The host's `vendor/` is behind the lock (phpseclib 3.0.57 installed, 3.0.58 locked): **held**, and irrelevant to the diff, which is the lock alone.
+
+### Remedy verdict
+The row's `composer update laravel/framework --with-dependencies`, dry-run: **works, but moves 110 packages**, including a major `guzzlehttp/uri-template` 1 → 2. With `--minimal-changes` added, dry-run: `laravel/framework` v13.30.1 → **v13.42.0** (the newest 13.x) and `laravel/prompts` v0.3.21 → v0.3.27, **and nothing else**. Taken with `--no-install --no-scripts` (the `M235` recipe); `composer audit --locked` after the write is the measurement.
+
+Files: `composer.lock`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from the ADR, migration or decision namespaces.
+
+Prediction:
+- `composer audit --locked` exits 0, the diff is the two packages' lock entries, and `content-hash` does not move.
+- Every required check is green, and Static runs past the audit to its full step count for the first time since 2026-11-13.
+
+The one most likely wrong: a 13.31–13.42 behaviour change that Pest or E2E catches.
+
+---
+
+## HELD — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test) — BUILT AND HELD: PR #519, red at `Composer audit (SCA)` until `M238` merges, waiting for a merge point
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Branch `m237-nhete-stress-test`, cut from origin/main at `93d85ccd`, PR into main. **Tests and records only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
 Row: filed by this increment, `nhete-stress-test`, *"The NHETE TWG pre-work module (about 45 screens, 35 indicator rows of five questions, about 90 conditional part rows) has never been built in the app; the biggest form ever seeded has about eight questions, and nothing has been measured at that size."* The user's three answers are recorded as `D220`–`D222` in this PR: a test case, not a live run; the repository gets a same-shape copy with placeholder wording and never the review copy's own words; every NHETE row is filed `during-testing` and taken next.

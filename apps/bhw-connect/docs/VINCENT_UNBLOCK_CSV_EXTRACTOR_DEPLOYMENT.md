@@ -132,7 +132,7 @@ Jong's first action is:
 
 The original is retained, so another upload is unnecessary. Retrying the analysis question alone does not necessarily retry a failed source extraction.
 
-Once the source is ready, submit the synthetic census-description request from [the Python verification guide](PYTHON_WORKER_VERIFICATION_FOR_VINCENT.md). Expected: input rows **5**, valid count **4**, missing count **1**, mean **5**, median **5**, sample SD **2.582**, and no census sampling p-value. Then complete background/browser-close, export, private-access and exact-replay checks in that guide. Those production checks remain outstanding; passing CI does not replace them.
+Once the source is ready, submit the synthetic census-description request from [the Python verification guide](https://github.com/avincentpatrick/dev_formbuilder_app/blob/3184a5333b1b8e1b7c59917e2f718f69efa684e7/apps/bhw-connect/docs/PYTHON_WORKER_VERIFICATION_FOR_VINCENT.md). Expected: input rows **5**, valid count **4**, missing count **1**, mean **5**, median **5**, sample SD **2.582**, and no census sampling p-value. Then complete background/browser-close, export, private-access and exact-replay checks in that guide. Those production checks remain outstanding; passing CI does not replace them.
 
 ## Return this status
 

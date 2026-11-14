@@ -61,6 +61,26 @@ Prediction:
 
 The one most likely wrong: the 141-question parts page at 375 px (a long placeholder word or a dropdown overflowing), or the filler tripping a rule on a first-choice pick.
 
+**BUILT AND HELD (2026-11-14): PR #521, stacked on #519.** Its first CI run, 43568612961, passed all six NHETE cases. The walk took about 22 s per width and the builder spec about 20 s, so about 2 minutes in all.
+- Static stopped at `Composer audit (SCA)`, as expected until #520 merges.
+- Two failures in that run were this branch's, and it fixed both:
+  - `analytics-axe`'s suppressed-tiles read counted NHETE's labels ("70%") as zeros. It is now scoped to the tiles.
+  - The seeder test's page read needed Vite. It now reads without it.
+- Two failures were not this branch's: `NoteContentShapeTest` (`publish-gate-field-order`) and the PDF minute flake.
+- 5 of 5 mutants caught.
+
+**How the prediction fared.**
+- **Held:** the walk passes at all three widths with no sideways scroll and clean axe in both themes, and resume restores the answers. The builder block survives a reload.
+- **Wrong:**
+  - CI's cost: predicted 6 to 12 minutes, measured about 2.
+  - The one flagged as most likely wrong did not happen: the parts page at 375 px and the filler both held.
+  - Four things nobody predicted:
+    - the import's `default_language` as `<html lang>` (filed);
+    - the drawn radio and checkbox taking the pointer, so `.check()` hung for the whole test budget;
+    - a page-wide `'0%'` read in another spec;
+    - a Pest page read that needs built assets.
+  - The row's premise that the local database held no E2E seed was false.
+
 **Extended mid-build (2026-11-14), before the file was opened.** The walk's first axe scan failed `html-lang-valid` on the welcome page. The import stores the workbook's `default_language` (`English`) as the form's locale, and the guest page writes `<html lang="English">`.
 - It is filed as `xlsform-default-language-name` (`during-testing`).
 - The seeder sets the form's locale to `en`, naming that row, so the walk measures the respondent app and not the import.
@@ -68,7 +88,15 @@ The one most likely wrong: the 141-question parts page at 375 px (a long placeho
 
 ---
 
-## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520, extended mid-build (below), waiting for a merge point, where it goes first
+## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520 green, run 43562454871 8/8 with real step counts, waiting for a merge point, where it goes first
+
+**BUILT AND HELD (2026-11-14):** run 43562454871 has every required check green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, plus Boundary 43562453077 green (5).
+
+**How the prediction fared.**
+- **Held:** `composer audit --locked` exits 0, the lock moves two packages only, and `content-hash` does not move. Static runs to its full 33 steps for the first time since 2026-11-13.
+- **Wrong:** "every required check green" failed on the first run. PHPStan went red, through a path nobody named: Laravel 13.38 blinded Larastan to the app's console commands.
+- The one flagged as most likely wrong, a behaviour change caught by Pest or E2E, did not happen: both were green on 13.42.0.
+- Found on the way, not predicted: `NoteContentShapeTest`'s order flake (`publish-gate-field-order`).
 
 **Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
 - Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.

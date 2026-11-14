@@ -16,6 +16,67 @@ Standing Rule 7(b-bis).
 
 ---
 
+## Status: ACTIVE CLAIM — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test)
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Branch `m237-nhete-stress-test`, cut from origin/main at `93d85ccd`, PR into main. **Tests and records only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
+Row: filed by this increment, `nhete-stress-test`, *"The NHETE TWG pre-work module (about 45 screens, 35 indicator rows of five questions, about 90 conditional part rows) has never been built in the app; the biggest form ever seeded has about eight questions, and nothing has been measured at that size."* The user's three answers are recorded as `D220`–`D222` in this PR: a test case, not a live run; the repository gets a same-shape copy with placeholder wording and never the review copy's own words; every NHETE row is filed `during-testing` and taken next.
+
+### Evidence verified
+- `RuntimeShell.vue` caps the guest column at `max-width: 44rem`: **held**.
+- `MatrixColumns::TYPES` is single choice, multiple choice, short text, whole number, decimal and date, with no long text: **held**.
+- `GridSources` copies a sourced grid's rows in at publish, at most `ROWS_MAX = 200`: **held**. So rows never change per respondent.
+- `FunctionRegistry::PUBLIC_FUNCTIONS` holds thirteen names, none of them `count-selected`, `regex` or `string-length`: **held**. `not` is a parser keyword (`ExpressionParser::parseNot()`), and `.` lexes as a self-reference: **held**.
+- `form_fields.label` is `string('label', 500)`: **held**. `XlsformImportParser` checks the length of `appearance` only, never a label: **held**.
+- The builder's own requests, read in `useBuilderStore.ts`, are:
+  - `POST …/sections` (empty), then a `PATCH`;
+  - `POST …/fields`, then `PATCH …/fields/{id}`;
+  - `…/other-specify`, `…/duplicate`, `…/from-library` and `…/save-to-library`.
+
+  **Held.** These are the routes the "by hand" test drives.
+- **Read by the planning survey only, and verified by this build rather than taken on trust:**
+  - `ExpressionValidationGate` refuses a grid as a condition operand;
+  - `useAutosave` restores only within the same browser session;
+  - submissions are edited by staff only;
+  - `SectionView` looks up each field with `find()`.
+
+### Premise verified
+- Nothing under `apps/` is read or edited (`D210`): **held**.
+- No migration, no ADR, and no change a respondent or author sees: **held** by the file list below.
+- The planning answers are the user's, given in chat on 2026-11-14, and none is open: **held**. They are recorded as `D220`–`D222` by this PR.
+- The tests run in the app container (`DB_HOST=postgres`). Docker Desktop was stopped at session start and was started for this build: **held**.
+- `docs/claims/**` is in `ci.yml`'s `paths-ignore`, so this claim push starts no run: **held**.
+- The review copy's wording is not committed (`D221`): **held**. The fixture keeps every count, choice order, condition and text length, with placeholder words. The real-text workbook is generated only in the session's scratchpad.
+
+### Remedy verdict
+The method is to build the same form from one fixture through every route, then publish it and submit to it.
+
+That the builder routes are what a person's clicks send was **checked by reading the store, above**. That the guest endpoints are what the respondent app sends is checked by the browser spec, which fills the published form for real.
+
+There is no fix to disprove. The measurements replace the plan's *(prove)* marks one by one.
+
+Files:
+- new `tests/fixtures/nhete/nhete-shape.json`;
+- new `tests/Support/Nhete/` (the loader, the builder-route driver, the workbook writer for the Kobo and Meridian dialects);
+- new `tests/Feature/Forms/Nhete/` (builder route, XLSForm import, template, library and export round trip);
+- new `tests/e2e/nhete-stress.spec.ts`, and its seeding in `database/seeders/E2eSeeder.php` or a seeder it calls.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `docs/gate-baselines.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D220`, `D221`, `D222`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- The builder-route build publishes and takes a full response.
+- Each answer rule rejects what it should: word cap by pattern, `count(.) <= 2`, the exclusive choice, and the required-when comment.
+- The Kobo-dialect import succeeds, then fails at publish on `count-selected` and `regex`.
+- A note label over 500 characters fails the import with a database error instead of a message.
+- The Meridian-dialect import publishes.
+- A template copy keeps note content, conditions and rules; the export round trip loses note content and conditional required.
+- The guest app boots and walks the ~700-question form at 375, 834 and 1440 px with no sideways scroll.
+
+The one most likely wrong: the 500-character overflow. The importer may stop it before the database, or Postgres may refuse it in a way that is caught.
+
+---
+
 ## RELEASED — `M235`, `iconnect-domain-move`: the testing site moves to `iconnect.com.de`, and the Settings card names the workspace's real host (merged as PR #505, `39ff605e`, at the cutover sitting of 2026-11-12/13, after merging the trunk into its branch at `2d1d3dc3`; every required check green with real step counts on its run 43293356815 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43293352960 green (5); the trunk's run 43299220087 on `39ff605e` 8/8, with BHW Connect at 23)
 
 **RELEASED AT ITS OWN MERGE POINT, THE CUTOVER SITTING** (`D137`, `D216`; the user chose *"Switch + merge now"*). The census before, 2026-11-12 19:23:10 UTC, read 1 · 6 · 11 · 27 · 22 · 62 · 31 · 74; the user's census after, 2026-11-13 01:26:06 UTC, read the same 1 · 6 · 11 · 27 · 22 · 62 · 31 · 74 (tenants · users · forms · form_versions · submissions · attachments · feedback_reports · notifications), so before = after. The same sitting the user confirmed Settings → Access names `iconnect.com.de` ("Turn it off to let anyone create an account at iconnect.com.de"), and approved the tester notice, which they send on their own channel. Deploy run 43304765894 backed up `deploy-20261112-205817.dump` (1,178,862 B), counted 71 tables / 54,253 rows, had nothing to migrate and held, and added 0.20.1 to the releases table; BHW's step skipped, keeping the build made for the new URL. From outside: `/login` reads `"version":"0.20.1"`, `/up` and `/bhw-connect` 200.

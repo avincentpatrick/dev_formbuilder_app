@@ -60,3 +60,5 @@ Every npm run build now verifies the detached standalone release through a tempo
 Server/runtime failures now have safe, differentiated messages and a server log code; raw stderr, paths and document contents are not logged or returned by this failure classifier. A failed extraction alone does not establish that an uploaded file is empty, corrupt, encrypted or needs a converter. The assistant must not infer those causes from file size.
 
 After this fix deploys, expand the existing failed source in Project sources and choose Retry extraction. The original file is retained, so another upload is unnecessary. Wait for ready before requesting the statistical analysis again. This change runs in the BHW web service; the existing dispatcher script and Python setting are unchanged.
+
+For the existing Meridian audit/deployment blocker and exact Windows release checks, see [Vincent: unblock the CSV extractor deployment](VINCENT_UNBLOCK_CSV_EXTRACTOR_DEPLOYMENT.md).

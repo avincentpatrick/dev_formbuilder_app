@@ -16096,6 +16096,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   - `composer audit --locked` reads *"No security vulnerability advisories found"*.
   - Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade, so the advisory reached no path this app runs. That is why the row stays `minor`.
   - The Forms, Guest and Unit suites passed against 13.42.0 in the app container: 2,472 tests, with the same two `preg_match` warnings CI already shows.
+  - **The bump turned PHPStan red, and the branch fixed that too.** #520's first run, 43559666697, failed Static at PHPStan with 17 `cast.string` errors, each a `(string)` cast on a console command's `argument()` or `option()`, in nine commands.
+    - Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+    - Every fixed version is 13.40.0 or later, so pinning lower could not avoid it, and Larastan 3.15.0 builds the application the same way.
+    - The nine now read through a new `ReadsTextInput` trait, which returns what the cast did for every scalar and for null. PHPStan on the host: 0 errors. The nine commands' tests: 106 passed.
+    - The same blindness takes Larastan's undefined-argument rule with it, filed as `larastan-console-commands-blind`.
   - It merges first at the next merge point, ahead of #519.
 
 - **`minor` · `publish-gate-field-order` — A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ.**
@@ -16110,3 +16115,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read the gate's fields in the form's order, so the list follows the form and the test's order holds by construction.
 
   **Live.** Filed by `M238`. **Tier: during-testing.**
+
+- **`nit` · `larastan-console-commands-blind` — Since Laravel 13.38, Larastan no longer finds this app's console commands, so it neither types their arguments nor checks that an argument a command reads is in its signature.**
+  Found by `M238` (2026-11-14), when the bump to 13.42.0 turned PHPStan red on nine commands.
+  - Larastan reads each command's signature from a console application it builds itself (`ConsoleApplicationResolver`). Since 13.38, the commands `load()` discovers are kept in the kernel's `$kernelCommands`, which that application never sees.
+  - Measured in the app container: a fresh `Illuminate\Console\Application` lists 160 commands, none of them this app's (`sso:domains` and `tenants:create` are both missing).
+  - So `argument()` and `option()` fall back to their wide type, which `M238` met by narrowing. `UndefinedArgumentOrOptionRule` finds no command either, so a typo in an argument's name now passes PHPStan silently.
+  - Larastan 3.15.0, the newest on 2026-11-14, builds the application the same way.
+
+  The remedy, when taken: give Larastan's application the app's commands (a PHPStan bootstrap that registers them, or an upstream fix), then prove it with a deliberately misspelt argument that turns PHPStan red.
+
+  **Not live** — it blinds a gate and changes nothing a tester sees; it reaches the trunk when `M238` merges. Filed by `M238`. **Tier: during-testing.**

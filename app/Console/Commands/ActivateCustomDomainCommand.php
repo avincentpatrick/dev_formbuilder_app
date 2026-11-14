@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Models\Domain;
 use App\Services\Tenancy\CustomDomainService;
 use Illuminate\Console\Command;
@@ -27,6 +28,8 @@ use Illuminate\Console\Command;
  */
 final class ActivateCustomDomainCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'domains:activate {domain : The fully-qualified custom domain to put into service}
                             {--deactivate : Take a live domain back out of service, keeping its verification}';
 
@@ -34,7 +37,7 @@ final class ActivateCustomDomainCommand extends Command
 
     public function handle(CustomDomainService $domains): int
     {
-        $host = mb_strtolower(trim((string) $this->argument('domain')));
+        $host = mb_strtolower(trim($this->textArgument('domain')));
 
         /** @var Domain|null $domain */
         $domain = Domain::unscopedQuery()->where('domain', $host)->first();

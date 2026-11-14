@@ -16245,3 +16245,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: a report that, for a chosen set of questions, shows each one's share agreeing over those who gave a view, flags the ones over a threshold with enough views, and exports the list.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `composer-audit-laravel-13-40` — A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed.**
+  Found by `M237` (2026-11-14), in PR #519's Static job (run 43545115637). `composer audit` reports `PKSA-yxbx-3c9s-cjt9` (CVE-2026-128083, *"Laravel: Task Output Injection - Concurrency Process"*, severity low), affecting `laravel/framework` `>=13.0.0,<13.40.0`. The lock holds `v13.30.1`.
+  - The Static job stops at its first failing step, so on every pull request the steps after the audit never run: npm audit, the staging headers judge and the secret scan. Every step before it passed on #519.
+  - No pull request can be merged green until the lock moves, so this goes first at the next merge point.
+
+  The remedy, when taken: `composer update laravel/framework --with-dependencies` to 13.40.0 or later, in its own increment, with the full Pest, E2E and Static runs read before it merges.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**

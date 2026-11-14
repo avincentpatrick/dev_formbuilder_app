@@ -810,6 +810,18 @@ Three things worth knowing if you go beyond this guide:
   the automated browser tests. `migrate:fresh --seed` does *not* create it, and `DemoSeeder` never touches it.
 - **The PHP test suite is safe to run while you are testing by hand.** `phpunit.xml` pins it to a separate
   `meridian_testing` database, so `php artisan test` cannot disturb the demo data in `meridian`.
-- **The Playwright browser suite is not.** It serves the app from `.env`, so it runs against *this* database
-  and its setup step seeds the `acme` fixture into it. Don't run it mid-walkthrough; if you already have,
-  `php artisan migrate:fresh --seed` puts the demo back.
+- **The Playwright browser suite is not.** It serves the app from `.env`, so it runs against *this* database,
+  and the forms its specs make land there. Nothing in the suite seeds: `tests/e2e/global-setup.ts` only signs in.
+  CI seeds a fresh database with `E2eSeeder`, then `NheteE2eSeeder` (the NHETE module at `/f/nhete`, for
+  `nhete-walk.spec.ts`). Locally you seed it yourself — or, to leave `meridian` alone, use a scratch database:
+  1. `CREATE DATABASE meridian_e2e OWNER meridian_app;`, then `CREATE EXTENSION postgis;` in it, as the
+     `meridian` superuser.
+  2. `docker compose exec -e DB_DATABASE=meridian_e2e app php artisan migrate --force`, then `db:seed` with each
+     of the two seeders, in that order, under the same variable.
+  3. Serve it: `docker compose exec -d -e DB_DATABASE=meridian_e2e app php artisan serve --host=0.0.0.0 --port=8001 --no-reload`.
+     Without `--no-reload`, `artisan serve` drops the variable and the server reads `meridian` again.
+  4. Build the assets and set `public/hot` aside (the `e2e` service's comment says why), then
+     `docker compose run --rm -e E2E_BASE_URL=http://acme.localhost:8001 e2e test <spec>`.
+
+  Don't run it against `meridian` mid-walkthrough; if you already have, `php artisan migrate:fresh --seed` puts
+  the demo back.

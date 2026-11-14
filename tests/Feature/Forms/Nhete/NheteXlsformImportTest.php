@@ -133,6 +133,9 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
         ->and($outcome['published'])->toBeTrue('publish refused: '.json_encode($outcome['publish_toast']));
 
     $form = $outcome['form'];
+    // TODAY'S DEFECT (`xlsform-default-language-name`, found by `M239`'s walk): the settings sheet's `default_language`
+    // is a language NAME, stored as the locale as it stands, so the guest page writes `<html lang="English">`.
+    expect($form->default_locale)->toBe('English');
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/share", [
         'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null, 'public_slug' => 'nhete',
     ]);

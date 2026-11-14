@@ -16245,3 +16245,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: a report that, for a chosen set of questions, shows each one's share agreeing over those who gave a view, flags the ones over a threshold with enough views, and exports the list.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
+  Found by `M239` (2026-11-14), on the NHETE walk's first axe scan: `html-lang-valid` on the welcome page, *"<html> element must have a valid value for the lang attribute"*.
+  - The NHETE workbook's settings say `default_language: English`. `XlsformImporter::applySettings()` copies it into `forms.default_locale` as it stands, and `public-runtime.blade.php` writes `<html lang="English">`.
+  - `docs/xlsform-interop-spec.md` §4 maps `default_language` to `forms.default_locale` and says nothing about its form. This product's own export writes a code (`en`), so its own round trip never shows it; a workbook from ODK or Kobo does.
+  - A screen reader reads the page with the wrong voice rules or none, and every page of such a form fails WCAG 3.1.1.
+  - `NheteXlsformImportTest` pins what the import stores today (`English`). `NheteE2eSeeder` sets `en` after its import, naming this row, so the walk measures the respondent app.
+
+  The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
+
+  **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**

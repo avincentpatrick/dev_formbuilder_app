@@ -215,7 +215,7 @@ final class SchemaBlueprintMaterializer
         return $count;
     }
 
-    /** A collision-free field key within the draft (mirrors FormBuilderService::uniqueKey/copyKey). */
+    /** A collision-free field key within the draft (mirrors FormBuilderService::uniqueKey). */
     private function uniqueFieldKey(FormVersion $target, ?string $base): string
     {
         $taken = DB::table('form_fields')->where('form_version_id', $target->id)->pluck('key')->flip();

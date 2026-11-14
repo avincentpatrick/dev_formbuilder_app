@@ -74,4 +74,46 @@ final class RetiredFieldKeys
             return $last + 1;
         }, $lastHeld);
     }
+
+    /**
+     * M240 (`builder-copy-section`, `D225`) — every key ANY published version of the form ever held, a question's or a
+     * section's: the keys a copy must never take. {@see for()} is the wrong set for that. It leaves out a key the current
+     * version still holds (deleted in the draft only, so a copy taking it would mix that question's answers with the
+     * copy's) and every section key, though a repeatable section's answers are stored under its key.
+     *
+     * @return array<string, true>
+     */
+    public function everHeld(Form $form): array
+    {
+        $rows = FormVersion::query()
+            ->where('form_id', $form->id)
+            ->whereNotNull('published_at')
+            ->selectRaw($this->keysOf('fields').' as field_keys, '.$this->keysOf('sections').' as section_keys')
+            ->toBase()
+            ->get();
+
+        $held = [];
+
+        foreach ($rows as $row) {
+            foreach ([$row->field_keys, $row->section_keys] as $json) {
+                $keys = json_decode((string) $json, true);
+
+                foreach (is_array($keys) ? $keys : [] as $key) {
+                    if (is_string($key) && $key !== '') {
+                        $held[$key] = true;
+                    }
+                }
+            }
+        }
+
+        return $held;
+    }
+
+    /** The SQL for one snapshot array's key list, as {@see for()} reads `fields` — a missing or non-array member is []. */
+    private function keysOf(string $member): string
+    {
+        return "coalesce((select jsonb_agg(f ->> 'key') from jsonb_array_elements("
+            ."case when jsonb_typeof(schema_snapshot -> '{$member}') = 'array' then schema_snapshot -> '{$member}' else '[]'::jsonb end"
+            .') as f), \'[]\'::jsonb)';
+    }
 }

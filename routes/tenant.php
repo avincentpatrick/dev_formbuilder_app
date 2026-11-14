@@ -646,6 +646,15 @@ Route::middleware([
         ->middleware('can:update,form')->name('forms.fields.history');
     Route::post('/forms/{form}/fields/{field}/duplicate', [FormBuilderController::class, 'duplicateField'])
         ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.duplicate');
+    // M240 (`builder-copy-section`, `D224`): copy ticked questions, or a section with its questions, every link inside the
+    // copy pointing at the copies; and delete several questions at once, the builder's undo of a copy. `duplicate` and
+    // `delete-many` are literal segments with no `{field}`, so they never collide with the fields/{field} routes.
+    Route::post('/forms/{form}/fields/duplicate', [FormBuilderController::class, 'duplicateFields'])
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.duplicate-many');
+    Route::post('/forms/{form}/fields/delete-many', [FormBuilderController::class, 'destroyFields'])
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.fields.destroy-many');
+    Route::post('/forms/{form}/sections/{section}/duplicate', [FormBuilderController::class, 'duplicateSection'])
+        ->middleware(['can:update,form', 'builder.draft'])->name('forms.sections.duplicate');
     // Type conversion (Increment M122): its own controller and endpoint, never the autosave PATCH, whose
     // configRules() dispatch on the field's CURRENT type. GET reads every plan with its cross-field census;
     // POST applies one under the token and the confirmed plan's fingerprint.

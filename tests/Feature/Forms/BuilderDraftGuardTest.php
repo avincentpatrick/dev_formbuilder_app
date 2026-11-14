@@ -506,8 +506,13 @@ it('answers 409 draft_superseded to every other write a stale tab sends', functi
     $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/reorder", [
         'sections' => [], 'fields' => [['id' => $publishedField->id, 'form_section_id' => null, 'sequence' => 3, 'section_sequence' => null]],
     ])->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+    // M240: the copy writes and the undo of a copy.
+    $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/fields/duplicate", ['field_ids' => [$publishedField->id]])
+        ->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
+    $this->actingAs($admin)->withHeaders($stale)->postJson("{$base}/fields/delete-many", ['field_ids' => [$publishedField->id]])
+        ->assertStatus(409)->assertJsonPath('code', 'draft_superseded');
 
-    // Nothing reached the new draft: the stale create made no field there.
+    // Nothing reached the new draft: the stale create and the stale copy made no field there.
     enterTenant($tenant->id, $admin->id);
     expect(FormField::query()->where('form_version_id', $draftField->form_version_id)->count())->toBe(1);
 });

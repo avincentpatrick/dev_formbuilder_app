@@ -73,6 +73,35 @@ Prediction:
 
 The one most likely wrong: the builder store's undo and redo across a section copy, where the section's server id changes on redo and history entries hold section ids.
 
+**BUILT AND HELD (2026-11-15): PR #526, stacked on #521.** `VERSION` 0.21.0 with its notes.
+- **CI run 43692637135 on `d9b95b89`:** every job but Static green.
+  - Pest: 7,618 passed and 1 skipped (36,545 assertions).
+  - E2E: 924 passed in 38.9 min. `nhete-builder-block.spec.ts` takes about 27 s per width, against M239's 20 s.
+  - Static stopped at the pipeline lint, because the line had drifted after a late backlog edit. The line was regenerated in `df08af51`.
+  - The run before it (43690519220) also showed `NoteContentShapeTest`'s known order flake (`publish-gate-field-order`, filed in #520). Static stops at `Composer audit (SCA)` until #520 merges.
+- **9 of 9 mutants caught:** five server ones through `mutate.php`, and four store ones through a byte-restoring Vitest harness.
+- **Local runs:**
+  - Pest: `BuilderCopyTest` 7, the unit tests 17, the builder and draft-guard tests 31, the NHETE group all green;
+  - Vitest: 75 builder and help files;
+  - `vue-tsc` and Pint clean;
+  - host PHPStan 0 in this branch's files;
+  - E2E against a scratch database: 87 of 90 first, then 3 of 3 after a locator fix.
+
+**How the prediction fared.**
+- **Held:**
+  - Every copy publishes through both gates with its references re-pointed.
+  - Domain B built by copying serialises exactly as domain B built by hand.
+  - The E2E additions cost under a minute (about 21 s across the three widths).
+  - The one flagged as most likely wrong was real: history entries hold section ids, and a redone section copy gets a new one. The plan's review caught it before the build, and `sectionAlias` fixes it. Two Vitest cases pin it, and both go red without it. It had already broken undo of a section's delete followed by a Move.
+- **Close:** about 1,555 requests predicted, 1,560 measured. The 5 extra are moves of a copy to its section's end, which I had not counted.
+- **Not predicted:**
+  - Each copy cleared `section_sequence` on every question of the draft, which made the copy-built NHETE form 2.7 times slower: 294 s against 107 s by hand on one box. Only rows that carry one are written now, and the copy build takes 141 s. In production the old write also row-locked every question of the draft on each copy.
+  - `mutate.php` aborts on a dirty target (four of five mutants, until I committed).
+  - Two old backlog citations went blank when my lines moved. They had already pointed at the wrong code, and are now cited by name.
+  - PHPStan wanted real lists in four places.
+  - My E2E locator read a section's head as its question list.
+  - Filed, not fixed: `copy-split-other-pair` (`before-launch`) and `copy-text-over-request-cap` (`after-launch`).
+
 ---
 
 ## HELD — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk) — BUILT AND HELD: PR #521, stacked on #519, every job green but Static (audit only, until #520 merges), waiting for a merge point, where it goes third

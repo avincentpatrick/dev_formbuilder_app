@@ -108,3 +108,36 @@ test("direct municipality links resolve both named ancestors", async ({ page }) 
   );
   await expect(trail.locator('[aria-current="page"]')).toHaveText("City of Naga");
 });
+
+for (const width of [390, 1440]) {
+  test(`dataset return follows in-page drill and history at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await fixture(page);
+    await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
+    await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    const back = page.getByRole("link", { name: "← BHW dataset", exact: true });
+    await expect(back).toHaveAttribute(
+      "href",
+      "/bhw-connect/catalog?mode=psgc&location=region%3A07&dataset=bhw",
+    );
+    if (width < 1024)
+      await page.getByRole("button", { name: "Areas and data", exact: true }).click();
+    await page.getByLabel("BHW Headcount 2025 area", { exact: true }).selectOption("07022");
+    // Selecting a child alone does not change the map's geographic scope.
+    await expect(back).toHaveAttribute("href", /location=region%3A07/);
+    await page.getByRole("button", { name: "Show areas within Cebu", exact: true }).click();
+    await expect(back).toHaveAttribute(
+      "href",
+      "/bhw-connect/catalog?mode=psgc&location=province%3A07022&dataset=bhw",
+    );
+    await page.goBack();
+    await expect(back).toHaveAttribute("href", /location=region%3A07/);
+    await page.goForward();
+    await expect(back).toHaveAttribute("href", /location=province%3A07022/);
+    await back.click();
+    await expect(page).toHaveURL(/catalog\?mode=psgc&location=province%3A07022&dataset=bhw/);
+    await page.goBack();
+    await expect(page).toHaveURL(/level=province&code=07022/);
+    await expect(back).toHaveAttribute("href", /location=province%3A07022/);
+  });
+}

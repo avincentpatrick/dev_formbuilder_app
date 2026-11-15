@@ -125,7 +125,6 @@ final class TemplateParser
             return $template;
         }
 
-        /** @var list<array{0: int, 1: string}> $holes */
         $holes = [];
         $this->scan($template, false, $holes);
 
@@ -139,15 +138,18 @@ final class TemplateParser
     }
 
     /**
-     * The one scanner, both modes. `$holes`, when passed, collects each hole's byte offset and key in source order
-     * ({@see rewriteKeys()}); the segments themselves are unchanged, because both golden runners compare them exactly.
+     * The one scanner, both modes. `$holes` collects each hole's byte offset and key in source order, for
+     * {@see rewriteKeys()}; the segments themselves are unchanged, because both golden runners compare them exactly.
      *
-     * @param  list<array{0: int, 1: string}>|null  $holes
+     * @param  list<array{0: int, 1: string}>  $holes
+     *
+     * @param-out  list<array{0: int, 1: string}>  $holes
+     *
      * @return list<TemplateSegment>
      *
      * @throws TemplateSyntaxException
      */
-    private function scan(string $template, bool $strict, ?array &$holes = null): array
+    private function scan(string $template, bool $strict, array &$holes = []): array
     {
         // ── Doc #26 §2.1, as amended by H6a: the caps bind only a HOLE-BEARING value ────────────────
         // The caps exist to bound RENDER cost, and a template with no hole has none — it is returned
@@ -222,10 +224,7 @@ final class TemplateParser
 
             $segments[] = ['type' => 'hole', 'value' => $key];
             $holeCount++;
-
-            if ($holes !== null) {
-                $holes[] = [$i, $key];
-            }
+            $holes[] = [$i, $key];
 
             if ($strict && $holeCount > self::MAX_HOLES) {
                 throw TemplateSyntaxException::tooManyHoles($holeCount);

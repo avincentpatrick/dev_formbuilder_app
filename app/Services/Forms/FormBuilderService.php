@@ -457,8 +457,8 @@ final class FormBuilderService
             // M90: the RE-READING guard — see the note on assertStillDraftChild().
             $this->assertStillDraftChild($form, $section);
 
-            $sources = FormField::query()->where('form_version_id', $draft->id)->where('form_section_id', $section->id)
-                ->orderBy('sequence')->orderBy('id')->get()->all();
+            $sources = array_values(FormField::query()->where('form_version_id', $draft->id)->where('form_section_id', $section->id)
+                ->orderBy('sequence')->orderBy('id')->get()->all());
 
             return app(DraftCopier::class)->copy($form, $draft, $user, $sources, $section->refresh());
         });
@@ -507,11 +507,11 @@ final class FormBuilderService
 
         $sectionOrder = FormSection::query()->where('form_version_id', $draft->id)->pluck('sequence', 'id');
 
-        return $fields->sortBy([
+        return array_values($fields->sortBy([
             static fn (FormField $a, FormField $b): int => ($a->form_section_id === null ? -1 : (int) $sectionOrder->get($a->form_section_id))
                 <=> ($b->form_section_id === null ? -1 : (int) $sectionOrder->get($b->form_section_id)),
             static fn (FormField $a, FormField $b): int => [$a->sequence, $a->id] <=> [$b->sequence, $b->id],
-        ])->values()->all();
+        ])->all());
     }
 
     // ── "Other, please specify" (M177, `R-71509975`) ────────────────────────────

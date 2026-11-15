@@ -109,7 +109,13 @@ final class RetiredFieldKeys
         return $held;
     }
 
-    /** The SQL for one snapshot array's key list, as {@see for()} reads `fields` — a missing or non-array member is []. */
+    /**
+     * The SQL for one snapshot array's key list, as {@see for()} reads `fields` — a missing or non-array member is [].
+     * Only ever this class's own literal, so the SQL stays a literal string.
+     *
+     * @param  'fields'|'sections'  $member
+     * @return literal-string
+     */
     private function keysOf(string $member): string
     {
         return "coalesce((select jsonb_agg(f ->> 'key') from jsonb_array_elements("

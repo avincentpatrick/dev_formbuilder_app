@@ -225,16 +225,16 @@ final class BuilderPresenter
                 'field' => $this->field($pair['copy'], $rules->get($pair['copy']->id) ?? new Collection, $keyById),
             ], $made->copies),
             'order' => [
-                'sections' => FormSection::query()->where('form_version_id', $draftId)->orderBy('sequence')->get(['id', 'sequence'])
-                    ->map(static fn (FormSection $s): array => ['id' => $s->id, 'sequence' => $s->sequence])->values()->all(),
-                'fields' => FormField::query()->where('form_version_id', $draftId)->orderBy('sequence')
+                'sections' => array_values(FormSection::query()->where('form_version_id', $draftId)->orderBy('sequence')->get(['id', 'sequence'])
+                    ->map(static fn (FormSection $s): array => ['id' => $s->id, 'sequence' => $s->sequence])->all()),
+                'fields' => array_values(FormField::query()->where('form_version_id', $draftId)->orderBy('sequence')
                     ->get(['id', 'form_section_id', 'sequence', 'section_sequence'])
                     ->map(static fn (FormField $f): array => [
                         'id' => $f->id,
                         'form_section_id' => $f->form_section_id,
                         'sequence' => $f->sequence,
                         'section_sequence' => $f->section_sequence,
-                    ])->values()->all(),
+                    ])->all()),
             ],
         ];
     }

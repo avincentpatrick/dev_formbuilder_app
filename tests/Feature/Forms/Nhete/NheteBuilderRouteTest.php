@@ -58,11 +58,17 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
     $report = ['workarounds' => null, 'timings_ms' => []];
 
     // ── 1. Build every screen, as clicks ────────────────────────────────────────────────────────────────────
+    // M240 (`builder-copy-section`): each indicator block after a domain's first of its shape is COPIED from the latest
+    // (`NheteBuilderDriver::$copyBlocks`), so everything below — publish, the responses, every refusal — runs on a form
+    // whose Stop 8 rules came from copies. `M237` built it question by question in 1,725 requests;
+    // `NheteCopyEquivalenceTest` proves a copied block serialises as the hand-built one.
     $driver = new NheteBuilderDriver($this, $admin, $form);
+    $driver->copyBlocks = true;
     $started = hrtime(true);
     $driver->build($plan);
     $report['timings_ms']['build'] = (int) ((hrtime(true) - $started) / 1e6);
     $report['builder_requests'] = $driver->requests;
+    $report['blocks_copied'] = $driver->blocksCopied;
     $report['workarounds'] = $plan->workarounds();
 
     enterTenant($tenant->id, $admin->id);

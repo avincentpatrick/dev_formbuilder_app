@@ -13,6 +13,10 @@ import { showBuilderPane } from './support/navigate';
  *   - a comment shown when "keep" is "change" (the condition editor), and required then too ("Required when…").
  * Then the preview proves the rules work: the comment appears only on "change", marked required. A reload keeps it all.
  *
+ * `M240` (`builder-copy-section`, `D224`, `D225`) then copies the block the two ways NHETE's other 34 would be made: its
+ * six questions ticked and Duplicated (keys i1 → i2, the copied comment answering to the copied "keep"; one Undo and one
+ * Redo), and, moved into a section, the section Duplicated (i2 → i3, the condition naming i3_keep after a reload).
+ *
  * ── STATE: IT MAKES ITS OWN FORM, AND ARCHIVES IT ─────────────────────────────────────────────────────
  * `builder-content-axe.spec.ts`'s reason: every spec shares one seeded database across three viewport projects.
  */
@@ -56,6 +60,11 @@ async function openPreview(page: Page): Promise<void> {
     await showBuilderPane(page, 'canvas');
     await page.locator('.builder__centre-tabs').getByText('Preview').click();
     await expect(page.locator('[data-builder-preview]')).toBeVisible({ timeout: 15_000 });
+}
+
+async function structure(page: Page): Promise<void> {
+    await showBuilderPane(page, 'canvas');
+    await page.locator('.builder__centre-tabs').getByText('Structure').click();
 }
 
 const KEEP_CHOICES = [
@@ -135,6 +144,64 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await openPreview(page);
         await expect(page.locator('[data-preview-field]')).toHaveCount(6, { timeout: 15_000 });
         await expect(page.locator('[data-preview-field="i1_keep"] option:not([value=""])')).toHaveText(KEEP_CHOICES.map(([, label]) => label));
+
+        // ── M240 (`builder-copy-section`, `D224`, `D225`) — the block copied whole, the way NHETE's 34 others would be ──
+        // Tick its six questions and press Duplicate: the copies' keys count up (i1 → i2), and the copied comment answers
+        // to the COPIED "keep", shown and required on "change" while the source's stays hidden.
+        await structure(page);
+        const topLevel = page.locator('[data-drop-group="ungrouped"] [data-field-uid]');
+        await expect(topLevel).toHaveCount(6);
+        for (let i = 0; i < 6; i++) await topLevel.nth(i).locator('[data-field-tick]').click();
+        const bar = page.locator('[data-bulk-bar]');
+        await expect(bar).toContainText('6 selected');
+        await bar.locator('[data-bulk-duplicate]').click();
+        await settled(page);
+        await expect(topLevel).toHaveCount(12);
+        await expect(bar).toContainText('6 selected'); // the ticks moved to the copies
+
+        await openPreview(page);
+        const keep2 = page.locator('[data-preview-field="i2_keep"]').locator('select');
+        const comment2 = page.locator('[data-preview-field="i2_comment"]');
+        await expect(keep2).toBeVisible({ timeout: 15_000 });
+        await expect(comment2.locator('textarea')).toHaveCount(0);
+        await keep2.selectOption('change');
+        await expect(comment2.locator('textarea')).toBeVisible();
+        await expect(comment2).toContainText('(required)');
+        await expect(comment.locator('textarea')).toHaveCount(0); // i1_comment: its own "keep" is still unanswered
+
+        // One Undo takes the whole copy away; Redo brings it back.
+        await page.getByRole('button', { name: 'Undo' }).click();
+        await settled(page);
+        await expect(page.locator('[data-preview-field]')).toHaveCount(6);
+        await page.getByRole('button', { name: 'Redo' }).click();
+        await settled(page);
+        await expect(page.locator('[data-preview-field]')).toHaveCount(12);
+
+        // Duplicate section: the copied block moved into a section, then the section copied with it. Inside the copy the
+        // comment's condition names the section copy's own "keep" (i2 → i3), and it all survives a reload.
+        await structure(page);
+        await page.getByRole('button', { name: 'Add section' }).click();
+        await settled(page);
+        for (let i = 6; i < 12; i++) await topLevel.nth(i).locator('[data-field-tick]').click();
+        await expect(bar).toContainText('6 selected');
+        await bar.getByRole('combobox', { name: 'Move to' }).selectOption({ index: 1 });
+        await bar.getByRole('button', { name: 'Move', exact: true }).click();
+        await settled(page);
+        await expect(topLevel).toHaveCount(6);
+        await page.locator('[data-section-duplicate]').first().click();
+        await settled(page);
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await structure(page);
+        const sections = page.locator('[data-section-uid]');
+        await expect(sections).toHaveCount(2, { timeout: 15_000 });
+        await expect(sections.nth(1).locator('.canvas__section-label')).toHaveText('New section (copy)');
+        await expect(sections.nth(1).locator('[data-field-uid]')).toHaveCount(6);
+        await sections.nth(1).locator('[data-field-uid]').filter({ hasText: 'What should change?' }).locator('.canvas__field-main').click();
+        await configTab(page, 'Advanced');
+        await expect(page.getByLabel('Field key', { exact: true })).toHaveValue('i3_comment');
+        await page.getByRole('button', { name: 'Edit as text' }).click();
+        await expect(page.getByLabel('Condition expression')).toHaveValue("${i3_keep} = 'change'");
     } finally {
         await archive(page, formId);
     }

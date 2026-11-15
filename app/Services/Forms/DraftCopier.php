@@ -194,11 +194,14 @@ final class DraftCopier
     {
         /** @var array<string, list<FormField>> $groups section id (or '' for the top level) ⇒ its sources */
         $groups = [];
+        /** @var array<string, int> $lastOf section id ⇒ the position of its last copied question */
+        $lastOf = [];
         foreach ($sources as $source) {
-            $groups[(string) $source->form_section_id][] = $source;
+            $group = (string) $source->form_section_id;
+            $groups[$group][] = $source;
+            $lastOf[$group] = max($lastOf[$group] ?? $source->sequence, $source->sequence);
         }
 
-        $lastOf = array_map(static fn (array $group): int => max(array_map(static fn (FormField $f): int => $f->sequence, $group)), $groups);
         arsort($lastOf);
 
         $out = [];

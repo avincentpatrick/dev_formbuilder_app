@@ -58,6 +58,11 @@ async function moveChecked(): Promise<void> {
     await store.moveFieldsToSection([...checked.value], bulkTarget.value === '' ? null : bulkTarget.value);
 }
 
+// M240 (`D224`): copies of the ticked questions, every link between them pointing at the copies; the ticks move to the copies.
+async function duplicateChecked(): Promise<void> {
+    await store.duplicateFields([...checked.value]);
+}
+
 // ── A label edited in place (M150, `R-34edf1f5`) ────────────────────────────────────────────────────────────────────
 const editingUid = ref<string | null>(null);
 const editor = ref<InstanceType<typeof InlineLabelEdit> | null>(null);
@@ -180,6 +185,7 @@ async function requestDelete(field: LocalField): Promise<void> {
                 <MdsSelect :id="id" :describedby="describedby" :model-value="bulkTarget" :options="sectionTargets" @update:model-value="bulkTarget = $event" />
             </MdsFormField>
             <MdsButton size="sm" :disabled="isReordering" @click="moveChecked">Move</MdsButton>
+            <MdsButton size="sm" variant="secondary" :disabled="isReordering" data-bulk-duplicate @click="duplicateChecked">Duplicate</MdsButton>
             <MdsButton size="sm" variant="tertiary" @click="store.clearChecked()">Clear</MdsButton>
         </div>
 
@@ -249,6 +255,15 @@ async function requestDelete(field: LocalField): Promise<void> {
                             size="sm"
                             :disabled="isReordering"
                             @click="startSectionEdit(group.section.uid)"
+                        />
+                        <!-- M240 (`D224`): named per section, so each button says which one it copies. -->
+                        <MdsIconButton
+                            icon="copy"
+                            :label="`Duplicate section ${group.section.label || 'without a title'}`"
+                            size="sm"
+                            :disabled="isReordering"
+                            data-section-duplicate
+                            @click="store.duplicateSection(group.section.uid)"
                         />
                         <MdsIconButton
                             icon="trash"

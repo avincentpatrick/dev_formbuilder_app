@@ -16,6 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
+## Status: ACTIVE CLAIM — `M242`, `R-ade0b598`: a renamed key carries every condition, formula and piped answer that names it (m242-key-rename-carries-references)
+
+Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/record-the-census-after-cosmic-hare.md`), taken straight after `M240` by `D226` **A**, on `M240`'s `KeyReferenceRewriter`.
+Branch `m242-key-rename-carries-references`, cut from origin/main at `dd275c3b`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.21.1 (a fix) with its release notes.** Held green for a merge point on the user's word (`D137`).
+Row: `R-ade0b598`, *"A key edited in the builder leaves conditions, formulas and piping that name the old key pointing at nothing until publish refuses them."*
+The user's answer in planning, recorded on this branch:
+- `D227` **A** (reserved here): the thank-you message (`forms.confirmation_message`) follows a rename **only while the form has never been published**; on a live form it is left as written and the builder says so.
+
+### Evidence verified
+- *"A comparison rule follows a key change"* (stored by id; `repointRules()`): **held** (`useBuilderStore.ts`, `adoptKeptKey()` → `repointRules()`).
+- *"Expression TEXT does not"* — `relevant_expression`, `config.calculated_formula`, a validation's `expression`, `${key}` holes in labels, hints and placeholders, and the confirmation message: **held.** `FormBuilderService::writeField()` sets the key through `freeKey()` and writes no other row; `updateSection()` the same for a section.
+- *"`ConversionCensus::referencesTo()` already lists every such use"*: **held**, and it is a floor: `KeyReferenceRewriter` (M240) also covers a formula default and `config.other_specify_key`, which the census does not list.
+- *"After a key edit the preview shows the broken reference and publish refuses it (`ExpressionValidationGate`)"*: **held** (and `TemplateValidationGate` for holes).
+
+### Premise verified
+- *"A key edited in the builder"* means a question's key: **narrow.** Section keys are named by expressions too (`count(${roster})`, repeats; `ExpressionValidationGate` adds section keys to the known set), and `updateSection()` renames them through the same `freeKey()`. **Both renames carry.**
+- *"Rewrite what `referencesTo()` finds"* includes the confirmation message: **it is form-level.** `forms.confirmation_message` is not frozen per version and the live published version reads it (`PublicFormPresenter`), so rewriting it on a draft rename changes the live thank-you page. Asked as `D227`; answered **A**.
+- A rename lands on a free key: **false across tables.** `freeKey()` checks only its own table, so a question can take a section's key; with the carry, every `${old}` would then silently re-point at an ambiguous key the publish gate accepts (the gate only asks "is the key known"). **When — and only when — the key changes, the free-key check takes both tables**, `DraftCopier`'s one key space. Not on every save: `freeKey()` runs on every save, and an unconditional check would rename a question that already shares a section's key the next time anyone edits it.
+- A rename never lands on a key a published version held: **false, and not this row.** `freeKey()` never asks `RetiredFieldKeys::everHeld()`; reusing a retired key may be deliberate, so it is filed as its own row at the close-out, not fixed here.
+- The client holds the only copy of the Other pair's link: **no longer.** `repointOtherPair()` re-saves the partner from the browser; once the server rewrites that row its token moves and that resave would 409. The client adopts the server's row instead.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+**Works, by reading**, with three corrections. A rename is a one-entry map through `KeyReferenceRewriter`; `ExpressionKeyRewriter::rewriteReporting()` reports text it cannot read, so nothing is left behind silently. Corrections:
+- **`KeyReferenceRewriter` does not pass that report up** (it calls `rewrite()`); it will return the unread columns.
+- **A changed validation must move its owner's token**, because the builder re-sends whole rule lists under the owner's token; otherwise a stale tab overwrites the rewrite without a 409.
+- **The other rows must come back in the reply and be adopted by the store, tokens included**, or the author's next edit to any of them is refused as a conflict. The rename path takes the `forms` lock and then every section, field and rule of the draft in publish's order, only when the key changes; an ordinary edit is unchanged (§3.4).
+
+Files:
+- new `app/Services/Forms/KeyRenameCarrier.php` and its `CarriedReferences` value;
+- `app/Services/Forms/KeyReferenceRewriter.php`, `app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/BuilderPresenter.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`;
+- `resources/js/components/builder/useBuilderStore.ts`, `resources/js/components/builder/ConfigPanel.vue`, and the builder's types if the reply type lives apart;
+- tests: new `tests/Feature/Forms/BuilderKeyRenameTest.php`, a unit test for `KeyReferenceRewriter`, `tests/Feature/Forms/BuilderLockOrderTest.php`, new `resources/js/components/builder/key-rename-carry.test.ts`, `other-specify-store.test.ts`, `tests/Support/Nhete/NheteBuilderDriver.php`, new `tests/e2e/builder-key-rename.spec.ts`;
+- `resources/js/components/help/manual.ts` if it describes a key rename;
+- `VERSION`, `database/data/releases.json`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D227`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- One rename re-points every reference in the draft, and the draft publishes with no hand edit; renaming back restores every text byte for byte.
+- The NHETE copy build keeps its request count (1,560): the driver drops its retyping, not a request, and the copy-built form still serialises identically.
+- No existing Pest case moves except `BuilderLockOrderTest`'s new arm and `other-specify-store.test.ts`.
+
+The one most likely wrong: the store adopting a carried row that has an unsent edit of its own, where a column-by-column merge has to keep the typed text and still take the rewrite.
+
+---
+
 ## RELEASED — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (merged as PR #526, `eaa3a39b`, fifth and last at the merge point of 2026-11-15, after merging the trunk into its branch at `6536ce35`; every required check green with real step counts on its run 43744913438 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43744910857 green (5); the trunk's run 43749147828 on `eaa3a39b` 8/8, with BHW Connect at 23)
 
 **RELEASED LAST AT THE MERGE POINT OF 2026-11-15.** Its trunk merge was made three-way against #521's old tip (`7d968105`), where it forked, not against the base git chose after the squashes; against that base the backlog and the decisions merged cleanly. `VERSION` 0.21.0, with 0.20.2's note kept beneath its own. Deploy run 43752663230 backed up `deploy-20261115-193016.dump` (1,177,242 B), counted 71 tables / 54,280 rows, had nothing to migrate and held, and added 0.21.0 to the releases table (0.20.2 went in at 43739676478); BHW's step skipped. From outside: `/login` reads `"version":"0.21.0"`, and `/up` answers 200.

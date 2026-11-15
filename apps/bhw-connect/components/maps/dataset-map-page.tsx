@@ -90,8 +90,8 @@ export function DatasetMapPage({
         />
       ) : (
         <p role="status">
-          Choose a dataset to open its map. If a shared link has an unsupported indicator, period, geography or
-          count range, select the dataset again.
+          Choose a dataset to open its map. If a shared link has an unsupported indicator, period,
+          geography, count range or classification, select the dataset again.
         </p>
       )}
     </div>

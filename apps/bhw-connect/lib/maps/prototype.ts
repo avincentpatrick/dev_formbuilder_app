@@ -1,19 +1,25 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
 import { isReleasePublic } from "@/lib/releases/visibility";
+import {
+  parseCountClassification,
+  classificationBreaksText,
+  type CountClassification,
+} from "./classification";
 import { parseCountRange, hasValueFilter } from "./value-filter";
 import { supportsCircles } from "./symbols";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
-export type MapChoice = MapScope & {
-  valueMin?: number;
-  valueMax?: number;
-  dataset: string;
-  indicator: string;
-  period: string;
-  selected: string | null;
-  view?: "circles" | "choropleth";
-};
+export type MapChoice = MapScope &
+  CountClassification & {
+    valueMin?: number;
+    valueMax?: number;
+    dataset: string;
+    indicator: string;
+    period: string;
+    selected: string | null;
+    view?: "circles" | "choropleth";
+  };
 export type MapRow = {
   code: string;
   name: string;
@@ -111,6 +117,9 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
       "view",
       "valueMin",
       "valueMax",
+      "classification",
+      "classCount",
+      "classBreaks",
     ].some((key) => params.getAll(key).length > 1)
   )
     return null;
@@ -152,10 +161,18 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const view = dataset === "ph-legislative-districts" ? null : params.get("view");
   if (view !== null && view !== "circles" && view !== "choropleth") return null;
   if (view === "circles" && !supportsCircles({ dataset, indicator })) return null;
+  const grouping = parseCountClassification(
+    params.get("classification"),
+    params.get("classCount"),
+    params.get("classBreaks"),
+  );
+  if (!grouping || (grouping.classification && !supportsCircles({ dataset, indicator })))
+    return null;
   const range = parseCountRange(params.get("valueMin"), params.get("valueMax"));
   if (!range || (hasValueFilter(range) && !supportsCircles({ dataset, indicator }))) return null;
   return {
     ...range,
+    ...grouping,
     dataset,
     indicator,
     period,
@@ -174,6 +191,12 @@ export function mapHref(choice: MapChoice) {
   params.set("level", choice.level);
   params.set("code", choice.code);
   if (choice.selected) params.set("selected", choice.selected);
+  if (choice.classification) {
+    params.set("classification", choice.classification);
+    if (choice.classification === "custom")
+      params.set("classBreaks", classificationBreaksText(choice.classBreaks ?? []));
+    else params.set("classCount", String(choice.classCount ?? 5));
+  }
   if (choice.view) params.set("view", choice.view);
   if (choice.valueMin !== undefined) params.set("valueMin", String(choice.valueMin));
   if (choice.valueMax !== undefined) params.set("valueMax", String(choice.valueMax));

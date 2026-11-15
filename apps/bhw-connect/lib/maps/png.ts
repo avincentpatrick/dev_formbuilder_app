@@ -60,6 +60,9 @@ export function pngNotes(data: Context): string[] {
   return [
     `${data.dataset.title} — ${data.indicator.label}`,
     `${data.indicator.period} | ${data.indicator.unit} | ${data.geography.area}`,
+    ...(data.classification
+      ? [`Color settings (choropleth only): ${data.classification.note}`]
+      : []),
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
     ...(data.valueFilter
       ? [

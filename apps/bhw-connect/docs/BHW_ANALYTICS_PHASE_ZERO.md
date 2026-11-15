@@ -2,7 +2,7 @@
 
 Continuation of draft PR [#525](https://github.com/avincentpatrick/dev_formbuilder_app/pull/525), handoff commit `4c62bd8dac45a97349589df3a9b46b21ecba9421`. The assessment and live-verification documents on that branch remain the requirements; this document adds implementation evidence, not a replacement plan. Source audit: `73affc2752212155847b7885d552932514002cbb`, 2026-11-15.
 
-**Status: Phase 0 remains open.** Disclosure policy confirmation, physical-device evaluation, historical boundary acceptance and representative-device measurements are outstanding. Small fixes to confirmed defects can proceed independently; no phase is certified complete by this audit.
+**Status: Phase 0 remains open.** Physical-device evaluation, historical boundary acceptance and representative-device measurements are outstanding. Small fixes to confirmed defects can proceed independently; no phase is certified complete by this audit.
 
 ## Evidence and reuse decisions
 
@@ -12,7 +12,7 @@ Continuation of draft PR [#525](https://github.com/avincentpatrick/dev_formbuild
 | `getStepzeroCounts` selects one `(dataset_id, geo_code, geo_level)` row with `maybeSingle`; `getBhwCounts` selects the pinned active profile release and same geography | Existing reusable capability | National headlines read `PH/national`. Never sum all-locations availability records. Headcount unavailable stays unavailable; profiles are separate. |
 | `getBhwOverview` includes a PSA population fallback; it caps displayed profiling coverage at 100% through `coverageForDisplay` | Existing capability with different semantics | Reuse headcount/profile fields, not the fallback ratio for the new source-specific map. Explain any coverage drift; no new contextual ratios in Phase 1. |
 | Catalog `reader.privacy` checks for any protected cell in the release/table/category or payer before reading local values | Existing disclosure contract | Failed privacy checks fail closed. All-location counts are availability metadata, not workforce totals. |
-| Legacy `getDemographics` and `getHonorarium` return local rows/flags; dashboard education removes locally suppressed rows | Disclosure mismatch (L10), not proof of a leak | Do not reuse demographic/payer charts in the new journey until policy is settled. Proposed rule: use catalog-wide withholding throughout the new journey. User question pending. Amount/distribution/sufficiency and generated insights need their own provenance audit before inclusion. |
+| Legacy `getDemographics` and `getHonorarium` return local rows/flags; dashboard education removes locally suppressed rows | Disclosure mismatch (L10), not proof of a leak | Do not reuse demographic/payer charts in the new journey unless catalog-wide privacy clearance succeeds. Owner confirmed on 2026-11-15: use catalog-wide withholding throughout the new journey. No legacy-reader fallback may fill a withheld value. Amount/distribution/sufficiency and generated insights need their own provenance audit before inclusion. |
 | Catalog lists 66 BHW indicators; map adapters expose a narrower allowlist | Existing but inconsistent eligibility metadata | Search must use the intersection of source, disclosure and destination eligibility, not simply every catalog definition. See complete inventory below. |
 | `GeoSearch` already supports parent chains, PSGC and districts; mixed queries are sent to geographic fuzzy search | Existing capability plus confirmed relevance defect (L03) | Parse supported measure/action intent before geographic retrieval; do not equate a nonempty fuzzy result with success. |
 | `DatasetMapCard`, `DatasetCanvas`, `MapLegend`, PNG composition and exact table exist | Reuse, with missing interactions | Extend these, retaining provenance and table rows. Proportional circles, classification state and map controls remain Phase 1 work. |
@@ -94,16 +94,16 @@ Inventory rules (apply to every row below):
 | `bhw.certification.tesda_nc2` | Profiles 2025 | % | N–M + B | N–M, verify denominator; not mapped |
 | `bhw.certification.tesda_certified` | Profiles 2025 | % | N–M + B | N–M, verify denominator; not mapped |
 | `bhw.certification.ref_manual_trained` | Profiles 2025 | % | N–M + B | N–M, verify denominator; not mapped |
-| `bhw.demographics.sex` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.demographics.civil_status` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.demographics.bloodtype` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.demographics.education` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.demographics.ip_status` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.demographics.age_band` | Profiles 2025 | people | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.honorarium.region` | Profiles 2025 | % | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.honorarium.province` | Profiles 2025 | % | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.honorarium.citymun` | Profiles 2025 | % | N–M + B | Privacy clearance required; no new chart pending decision |
-| `bhw.honorarium.barangay` | Profiles 2025 | % | N–M + B | Privacy clearance required; no new chart pending decision |
+| `bhw.demographics.sex` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.demographics.civil_status` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.demographics.bloodtype` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.demographics.education` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.demographics.ip_status` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.demographics.age_band` | Profiles 2025 | people | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.honorarium.region` | Profiles 2025 | % | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.honorarium.province` | Profiles 2025 | % | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.honorarium.citymun` | Profiles 2025 | % | N–M + B | Privacy clearance required; catalog-wide check must pass |
+| `bhw.honorarium.barangay` | Profiles 2025 | % | N–M + B | Privacy clearance required; catalog-wide check must pass |
 
 ## Route and state mapping before changing links
 
@@ -146,7 +146,7 @@ Accessibility acceptance: keyboard-complete search/disambiguation, classificatio
 
 ## Remaining gates and review slices
 
-1. **Phase 0:** confirm new-journey disclosure policy; extend the recorded map keyboard/axe baseline to search, overview and comparison; obtain representative device measurements and physical-device/user evaluation. Retain explicit boundary/license blockers. Inventory above covers all 66 definitions, not all live observations.
+1. **Phase 0:** enforce the confirmed catalog-wide disclosure policy at each new surface; extend the recorded map keyboard/axe baseline to search, overview and comparison; obtain representative device measurements and physical-device/user evaluation. Retain explicit boundary/license blockers. Inventory above covers all 66 definitions, not all live observations.
 2. **Prerequisite repair PR:** fix confirmed catalog context loss without changing disclosure or routes; regression-test real form serialization and ancestor navigation. This answers “can I keep BHW while choosing my location?”
 3. **Phase 1 overview PR:** reuse existing headline/visual components after disclosure gate; meaningful visual or unavailable state, source-specific populations, purposeful navigation and availability as supporting information. No claim that the whole phase is done.
 4. **Phase 1 search/comparison PRs:** grammar, global place retrieval, explicit ambiguities; two-to-four-place editing and retained phone/shared state. Synthetic multiple-region and repeated-name cases required.

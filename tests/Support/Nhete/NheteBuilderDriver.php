@@ -40,14 +40,160 @@ final class NheteBuilderDriver
         $this->test->withHeaders(['X-Builder-Draft' => (string) $form->draft_version_id]);
     }
 
+    /**
+     * `M240` (`builder-copy-section`) — build each indicator block after a domain's first of its shape by COPYING the
+     * domain's latest block of that shape (`POST …/fields/duplicate`, the ticked-questions Duplicate) rather than question
+     * by question. Off, the module is built as `M237` built it.
+     */
+    public bool $copyBlocks = false;
+
+    public int $blocksCopied = 0;
+
     public function build(NhetePlan $plan): void
     {
         foreach ($plan->sections() as $section) {
-            $sectionId = $this->section($section);
-            foreach ($section['elements'] as $element) {
-                $this->field($sectionId, $element);
-            }
+            $this->buildSection($section);
         }
+    }
+
+    /** @param  array{key: string, label: string, relevant: ?string, elements: list<array<string, mixed>>}  $section */
+    public function buildSection(array $section): void
+    {
+        $sectionId = $this->section($section);
+        $elements = $section['elements'];
+        /** @var array<string, list<array{key: string, id: string}>> $latest block shape ⇒ the domain's latest block of it */
+        $latest = [];
+
+        for ($i = 0, $n = count($elements); $i < $n;) {
+            $e = $elements[$i];
+            if (! $this->copyBlocks || ! self::inBlock($e)) {
+                $this->field($sectionId, $e);
+                $i++;
+
+                continue;
+            }
+
+            $block = [];
+            while ($i < $n && self::inBlock($elements[$i]) && $elements[$i]['indicator'] === $e['indicator']) {
+                $block[] = $elements[$i++];
+            }
+            // A block with a cut-off question and one without are different shapes: each copies its own kind.
+            $shape = implode(',', array_column($block, 'role'));
+            $latest[$shape] = isset($latest[$shape])
+                ? $this->copyBlock($latest[$shape], $block)
+                : array_map(fn (array $b): array => ['key' => (string) $b['key'], 'id' => $this->field($sectionId, $b)], $block);
+        }
+    }
+
+    /** @param  array<string, mixed>  $e */
+    private static function inBlock(array $e): bool
+    {
+        return str_starts_with((string) ($e['role'] ?? ''), 'ind_') && ($e['indicator'] ?? null) !== null;
+    }
+
+    /**
+     * One copy of a whole block, then what a person changes in it: each question's key (the copy's counted-up key is the
+     * next free number, never NHETE's next code — A01, A07, A03 …), its label and hint, and the note's content. Everything
+     * else — choices, required flags, the "Required when…" rules, the formula, the piped placeholder — is the COPY's, so a
+     * link the copy failed to re-point arrives at the end still naming the source block, and the equivalence case sees it.
+     *
+     * Until `R-ade0b598` (`D226`), renaming a key does not carry into text that names it, so the two text references are
+     * renamed here the way a person would retype them: the copy's own text, its counted-up keys swapped for the new ones.
+     *
+     * @param  list<array{key: string, id: string}>  $source
+     * @param  list<array<string, mixed>>  $block
+     * @return list<array{key: string, id: string}>
+     */
+    private function copyBlock(array $source, array $block): array
+    {
+        $made = $this->send('post', 'fields/duplicate', ['field_ids' => array_column($source, 'id')], 'copy a block for '.$block[0]['indicator']);
+        $this->blocksCopied++;
+        /** @var list<array{source_id: string, field: array<string, mixed>}> $copies */
+        $copies = $made->json('copies');
+
+        /** @var array<string, string> $map the copy's counted-up key ⇒ the indicator's key */
+        $map = [];
+        foreach ($copies as $n => $copy) {
+            $map[(string) $copy['field']['key']] = (string) $block[$n]['key'];
+        }
+
+        $this->toSectionEnd($made->json('order'), array_map(static fn (array $c): string => (string) $c['field']['id'], $copies));
+
+        $out = [];
+        foreach ($copies as $n => $copy) {
+            $row = $copy['field'];
+            $e = $block[$n];
+            $config = (array) $row['config'];
+            if ($e['type'] === 'note') {
+                $config['content'] = $e['content'] === null ? [] : $this->withImages($e['content']);
+            }
+            if (isset($config['calculated_formula'])) {
+                $config['calculated_formula'] = self::rekey((string) $config['calculated_formula'], $map);
+            }
+
+            $this->send('patch', "fields/{$row['id']}", [
+                'key' => $e['key'],
+                'label' => $e['label'],
+                'hint' => $e['hint'],
+                'placeholder' => $row['placeholder'] === null ? null : self::rekey((string) $row['placeholder'], $map),
+                'is_required' => $row['is_required'],
+                'relevant_expression' => $row['relevant_expression'] === null ? null : self::rekey((string) $row['relevant_expression'], $map),
+                'appearance' => $row['appearance'],
+                'config' => $config,
+                // As the builder's `repointRules()` does on a rename: a rule naming a renamed sibling names its new key.
+                'validations' => array_map(static fn (array $v): array => [
+                    'rule_type' => $v['rule_type'], 'operator' => $v['operator'], 'rule_value' => $v['rule_value'],
+                    'expression' => $v['expression'], 'error_message' => $v['error_message'],
+                    'related_field_key' => $v['related_field_key'] === null ? null : ($map[$v['related_field_key']] ?? $v['related_field_key']),
+                    'logic_group' => $v['logic_group'], 'logic_operator' => $v['logic_operator'],
+                ], $row['validations']),
+                'version' => $row['version'],
+            ], 'rename '.$e['key']);
+
+            $this->fieldIds[(string) $e['key']] = (string) $row['id'];
+            $out[] = ['key' => (string) $e['key'], 'id' => (string) $row['id']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * A copy lands right after its source. When the source is not the section's last block (a block of the other shape
+     * came since), the copies are moved to the end, as a person would with Move to: one reorder. The section being built
+     * is the draft's last, so its end is the end of the draft's one sequence line.
+     *
+     * @param  array{sections: list<array{id: string, sequence: int}>, fields: list<array{id: string, form_section_id: ?string, sequence: int}>}  $order
+     * @param  list<string>  $copyIds
+     */
+    private function toSectionEnd(array $order, array $copyIds): void
+    {
+        $fields = $order['fields'];
+        usort($fields, static fn (array $a, array $b): int => $a['sequence'] <=> $b['sequence']);
+        $ids = array_column($fields, 'id');
+        if (array_slice($ids, -count($copyIds)) === $copyIds) {
+            return;
+        }
+
+        $copies = array_flip($copyIds);
+        $rest = array_values(array_filter($fields, static fn (array $f): bool => ! isset($copies[$f['id']])));
+        $moved = array_values(array_filter($fields, static fn (array $f): bool => isset($copies[$f['id']])));
+        $this->send('post', 'reorder', [
+            'sections' => $order['sections'],
+            'fields' => array_map(static fn (array $f, int $i): array => [
+                'id' => $f['id'], 'form_section_id' => $f['form_section_id'], 'sequence' => $i, 'section_sequence' => null,
+            ], [...$rest, ...$moved], array_keys([...$rest, ...$moved])),
+        ], 'move the copies to the end');
+    }
+
+    /**
+     * @param  array<string, string>  $map
+     */
+    private static function rekey(string $text, array $map): string
+    {
+        return strtr($text, array_combine(
+            array_map(static fn (string $k): string => '${'.$k.'}', array_keys($map)),
+            array_map(static fn (string $k): string => '${'.$k.'}', array_values($map)),
+        ));
     }
 
     /** @param  array{key: string, label: string, relevant: ?string}  $section */

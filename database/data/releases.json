@@ -1,5 +1,31 @@
 [
     {
+        "version": "0.21.0",
+        "title": "Copy a whole section, or several questions at once",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Copy a whole section: in the form builder, press the copy button on a section's heading. The copy, with every question in it, goes right after the original."
+            },
+            {
+                "kind": "new",
+                "text": "Copy several questions at once: tick them and press Duplicate in the bar that appears. The copies go right after the last ticked question."
+            },
+            {
+                "kind": "new",
+                "text": "Inside a copy, every condition, \"Required when\" rule, calculation and answer shown in a label that named one of the copied questions now names its copy. A repeated block, such as one question set per indicator, no longer has to have its rules set up again for every copy."
+            },
+            {
+                "kind": "improved",
+                "text": "A copy's data name now counts up: a copy of q1 is named q2, and a whole block numbered 01 becomes 02. A copied question also now appears right below the original, not at the end of its section."
+            },
+            {
+                "kind": "fixed",
+                "text": "A change typed just before pressing Duplicate is now in the copy. Before, the copy could be made without it."
+            }
+        ]
+    },
+    {
         "version": "0.20.2",
         "title": "Publish problems listed in your form's order",
         "items": [

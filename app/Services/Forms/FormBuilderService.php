@@ -129,14 +129,27 @@ final class FormBuilderService
         });
     }
 
-    public function deleteSection(Form $form, FormSection $section, User $user): void
+    /**
+     * @param  list<string>  $fieldIds  M240 — questions of this section to delete WITH it, in the same transaction: the
+     *                                  builder's undo of a section copy names the copies it made. Every other question of
+     *                                  the section is moved to the top level, as before.
+     */
+    public function deleteSection(Form $form, FormSection $section, User $user, array $fieldIds = []): void
     {
-        DB::transaction(function () use ($form, $section, $user): void {
+        DB::transaction(function () use ($form, $section, $user, $fieldIds): void {
             $draft = $this->lockDraft($form);
             // M90: the RE-READING guard, not the route-bound one. Holding the `forms` lock does not bound
             // this staleness — `lockDraft()` re-reads and returns a FRESH draft, so the lock says nothing
             // about the `$form` this guard compares. See the note on assertStillDraftChild().
             $this->assertStillDraftChild($form, $section);
+
+            if ($fieldIds !== []) {
+                // Only questions still in THIS section: one another tab moved out meanwhile is not the copy's to delete.
+                FormField::query()->where('form_version_id', $draft->id)->where('form_section_id', $section->id)
+                    ->whereIn('id', array_values(array_unique($fieldIds)))->get()
+                    ->each(static fn (FormField $field) => $field->delete()); // cascades its validations
+            }
+
             // M188 (`R-3894369d`): the section's questions are moved to the top level, so each one's history says so —
             // the database moves them (below), so nothing else would.
             $recorder = app(FieldRevisionRecorder::class);
@@ -399,43 +412,106 @@ final class FormBuilderService
         });
     }
 
+    /**
+     * One question's Duplicate — since M240 the one-question case of {@see DraftCopier}: the key counts up (`q1` → `q2`,
+     * `D225`), the copy lands right below its source, and its label says "(copy)". A copy is a new question, so it
+     * leaves the lineage behind (M188); its choices come along, the Other one too, but not the link to a "Please
+     * specify" it was not copied with (M177). A rule comparing with a sibling keeps comparing with that sibling.
+     */
     public function duplicateField(Form $form, User $user, FormField $field): FormField
     {
         return DB::transaction(function () use ($form, $user, $field): FormField {
             $draft = $this->lockDraft($form);
-            // M90. This one is not a silent write — it is a 500. The INSERT below straddles two versions:
-            // `form_version_id` is replicated from the STALE `$field` while the key and sequence come from
-            // the FRESH `$draft`. When they disagree, `draft_insert`'s WITH CHECK raises 42501, and
-            // FormBuilderController::respond() catches only BuilderConflictException and FormException, so
-            // it escapes as a bare JSON 500. ⚠️ M89 deliberately declined to RELABEL 42501 (see the
-            // QueryException catch in updateField()); this does not relabel it, it makes it unreachable.
+            // M90. Without this re-read the INSERT straddled two versions (`form_version_id` from the stale `$field`, the
+            // key and sequence from the fresh `$draft`) and `draft_insert`'s WITH CHECK escaped as a bare 500.
             $this->assertStillDraftChild($form, $field);
 
-            // M188 (`R-3894369d`): a copy is a new question, so it leaves the lineage behind and the database gives it its
-            // own — otherwise the two would share one history.
-            $copy = $field->replicate(['created_by', 'updated_by', 'lineage_id']);
-            // M177 (`R-71509975`): the copy keeps its choices, the Other one too, but not the link — two questions would
-            // otherwise claim one Please specify, and turning either off would delete the other's.
-            $copyConfig = (array) $copy->config;
-            unset($copyConfig[OtherSpecify::CONFIG_KEY]);
-            $copy->config = $copyConfig;
-            $copy->key = $this->copyKey($draft, $field->key);
-            $copy->label = $field->label.' (copy)';
-            $copy->sequence = $this->nextFieldSequence($draft);
-            $copy->created_by = $user->id;
-            $copy->updated_by = null;
-            $copy->save();
-
-            // Copy the source field's validation rows onto the new field (same version, new field id).
-            foreach ($field->validations()->orderBy('sequence')->get() as $validation) {
-                $newValidation = $validation->replicate();
-                $newValidation->form_field_id = $copy->id;
-                // A field→field comparison that pointed at the source keeps pointing at the same sibling.
-                $newValidation->save();
-            }
-
-            return $copy->refresh();
+            return app(DraftCopier::class)->copy($form, $draft, $user, [$field->refresh()], null)->copies[0]['copy'];
         });
+    }
+
+    /**
+     * M240 (`D224`) — Duplicate on ticked questions: each copy in its source's section, right after the last ticked
+     * question there, with every link between the ticked questions pointing at the copies ({@see DraftCopier}).
+     *
+     * @param  list<string>  $fieldIds
+     */
+    public function duplicateFields(Form $form, User $user, array $fieldIds): DraftCopy
+    {
+        return DB::transaction(function () use ($form, $user, $fieldIds): DraftCopy {
+            $draft = $this->lockDraft($form);
+            $sources = $this->draftFieldsInOrder($draft, $fieldIds);
+
+            return app(DraftCopier::class)->copy($form, $draft, $user, $sources, null);
+        });
+    }
+
+    /**
+     * M240 (`D224`) — Duplicate section: the section, right after itself, with every question in it, every link between
+     * them — the section's own key too, as `count(${section})` — pointing at the copies ({@see DraftCopier}).
+     */
+    public function duplicateSection(Form $form, User $user, FormSection $section): DraftCopy
+    {
+        return DB::transaction(function () use ($form, $user, $section): DraftCopy {
+            $draft = $this->lockDraft($form);
+            // M90: the RE-READING guard — see the note on assertStillDraftChild().
+            $this->assertStillDraftChild($form, $section);
+
+            $sources = array_values(FormField::query()->where('form_version_id', $draft->id)->where('form_section_id', $section->id)
+                ->orderBy('sequence')->orderBy('id')->get()->all());
+
+            return app(DraftCopier::class)->copy($form, $draft, $user, $sources, $section->refresh());
+        });
+    }
+
+    /**
+     * M240 — delete several questions in one request, all or none: the builder's undo of a copy. A copy of 140
+     * questions undone one request at a time would take the form lock 140 times and could stop halfway; this cannot.
+     * Each question's rules go with it, and every rule comparing with one goes by the foreign key's cascade.
+     *
+     * @param  list<string>  $fieldIds
+     */
+    public function deleteFields(Form $form, array $fieldIds): void
+    {
+        DB::transaction(function () use ($form, $fieldIds): void {
+            $draft = $this->lockDraft($form);
+
+            foreach ($this->draftFieldsInOrder($draft, $fieldIds) as $field) {
+                $field->delete(); // cascades its validations
+            }
+        });
+    }
+
+    /**
+     * The questions named, as rows of the draft, in on-screen order. An id from a version a publish has moved past is
+     * the recoverable 409 every builder write gives (M172); one that is gone, or never was a question of this form, is
+     * refused whole — a copy or a delete of part of what the author ticked would not be what they asked for.
+     *
+     * @param  list<string>  $fieldIds
+     * @return list<FormField>
+     */
+    private function draftFieldsInOrder(FormVersion $draft, array $fieldIds): array
+    {
+        $ids = array_values(array_unique($fieldIds));
+        $this->assertNoSupersededIds(FormField::query(), $draft, $ids);
+
+        $fields = FormField::query()->where('form_version_id', $draft->id)->whereIn('id', $ids)->get();
+
+        if ($fields->count() !== count($ids)) {
+            // Still a row somewhere, so a question of another form (a superseded one of this form was refused above);
+            // otherwise it was deleted meanwhile. The two refusals of notInDraft() and assertStillDraftChild().
+            throw FormField::query()->whereIn('id', array_diff($ids, $fields->modelKeys()))->exists()
+                ? FormException::childNotInDraft()
+                : FormException::childRemovedDuringEdit();
+        }
+
+        $sectionOrder = FormSection::query()->where('form_version_id', $draft->id)->pluck('sequence', 'id');
+
+        return array_values($fields->sortBy([
+            static fn (FormField $a, FormField $b): int => ($a->form_section_id === null ? -1 : (int) $sectionOrder->get($a->form_section_id))
+                <=> ($b->form_section_id === null ? -1 : (int) $sectionOrder->get($b->form_section_id)),
+            static fn (FormField $a, FormField $b): int => [$a->sequence, $a->id] <=> [$b->sequence, $b->id],
+        ])->all());
     }
 
     // ── "Other, please specify" (M177, `R-71509975`) ────────────────────────────
@@ -1187,7 +1263,7 @@ final class FormBuilderService
 
     /**
      * M172 (`R-733eff09`, `D132`) — the key an edit asked for or, when another row of the same version already holds it,
-     * the lowest free `{key}_{n}` with n from 2 (the numbering {@see self::copyKey()} gives a duplicate). A clash is
+     * the lowest free `{key}_{n}` with n from 2 (a copy's own key comes from `CopyKeys`, M240). A clash is
      * adjusted, never refused: the response carries the key kept, and the builder says so under Field key. The request
      * no longer checks uniqueness at all — the user's words were *"auto adjust the key naming to avoid conflicts"*.
      * Kept inside the column's 150 characters by shortening the requested part, never the suffix.
@@ -1210,19 +1286,5 @@ final class FormBuilderService
                 return $candidate;
             }
         }
-    }
-
-    private function copyKey(FormVersion $draft, string $sourceKey): string
-    {
-        $taken = FormField::query()->where('form_version_id', $draft->id)->pluck('key')->flip();
-
-        $candidate = "{$sourceKey}_copy";
-        $n = 2;
-        while ($taken->has($candidate)) {
-            $candidate = "{$sourceKey}_copy_{$n}";
-            $n++;
-        }
-
-        return $candidate;
     }
 }

@@ -14532,7 +14532,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:645-652`), while selecting a question always opens Basics (`:168-173`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
-  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts`, `settled()`; cited by name since `M240`, whose additions moved the lines).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
   2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
   conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
@@ -14785,6 +14785,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   such use. After a key edit the preview shows the broken reference and publish refuses it (`ExpressionValidationGate`); nothing
   offers to carry the new key into them. The remedy: on a key change, rewrite the references `referencesTo()` finds — token-aware,
   never a text replace — and say so in the undo entry. **Live.** Filed by `M172`. **Tier: during-testing.**
+  `D226` (2026-11-14): taken straight after `M240`, whose `KeyReferenceRewriter` already rewrites every such column through an
+  old ⇒ new map. A rename is a one-entry map, and `ExpressionKeyRewriter::rewriteReporting()` says which text it could not read,
+  so a reference is never left behind silently. Until it lands, a copied block's renamed keys leave its text references to be
+  retyped (`NheteBuilderDriver::copyBlock()` does so).
 
 - **`nit` · The builder's Undo and Redo never say what they will undo or redo.**
   Found by `M172`: every history entry carries a label (`resources/js/components/builder/useBuilderStore.ts`, `pushHistory()` — "Edit
@@ -14851,7 +14855,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
   The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
   *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
-  by reading: `app/Services/Forms/FormBuilderService.php:732` (`reorder()`) writes each position through Eloquent's query builder
+  by reading: `app/Services/Forms/FormBuilderService.php`'s `reorder()` (cited by name since `M240` moved the lines) writes each position through Eloquent's query builder
   (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
   timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
   ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a
@@ -16236,12 +16240,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `builder-copy-section` — The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand.**
+- ✅ **CLOSED BY `M240` (2026-11-15) — ****`minor` · `builder-copy-section` — The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand.**
   Found by `M237` (2026-11-14). `FormBuilderService::duplicateField()` copies one question, and there is no section copy. Building NHETE took 1,725 builder requests (`NheteBuilderRouteTest`), each indicator a note, four dropdowns, a calculation and a comment whose conditions name its siblings.
 
   The remedy, when taken: copy a whole section with its questions, giving the copies fresh keys and re-pointing every condition, rule and piped reference that names a question inside the copied section.
 
   **Not live** — a request, not a defect. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M240` (2026-11-15), on its branch, stacked on #521.** Built as the remedy says, with the second way in the user chose (`D224`): NHETE's blocks sit 5–12 to a page, so a section copy alone could not build them.
+  - **One engine, three ways in.** `DraftCopier` copies a question (its Duplicate), the ticked questions (Duplicate in the bar that appears with a tick) or a section with its questions (Duplicate section, on its heading). Every link between the copied rows points at the copies:
+    - conditions, a Calculated field's formula and a formula default, through `ExpressionKeyRewriter` (a token splice, so a quoted lookalike is never touched);
+    - piped `${…}` in labels, hints, placeholders and their translations, through `TemplateParser::rewriteKeys()` (escapes kept byte for byte);
+    - "Required when…" and the other comparison rules, through an old-id ⇒ new-id map;
+    - the Other pair, re-linked when both halves are copied;
+    - a repeat's own key in `count(${section})`.
+    Links to anything outside the copy are left as they were. `KeyReferenceRewriter` is the one place that knows every column, for `R-ade0b598` to reuse (`D226`).
+  - **Keys count up (`D225`).** `CopyKeys`: the first number in each key, one step for the whole copy (`a01_use` → `a02_use`), never a key the draft holds as a question or a section, and never one any published version held (`RetiredFieldKeys::everHeld()`; `for()` was the wrong set). A key with no number takes `_copy`. The one-question Duplicate follows the same rule, and its copy now lands right below the original, as the manual always said.
+  - **Placed by the server.** The copies go right after their sources inside the copy's own transaction, through `toBase()`. Placed by the builder and saved through `reorder()`, they would have logged "Moved" for every question below them. The reply carries the whole order, and the builder applies it.
+  - **One request to undo.** A section copy's undo deletes the section with the copies named (`DELETE …/sections/{id}` with `field_ids`), a ticked copy's `POST …/fields/delete-many`. Redo makes the copy again under the same identities.
+  - **Found and fixed on the way:** a change typed just before Duplicate was missing from the copy (no `flushCommit()`); " (copy)" on a 500-character label overflowed the column (a bare 500); and a section put back by Undo had a new id that earlier history entries did not know, so undoing a Move made before a section's delete dropped its questions to the top level. `sectionAlias` fixes the last for every path that puts a section back.
+  - **NHETE, switched to the copy route.** `NheteBuilderDriver::$copyBlocks` builds a domain's first block of each shape by hand and copies the other 29, renaming and rewording each as a person would. The rules, choices, formula and placeholder come from the copy. `NheteBuilderRouteTest` then publishes and takes and refuses every response on the copy-built form: **1,560 builder requests, down from 1,725**, with 29 blocks copied. `NheteCopyEquivalenceTest` builds domain B (10 blocks, both shapes) both ways and finds the two pages serialise identically.
+  - **Measured on one box (2026-11-15).** Domain B: 8.4 s and 134 requests by hand, 5.0 s and 94 requests by copying. The whole module: 107 s by hand and 141 s by copying. The extra time is mostly the 5 moves of a copy to its section's end, because the existing reorder rewrites every row, as the builder's own move does.
+    - The first copy-built run took 294 s. Each copy cleared `section_sequence` on every question of the draft, already-empty or not, and every later save slowed about threefold. Now only rows that carry one are written. In production that also stops a copy taking a row lock on every question.
+
+- **`nit` · `copy-split-other-pair` — Copying only the "Please specify" half of an Other pair gives the choice question a second box, shown together with the first.**
+  Found by `M240` (2026-11-15). A copy re-links an Other pair only when both halves are copied. Copied alone, the "Please specify" question keeps its condition `selected(${choice}, 'other')`, which names a question outside the copy and so is left as it was. Picking Other then shows both boxes, and the choice question's link names only the first. Copied alone, the choice question loses the link, as a one-question Duplicate always did.
+
+  The remedy, when taken: a ticked copy takes each ticked half's partner along (or says it did not), and a section copy whose pair spans two sections does the same.
+
+  **Latent** — needs an author to tick one half of a pair. Filed by `M240`. **Tier: before-launch.**
+
+- **`nit` · `copy-text-over-request-cap` — A copy whose re-pointed condition or label grows past 2,000 characters cannot be saved again.**
+  Found by `M240` (2026-11-15). Re-pointing lengthens every reference whose key grew (`q9` → `q10`, or `age` → `age_copy`). Text that was just under the 2,000-character request limits (`UpdateFieldRequest`, `UpdateSectionRequest`) can end just over them. The copy is stored, but the builder sends the whole row on its next save, which is refused. Untokenizable text is left exactly as it was, so only re-pointed text grows.
+
+  The remedy, when taken: refuse the copy with the question named, or check the limit before re-pointing.
+
+  **Latent** — needs text within a few characters of the limit. Filed by `M240`. **Tier: after-launch.**
 
 - **`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
   Found by `M237` (2026-11-14). NHETE builds today with three workarounds:

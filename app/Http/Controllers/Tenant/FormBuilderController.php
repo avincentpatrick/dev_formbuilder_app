@@ -82,11 +82,27 @@ final class FormBuilderController extends Controller
 
     public function destroySection(Request $request, Form $form, FormSection $section): JsonResponse
     {
-        return $this->respond(function () use ($request, $form, $section): array {
-            $this->builder->deleteSection($form, $section, $this->actor($request));
+        // M240: `field_ids` — the questions to delete WITH the section, the builder's undo of a section copy.
+        $data = $request->validate([
+            'field_ids' => ['sometimes', 'array', 'max:2000'],
+            'field_ids.*' => ['required', 'uuid'],
+        ]);
+
+        return $this->respond(function () use ($request, $form, $section, $data): array {
+            /** @var list<string> $fieldIds */
+            $fieldIds = array_values($data['field_ids'] ?? []);
+            $this->builder->deleteSection($form, $section, $this->actor($request), $fieldIds);
 
             return ['deleted' => true];
         });
+    }
+
+    /** M240 (`D224`) — Duplicate section: the section and its questions, every link inside pointing at the copies. */
+    public function duplicateSection(Request $request, Form $form, FormSection $section): JsonResponse
+    {
+        return $this->respond(fn (): array => $this->presenter->copies(
+            $this->builder->duplicateSection($form, $this->actor($request), $section),
+        ));
     }
 
     // ── Fields ───────────────────────────────────────────────────────────────────
@@ -157,6 +173,42 @@ final class FormBuilderController extends Controller
         return $this->respond(fn (): array => $this->presenter->field(
             $this->builder->duplicateField($form, $this->actor($request), $field),
         ));
+    }
+
+    /** M240 (`D224`) — Duplicate on ticked questions (one or more), every link between them pointing at the copies. */
+    public function duplicateFields(Request $request, Form $form): JsonResponse
+    {
+        $fieldIds = $this->fieldIds($request);
+
+        return $this->respond(fn (): array => $this->presenter->copies(
+            $this->builder->duplicateFields($form, $this->actor($request), $fieldIds),
+        ));
+    }
+
+    /** M240 — delete several questions at once, all or none: the builder's undo of a copy. */
+    public function destroyFields(Request $request, Form $form): JsonResponse
+    {
+        $fieldIds = $this->fieldIds($request);
+
+        return $this->respond(function () use ($form, $fieldIds): array {
+            $this->builder->deleteFields($form, $fieldIds);
+
+            return ['deleted' => true];
+        });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function fieldIds(Request $request): array
+    {
+        $data = $request->validate([
+            'field_ids' => ['required', 'array', 'min:1', 'max:2000'],
+            'field_ids.*' => ['required', 'uuid'],
+        ]);
+
+        /** @var list<string> */
+        return array_values($data['field_ids']);
     }
 
     // ── Question library (Increment G9b) ──────────────────────────────────────────

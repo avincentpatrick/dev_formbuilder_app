@@ -48,6 +48,25 @@ interface OrderSnapshot {
     sections: { uid: Uid; sequence: number }[];
 }
 
+/** M240 — the draft's whole order, as the server placed it after a copy. Applied as it stands, never saved back. */
+interface ServerOrder {
+    sections: { id: string; sequence: number }[];
+    fields: { id: string; form_section_id: string | null; sequence: number; section_sequence: number | null }[];
+}
+
+/** M240 (`D224`) — what a copy's reply carries: the new section, each copy beside its source's id, and the order. */
+interface CopyReply {
+    section: ServerSection | null;
+    copies: { source_id: string; field: ServerField }[];
+    order: ServerOrder;
+}
+
+/** M240 — what one copy made on screen: the new section's uid, and each copy's uid in source order (a redo reuses them). */
+interface CopyMade {
+    sectionUid: Uid | null;
+    copyUids: Uid[];
+}
+
 export interface ConflictState {
     kind: 'field' | 'section';
     uid: Uid;
@@ -235,6 +254,29 @@ export function useBuilderStore(props: BuilderPageProps) {
     }
     function findSection(uid: Uid): LocalSection | undefined {
         return sections.value.find((s) => s.uid === uid);
+    }
+
+    /**
+     * M240 — a section put back by a history step (an undone delete, a redone add or copy) is a NEW server row under the
+     * same uid, while every entry recorded before holds its OLD id: an order snapshot names each question's section by id,
+     * and so does a deleted question's restore. Without this, undoing a Move after such a step put its questions into a
+     * section that no longer exists, and the server dropped them to the top level. `retiredSectionIds` remembers the id a
+     * section had when it went; the step that brings it back records old id ⇒ new id.
+     */
+    const sectionAlias = new Map<string, string>();
+    const retiredSectionIds = new Map<Uid, string>();
+
+    function liveSectionId(id: string | null): string | null {
+        let current = id;
+        for (let hops = 0; current !== null && sectionAlias.has(current) && hops < 100; hops++) current = sectionAlias.get(current) ?? null;
+
+        return current;
+    }
+
+    function noteSectionBack(uid: Uid, id: string): void {
+        const old = retiredSectionIds.get(uid);
+        if (old !== undefined && old !== id) sectionAlias.set(old, id);
+        retiredSectionIds.delete(uid);
     }
     function nextSequence(): number {
         return fields.value.reduce((max, f) => Math.max(max, f.sequence), 0) + 1;
@@ -424,12 +466,13 @@ export function useBuilderStore(props: BuilderPageProps) {
         snap: FieldSnapshot,
         sequence: number,
     ): Promise<void> {
-        const created = await createFieldServer(typeValue, sectionId, true);
+        const liveSection = liveSectionId(sectionId); // M240: the section may have been put back under a new id since
+        const created = await createFieldServer(typeValue, liveSection, true);
         if (!created) return;
         const local: LocalField = { ...created, uid };
         applyFieldSnapshot(local, snap);
         local.sequence = sequence;
-        local.form_section_id = sectionId;
+        local.form_section_id = liveSection;
         fields.value.push(local);
         await persistField(uid);
         await persistOrder();
@@ -464,17 +507,31 @@ export function useBuilderStore(props: BuilderPageProps) {
         return true;
     }
 
-    async function deleteSectionServer(uid: Uid): Promise<boolean> {
+    /**
+     * `fieldUids` — M240: questions of this section deleted WITH it, in the same request (the undo of a section copy). Every
+     * other question of the section is ungrouped, as before.
+     */
+    async function deleteSectionServer(uid: Uid, fieldUids: Uid[] = []): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
-        const result = await guard(() => client.delete(`${base}/sections/${section.id}`));
+        const going = fieldUids
+            .map((fieldUid) => findField(fieldUid))
+            .filter((field): field is LocalField => field !== undefined && field.form_section_id === section.id);
+        const body = going.length === 0 ? undefined : { field_ids: going.map((field) => field.id) };
+        const result = await guard(() => client.delete(`${base}/sections/${section.id}`, body));
         if (!result) return false;
+        for (const field of going) {
+            dropRulesComparingWith(field.key); // the server's foreign key took them, as for a deleted question
+            removeFieldLocal(field.uid);
+            delete save.fieldErrors[field.uid];
+        }
         // The FK is ON DELETE SET NULL — its fields become ungrouped (mirror that locally).
         fields.value.forEach((f) => {
             if (f.form_section_id === section.id) f.form_section_id = null;
         });
         sections.value = sections.value.filter((s) => s.uid !== uid);
         if (selection.value?.kind === 'section' && selection.value.uid === uid) selection.value = null;
+        retiredSectionIds.set(uid, section.id); // M240: so the step that puts it back can say which id it replaces
         forget(uid, 'section', section.id); // M170: a deleted section has no edit left to put back or retry
         return true;
     }
@@ -490,6 +547,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         const local: LocalSection = { ...result.data, uid };
         applySectionSnapshot(local, snap);
         local.sequence = sequence;
+        noteSectionBack(uid, local.id);
         sections.value.push(local);
         await persistSection(uid);
         // Re-adopt the fields the section owned before it was deleted.
@@ -777,31 +835,148 @@ export function useBuilderStore(props: BuilderPageProps) {
         });
     }
 
+    // ── Copies (M240, `builder-copy-section`, `D224`, `D225`) ─────────────────────────────────────
+    // One server engine for three ways in — a question's Duplicate, Duplicate on ticked questions, Duplicate section. The
+    // server gives the copies their keys (counting up), re-points every link between the copied rows, PLACES them and
+    // answers with the whole order, which is applied as it stands: saving it back would log "Moved" for questions nobody
+    // moved. Each copy is ONE request and ONE undo entry, and its undo is one request too.
+
+    /** Adopt a copy's reply: the section and every copy (under the uids a redo reuses, else new ones), then the order. */
+    async function copyServer(request: () => Promise<BuilderResult<CopyReply>>, reuse?: CopyMade): Promise<CopyMade | null> {
+        const result = await guard(request);
+        if (!result || result.conflict) return null;
+        const reply = result.data;
+        let sectionUid: Uid | null = null;
+        if (reply.section !== null) {
+            sectionUid = reuse?.sectionUid ?? nextUid();
+            noteSectionBack(sectionUid, reply.section.id);
+            const local: LocalSection = { ...clone(reply.section), uid: sectionUid };
+            sections.value.push(local);
+            baselines.set(sectionUid, sectionSnapshot(local));
+        }
+        const copyUids = reply.copies.map(({ field }, i) => {
+            const local: LocalField = { ...clone(field), uid: reuse?.copyUids[i] ?? nextUid() };
+            fields.value.push(local);
+            baselines.set(local.uid, fieldSnapshot(local));
+
+            return local.uid;
+        });
+        applyServerOrder(reply.order);
+
+        return { sectionUid, copyUids };
+    }
+
+    /** Copy questions where they stand. A redo whose source is gone can never apply, so it is dropped, not retried. */
+    async function copyFieldsServer(sourceUids: Uid[], reuse?: CopyMade): Promise<CopyMade | null> {
+        const sources = sourceUids.map((uid) => findField(uid));
+        if (sources.some((source) => source === undefined)) {
+            if (reuse !== undefined) throw new StaleHistoryStep(COPY_SOURCE_GONE);
+            return null;
+        }
+
+        return copyServer(
+            () => client.post<CopyReply>(`${base}/fields/duplicate`, { field_ids: sources.map((source) => (source as LocalField).id) }),
+            reuse,
+        );
+    }
+
+    async function copySectionServer(sourceUid: Uid, reuse?: CopyMade): Promise<CopyMade | null> {
+        const section = findSection(sourceUid);
+        if (section === undefined) {
+            if (reuse !== undefined) throw new StaleHistoryStep(COPY_SOURCE_GONE);
+            return null;
+        }
+
+        return copyServer(() => client.post<CopyReply>(`${base}/sections/${section.id}/duplicate`), reuse);
+    }
+
+    /**
+     * Undo a copy in ONE request — the section with the copies named, or the copies alone — so a 140-question copy cannot
+     * stop halfway. A copy no longer on screen is skipped, which makes a retry safe; a failure keeps the entry for one.
+     */
+    async function removeCopiesServer(made: CopyMade): Promise<void> {
+        if (made.sectionUid !== null) {
+            if (findSection(made.sectionUid) === undefined) return;
+            if (!(await deleteSectionServer(made.sectionUid, made.copyUids))) {
+                throw new HistoryStepFailed(`${COPY_UNDO_FAILED} ${save.error ?? ''}`.trim());
+            }
+
+            return;
+        }
+        const live = made.copyUids.map((uid) => findField(uid)).filter((field): field is LocalField => field !== undefined);
+        if (live.length === 0) return;
+        const result = await guard(() => client.post(`${base}/fields/delete-many`, { field_ids: live.map((field) => field.id) }));
+        if (result === null) throw new HistoryStepFailed(`${COPY_UNDO_FAILED} ${save.error ?? ''}`.trim());
+        for (const field of live) {
+            dropRulesComparingWith(field.key);
+            removeFieldLocal(field.uid);
+            delete save.fieldErrors[field.uid];
+        }
+    }
+
+    /** One copy as one undo entry: undo removes what it made, redo makes it again under the same uids. */
+    function pushCopyHistory(label: string, made: CopyMade, again: (reuse: CopyMade) => Promise<CopyMade | null>): void {
+        let current = made;
+        pushHistory(
+            label,
+            async () => {
+                await removeCopiesServer(current);
+            },
+            async () => {
+                const remade = await again(current);
+                if (remade === null) throw new HistoryStepFailed(`${COPY_REDO_FAILED} ${save.error ?? ''}`.trim());
+                current = remade;
+            },
+        );
+    }
+
+    /**
+     * A question's Duplicate: the copy lands right below it, its key counting up, and is selected. The copy is made from the
+     * question AS STORED, so an edit still waiting out its debounce is sent first (it used not to be, and was missing).
+     */
     function duplicateField(uid: Uid): Promise<void> {
+        flushCommit();
         return enqueue(async () => {
             const field = findField(uid);
             if (!field) return;
-            const result = await guard(() => client.post<ServerField>(`${base}/fields/${field.id}/duplicate`));
-            if (!result || result.conflict) return;
-            const local = toLocalField(result.data);
-            fields.value.push(local);
-            baselines.set(local.uid, fieldSnapshot(local));
-            selection.value = { kind: 'field', uid: local.uid };
+            const made = await copyFieldsServer([uid]);
+            if (made === null) return;
+            selection.value = { kind: 'field', uid: made.copyUids[0] };
+            pushCopyHistory(`Duplicate ${field.label}`, made, (reuse) => copyFieldsServer([uid], reuse));
+        });
+    }
 
-            const dupUid = local.uid;
-            const snap = fieldSnapshot(local);
-            const seq = local.sequence;
-            const sectionId = local.form_section_id;
-            const type = local.field_type;
-            pushHistory(
-                `Duplicate ${field.label}`,
-                async () => {
-                    await deleteFieldServer(dupUid);
-                },
-                async () => {
-                    await restoreFieldServer(dupUid, type, sectionId, snap, seq);
-                },
-            );
+    /**
+     * Duplicate on ticked questions (`D224`): each copy right after the last ticked question of its section, in the order on
+     * screen, every link between the ticked questions pointing at the copies. The ticks move to the copies — the next step
+     * is usually to move or edit them — and the selection stays.
+     */
+    function duplicateFields(uids: Uid[]): Promise<void> {
+        flushCommit();
+        return enqueue(async () => {
+            const wanted = new Set(uids);
+            const sourceUids = flattenedFields().filter((field) => wanted.has(field.uid)).map((field) => field.uid);
+            if (sourceUids.length === 0) return;
+            const label =
+                sourceUids.length === 1 ? `Duplicate ${findField(sourceUids[0])?.label ?? 'a question'}` : `Duplicate ${sourceUids.length} questions`;
+            const made = await copyFieldsServer(sourceUids);
+            if (made === null) return;
+            checked.value = new Set(made.copyUids);
+            checkAnchor = null;
+            pushCopyHistory(label, made, (reuse) => copyFieldsServer(sourceUids, reuse));
+        });
+    }
+
+    /** Duplicate section (`D224`): the copy lands right after its source, with every question in it, and is selected. */
+    function duplicateSection(uid: Uid): Promise<void> {
+        flushCommit();
+        return enqueue(async () => {
+            const section = findSection(uid);
+            if (!section) return;
+            const made = await copySectionServer(uid);
+            if (made === null || made.sectionUid === null) return;
+            selection.value = { kind: 'section', uid: made.sectionUid };
+            pushCopyHistory(`Duplicate section “${section.label}”`, made, (reuse) => copySectionServer(uid, reuse));
         });
     }
 
@@ -1713,7 +1888,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const field = findField(row.uid);
             if (field) {
                 field.sequence = row.sequence;
-                field.form_section_id = row.section;
+                field.form_section_id = liveSectionId(row.section); // M240: a section put back since has a new id
             }
         });
         order.sections.forEach((row) => {
@@ -1726,6 +1901,24 @@ export function useBuilderStore(props: BuilderPageProps) {
         await persistOrder();
     }
 
+    /** M240 — the order the server placed a copy in, applied to every row it names. Positions only; no baseline moves. */
+    function applyServerOrder(order: ServerOrder): void {
+        const sectionById = new Map(sections.value.map((section) => [section.id, section]));
+        order.sections.forEach((row) => {
+            const section = sectionById.get(row.id);
+            if (section) section.sequence = row.sequence;
+        });
+        const fieldById = new Map(fields.value.map((field) => [field.id, field]));
+        order.fields.forEach((row) => {
+            const field = fieldById.get(row.id);
+            if (field) {
+                field.sequence = row.sequence;
+                field.form_section_id = row.form_section_id;
+                field.section_sequence = row.section_sequence;
+            }
+        });
+    }
+
     // ── Local mutation helpers ───────────────────────────────────────────────────
     function removeFieldLocal(uid: Uid): void {
         const gone = findField(uid);
@@ -1733,6 +1926,12 @@ export function useBuilderStore(props: BuilderPageProps) {
         fields.value = fields.value.filter((f) => f.uid !== uid);
         baselines.delete(uid);
         if (selection.value?.kind === 'field' && selection.value.uid === uid) selection.value = null;
+        // M240: a deleted question is no longer one of the ticked ones ("N selected" counted it until now).
+        if (checked.value.has(uid)) {
+            const next = new Set(checked.value);
+            next.delete(uid);
+            checked.value = next;
+        }
     }
 
     // M170 — last, so every `let` the commit path reads (the queue, the debounce) is initialised before it runs.
@@ -1781,6 +1980,9 @@ export function useBuilderStore(props: BuilderPageProps) {
         addOtherSpecify,
         removeOtherSpecify,
         duplicateField,
+        // copies with every link inside re-pointed (M240)
+        duplicateFields,
+        duplicateSection,
         insertFromLibrary,
         saveFieldToLibrary,
         refreshLibrary,
@@ -2072,6 +2274,9 @@ const EDIT_REDO_TYPE_MOVED = 'That edit can’t be redone: this question’s typ
 const MINE_ACROSS_TYPES =
     'This question was changed to another type somewhere else, so your edit couldn’t be kept. The other version is shown.';
 const HISTORY_STEP_FAILED = 'That step couldn’t be completed.';
+const COPY_UNDO_FAILED = 'Couldn’t undo the copy.';
+const COPY_REDO_FAILED = 'Couldn’t redo the copy.';
+const COPY_SOURCE_GONE = 'The copy can’t be redone: what it copied was deleted.';
 
 /** The label a new field of a palette variant group arrives with (M125), or null for a type the palette lists by itself. */
 function variantLabelOf(palette: BuilderPageProps['palette'], typeValue: string): string | null {

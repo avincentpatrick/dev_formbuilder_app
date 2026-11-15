@@ -201,6 +201,45 @@ final class BuilderPresenter
     }
 
     /**
+     * M240 — what a copy made, for the builder to adopt without asking again: the new section (or null), each copy
+     * beside the id of the question it was copied from, and the draft's whole order after the copies were placed. The
+     * builder applies that order as it stands; saving it back would log a "Moved" entry for questions nobody moved.
+     *
+     * The id ⇒ key lookup is read AFTER the inserts, so a copied rule comparing with a copied sibling comes back naming
+     * the sibling's copy; read before, it would come back null, and the next save of that copy would drop the rule.
+     *
+     * @return array{section: ?array<string, mixed>, copies: list<array{source_id: string, field: array<string, mixed>}>, order: array{sections: list<array{id: string, sequence: int}>, fields: list<array{id: string, form_section_id: ?string, sequence: int, section_sequence: ?int}>}}
+     */
+    public function copies(DraftCopy $made): array
+    {
+        $draftId = $made->draft->id;
+        $keyById = FormField::query()->where('form_version_id', $draftId)->pluck('key', 'id');
+        $copyIds = array_map(static fn (array $pair): string => $pair['copy']->id, $made->copies);
+        /** @var Collection<string, Collection<int, FormFieldValidation>> $rules */
+        $rules = FormFieldValidation::query()->whereIn('form_field_id', $copyIds)->orderBy('sequence')->get()->groupBy('form_field_id');
+
+        return [
+            'section' => $made->section !== null ? $this->section($made->section) : null,
+            'copies' => array_map(fn (array $pair): array => [
+                'source_id' => $pair['source_id'],
+                'field' => $this->field($pair['copy'], $rules->get($pair['copy']->id) ?? new Collection, $keyById),
+            ], $made->copies),
+            'order' => [
+                'sections' => array_values(FormSection::query()->where('form_version_id', $draftId)->orderBy('sequence')->get(['id', 'sequence'])
+                    ->map(static fn (FormSection $s): array => ['id' => $s->id, 'sequence' => $s->sequence])->all()),
+                'fields' => array_values(FormField::query()->where('form_version_id', $draftId)->orderBy('sequence')
+                    ->get(['id', 'form_section_id', 'sequence', 'section_sequence'])
+                    ->map(static fn (FormField $f): array => [
+                        'id' => $f->id,
+                        'form_section_id' => $f->form_section_id,
+                        'sequence' => $f->sequence,
+                        'section_sequence' => $f->section_sequence,
+                    ])->all()),
+            ],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function section(FormSection $section): array

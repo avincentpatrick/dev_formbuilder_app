@@ -112,13 +112,44 @@ final class TemplateParser
     }
 
     /**
-     * The one scanner, both modes.
+     * M240 (`builder-copy-section`) — re-point the holes through an old ⇒ new key map, leaving every other byte
+     * exactly as written. The lenient scanner finds the holes (so this never throws and applies no cap), recording
+     * where each one starts; the splice runs right to left on the ORIGINAL text, so an escape (`$${`), a lone `$`
+     * and a malformed `${` — none of which is a hole — survive byte for byte. A key absent from the map is kept.
+     *
+     * @param  array<string, string>  $map  old key ⇒ new key
+     */
+    public function rewriteKeys(string $template, array $map): string
+    {
+        if ($map === [] || ! str_contains($template, '${')) {
+            return $template;
+        }
+
+        $holes = [];
+        $this->scan($template, false, $holes);
+
+        foreach (array_reverse($holes) as [$at, $key]) {
+            if (isset($map[$key])) {
+                $template = substr_replace($template, '${'.$map[$key].'}', $at, strlen($key) + 3);
+            }
+        }
+
+        return $template;
+    }
+
+    /**
+     * The one scanner, both modes. `$holes` collects each hole's byte offset and key in source order, for
+     * {@see rewriteKeys()}; the segments themselves are unchanged, because both golden runners compare them exactly.
+     *
+     * @param  list<array{0: int, 1: string}>  $holes
+     *
+     * @param-out  list<array{0: int, 1: string}>  $holes
      *
      * @return list<TemplateSegment>
      *
      * @throws TemplateSyntaxException
      */
-    private function scan(string $template, bool $strict): array
+    private function scan(string $template, bool $strict, array &$holes = []): array
     {
         // ── Doc #26 §2.1, as amended by H6a: the caps bind only a HOLE-BEARING value ────────────────
         // The caps exist to bound RENDER cost, and a template with no hole has none — it is returned
@@ -143,7 +174,7 @@ final class TemplateParser
         /** @var list<TemplateSegment> $segments */
         $segments = [];
         $literal = '';
-        $holes = 0;
+        $holeCount = 0;
         $length = strlen($template);
         $i = 0;
 
@@ -192,10 +223,11 @@ final class TemplateParser
             }
 
             $segments[] = ['type' => 'hole', 'value' => $key];
-            $holes++;
+            $holeCount++;
+            $holes[] = [$i, $key];
 
-            if ($strict && $holes > self::MAX_HOLES) {
-                throw TemplateSyntaxException::tooManyHoles($holes);
+            if ($strict && $holeCount > self::MAX_HOLES) {
+                throw TemplateSyntaxException::tooManyHoles($holeCount);
             }
 
             $i += strlen($key) + 3; // '${' + key + '}'

@@ -16081,3 +16081,48 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: set it on the box to `iconnect.com.de`, then `config:cache` and `queue:restart`. The operator's, in chat.
 
   **Live**, with no failure seen. Filed by `M235`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M238` (2026-11-14) — ****`minor` · `composer-audit-laravel-13-40` — A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed.**
+  Found by `M237` (2026-11-14), in PR #519's Static job (run 43545115637). `composer audit` reports `PKSA-yxbx-3c9s-cjt9` (CVE-2026-128083, *"Laravel: Task Output Injection - Concurrency Process"*, severity low), affecting `laravel/framework` `>=13.0.0,<13.40.0`. The lock holds `v13.30.1`.
+  - The Static job stops at its first failing step, so on every pull request the steps after the audit never run: npm audit, the staging headers judge and the secret scan. Every step before it passed on #519.
+  - No pull request can be merged green until the lock moves, so this goes first at the next merge point.
+
+  The remedy, when taken: `composer update laravel/framework --with-dependencies` to 13.40.0 or later, in its own increment, with the full Pest, E2E and Static runs read before it merges.
+
+  **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M238` (2026-11-14), on its branch.** The row was first filed on #519's branch. That pull request merges after this one, so the row moved here, and #519 dropped its copy at `4a918ccb`.
+  - The command was `composer update laravel/framework --with-dependencies --minimal-changes --no-install --no-scripts`, run on the host. Without `--minimal-changes`, the row's command moved 110 packages in a dry run, among them a major `guzzlehttp/uri-template` 1 → 2.
+  - It moves two packages in `composer.lock` and nothing else: `laravel/framework` v13.30.1 → v13.42.0 (the newest 13.x), and `laravel/prompts` v0.3.21 → v0.3.27. `content-hash` and `plugin-api-version` (2.6.0) do not move.
+  - `composer audit --locked` reads *"No security vulnerability advisories found"*.
+  - Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade, so the advisory reached no path this app runs. That is why the row stays `minor`.
+  - The Forms, Guest and Unit suites passed against 13.42.0 in the app container: 2,472 tests, with the same two `preg_match` warnings CI already shows.
+  - **The bump turned PHPStan red, and the branch fixed that too.** #520's first run, 43559666697, failed Static at PHPStan with 17 `cast.string` errors, each a `(string)` cast on a console command's `argument()` or `option()`, in nine commands.
+    - Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+    - Every fixed version is 13.40.0 or later, so pinning lower could not avoid it, and Larastan 3.15.0 builds the application the same way.
+    - The nine now read through a new `ReadsTextInput` trait, which returns what the cast did for every scalar and for null. PHPStan on the host: 0 errors. The nine commands' tests: 106 passed.
+    - The same blindness takes Larastan's undefined-argument rule with it, filed as `larastan-console-commands-blind`.
+  - It merges first at the next merge point, ahead of #519.
+
+- **`minor` · `publish-gate-field-order` — A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ.**
+  Found by `M238` (2026-11-14), in #519's run 43550232199. Pest's only failure of 7,591 tests was in `NoteContentShapeTest`: *"it refuses at publish every image that is not this form's own usable upload, and passes its own"*. #519 touches neither that test nor the gate.
+  - The test expected the seven notes in the order they were added, and got `deleted` and `undescribed` first.
+  - The run before it, 43545115637, passed the same test on the same code.
+
+  The cause:
+  - `StructuralValidationGate::collect()` reads `$version->fields()->get()`, and `FormVersion::fields()` sets no order. Postgres returns the rows in storage order, which an UPDATE can change.
+  - An author who meets several problems at publish sees them in that order too. `BuilderPresenter` orders the same fields by `sequence`.
+
+  The remedy, when taken: read the gate's fields in the form's order, so the list follows the form and the test's order holds by construction.
+
+  **Live.** Filed by `M238`. **Tier: during-testing.**
+
+- **`nit` · `larastan-console-commands-blind` — Since Laravel 13.38, Larastan no longer finds this app's console commands, so it neither types their arguments nor checks that an argument a command reads is in its signature.**
+  Found by `M238` (2026-11-14), when the bump to 13.42.0 turned PHPStan red on nine commands.
+  - Larastan reads each command's signature from a console application it builds itself (`ConsoleApplicationResolver`). Since 13.38, the commands `load()` discovers are kept in the kernel's `$kernelCommands`, which that application never sees.
+  - Measured in the app container: a fresh `Illuminate\Console\Application` lists 160 commands, none of them this app's (`sso:domains` and `tenants:create` are both missing).
+  - So `argument()` and `option()` fall back to their wide type, which `M238` met by narrowing. `UndefinedArgumentOrOptionRule` finds no command either, so a typo in an argument's name now passes PHPStan silently.
+  - Larastan 3.15.0, the newest on 2026-11-14, builds the application the same way.
+
+  The remedy, when taken: give Larastan's application the app's commands (a PHPStan bootstrap that registers them, or an upstream fix), then prove it with a deliberately misspelt argument that turns PHPStan red.
+
+  **Not live** — it blinds a gate and changes nothing a tester sees; it reaches the trunk when `M238` merges. Filed by `M238`. **Tier: during-testing.**

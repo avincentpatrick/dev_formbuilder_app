@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Enums\FormVersionStatus;
 use App\Models\Form;
 use App\Models\FormVersion;
@@ -36,6 +37,8 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
  */
 final class OcrBakeoffLayoutCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'ocr:bakeoff-layout
         {tenant : The workspace slug}
         {form : The form id (from the form\'s address)}
@@ -45,9 +48,9 @@ final class OcrBakeoffLayoutCommand extends Command
 
     public function handle(BlankFormPrintPresenter $presenter): int
     {
-        $slug = (string) $this->argument('tenant');
-        $formId = (string) $this->argument('form');
-        $dir = rtrim((string) $this->argument('dir'), '/\\');
+        $slug = $this->textArgument('tenant');
+        $formId = $this->textArgument('form');
+        $dir = rtrim($this->textArgument('dir'), '/\\');
 
         if (! Str::isUuid($formId)) {
             $this->error("{$formId} is not a form id. Copy it from the form's address: /forms/<id>.");

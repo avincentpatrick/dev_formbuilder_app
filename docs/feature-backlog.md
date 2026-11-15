@@ -14532,7 +14532,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `copyKey()`); the client never creates one. The refusal is shown under Field key on the Advanced tab only
   (`resources/js/components/builder/ConfigPanel.vue:645-652`), while selecting a question always opens Basics (`:168-173`); the
   alert names every other refused question as "has a change that was not saved. Select it to see why" (`:80`) with no reason and
-  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts:948-956`).
+  no badge on the tab; a validation refusal is not counted as unsaved, so there is no Retry (`useBuilderStore.ts`, `settled()`; cited by name since `M240`, whose additions moved the lines).
   `docs/form-versioning-schema-migration.md:129` says a key is never renamed, and nothing enforces it. `D132` (the user,
   2026-10-15): *"if we can already help the user avoid the errors, notify them or the app auto adjust the key naming to avoid
   conflicts"*. The remedy: the store knows every key in the draft — as the author types a key in use the panel says so inline
@@ -14855,7 +14855,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`major` · Moving a question or a section re-stamps every question's save token, so the author's next edit to any question opens "This item changed elsewhere".**
   The testers' comment (2026-10-11, comment 5): after creating a question and changing only whether it is required, the dialog
   *"This item changed elsewhere — Someone else edited this field since you opened it"* showed the same text on both sides. Measured
-  by reading: `app/Services/Forms/FormBuilderService.php:732` (`reorder()`) writes each position through Eloquent's query builder
+  by reading: `app/Services/Forms/FormBuilderService.php`'s `reorder()` (cited by name since `M240` moved the lines) writes each position through Eloquent's query builder
   (`:603`, `:612`), whose `update()` adds `updated_at`, so every question and section of the draft gets a new token; the token is that
   timestamp, compared exactly by `assertNoDrift()` (`:740`); `persistOrder()` (`resources/js/components/builder/useBuilderStore.ts:422`)
   ignores the reply, so the page keeps the old tokens. A drag or keyboard move, the Advanced tab's Section choice, an undo of a

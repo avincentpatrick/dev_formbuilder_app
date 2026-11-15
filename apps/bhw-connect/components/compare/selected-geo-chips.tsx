@@ -16,12 +16,24 @@ export type SelectedGeo = {
  * which previously left "remove places until only one level remains" with no
  * control to do it.
  */
-export function SelectedGeoChips({ places }: { places: SelectedGeo[] }) {
+export function SelectedGeoChips({
+  places,
+  onRemove,
+  onClear,
+}: {
+  places: SelectedGeo[];
+  onRemove?: (code: string) => void;
+  onClear?: () => void;
+}) {
   const [filters, setFilters] = useFilterState();
 
   if (places.length === 0) return null;
 
   function remove(geoCode: string) {
+    if (onRemove) {
+      onRemove(geoCode);
+      return;
+    }
     const next = (filters.compareGeos ?? []).filter((c) => c !== geoCode);
     setFilters({ compareGeos: next.length > 0 ? next : null });
   }
@@ -49,7 +61,7 @@ export function SelectedGeoChips({ places }: { places: SelectedGeo[] }) {
         <li>
           <button
             type="button"
-            onClick={() => setFilters({ compareGeos: null })}
+            onClick={() => (onClear ? onClear() : setFilters({ compareGeos: null }))}
             className="text-xs text-muted underline hover:text-accent"
           >
             Clear all

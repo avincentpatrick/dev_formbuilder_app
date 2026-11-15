@@ -20,7 +20,9 @@ const nextConfig: NextConfig = {
   // @resvg/resvg-js ships a native .node binding (PNG export rendering,
   // increment 1.8) that Turbopack can't bundle into an ESM chunk — keep it
   // as a real runtime require() instead.
-  serverExternalPackages: ["@resvg/resvg-js", "unpdf"],
+  // The standalone extraction sidecar imports ExcelJS natively too. Keep its dependency
+  // closure in the release instead of only bundling it inside Next server chunks.
+  serverExternalPackages: ["@resvg/resvg-js", "unpdf", "exceljs"],
 
   // Place pages read boundary GeoJSON from public/geo at render time
   // (lib/geo/locator.ts). Regions/provinces are SSG'd at build where the

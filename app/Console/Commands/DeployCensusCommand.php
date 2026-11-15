@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -22,6 +23,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DeployCensusCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'deploy:census
                             {--write= : Count every table and write the counts to this file}
                             {--compare= : Count again and fail if any table holds fewer rows than this file says}';
@@ -39,7 +42,7 @@ final class DeployCensusCommand extends Command
             return self::FAILURE;
         }
 
-        return is_string($write) ? $this->write($write) : $this->compare((string) $compare);
+        return is_string($write) ? $this->write($write) : $this->compare($this->textOption('compare'));
     }
 
     private function write(string $file): int

@@ -86,8 +86,7 @@ export async function POST(request: Request) {
   try {
     const { operation, ...payload } = parsed.data;
     if (operation !== "create") return reply(await reviewCall(id, operation, payload));
-    if (!("sources" in payload) || payload.sources.online)
-      return reply({ error: "Online review is unavailable." }, 400);
+    if (!("sources" in payload)) return reply({ error: "Invalid sources." }, 400);
     const available = await listRegisteredDatasets("internal");
     const definitions = available
       .filter(

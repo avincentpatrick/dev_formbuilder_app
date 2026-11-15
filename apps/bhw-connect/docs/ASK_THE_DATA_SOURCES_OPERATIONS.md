@@ -47,3 +47,16 @@ Search request usage joins Phase 2 attempt accounting. Optional `BHW_AI_PRICES_J
 Deleting a source immediately scrubs its extracted content/metadata/URL/provenance, cancels queued/running project analyses and invalidates saved result JSON that references its source ID. Other saved runs retain their own evidence. Project deletion scrubs all source rows through a trigger. Both APIs remove raw originals immediately where possible; worker housekeeping retries failed physical deletions. Tombstones deny downloads even before disk cleanup completes. Backup copies expire under backup policy; deletion cannot rewrite existing backups.
 
 Before release, verify uploads, byte-identical private downloads, viewer/editor/owner permissions, revocation, project isolation, source/result invalidation, physical cleanup, extraction statuses and mobile review. Confirm the packaged extractor works from the release directory, including PDF/Excel. Test source extraction after browser closure and interrupted lease recovery. Real paid search, optional legacy Office conversion, filesystem ACL/backups and target Windows worker restart remain operator checks. Local synthetic tests are not evidence of those production steps.
+
+
+## Release regression: extractor dependencies and directory junctions
+
+A valid 30-byte synthetic CSV exposed a standalone packaging defect: the parser sidecar imports ExcelJS at startup, but Next had bundled ExcelJS into its own server chunks rather than shipping the package for that sidecar. A checkout test could find the development node_modules in a parent directory and mask the missing release dependency. ExcelJS is now explicitly external to Next so its runtime dependency closure is traced into standalone output.
+
+The extractor entry-point check also canonicalizes argv through realpath before comparing it with import.meta.url. Node resolves the module to the real release directory; invoking it through the Windows current junction must still execute the CLI and write its result file.
+
+Every npm run build now verifies the detached standalone release through a temporary current directory junction. The copied release cannot borrow checkout node_modules. Actual CSV (including the five-row Python verification fixture), XLSX, PDF and GeoJSON extraction must pass before the build succeeds. No real input or provider calls are used. The temporary release is removed afterwards.
+
+Server/runtime failures now have safe, differentiated messages and a server log code; raw stderr, paths and document contents are not logged or returned by this failure classifier. A failed extraction alone does not establish that an uploaded file is empty, corrupt, encrypted or needs a converter. The assistant must not infer those causes from file size.
+
+After this fix deploys, expand the existing failed source in Project sources and choose Retry extraction. The original file is retained, so another upload is unnecessary. Wait for ready before requesting the statistical analysis again. This change runs in the BHW web service; the existing dispatcher script and Python setting are unchanged.

@@ -9988,3 +9988,37 @@ local database, registry queries and OCR were real. Windows setup, scheduler,
 backup changes and live-provider acceptance remain deferred by the owner. No
 shared ops changes or operator messages. See POLICY_REVIEW_CONTRACT.md. Phase 6
 optional online research is next.
+
+
+## 2026-11-14 — Standalone source-extractor startup fix
+
+The phone verification CSV had its expected 30-byte size but extraction failed before statistical execution. Reproduced missing ExcelJS by copying standalone outside the checkout, and a missing-output failure when launching through a directory junction. Explicitly externalize ExcelJS for Next file tracing, canonicalize the CLI entry path, and gate every build on a detached junction-based CSV/XLSX/PDF/GeoJSON smoke test. This replaces the earlier checkout-only evidence, which could resolve parent development dependencies.
+
+Preserve failed originals and use the existing Retry extraction action after deployment. Separate runtime dependency, permission, timeout and missing-output messages from parser-format failures, log only safe source IDs/codes, and prohibit unsupported file-corruption guesses from file size. No schema, shared ops/workflow or server-setting change is needed. Full local/CI verification and release status belong in the PR; the signed-in production smoke test remains to be completed after deployment.
+
+
+## 2026-11-15 — Phase 6 opt-in official policy research
+
+Reuse existing Brave Search and protected HTTPS retrieval; keep policy online
+research explicitly per-question/new-run and off by default. Use fixed public
+topics, selected government publishers and public numeric issuance references.
+Never form searches from private questions/passages, metadata titles, dataset
+records or model arguments. The model receives inert captured evidence, without
+network tools. Constrain publisher/redirect/DNS/IP, decoded size and time limits;
+use the existing bounded sidecar for original PDFs and report unread/OCR gaps.
+
+Store one private owner-scoped snapshot per run, referenced by its sections;
+quick questions retain their own evidence before it is used. Atomic creation
+freezes opt-in and public settings, idempotent retries cannot enable an offline
+run, and resume reuses its captured snapshot. Exact web tokens, URLs, retrieval
+and reported publication/effective dates remain distinct from uploaded-policy
+identities and dataset observations. Source viewers verify retained excerpt hashes.
+Web evidence cannot establish silent supersession or become a library entry.
+Unavailable research preserves internal answers with an explicit gap.
+
+Verification: 1,923 tests passed / 13 skipped; 17 PostgreSQL review/research cases
+and 24 mobile acceptance groups included. Lint/types/migration lint/prefixed build
+and detached standalone extractor checks passed. AI, identity and web transports
+were synthetic; SQL, PostgREST, OCR and PDF extraction were real locally. No new
+settings, shared ops changes or operator messages. Phase 7 Windows, live-provider,
+scheduler, backup/restore and schema-copy verification remains deferred.

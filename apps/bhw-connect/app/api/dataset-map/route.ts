@@ -8,7 +8,8 @@ import { joinPovertyRows } from "@/lib/maps/poverty";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/db/supabase";
 import { readDatasetBySlug } from "@/lib/db/dataset";
-import { getGeoByCode } from "@/lib/db/geo";
+import { mapParents } from "@/lib/maps/breadcrumbs";
+import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import { withBasePath } from "@/lib/base-path";
 import { barangayDrillAvailable, barangayGeometryUrl, barangayRelease } from "@/lib/maps/barangay-release";
 import { readBarangayRows } from "@/lib/maps/barangay-reader";
@@ -35,11 +36,15 @@ export async function GET(request: NextRequest) {
   if (choice.level === "citymun" && !barangayDrill)
     return NextResponse.json({ state: "unsupported" }, { status: 400 });
   try {
-    const [source, geo] = await Promise.all([
+    const bhw = choice.dataset === "bhw-2025" || choice.dataset === "bhw-stepzero-2026";
+    const [source, geo, ancestors] = await Promise.all([
       choice.dataset === "bhw-2025"
         ? readDatasetBySlug(choice.dataset, true)
         : readDatasetBySlug(income ? INCOME_SOURCE_SLUG : choice.dataset),
       getGeoByCode(choice.code),
+      bhw && (choice.level === "province" || choice.level === "citymun")
+        ? getGeoAncestors(choice.code, choice.level).catch(() => null)
+        : Promise.resolve(null),
     ]);
     if (source.state !== "available")
       return NextResponse.json(
@@ -216,6 +221,7 @@ export async function GET(request: NextRequest) {
       ...((declaredAccreditation || censusRate) ? { parentRate } : {}),
       ...(totalNote ? { totalNote } : {}),
       area: geo.geoName,
+      ...(bhw ? { navigation: mapParents(choice, ancestors) } : {}),
       childLevel,
       valueSupport,
       source: source.value.sourceName ?? source.value.name,

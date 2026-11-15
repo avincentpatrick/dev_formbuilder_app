@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { PolicyOnlineEvidence } from "./policy-online-evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PolicySources } from "@/lib/policy-analysis/schema";
 import type { ReviewReport, ReviewRun } from "@/lib/policy-review/types";
@@ -20,7 +21,13 @@ async function api<T>(suffix: string, payload?: unknown, signal?: AbortSignal): 
   if (!res.ok) throw Error(data.error ?? "Review unavailable.");
   return data as T;
 }
-export function PolicyReviewPanel({ sources }: { sources: PolicySources }) {
+export function PolicyReviewPanel({
+  sources,
+  onStarted,
+}: {
+  sources: PolicySources;
+  onStarted?: () => void;
+}) {
   const [question, setQuestion] = useState("");
   const [budget, setBudget] = useState(200);
   const [runs, setRuns] = useState<ReviewRun[]>([]),
@@ -87,6 +94,7 @@ export function PolicyReviewPanel({ sources }: { sources: PolicySources }) {
           sources,
           budget,
         });
+        onStarted?.();
         setRun(created.id);
         setOffset(0);
         setTopic("");
@@ -305,6 +313,7 @@ export function PolicyReviewPanel({ sources }: { sources: PolicySources }) {
                   </div>
                 ))}
                 {!!s.result?.limitations.length && <p>Gaps: {s.result.limitations.join("; ")}</p>}
+                <PolicyOnlineEvidence value={s.evidence?.online} />
                 {s.evidence && (
                   <details>
                     <summary>Saved evidence, dataset query results and usage</summary>

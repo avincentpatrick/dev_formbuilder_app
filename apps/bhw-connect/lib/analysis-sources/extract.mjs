@@ -1,7 +1,6 @@
 import { readFile, writeFile, mkdtemp, rm, stat, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, extname, isAbsolute } from "node:path";
-import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parse } from "csv-parse/sync";
@@ -439,14 +438,4 @@ export async function extractFile(bytes, name, options = {}) {
       preparations,
     };
   }
-}
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [input, name, options = "{}", output] = process.argv.slice(2);
-  const result = await extractFile(
-    new Uint8Array(await readFile(input)),
-    name,
-    JSON.parse(options),
-  );
-  if (output) await writeFile(output, JSON.stringify(result));
-  else process.stdout.write(JSON.stringify(result));
 }

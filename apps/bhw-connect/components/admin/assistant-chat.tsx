@@ -18,20 +18,7 @@ import { withBasePath } from "@/lib/base-path";
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 type ToolCall = { name: string; args: Record<string, unknown> };
 
-type Citation = {
-  chunkId: number;
-  document: string;
-  documentTitle: string;
-  asOf: string | null;
-  page: number;
-  pageRange?: string;
-  heading: string | null;
-  text: string;
-  truncated: boolean;
-  charStart: number;
-  charEnd: number;
-  label: string;
-};
+import type { Citation } from "@/lib/ai/citations";
 
 type StreamEvent =
   | { type: "route"; route: AssistantRoute }
@@ -215,6 +202,7 @@ export function AssistantChat({
     setReport(null);
     setReportState("idle");
     setStatus("sending");
+    if (policySources?.online) setPolicySources({ ...policySources, online: false });
 
     try {
       const res = await fetch(withBasePath("/api/analysis/chat"), {
@@ -343,7 +331,14 @@ export function AssistantChat({
           </select>
         </label>
       )}
-      {fullReview && policySources && <PolicyReviewPanel sources={policySources} />}
+      {fullReview && policySources && (
+        <PolicyReviewPanel
+          sources={policySources}
+          onStarted={() =>
+            setPolicySources((current) => (current ? { ...current, online: false } : current))
+          }
+        />
+      )}
       <div className={fullReview ? "hidden" : "flex flex-col gap-3"}>
         <div
           ref={listRef}
@@ -456,10 +451,16 @@ export function AssistantChat({
                       </pre>
                       <p className="mt-1 text-muted">
                         <Link
-                          href={`/ask-the-data/source/${citation.chunkId}`}
+                          href={
+                            citation.sourceKind === "policy-web"
+                              ? `/ask-the-data/online/${citation.sourceId}?passage=${citation.chunkId}`
+                              : `/ask-the-data/source/${citation.chunkId}`
+                          }
                           className="underline"
                         >
-                          Open the stored chunk
+                          {citation.sourceKind === "policy-web"
+                            ? "Open saved online evidence"
+                            : "Open the stored chunk"}
                         </Link>{" "}
                         <span className="font-mono">
                           #{citation.chunkId} · chars {citation.charStart.toLocaleString()}–

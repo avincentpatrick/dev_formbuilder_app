@@ -696,7 +696,8 @@ test("Census active years preserves decimal means, years and the unknown contrib
   } }));
   await page.goto("map?dataset=bhw-2025&indicator=bhw.active-years");
   await expect(page.getByText(/Reported area mean: 9.87 years/)).toBeVisible();
-  await expect(page.getByText(/contributing count not supplied/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Areas and data", exact: true }).getByText(/contributing count not supplied/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Map and legend", exact: true }).getByText(/contributing count not supplied/)).toBeVisible();
   await expect(page.getByText(/Reported area total:|Reported area rate:/)).toHaveCount(0);
   await page.getByText(/Complete area table/).click();
   await expect(page.getByRole("columnheader", { name: "years", exact: true })).toBeVisible();

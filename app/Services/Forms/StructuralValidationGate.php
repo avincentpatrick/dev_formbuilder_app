@@ -63,11 +63,19 @@ final class StructuralValidationGate
      */
     public function collect(FormVersion $version): array
     {
-        $fields = $version->fields()->get();
+        // M241 (`publish-gate-field-order`): questions and rules are read in the form's order, as the builder
+        // reads them, so a refusal lists its problems in that order. An unordered read returns rows in storage
+        // order, which an UPDATE can change; that made NoteContentShapeTest's order assertion fail on some runs
+        // and not others. A rule follows its question's position, then its own [sequence, id] (PHP's sort is
+        // stable). Sections are only looked up, never iterated for a refusal, so their order changes nothing.
+        $fields = $version->fields()->orderBy('sequence')->orderBy('id')->get();
         $sections = $version->sections()->get();
         $sectionIds = $sections->pluck('id')->flip();
         $repeatableSectionIds = $sections->where('is_repeatable', true)->pluck('id')->flip();
-        $validations = $version->validations()->get();
+        $fieldPosition = $fields->pluck('id')->flip();
+        $validations = $version->validations()->orderBy('sequence')->orderBy('id')->get()
+            ->sortBy(static fn (FormFieldValidation $v): int => (int) $fieldPosition->get($v->form_field_id, PHP_INT_MAX))
+            ->values();
 
         $fieldIds = $fields->pluck('id')->flip();
         $fieldKeyById = $fields->pluck('key', 'id');

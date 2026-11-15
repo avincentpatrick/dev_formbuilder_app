@@ -6,6 +6,9 @@ import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
 import type { MapRow } from "@/lib/maps/prototype";
+import { mapLabelPoints } from "@/lib/maps/orientation";
+import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { boundaryCenter, symbolMaximum, symbolRadius } from "@/lib/maps/symbols";
 
 export function DatasetCanvas({
   url,
@@ -18,21 +21,32 @@ export function DatasetCanvas({
   onRetry,
   expanded,
   emphasis,
+  compact = false,
+  labels = false,
+  excludedCodes = [],
+  view = "choropleth",
 }: {
   url: string;
   rows: MapRow[];
   bins: ColorBin[];
   selected: string | null;
   onSelect: (code: string) => void;
-  onGeometry: (codes: string[]) => void;
+  onGeometry: (codes: string[], geometry?: BoundaryCollection) => void;
   onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
   onRetry: () => void;
   /** Areas to outline strongly, e.g. one district's members among their province's municipalities. */
   emphasis?: readonly string[];
+  /** BHW workspace fits a useful visual beside its legend on phones. */
+  compact?: boolean;
+  /** Collision-managed names from the accepted area rows; no remote font source. */
+  labels?: boolean;
+  excludedCodes?: readonly string[];
+  view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
+  const resetView = useRef<(() => void) | null>(null);
   const selectedRef = useRef(selected);
   useEffect(() => {
     selectedRef.current = selected;
@@ -42,6 +56,7 @@ export function DatasetCanvas({
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
+  const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
@@ -62,9 +77,12 @@ export function DatasetCanvas({
         if (disposed || !container.current) return;
         if (geometry.type !== "FeatureCollection" || !Array.isArray(geometry.features))
           throw new Error("Invalid boundary");
+        const excluded = new Set(excludedKey.split(",").filter(Boolean));
         const byCode = new Map(rows.map((r) => [r.code, r]));
         const codes: string[] = [];
         const bounds = new gl.LngLatBounds();
+        const maximum = symbolMaximum(rows);
+        const points: GeoJSON.Feature<GeoJSON.Point>[] = [];
         // Retain only children in the authoritative geography table, not unrelated shapes.
         geometry.features = geometry.features.filter(
           (f: { properties?: { geo_code?: string }; geometry?: unknown }) => {
@@ -76,12 +94,30 @@ export function DatasetCanvas({
           const code = feature.properties.geo_code;
           codes.push(code);
           const row = byCode.get(code)!;
+          const center = boundaryCenter(feature.geometry);
+          if (
+            !excluded.has(code) &&
+            center &&
+            row.value !== null &&
+            Number.isFinite(row.value) &&
+            row.value >= 0
+          )
+            points.push({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: center },
+              properties: {
+                geo_code: code,
+                value: row.value,
+                radius: symbolRadius(row.value, maximum),
+              },
+            });
+          feature.properties.excluded = excluded.has(code);
           feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
         }
-        callbacks.current.onGeometry(codes);
+        callbacks.current.onGeometry(codes, geometry);
         map = new gl.Map({
           container: container.current,
           style: {
@@ -114,7 +150,12 @@ export function DatasetCanvas({
             type: "fill",
             source: "areas",
             paint: {
-              "fill-color": ["get", "color"],
+              "fill-color": [
+                "case",
+                ["==", ["get", "excluded"], true],
+                "#ffffff",
+                view === "circles" ? "#e5e7eb" : ["get", "color"],
+              ],
               "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
             },
           });
@@ -123,6 +164,13 @@ export function DatasetCanvas({
             type: "line",
             source: "areas",
             paint: { "line-color": "#fff", "line-width": 1 },
+          });
+          map.addLayer({
+            id: "excluded-range",
+            type: "line",
+            source: "areas",
+            filter: ["==", ["get", "excluded"], true],
+            paint: { "line-color": "#6b7280", "line-width": 1.5, "line-dasharray": [3, 2] },
           });
           map.addLayer({
             id: "small-sample",
@@ -146,17 +194,100 @@ export function DatasetCanvas({
             filter: ["==", "geo_code", selectedRef.current ?? ""],
             paint: { "line-color": "#111827", "line-width": 3 },
           });
+          if (view === "circles") {
+            map.addSource("symbols", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: points },
+            });
+            map.addLayer({
+              id: "counts",
+              type: "circle",
+              source: "symbols",
+              filter: [">", "value", 0],
+              layout: { "circle-sort-key": ["-", 0, ["get", "value"]] },
+              paint: {
+                "circle-radius": ["get", "radius"],
+                "circle-color": "#0c747b",
+                "circle-opacity": 0.85,
+                "circle-stroke-width": 1,
+                "circle-stroke-color": "white",
+              },
+            });
+            map.addLayer({
+              id: "zeros",
+              type: "circle",
+              source: "symbols",
+              filter: ["==", "value", 0],
+              paint: {
+                "circle-radius": 3,
+                "circle-opacity": 0,
+                "circle-stroke-width": 2,
+                "circle-stroke-color": "#0c747b",
+              },
+            });
+            for (const layer of ["counts", "zeros"])
+              map.on("click", layer, (e) => {
+                const code = e.features?.[0]?.properties?.geo_code;
+                if (typeof code === "string") callbacks.current.onSelect(code);
+              });
+          }
+          if (labels) {
+            map.addSource("place-names", {
+              type: "geojson",
+              data: mapLabelPoints(
+                rows.filter((row) => !excluded.has(row.code)),
+                geometry,
+              ),
+            });
+            map.addLayer({
+              id: "place-labels",
+              type: "symbol",
+              source: "place-names",
+              layout: {
+                "text-field": ["get", "name"],
+                "text-font": ["sans-serif"],
+                "text-size": 13,
+                "text-max-width": 10,
+                "text-padding": 4,
+                "text-variable-anchor": ["top", "bottom", "left", "right"],
+                "text-radial-offset": view === "circles" ? 1.8 : 0.4,
+                "text-allow-overlap": false,
+              },
+              paint: {
+                "text-color": "#111827",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.5,
+              },
+            });
+            map.on("click", "place-labels", (e) => {
+              const code = e.features?.[0]?.properties?.geo_code;
+              if (typeof code === "string") callbacks.current.onSelect(code);
+            });
+          }
+          map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
+          resetView.current = () => {
+            if (!bounds.isEmpty()) map?.fitBounds(bounds, { padding: 20, animate: false });
+          };
           map.getCanvas().tabIndex = -1;
           map.once("idle", () => {
-            if (!disposed && map && codes.length) {
+            if (!disposed && map) {
               setReady(true);
               const readyMap = map;
-              callbacks.current.onCapture(() => captureMapFrame(readyMap));
+              callbacks.current.onCapture(codes.length ? () => captureMapFrame(readyMap) : null);
             }
           });
           map.on("click", "fill", (e) => {
-            const code = e.features?.[0]?.properties?.geo_code;
+            const symbolCode =
+              view === "circles"
+                ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
+                    ?.properties?.geo_code
+                : undefined;
+            const labelCode = labels
+              ? map?.queryRenderedFeatures(e.point, { layers: ["place-labels"] })[0]?.properties
+                  ?.geo_code
+              : undefined;
+            const code = labelCode ?? symbolCode ?? e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
@@ -175,18 +306,53 @@ export function DatasetCanvas({
       resize?.disconnect();
       map?.remove();
       mapRef.current = null;
+      resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey]);
+  }, [url, rows, bins, emphasisKey, view, labels, excludedKey]);
   return (
     <div>
+      <div
+        aria-label="Map viewport controls"
+        role="group"
+        className="mb-2 flex flex-wrap gap-3 text-sm"
+      >
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => mapRef.current?.zoomIn()}
+          aria-label="Zoom in"
+        >
+          {compact ? "+" : "Zoom in"}
+        </button>
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => mapRef.current?.zoomOut()}
+          aria-label="Zoom out"
+        >
+          {compact ? "−" : "Zoom out"}
+        </button>
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => resetView.current?.()}
+        >
+          Reset map view
+        </button>
+      </div>
       <div
         aria-hidden="true"
         data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
         className={
-          expanded
-            ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
-            : "h-64 w-full rounded-lg border border-border"
+          compact
+            ? "h-[32svh] min-h-60 w-full rounded-lg border border-border lg:h-[55vh]"
+            : expanded
+              ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+              : "h-64 w-full rounded-lg border border-border"
         }
       />
       {!ready && !failed && (

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -84,6 +84,8 @@ try {
     BHW_AUTH_MODE: "meridian",
     BHW_STORAGE_DIR: root,
     GEMINI_API_KEY: "synthetic-fixture",
+    BHW_WEB_SEARCH_API_KEY: process.env.BHW_POLICY_E2E_ONLINE === "1" ? "synthetic-web-key" : "",
+    BHW_POLICY_WEB_LOG: join(root, "web-requests.jsonl"),
     CRON_SECRET: "synthetic-local-worker-secret",
     GEMINI_EMBEDDING_MODEL: "",
     NODE_OPTIONS: `--require ${resolve("scripts/fixtures/document-provider.cjs")}`,
@@ -392,6 +394,150 @@ x=fitz.open();p=x.new_page();p.insert_text((72,100),'Original signed endorsement
       "private run owner, worker authorization and cancellation",
     );
   }
+  if (process.env.BHW_POLICY_E2E_ONLINE === "1") {
+    const readRequests = async () => {
+      try {
+        return (await readFile(join(root, "web-requests.jsonl"), "utf8"))
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+      } catch {
+        return [];
+      }
+    };
+    assert.equal(
+      (await readRequests()).length,
+      0,
+      "Offline questions and reviews must never search/fetch",
+    );
+    await db.query("update ai_provider_quota set request_count=0 where provider='gemini'");
+    const researchPage = await context.newPage();
+    await researchPage.goto(`${base}/ask-the-data?policies=active`);
+    await researchPage
+      .getByRole("checkbox", { name: "Research official sources for this question or new run" })
+      .check();
+    await researchPage.getByLabel("Public research topic").selectOption("referrals");
+    await researchPage
+      .getByLabel("Public issuance number (optional; digits and hyphens)")
+      .fill("2025-01");
+    await researchPage
+      .getByRole("textbox", { name: "Question for Ask the Data" })
+      .fill(
+        "Compare private synthetic referral policy with official guidance. Never search for private-test-secret.",
+      );
+    await researchPage.getByRole("button", { name: "Ask", exact: true }).click();
+    await researchPage
+      .getByText("Online evidence: Official synthetic referral guidance", { exact: false })
+      .waitFor();
+    assert.equal(
+      await researchPage
+        .getByRole("checkbox", { name: "Research official sources for this question or new run" })
+        .isChecked(),
+      false,
+    );
+    const requests = await readRequests();
+    assert.equal(requests.length, 3);
+    assert(!JSON.stringify(requests).includes("private-test-secret"));
+    assert(!requests.some((r) => r.url.includes("127.0.0.1")));
+    assert(requests.some((r) => r.url.includes("site%3Adoh.gov.ph")));
+    const onlineCitation = researchPage
+      .locator("summary")
+      .filter({ hasText: "Official synthetic referral guidance" });
+    await onlineCitation.click();
+    const webLink = researchPage.getByRole("link", { name: "Open saved online evidence" });
+    await webLink.click();
+    await researchPage.waitForURL(/\/online\//);
+    await researchPage.getByRole("heading", { name: "Saved online policy evidence" }).waitFor();
+    const sourceBody = await researchPage.locator("body").innerText();
+    assert(sourceBody.includes("2025-01-02"));
+    assert(sourceBody.includes("2025-02-01"));
+    assert(sourceBody.includes("Original SHA-256"));
+    const otherWeb = await browser.newContext();
+    await otherWeb.addCookies([
+      { name: "meridian-session", value: "other", domain: "127.0.0.1", path: "/" },
+    ]);
+    const forbidden = await otherWeb.request.get(researchPage.url());
+    assert.equal(forbidden.status(), 404);
+    await otherWeb.close();
+    await db.query("update ai_provider_quota set request_count=0 where provider='gemini'");
+    const failure = await context.request.post(`${base}/api/analysis/chat`, {
+      data: {
+        policySources: {
+          mode: "selected",
+          versions: [version],
+          online: true,
+          research: { site: "doh.gov.ph", topic: "referrals", reference: "9999" },
+        },
+        messages: [
+          { role: "user", content: "Check official guidance with internal referral evidence" },
+        ],
+      },
+    });
+    const failedText = await failure.text();
+    assert(failedText.includes("Online provider unavailable"));
+    assert(failedText.includes("signed referral record"));
+    assert(!failedText.includes('"sourceKind":"policy-web"'));
+    const runPage = await context.newPage();
+    await runPage.goto(`${base}/ask-the-data?libraryVersion=${version}`);
+    await runPage.getByLabel("Analysis mode").selectOption("full");
+    await runPage
+      .getByRole("checkbox", { name: "Research official sources for this question or new run" })
+      .check();
+    await runPage.getByLabel("Public research topic").selectOption("referrals");
+    await runPage
+      .getByLabel("Public issuance number (optional; digits and hyphens)")
+      .fill("2025-01");
+    await runPage
+      .getByLabel("Review question", { exact: true })
+      .fill("Review policy with public guidance");
+    await runPage.getByLabel("Section-attempt budget").fill("3");
+    await runPage.getByRole("button", { name: "Start full review", exact: true }).click();
+    await runPage.getByText("0 / 3 section attempts used", { exact: false }).waitFor();
+    assert.equal(
+      await runPage
+        .getByRole("checkbox", { name: "Research official sources for this question or new run" })
+        .isChecked(),
+      false,
+    );
+    const runId = (await (await context.request.get(`${base}/api/admin/policy-reviews`)).json())[0]
+      .id;
+    await runPage.close();
+    const beforeRun = (await readRequests()).length;
+    for (let i = 0; i < 4; i++) {
+      await db.query("update ai_provider_quota set request_count=0 where provider='gemini'");
+      const dispatch = await context.request.post(
+        `${base}/api/analysis/worker?kind=policy-review`,
+        { headers: { authorization: "Bearer synthetic-local-worker-secret" } },
+      );
+      if (!(await dispatch.json()).worked) break;
+    }
+    const onlineReport = await (
+      await context.request.get(`${base}/api/admin/policy-reviews?run=${runId}`)
+    ).json();
+    assert(onlineReport.sections.some((s) => s.evidence?.online?.sourceCount > 0));
+    const frozenOnline = (
+      await db.query("select snapshot from policy_research_evidence where run_id=$1", [runId])
+    ).rows[0].snapshot;
+    assert(
+      frozenOnline.results.some((p) => p.text.includes("Official PDF referral requirement")),
+      "Original PDF evidence extracted by the bounded sidecar",
+    );
+    assert.equal(
+      (await readRequests()).length,
+      beforeRun + 3,
+      "Run reuses one frozen web snapshot",
+    );
+    checks.push(
+      "online off means no web transport; explicit one-question opt-in resets",
+      "official evidence has private saved excerpts, reported dates and original hashes",
+      "web injection cannot fetch private addresses or leak question text into search",
+      "online provider failure retains internal answer without invented findings",
+      "full review freezes and reuses one private online snapshot",
+      "original online PDF uses bounded real extraction and separate quality warnings",
+    );
+    await researchPage.close();
+  }
   const edited = await context.request.post(`${base}/api/admin/documents`, {
     data: {
       operation: "metadata",
@@ -484,6 +630,7 @@ x=fitz.open();p=x.new_page();p.insert_text((72,100),'Original signed endorsement
   server.close();
   // Only this harness's generated identities/records are removed; the practice DB is retained.
   const actors = Object.values(roles);
+  await db.query("delete from policy_research_evidence where actor_id=any($1)", [actors]);
   await db.query(
     "delete from policy_review_section where run_id in (select id from policy_review_run where actor_id=any($1))",
     [actors],

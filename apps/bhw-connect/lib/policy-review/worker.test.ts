@@ -1,6 +1,16 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import type { ReviewClaim } from "./types";
-const m = vi.hoisted(() => ({ db: vi.fn(), loop: vi.fn(), registry: vi.fn(), query: vi.fn() }));
+const m = vi.hoisted(() => ({
+  db: vi.fn(),
+  loop: vi.fn(),
+  registry: vi.fn(),
+  query: vi.fn(),
+  research: vi.fn(),
+}));
+vi.mock("@/lib/policy-research/research", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/policy-research/research")>()),
+  prepareResearch: m.research,
+}));
 vi.mock("./db", () => ({ reviewWorkerCall: m.db }));
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop: m.loop }));
 vi.mock("@/lib/db/dataset-registry", () => ({ getRegisteredDataset: m.registry }));
@@ -187,5 +197,46 @@ describe("bounded full-policy section examination", () => {
     m.db.mockResolvedValue(null);
     expect(await processOnePolicyReview()).toBe(false);
     expect(m.loop).not.toHaveBeenCalled();
+  });
+  it("uses a frozen opt-in web snapshot without exposing model-controlled network tools", async () => {
+    claim.run.actor_id = "actor";
+    claim.run.settings = {
+      online: true,
+      research: { site: "doh.gov.ph", topic: "referrals", reference: "2025-01" },
+    } as never;
+    const snapshot = {
+      id: "run",
+      available: false,
+      results: [],
+      gaps: ["Online provider unavailable."],
+    };
+    m.research.mockResolvedValue(snapshot);
+    await processOnePolicyReview();
+    expect(m.research).toHaveBeenCalledWith(
+      "actor",
+      claim.run.settings.research,
+      "run",
+      true,
+      expect.any(AbortSignal),
+    );
+    const messages = m.loop.mock.calls[0][0];
+    expect(
+      messages.some((msg: { content: string }) => msg.content?.includes("untrustedOnlineResearch")),
+    ).toBe(true);
+    expect(
+      m.loop.mock.calls[0][2].map((t: { definition: { name: string } }) => t.definition.name),
+    ).toEqual(["listDatasets", "queryDataset"]);
+    expect(m.db).toHaveBeenCalledWith(
+      "finish",
+      77,
+      "lease",
+      undefined,
+      expect.objectContaining({
+        result: expect.objectContaining({ limitations: ["Online provider unavailable."] }),
+        evidence: expect.objectContaining({
+          online: expect.objectContaining({ id: snapshot.id, gaps: snapshot.gaps, results: [] }),
+        }),
+      }),
+    );
   });
 });

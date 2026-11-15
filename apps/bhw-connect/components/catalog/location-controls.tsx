@@ -2,14 +2,16 @@ import Link from "next/link";
 import { withBasePath } from "@/lib/base-path";
 import { catalogHref } from "@/lib/catalog/navigation";
 import type { CatalogGeography } from "@/lib/catalog/geography";
-import type { CatalogSelection } from "@/lib/catalog/types";
+import type { CatalogId, CatalogSelection } from "@/lib/catalog/types";
 
 export function LocationControls({
   geography,
   selection,
+  dataset = null,
 }: {
   geography: Extract<CatalogGeography, { state: "available" }>;
   selection: CatalogSelection;
+  dataset?: CatalogId | null;
 }) {
   return (
     <section
@@ -19,7 +21,7 @@ export function LocationControls({
       <div className="flex flex-wrap items-center gap-3">
         <Link
           prefetch={false}
-          href={catalogHref({ mode: "all" })}
+          href={catalogHref({ mode: "all" }, dataset)}
           aria-current={selection.mode === "all" ? "page" : undefined}
           className="rounded-md border border-border px-3 py-2 text-sm hover:border-accent focus-visible:outline-2 focus-visible:outline-accent"
         >
@@ -27,7 +29,7 @@ export function LocationControls({
         </Link>
         <Link
           prefetch={false}
-          href={catalogHref({ mode: "psgc", level: "national", code: "PH" })}
+          href={catalogHref({ mode: "psgc", level: "national", code: "PH" }, dataset)}
           aria-current={
             selection.mode === "psgc" && selection.level === "national" ? "page" : undefined
           }
@@ -51,7 +53,7 @@ export function LocationControls({
               prefetch={false}
               key={place.code}
               className="underline underline-offset-4"
-              href={catalogHref({ mode: "psgc", level: place.level, code: place.code })}
+              href={catalogHref({ mode: "psgc", level: place.level, code: place.code }, dataset)}
             >
               {place.name}
             </Link>
@@ -66,6 +68,7 @@ export function LocationControls({
           className="mt-4 flex flex-wrap items-end gap-3"
         >
           <input type="hidden" name="mode" value="psgc" />
+          {dataset && <input type="hidden" name="dataset" value={dataset} />}
           <div className="min-w-0 flex-1 basis-64">
             <label htmlFor="catalog-location" className="mb-1 block text-sm font-medium">
               {geography.current && geography.current.level !== "national"
@@ -101,6 +104,12 @@ export function LocationControls({
           {geography.current?.level === "barangay"
             ? "This is the barangay level. Only supported source figures are shown."
             : "No further locations are listed here."}
+        </p>
+      )}
+      {dataset && (
+        <p className="mt-3 text-sm text-muted">
+          Location changes keep this dataset selected. Congressional districts opens a separate
+          selection; choose a district and then its dataset.
         </p>
       )}
       <p className="mt-3 text-sm text-muted">

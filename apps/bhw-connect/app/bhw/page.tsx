@@ -27,7 +27,9 @@ export default function Home() {
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
         <OverviewContent />
       </Suspense>
-      <ChatLauncher geoCode="PH" geoLevel="national" />
+      <div>
+        <ChatLauncher geoCode="PH" geoLevel="national" placement="inline" />
+      </div>
     </div>
   );
 }

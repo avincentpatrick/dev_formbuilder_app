@@ -9,6 +9,10 @@ for (const width of [390, 1440]) {
     await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
     const firstVisual = await page.getByTestId("bhw-first-visual").boundingBox();
     expect(firstVisual!.y).toBeLessThan(page.viewportSize()!.height - 120);
+    await expect(page.getByRole("link", { name: "Ask the Data · approved users" })).toHaveCSS(
+      "position",
+      "static",
+    );
     const nav = page.getByRole("navigation", { name: "BHW analysis" });
     await nav.getByRole("link", { name: "Qualifications and training" }).click();
     await expect(page).toHaveURL(/#qualifications$/);

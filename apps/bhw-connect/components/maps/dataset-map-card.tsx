@@ -29,6 +29,7 @@ import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { RankedMapBars } from "./ranked-map-bars";
 import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
@@ -326,34 +327,63 @@ export function DatasetMapCard({
             <p className="text-sm">
               {metric?.period} · {metric?.unit} · {data?.area ?? choice.code}
             </p>
-            <nav
-              aria-label={`${definition.title} map navigation`}
-              className="flex gap-4 text-sm underline"
-            >
-              <button
-                type="button"
-                onClick={reset}
-                aria-label={
-                  workspace && choice.level === "national"
-                    ? "Reset map selection to Philippines"
-                    : undefined
-                }
+            {workspace && choice.level !== "national" && data ? (
+              <div className="min-w-0 space-y-1">
+                <Breadcrumbs
+                  label="Map geography"
+                  items={[
+                    {
+                      label: "Philippines",
+                      href: mapHref({ ...choice, level: "national", code: "PH", selected: null }),
+                    },
+                    ...(data.navigation?.parents ?? []).map((parent) => ({
+                      label: parent.name,
+                      href: mapHref({
+                        ...choice,
+                        level: parent.level,
+                        code: parent.code,
+                        selected: null,
+                      }),
+                    })),
+                    { label: data.area },
+                  ]}
+                />
+                {data.navigation?.complete === false && (
+                  <p role="status" className="text-xs text-muted">
+                    Some parent place names are unavailable. No parent links are inferred.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <nav
+                aria-label={`${definition.title} map navigation`}
+                className="flex gap-4 text-sm underline"
               >
-                {workspace && choice.level === "national" ? "Reset" : "Philippines"}
-              </button>
-              {trail.map((step, index) => (
                 <button
-                  key={`${step.level}-${step.code}`}
                   type="button"
-                  onClick={() => {
-                    setChoice({ ...step, indicator: choice.indicator, period: choice.period });
-                    setTrail(trail.slice(0, index));
-                  }}
+                  onClick={reset}
+                  aria-label={
+                    workspace && choice.level === "national"
+                      ? "Reset map selection to Philippines"
+                      : undefined
+                  }
                 >
-                  {step.code}
+                  {workspace && choice.level === "national" ? "Reset" : "Philippines"}
                 </button>
-              ))}
-            </nav>
+                {trail.map((step, index) => (
+                  <button
+                    key={`${step.level}-${step.code}`}
+                    type="button"
+                    onClick={() => {
+                      setChoice({ ...step, indicator: choice.indicator, period: choice.period });
+                      setTrail(trail.slice(0, index));
+                    }}
+                  >
+                    {step.code}
+                  </button>
+                ))}
+              </nav>
+            )}
           </div>
           {workspace && (
             <div role="group" aria-label="Map workspace panels" className="flex gap-2 lg:hidden">

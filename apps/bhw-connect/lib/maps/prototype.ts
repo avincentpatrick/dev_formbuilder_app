@@ -21,6 +21,7 @@ export type MapRow = {
   smallSample?: boolean;
 };
 export type MapPayload = {
+  navigation?: { parents: import("./breadcrumbs").NamedMapScope[]; complete: boolean };
   state: "available";
   rows: MapRow[];
   total: number | null;

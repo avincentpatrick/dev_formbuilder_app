@@ -27,6 +27,9 @@
  */
 
 export type Citation = {
+  publisher?: string;
+  publicationDate?: string | null;
+  effectiveDate?: string | null;
   versionId?: string;
   extractionId?: string;
   evidenceToken?: string;
@@ -56,6 +59,9 @@ export type Citation = {
 };
 
 type SearchHitShape = {
+  publisher?: string;
+  publicationDate?: string | null;
+  effectiveDate?: string | null;
   versionId?: string;
   extractionId?: string;
   evidenceToken?: string;
@@ -102,7 +108,7 @@ function isSearchHit(value: unknown): value is SearchHitShape {
  * it, and `searchDocuments` is the only tool that returns `chunkId` + `citation` together.
  */
 export function collectCitations(toolPayloads: unknown[]): Citation[] {
-  const byChunk = new Map<number, Citation>();
+  const byChunk = new Map<string, Citation>();
 
   for (const payload of toolPayloads) {
     if (!payload || typeof payload !== "object") continue;
@@ -114,9 +120,9 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
       // First retrieval wins. The same slide can surface in two searches in one turn, and the
       // UUC distribution is byte-identical on slides 37 and 141 — which must stay two citations,
       // since a quote came from one of them and not the other.
-      if (byChunk.has(hit.chunkId) && (!byChunk.get(hit.chunkId)!.truncated || hit.truncated))
-        continue;
-      byChunk.set(hit.chunkId, {
+      const key = `${hit.sourceKind ?? "corpus"}:${hit.sourceId ?? ""}:${hit.chunkId}`;
+      if (byChunk.has(key) && (!byChunk.get(key)!.truncated || hit.truncated)) continue;
+      byChunk.set(key, {
         ...(hit.sourceId
           ? {
               sourceId: hit.sourceId,
@@ -127,6 +133,9 @@ export function collectCitations(toolPayloads: unknown[]): Citation[] {
               retrievedAt: hit.retrievedAt,
             }
           : {}),
+        publisher: hit.publisher,
+        publicationDate: hit.publicationDate,
+        effectiveDate: hit.effectiveDate,
         versionId: hit.versionId,
         extractionId: hit.extractionId,
         evidenceToken: hit.evidenceToken,

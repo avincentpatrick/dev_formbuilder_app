@@ -1,10 +1,22 @@
 import "server-only";
+import { researchCall } from "@/lib/policy-research/db";
+import { researchSchema } from "@/lib/policy-research/schema";
 import { createSupabaseServiceClient } from "@/lib/db/service-client";
 export async function reviewCall<T>(
   actor: string,
   operation: string,
   payload: Record<string, unknown> = {},
 ): Promise<T> {
+  if (operation === "create") {
+    const sources = payload.sources as Record<string, unknown>;
+    return researchCall<T>(actor, "create_run", {
+      ...payload,
+      sources: {
+        ...sources,
+        ...(sources.online ? { research: researchSchema.parse(sources.research ?? {}) } : {}),
+      },
+    });
+  }
   const { data, error } = await createSupabaseServiceClient()
     .rpc(
       "policy_review_api" as never,

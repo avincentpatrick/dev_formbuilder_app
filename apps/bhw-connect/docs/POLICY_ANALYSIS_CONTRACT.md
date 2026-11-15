@@ -31,9 +31,10 @@ project jobs without a trusted policy context cannot activate this mode.
   complete-collection run/coverage ledger planned for Phase 5.
 - Dataset mode is automatic across registered tables, or restricted to explicitly
   validated registered table names. Selecting none means policy-only analysis.
-- Online research is off and unavailable in policy mode until Phase 6. No web
-  search/fetch tools are supplied, and a forged `online: true` request fails closed.
-  This does not change existing project attachment/web features on other paths.
+- Online research defaults off. Phase 6 adds explicit one-question/new-run opt-in,
+  fixed public queries and private dated evidence. No model-controlled web
+  search/fetch tools are supplied. See POLICY_ONLINE_RESEARCH.md. This does not
+  change existing project attachment/web features on other paths.
 
 Policy options show at most 501 revisions; the library's document/version links
 can select a specific version directly. Listing inventory does not examine text.

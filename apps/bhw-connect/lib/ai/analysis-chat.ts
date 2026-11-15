@@ -1,3 +1,8 @@
+import {
+  prepareResearch,
+  researchPrompt,
+  type ResearchSnapshot,
+} from "@/lib/policy-research/research";
 import { policySourcesSchema, type PolicyContext } from "@/lib/policy-analysis/schema";
 import { resolvePolicyContext } from "@/lib/policy-analysis/evidence";
 import { POLICY_ANALYSIS_PROMPT } from "@/lib/policy-analysis/prompt";
@@ -242,6 +247,16 @@ export async function analysisResponse(
     };
     send({ type: "route", route });
     try {
+      let online: ResearchSnapshot | undefined;
+      if (policyContext?.sources.online) {
+        send({
+          type: "tool_call",
+          name: "researchOfficialPolicies",
+          args: policyContext.sources.research ?? {},
+        });
+        online = await prepareResearch(policyContext.actor, policyContext.sources.research);
+        messages.push(researchPrompt(online));
+      }
       const baseTools = createInternalTools({
         allowLibraryDocuments,
         libraryKeys,
@@ -257,6 +272,7 @@ export async function analysisResponse(
         sourceTools.length || policyContext ? { maxRounds: 10 } : undefined,
       );
 
+      if (online) result.toolPayloads.unshift(online);
       captureEvidence?.(result.toolPayloads);
       const statistics = collectStatistics(result.toolPayloads);
       if (statistics.length && (result.allCapped || !result.finalText)) {
@@ -326,17 +342,18 @@ export async function analysisResponse(
         type: "message",
         followUps: suggestFollowUps(route, result.toolPayloads),
         content:
-          audited.text ||
-          (policyAudit?.rejected.length
-            ? "The proposed answer contained unsupported policy identities, quotations, page references or figures and was withheld. Read the source passages or narrow the question."
-            : "") ||
-          (statistics.length > 0
-            ? "Verified calculations, methods and scientific notes are shown below. Numerical prose that lacked valid result-field references was omitted."
-            : droppedPages.length > 0
-              ? `That answer cited ${droppedPages.length === 1 ? "a slide" : "slides"} (${droppedPages.join(", ")}) that no document search returned, so it was dropped. Ask again and it will search before answering.`
-              : strippedEverything
-                ? "Every sentence in that answer was stripped by the numeric audit, which means the figures in it were not in any tool result. Ask for a specific table or geography and try again."
-                : "No answer came back — try rephrasing the question."),
+          (online?.gaps.length ? `Online research limitations: ${online.gaps.join(" ")}\n\n` : "") +
+          (audited.text ||
+            (policyAudit?.rejected.length
+              ? "The proposed answer contained unsupported policy identities, quotations, page references or figures and was withheld. Read the source passages or narrow the question."
+              : "") ||
+            (statistics.length > 0
+              ? "Verified calculations, methods and scientific notes are shown below. Numerical prose that lacked valid result-field references was omitted."
+              : droppedPages.length > 0
+                ? `That answer cited ${droppedPages.length === 1 ? "a slide" : "slides"} (${droppedPages.join(", ")}) that no document search returned, so it was dropped. Ask again and it will search before answering.`
+                : strippedEverything
+                  ? "Every sentence in that answer was stripped by the numeric audit, which means the figures in it were not in any tool result. Ask for a specific table or geography and try again."
+                  : "No answer came back — try rephrasing the question.")),
         provider: result.provider,
       });
 

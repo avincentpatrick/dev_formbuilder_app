@@ -14,11 +14,10 @@ beforeEach(() => {
   });
   registered.mockResolvedValue([{ tableName: "allowed" }]);
 });
-it("refuses online policy mode before any DB or provider transport is invoked", async () => {
-  await expect(
-    resolvePolicyContext("admin", policySourcesSchema.parse({ online: true })),
-  ).rejects.toThrow("Online policy research is unavailable");
-  expect(rpc).not.toHaveBeenCalled();
+it("accepts explicit online scope while still deriving private policy keys only on the server", async () => {
+  const context = await resolvePolicyContext("admin", policySourcesSchema.parse({ online: true }));
+  expect(context.sources.online).toBe(true);
+  expect(context.keys).toEqual(["upload:server-validated"]);
 });
 it("derives source keys from the server inventory and validates restricted table names", async () => {
   const context = await resolvePolicyContext(

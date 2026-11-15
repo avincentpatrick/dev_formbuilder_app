@@ -12,10 +12,19 @@ import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type SetStateAction,
+} from "react";
 import { getDatasetMap } from "@/lib/maps/definitions";
 import {
   initialMapChoice,
+  parseMapChoice,
   mapHref,
   prototypeIndicators,
   type MapChoice,
@@ -63,11 +72,40 @@ export function DatasetMapCard({
 }) {
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
-  const [choice, setChoice] = useState(() => initial ?? initialMapChoice(dataset));
+  // Embedded previews do not own the page URL. Only the BHW map workspace
+  // records analysis edits; Next integrates native history without a server reload.
+  const historyEnabled =
+    Boolean(onChoiceChange) && (dataset === "bhw-stepzero-2026" || dataset === "bhw-2025");
+  const [choice, updateChoice] = useState(() => initial ?? initialMapChoice(dataset));
+  const latestChoice = useRef(choice);
+  const setChoice = useCallback(
+    (action: SetStateAction<MapChoice>) => {
+      const previous = latestChoice.current;
+      const next = typeof action === "function" ? action(previous) : action;
+      if (mapHref(previous) === mapHref(next)) return;
+      latestChoice.current = next;
+      if (historyEnabled) window.history.pushState(null, "", withBasePath(mapHref(next)));
+      updateChoice(next);
+    },
+    [historyEnabled],
+  );
   useEffect(() => {
     onChoiceChange?.(choice);
   }, [choice, onChoiceChange]);
   const [trail, setTrail] = useState<MapChoice[]>([]);
+  useEffect(() => {
+    if (!historyEnabled) return;
+    const restore = () => {
+      const next = parseMapChoice(new URLSearchParams(window.location.search));
+      // Cross-route/dataset entries belong to Next's router, not this card.
+      if (window.location.pathname !== withBasePath("/map") || next?.dataset !== dataset) return;
+      latestChoice.current = next;
+      updateChoice(next);
+      setTrail([]);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [dataset, historyEnabled]);
   const [search, setSearch] = useState({ scope: "", text: "" });
   const searchStatusId = useId();
   const searchScope = `${dataset}:${choice.level}:${choice.code}`;

@@ -61,6 +61,11 @@ export function pngNotes(data: Context): string[] {
     `${data.dataset.title} — ${data.indicator.label}`,
     `${data.indicator.period} | ${data.indicator.unit} | ${data.geography.area}`,
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
+    ...(data.valueFilter
+      ? [
+          `Count range: ${data.valueFilter.minimum ?? "no minimum"} to ${data.valueFilter.maximum ?? "no maximum"}, inclusive. ${data.valueFilter.included} included; ${data.valueFilter.excluded} excluded; ${data.valueFilter.unavailable} unavailable. ${data.valueFilter.note} Selected area: ${selected?.filterState ?? "none"}.`,
+        ]
+      : []),
     ...(data.dataset.slug === "bhw-stepzero-2026" || data.dataset.slug === "bhw-2025"
       ? [
           "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom. The national locator and live scale bar are not included in this image.",

@@ -27,7 +27,7 @@ Confirmed requirements:
 
 ## 2. Evidence and limits
 
-This is a source-code assessment, supplemented by the user's reported experience. Live rendering, production data coverage, actual search relevance, touch behavior, and response times have **not yet been verified** in this assessment. Existing planning documents provide history, not proof of current behavior. No real records or production counts are reproduced here.
+This combines source review with a live browser and public-endpoint assessment on 2026-11-15. See [live verification findings](BHW_CARD_LIVE_VERIFICATION.md) for reproducible cases, sampled geographic coverage, device settings, timing observations and limitations. The review covers desktop and emulated phone screens, not physical-device testing or exhaustive national validation. Existing planning documents provide history, not proof of current behavior. Production records and measure values are not committed with this assessment.
 
 Paths below are relative to `apps/bhw-connect/`. Recheck the baseline before implementation.
 
@@ -114,6 +114,7 @@ Each phase may use several small PRs. Dependencies are explicit; completion mean
 - Walk the live card → overview → search → locality → map → comparison journey on phone and desktop. Record screenshots and reproducible issues without personal records.
 - Audit supported indicators, denominators, geographic levels, sources, boundary coverage and disclosure rules. Check existing figures and readers for reuse.
 - Produce overview/map layouts and a route/state mapping. Verify national headline inputs rather than deriving them from overlapping geographic records.
+- Initial live review is recorded in `BHW_CARD_LIVE_VERIFICATION.md`. Resolve the Region VII HUC geometry mismatch, source-disclosure differences between catalog and legacy dashboard, mixed-query search relevance, numeric legend formatting and context-loss navigation as explicit implementation tasks. Do not repeat the review from scratch or treat its sampled coverage as nationwide certification.
 - Acceptance: an evidence matrix distinguishes confirmed defects, existing-but-disconnected capabilities, missing features and data blockers. Establish observed performance and accessibility baselines; record numerical budgets before Phase 1 work.
 
 ### Phase 1 — coherent overview, search and useful map
@@ -135,6 +136,7 @@ Acceptance:
 - A fresh map opens on BHW headcount with proportional circles and a size legend; a shared link restores its explicit indicator/view instead. Zero counts are distinguishable from missing observations through the linked details/table and legend. Source/coverage checks must not substitute profile counts for unavailable headcount.
 - Phone layout provides a usable map with panels/tabs or sheets; desktop uses available width with adjacent details. Ordinary content does not overflow horizontally; wide tables use labeled scroll regions.
 - Map, bars and table agree on values and inclusion rules. Share links restore settings and exports include the effective legend and provenance.
+- Legend formatting removes floating-point artifacts without creating misleading or overlapping intervals. Breadcrumbs use recognizable place names. Missing geometry is summarized prominently and its areas remain selectable; the Region VII HUC case is a required regression fixture.
 - No source becomes publicly accessible merely because search or a new visual supports it.
 
 ### Phase 2 — comparisons and qualification/support depth
@@ -179,7 +181,7 @@ Before each implementation PR, Sol should state: user question answered, existin
 
 ## 8. Remaining planning decisions
 
-- Live review and baseline measurements remain outstanding.
+- Initial live review and sampled timing/coverage measurements are complete; physical-device evaluation, exhaustive coverage and performance budgets remain outstanding. See the linked verification report.
 - Decide overview headline order after the source/coverage audit. The default map is agreed: BHW headcount with proportional circles.
 - Refine the supported search grammar using realistic phone and desktop tasks. Comparison size is agreed: start with two places, expandable to four.
 - Choose a lightweight evaluation exercise for general readers, LGU users and analytical users.

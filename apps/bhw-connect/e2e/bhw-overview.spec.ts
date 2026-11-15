@@ -18,8 +18,17 @@ for (const width of [390, 1440]) {
       .locator("..")
       .locator("..")
       .locator("..");
-    await training.getByRole("tab", { name: "Table", exact: true }).click();
-    await expect(training.getByRole("table")).toBeVisible();
+    // The committed seed need not contain a national certification observation.
+    // Verify its honest unavailable state, or exercise the actual populated chart.
+    const tableTab = training.getByRole("tab", { name: "Table", exact: true });
+    if (await tableTab.count()) {
+      await tableTab.click();
+      await expect(training.getByRole("table")).toBeVisible();
+    } else {
+      await expect(
+        training.getByText("No accepted training or certification observations are available."),
+      ).toBeVisible();
+    }
     await nav.getByRole("link", { name: "Data and methodology" }).click();
     await page.locator("#methodology summary").focus();
     await page.keyboard.press("Enter");

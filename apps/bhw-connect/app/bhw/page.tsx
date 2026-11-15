@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { BhwOverview } from "@/components/bhw/overview";
+import { ChatLauncher } from "@/components/chat/chat-launcher";
 import { GeoSearch } from "@/components/home/geo-search";
 
 export const metadata: Metadata = { title: "BHW 2025" };
@@ -26,6 +27,7 @@ export default function Home() {
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
         <OverviewContent />
       </Suspense>
+      <ChatLauncher geoCode="PH" geoLevel="national" />
     </div>
   );
 }

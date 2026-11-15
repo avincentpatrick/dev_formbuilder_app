@@ -16,43 +16,10 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M241`, `publish-gate-field-order`: the publish gate reads a version's questions, sections and rules in the form's order, so a refusal lists its problems in that order (m241-publish-gate-field-order)
+## RELEASED — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (merged as PR #526, `eaa3a39b`, fifth and last at the merge point of 2026-11-15, after merging the trunk into its branch at `6536ce35`; every required check green with real step counts on its run 43744913438 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43744910857 green (5); the trunk's run 43749147828 on `eaa3a39b` 8/8, with BHW Connect at 23)
 
-Taken 2026-11-15, during the merge point of the same day (`D137`; the user's "all four": #520, #519, #521, #526). #520 merged as `2d4524b9`. Then #519's Pest failed three attempts running (run 43711581650) on `NoteContentShapeTest`'s order assertion, each time in a different order. The user chose to fix the row first, as a fifth pull request that merges before #519 (asked in chat, 2026-11-15: *"Fix it first, as a 5th PR"*).
-Branch `m241-publish-gate-field-order`, cut from `origin/main` at `b5d8f49e`. PR into main, **second at this merge point**, ahead of #519. **A change a tester sees** (the order of the problems a publish refusal lists): `VERSION` 0.20.1 → 0.20.2 with its notes.
-Row: `publish-gate-field-order`, *"A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ."*
-
-### Evidence verified
-- `StructuralValidationGate::collect()` reads `$version->fields()->get()`, and `FormVersion::fields()` is a bare `hasMany` with no order: **held**.
-- `BuilderPresenter` orders the same fields by `sequence`: **held**. So do the PDF, the encode screen, the inbox and the semantic validator.
-- *"`NoteContentShapeTest` fails whenever the two differ"*: **held, and more often than the row says**. It failed #519's run 43550232199, #526's run 43690519220, and all three attempts of #519's run 43711581650, in three different orders. It passes on the trunk and on #520.
-
-### Premise verified
-- The gate's `sections()` and `validations()` reads are unordered too, which the row does not say: **moved**. A refusal about a section or a rule follows storage order as well, so the remedy covers all three reads.
-- Rule groups are already sorted by `[sequence, id]` inside the gate: **held**. Nothing else in `collect()` depends on read order.
-- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
-
-### Remedy verdict
-The row's remedy (read the gate's fields in the form's order) **works by reading**: every loop that emits a violation iterates one of the three reads.
-- Questions and sections are ordered by `[sequence, id]`, as the builder orders them.
-- Rules are ordered by their question's position in the form, then by their own `[sequence, id]`.
-
-A new test writes rows in an order that differs from `sequence`, so the unordered read returns insertion order, deterministically, rather than by chance. It is measured red without the fix before it is kept.
-
-Files: `app/Services/Forms/StructuralValidationGate.php`; new `tests/Feature/Forms/PublishGateOrderTest.php`; `VERSION`, `database/data/releases.json`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: nothing from the ADR or migration namespaces.
-Prediction:
-- The new test is red without the fix, every time, and green with it.
-- `NoteContentShapeTest` holds by construction on every run.
-- No other test asserted an order the database happened to give.
-
-The one most likely wrong is that last line: a test somewhere may pin the old storage order of a multi-problem refusal.
-
----
-
-## HELD — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (m240-builder-copy-section) — BUILT AND HELD: PR #526, stacked on #521, waiting for the merge point of 2026-11-15, where it goes last
+**RELEASED LAST AT THE MERGE POINT OF 2026-11-15.** Its trunk merge was made three-way against #521's old tip (`7d968105`), where it forked, not against the base git chose after the squashes; against that base the backlog and the decisions merged cleanly. `VERSION` 0.21.0, with 0.20.2's note kept beneath its own. Deploy run 43752663230 backed up `deploy-20261115-193016.dump` (1,177,242 B), counted 71 tables / 54,280 rows, had nothing to migrate and held, and added 0.21.0 to the releases table (0.20.2 went in at 43739676478); BHW's step skipped. From outside: `/login` reads `"version":"0.21.0"`, and `/up` answers 200.
+- **The merge point's census.** The user's census before, 2026-11-15 11:22:52 UTC, read 1 · 6 · 12 · 28 · 22 · 62 · 31 · 74 (tenants · users · forms · form_versions · submissions · attachments · feedback_reports · notifications); the census after is the user's, asked for at this close-out.
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-the-next-nhete-temporal-crab.md`). NHETE Phase 2, recommendation 1 of the NHETE plan, taken next by `D222`. The line shows the row `blocked (precondition: row is not-live)`; that is the generator's rule for every request row (`scripts/pipeline.php`, `read_defects()`), and `D222` is the user's signal to take it.
 Branch `m240-builder-copy-section`, cut from `origin/m239-nhete-browser-walk` at `7d968105`, so it is **stacked on #521 (and through it on #519)**: the row, `tests/Support/Nhete/` and `tests/e2e/nhete-builder-block.spec.ts` exist only there. `origin/main` is merged in for the claim files. PR into main, **fourth at the next merge point** (#520, #519, #521, this). **A change a tester sees: `VERSION` 0.20.1 → 0.21.0 with its release notes.** Held green for a merge point on the user's word (`D137`).
@@ -141,7 +108,9 @@ The one most likely wrong: the builder store's undo and redo across a section co
 
 ---
 
-## HELD — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk) — BUILT AND HELD: PR #521, stacked on #519, every job green but Static (audit only, until #520 merges), waiting for a merge point, where it goes third
+## RELEASED — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (merged as PR #521, `ea2dd2bb`, fourth of five at the merge point of 2026-11-15, after merging the trunk into its branch at `ea9ef055`; every required check green with real step counts on its run 43740523920 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43740521718 green (5); the trunk's run 43744612305 on `ea2dd2bb` 8/8, with BHW Connect at 23)
+
+**RELEASED FOURTH AT THE MERGE POINT OF 2026-11-15.** #519's squash left this stacked branch holding #519's old commits, so the trunk merge conflicted in five files. Each kept both sides: the test file took this branch's copy (#519's plus three lines), and the backlog took this branch's block with the trunk's three new rows inserted. Deploy run 43748726620 backed up `deploy-20261115-184840.dump` (1,177,115 B), counted 71 tables / 54,279 rows, had nothing to migrate and held; BHW's step skipped.
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m239-nhete-browser-walk`, cut from `origin/m237-nhete-stress-test` at `4a918ccb`, so it is **stacked on #519**: the row, the fixture and `tests/Support/Nhete/` exist only there. `origin/main` is merged in for the claim files. PR into main, after #519 at the merge point. **Tests, a test seeder and CI only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
 Row: `nhete-browser-walk`, *"The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder."* The user's answer in planning, recorded as `D223` on this branch: the walk runs on every CI run, at all three widths.
@@ -213,53 +182,14 @@ The one most likely wrong: the 141-question parts page at 375 px (a long placeho
 
 ---
 
-## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520 green, run 43562454871 8/8 with real step counts, waiting for a merge point, where it goes first
+## RELEASED — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (merged as PR #519, `9ff1d2d4`, third of five at the merge point of 2026-11-15, after merging the trunk into its branch at `58de12f4` and again at `3697fcc7`; every required check green with real step counts on its run 43736811597 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43736808565 green (5); the trunk's run 43740339898 on `9ff1d2d4` 8/8, with BHW Connect at 23)
 
-**BUILT AND HELD (2026-11-14):** run 43562454871 has every required check green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, plus Boundary 43562453077 green (5).
-
-**How the prediction fared.**
-- **Held:** `composer audit --locked` exits 0, the lock moves two packages only, and `content-hash` does not move. Static runs to its full 33 steps for the first time since 2026-11-13.
-- **Wrong:** "every required check green" failed on the first run. PHPStan went red, through a path nobody named: Laravel 13.38 blinded Larastan to the app's console commands.
-- The one flagged as most likely wrong, a behaviour change caught by Pest or E2E, did not happen: both were green on 13.42.0.
-- Found on the way, not predicted: `NoteContentShapeTest`'s order flake (`publish-gate-field-order`).
-
-**Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
-- Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
-- Every fixed version is 13.40.0 or later, so pinning lower cannot avoid it.
-- Files added: a new `app/Console/Concerns/ReadsTextInput.php`, and the `ActivateCustomDomain`, `BuildPsgc`, `CreateTenant`, `DeployCensus`, `ExtractTenant`, `OcrBakeoff`, `OcrBakeoffLayout`, `PlatformSuperAdmin` and `SsoDomain` commands under `app/Console/Commands/`.
-- Filed with it: the same blindness takes Larastan's undefined-argument rule with it, as its own row.
-
-Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
-Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.
-
-### Evidence verified
-- `composer.lock` holds `laravel/framework` `v13.30.1`: **held**.
-- `composer audit --locked` on the host reports exactly one advisory, `CVE-2026-128083` (GHSA-63hm-g96r-2m2q, *"Laravel: Task Output Injection - Concurrency Process"*, low), affecting `>=13.0.0,<13.40.0|<12.71.0`, reported 2026-11-13T18:54:31Z, and exits 1: **held**.
-- #519's run 43545115637 failed Static at step 23, *Composer audit (SCA)*, and skipped steps 24–30 (Node, npm audit, the staging headers fetch and judge, the secret scan): **held**.
-
-### Premise verified
-- The row exists only on #519's branch (`3f56e2df`), and #519 merges after this: **held**, so the row is filed and closed here.
-- Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade (the two hits are comments): **held**. The advisory does not reach this app's code; the bump is for the gate.
-- The lock's `plugin-api-version` is `2.6.0`, which is what the host's Composer 2.8.12 writes: **held**, so writing the lock on the host leaves that line alone.
-- The host's `vendor/` is behind the lock (phpseclib 3.0.57 installed, 3.0.58 locked): **held**, and irrelevant to the diff, which is the lock alone.
-
-### Remedy verdict
-The row's `composer update laravel/framework --with-dependencies`, dry-run: **works, but moves 110 packages**, including a major `guzzlehttp/uri-template` 1 → 2. With `--minimal-changes` added, dry-run: `laravel/framework` v13.30.1 → **v13.42.0** (the newest 13.x) and `laravel/prompts` v0.3.21 → v0.3.27, **and nothing else**. Taken with `--no-install --no-scripts` (the `M235` recipe); `composer audit --locked` after the write is the measurement.
-
-Files: `composer.lock`.
-Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
-Paired files taken: none.
-Namespaces spent: nothing from the ADR, migration or decision namespaces.
-
-Prediction:
-- `composer audit --locked` exits 0, the diff is the two packages' lock entries, and `content-hash` does not move.
-- Every required check is green, and Static runs past the audit to its full step count for the first time since 2026-11-13.
-
-The one most likely wrong: a 13.31–13.42 behaviour change that Pest or E2E catches.
-
----
-
-## HELD — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test) — BUILT AND HELD: PR #519, red at `Composer audit (SCA)` until `M238` merges, waiting for a merge point
+**RELEASED THIRD AT THE MERGE POINT OF 2026-11-15.** Its first run at this merge point, 43711581650, failed Pest on all three attempts on `NoteContentShapeTest`'s order flake; `M241` merged first and fixed it. Deploy run 43743420824 found only paths the site does not run, so it fast-forwarded with no maintenance window.
+- **How the prediction fared.**
+  - **Held:** the builder-route build publishes and takes a full response (1,725 requests, 808 questions in 49 sections, three region branches answered). Each answer rule rejects what it should: ten refusals, each on the right question and rule. The Meridian dialect publishes. The export round trip loses note content and conditional required (`R-0ceefbb4`). The one flagged as most likely wrong held as predicted: a note label over 500 characters fails the import as a server error, not a message.
+  - **Wrong:** the Kobo dialect never reaches publish: it stops at import, on that long note. `count-selected()` and `regex()` do fail at publish. A template copy keeps note content, conditions and rules, but not its three diagrams, which must be uploaded again (`R-06e31180`, now **Live**).
+  - **Not measured here:** the guest app's walk at three widths moved to its own row, `nhete-browser-walk`, built as `M239`, where it held.
+  - **Not predicted:** a `required` formula and `media::image` are dropped without a warning. Two rows were found on its own pull request: the Laravel advisory (`composer-audit-laravel-13-40`, closed by `M238`) and the order flake (`publish-gate-field-order`, filed by `M238`, closed by `M241`). Seventeen rows were filed `during-testing` in all.
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Branch `m237-nhete-stress-test`, cut from origin/main at `93d85ccd`, PR into main. **Tests and records only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
 Row: filed by this increment, `nhete-stress-test`, *"The NHETE TWG pre-work module (about 45 screens, 35 indicator rows of five questions, about 90 conditional part rows) has never been built in the app; the biggest form ever seeded has about eight questions, and nothing has been measured at that size."* The user's three answers are recorded as `D220`–`D222` in this PR: a test case, not a live run; the repository gets a same-shape copy with placeholder wording and never the review copy's own words; every NHETE row is filed `during-testing` and taken next.
@@ -317,6 +247,98 @@ Prediction:
 - The guest app boots and walks the ~700-question form at 375, 834 and 1440 px with no sideways scroll.
 
 The one most likely wrong: the 500-character overflow. The importer may stop it before the database, or Postgres may refuse it in a way that is caught.
+
+---
+
+## RELEASED — `M241`, `publish-gate-field-order`: the publish gate reads a version's questions and rules in the form's order, so a refusal lists its problems in that order (merged as PR #537, `5f83e5b8`, second of five at the merge point of 2026-11-15, cut from the trunk at `b5d8f49e` and merged without a trunk merge, which the ruleset does not require; every required check green with real step counts on its run 43721123419 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43721120298 green (5); the trunk's run 43736703483 on `5f83e5b8` 8/8, with BHW Connect at 23)
+
+**RELEASED SECOND AT THE MERGE POINT OF 2026-11-15**, ahead of #519, on the user's choice (*"Fix it first, as a 5th PR"*). Deploy run 43739676478 backed up `deploy-20261115-171459.dump` (1,176,889 B), counted 71 tables / 54,277 rows, had nothing to migrate and held; BHW's step skipped.
+- **How the prediction fared.**
+  - **Held:** the new test is red without the fix and green with it. `NoteContentShapeTest` held on every run after it: the PR runs of #519, #521 and #526, and each trunk run. No other test asserted an order the database happened to give.
+  - **Wrong:** the claim ordered three reads; two needed it. Sections are only looked up, never iterated for a refusal, so their read stays unordered, and the release names questions and rules only.
+  - **Not predicted:** the rule case's first form passed an unordered read. Mutant m2b (the rule read with no order at all) survived, because Postgres read the rules through the index on the owning question's id and the case had saved its questions in form order. It now saves them out of order, and all three mutants are caught.
+
+Taken 2026-11-15, during the merge point of the same day (`D137`; the user's "all four": #520, #519, #521, #526). #520 merged as `2d4524b9`. Then #519's Pest failed three attempts running (run 43711581650) on `NoteContentShapeTest`'s order assertion, each time in a different order. The user chose to fix the row first, as a fifth pull request that merges before #519 (asked in chat, 2026-11-15: *"Fix it first, as a 5th PR"*).
+Branch `m241-publish-gate-field-order`, cut from `origin/main` at `b5d8f49e`. PR into main, **second at this merge point**, ahead of #519. **A change a tester sees** (the order of the problems a publish refusal lists): `VERSION` 0.20.1 → 0.20.2 with its notes.
+Row: `publish-gate-field-order`, *"A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ."*
+
+### Evidence verified
+- `StructuralValidationGate::collect()` reads `$version->fields()->get()`, and `FormVersion::fields()` is a bare `hasMany` with no order: **held**.
+- `BuilderPresenter` orders the same fields by `sequence`: **held**. So do the PDF, the encode screen, the inbox and the semantic validator.
+- *"`NoteContentShapeTest` fails whenever the two differ"*: **held, and more often than the row says**. It failed #519's run 43550232199, #526's run 43690519220, and all three attempts of #519's run 43711581650, in three different orders. It passes on the trunk and on #520.
+
+### Premise verified
+- The gate's `sections()` and `validations()` reads are unordered too, which the row does not say: **moved**. A refusal about a section or a rule follows storage order as well, so the remedy covers all three reads.
+- Rule groups are already sorted by `[sequence, id]` inside the gate: **held**. Nothing else in `collect()` depends on read order.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+The row's remedy (read the gate's fields in the form's order) **works by reading**: every loop that emits a violation iterates one of the three reads.
+- Questions and sections are ordered by `[sequence, id]`, as the builder orders them.
+- Rules are ordered by their question's position in the form, then by their own `[sequence, id]`.
+
+A new test writes rows in an order that differs from `sequence`, so the unordered read returns insertion order, deterministically, rather than by chance. It is measured red without the fix before it is kept.
+
+Files: `app/Services/Forms/StructuralValidationGate.php`; new `tests/Feature/Forms/PublishGateOrderTest.php`; `VERSION`, `database/data/releases.json`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from the ADR or migration namespaces.
+Prediction:
+- The new test is red without the fix, every time, and green with it.
+- `NoteContentShapeTest` holds by construction on every run.
+- No other test asserted an order the database happened to give.
+
+The one most likely wrong is that last line: a test somewhere may pin the old storage order of a multi-problem refusal.
+
+---
+
+## RELEASED — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (merged as PR #520, `2d4524b9`, first of five at the merge point of 2026-11-15, after merging the trunk into its branch at `09906df1`; every required check green with real step counts on its run 43708241007 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43708239166 green (5); the trunk's run on `2d4524b9` was cancelled while still pending, superseded by jongsky25's #534, and the first trunk run holding it, 43712511522 on `4aa8f524`, is 8/8, with BHW Connect at 23)
+
+**RELEASED FIRST AT THE MERGE POINT OF 2026-11-15** (`D137`; the user's *"All four, in order"*, asked for jongsky25's #523: his CSV extractor fix #522 could not deploy while every trunk run failed `Composer audit (SCA)`). The user's census before, 2026-11-15 11:22:52 UTC, read 1 · 6 · 12 · 28 · 22 · 62 · 31 · 74 (tenants · users · forms · form_versions · submissions · attachments · feedback_reports · notifications).
+- **Its deploy.** Run 43715645480 shipped the trunk's tip, `b5d8f49e` (#535). Meridian's step backed up, counted, had nothing to migrate and held, and `/up` answered 200. The run reads `failure` because BHW's step failed after it, in jongsky25's postbuild extractor verifier, so the previous BHW release stayed live.
+- **That failure was in his tree, and is fixed there.** The deploy runs as NETWORK SERVICE, whose TEMP is an 8.3 short path. The verifier's junction kept the short names, so the extractor's run-directly guard compared two spellings of one path and never ran. Reproduced here and reported on #523; his #538 replaced the guard with an explicit CLI entry. Deploy 43726936872 then built BHW with the line `Standalone extractor verified outside checkout through a release junction: CSV, XLSX, PDF, GeoJSON.` and swapped it live, and 43729807339 swapped in `d2843fd5`, which holds #522 (`git merge-base --is-ancestor 3c556b98 d2843fd5` passes).
+
+**BUILT AND HELD (2026-11-14):** run 43562454871 has every required check green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, plus Boundary 43562453077 green (5).
+
+**How the prediction fared.**
+- **Held:** `composer audit --locked` exits 0, the lock moves two packages only, and `content-hash` does not move. Static runs to its full 33 steps for the first time since 2026-11-13.
+- **Wrong:** "every required check green" failed on the first run. PHPStan went red, through a path nobody named: Laravel 13.38 blinded Larastan to the app's console commands.
+- The one flagged as most likely wrong, a behaviour change caught by Pest or E2E, did not happen: both were green on 13.42.0.
+- Found on the way, not predicted: `NoteContentShapeTest`'s order flake (`publish-gate-field-order`).
+
+**Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
+- Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+- Every fixed version is 13.40.0 or later, so pinning lower cannot avoid it.
+- Files added: a new `app/Console/Concerns/ReadsTextInput.php`, and the `ActivateCustomDomain`, `BuildPsgc`, `CreateTenant`, `DeployCensus`, `ExtractTenant`, `OcrBakeoff`, `OcrBakeoffLayout`, `PlatformSuperAdmin` and `SsoDomain` commands under `app/Console/Commands/`.
+- Filed with it: the same blindness takes Larastan's undefined-argument rule with it, as its own row.
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
+Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.
+
+### Evidence verified
+- `composer.lock` holds `laravel/framework` `v13.30.1`: **held**.
+- `composer audit --locked` on the host reports exactly one advisory, `CVE-2026-128083` (GHSA-63hm-g96r-2m2q, *"Laravel: Task Output Injection - Concurrency Process"*, low), affecting `>=13.0.0,<13.40.0|<12.71.0`, reported 2026-11-13T18:54:31Z, and exits 1: **held**.
+- #519's run 43545115637 failed Static at step 23, *Composer audit (SCA)*, and skipped steps 24–30 (Node, npm audit, the staging headers fetch and judge, the secret scan): **held**.
+
+### Premise verified
+- The row exists only on #519's branch (`3f56e2df`), and #519 merges after this: **held**, so the row is filed and closed here.
+- Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade (the two hits are comments): **held**. The advisory does not reach this app's code; the bump is for the gate.
+- The lock's `plugin-api-version` is `2.6.0`, which is what the host's Composer 2.8.12 writes: **held**, so writing the lock on the host leaves that line alone.
+- The host's `vendor/` is behind the lock (phpseclib 3.0.57 installed, 3.0.58 locked): **held**, and irrelevant to the diff, which is the lock alone.
+
+### Remedy verdict
+The row's `composer update laravel/framework --with-dependencies`, dry-run: **works, but moves 110 packages**, including a major `guzzlehttp/uri-template` 1 → 2. With `--minimal-changes` added, dry-run: `laravel/framework` v13.30.1 → **v13.42.0** (the newest 13.x) and `laravel/prompts` v0.3.21 → v0.3.27, **and nothing else**. Taken with `--no-install --no-scripts` (the `M235` recipe); `composer audit --locked` after the write is the measurement.
+
+Files: `composer.lock`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from the ADR, migration or decision namespaces.
+
+Prediction:
+- `composer audit --locked` exits 0, the diff is the two packages' lock entries, and `content-hash` does not move.
+- Every required check is green, and Static runs past the audit to its full step count for the first time since 2026-11-13.
+
+The one most likely wrong: a 13.31–13.42 behaviour change that Pest or E2E catches.
 
 ---
 

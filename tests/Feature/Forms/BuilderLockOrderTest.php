@@ -468,3 +468,37 @@ it('writes the question’s history last, naming no row the publisher or the arc
         ->and($parents)->not->toContain('forms')
         ->and($parents)->not->toContain('form_versions');
 });
+
+it('takes the form row, then the draft’s sections, questions and rules, before a RENAME writes anything (M242)', function (): void {
+    // `R-ade0b598`: a rename rewrites other rows of the draft (KeyRenameCarrier), so it takes publish's locks in
+    // publish's order first. Only a rename: the arms above, which keep the key, still lock one row and never the form.
+    $form = builderLockOrderDraft($this->tenant, $this->user);
+    [$field, $payload] = builderLockOrderPayload($form);
+    $payload['key'] = $field->key.'_renamed';
+
+    $log = builderLockOrderSqlDuring(function () use ($form, $field, $payload): void {
+        app(FormBuilderService::class)->updateField($form, $field, $this->user, $payload, builderToken($field));
+    });
+
+    $formLock = builderLockOrderFirstIndex($log, 'from "forms"', 'for update');
+    $sections = builderLockOrderFirstIndex($log, 'from "form_sections"', 'for update');
+    $fields = builderLockOrderFirstIndex($log, 'from "form_fields"', 'for update');
+    $rules = builderLockOrderFirstIndex($log, 'from "form_field_validations"', 'for update');
+    $firstWrite = null;
+    foreach ($log as $i => $sql) {
+        if (str_starts_with($sql, 'update ') || str_starts_with($sql, 'insert ') || str_starts_with($sql, 'delete ')) {
+            $firstWrite = $i;
+            break;
+        }
+    }
+
+    foreach (['the form row' => $formLock, 'the sections' => $sections, 'the questions' => $fields, 'the rules' => $rules, 'a write' => $firstWrite] as $what => $at) {
+        expect($at)->not->toBeNull("the rename never locked {$what}");
+    }
+    expect($formLock)->toBeLessThan($sections)
+        ->and($sections)->toBeLessThan($fields)
+        ->and($fields)->toBeLessThan($rules)
+        ->and($rules)->toBeLessThan($firstWrite);
+    // The whole draft, not a set: `$fields` is the sweep, by version.
+    expect($log[$fields])->toContain('form_version_id');
+});

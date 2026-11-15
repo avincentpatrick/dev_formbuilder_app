@@ -144,6 +144,13 @@ watch(saveError, (message) => {
     if (message) pane.value = 'settings';
 });
 
+// M242 (`R-ade0b598`, `D227`) — a rename rewrote the thank-you message on the server (no version is live). The settings
+// modal seeds its message from this page's `form` prop each time it opens, so the prop is reloaded: a later save of the
+// message from the stale copy would put the old key back. Only `form` — the store never re-reads its props.
+watch(store.confirmationCarried, () => {
+    router.reload({ only: ['form'] });
+});
+
 const readOnly = computed(() => props.draft === null || restoredFromHistory);
 
 const fieldTypeLabels: Record<string, string> = {};

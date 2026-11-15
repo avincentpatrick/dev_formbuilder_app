@@ -56,6 +56,7 @@ import { TAKES_NO_DEFAULT } from '../../../public-runtime/lib/defaults';
 import type { ContentBlock } from './content-blocks';
 import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 import { LABEL_COUNT_FROM, LABEL_MAX, oneLine } from './label-text';
+import { carrySentences } from './carry-notice';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
 interface Choice {
@@ -280,6 +281,17 @@ const keyClash = computed<{ holder: string; free: string } | null>(() => {
 });
 /** M172: the server kept a different key than the one sent — said under Field key until the key is saved as typed. */
 const keyNotice = computed(() => (field.value ? props.store.keyNotices?.value[field.value.uid] ?? null : null));
+/** M242 (`R-ade0b598`): what the last rename carried into the rest of the draft — said under the key until the row's next save. */
+const carryLines = computed<string[]>(() => {
+    const notice = field.value ? props.store.carryNotices?.value[field.value.uid] : undefined;
+    return notice ? carrySentences(notice) : [];
+});
+/** M242: the kept key for a section too — a rename that meets a question's key is kept with a number since this increment. */
+const sectionKeyNotice = computed(() => (section.value ? props.store.keyNotices?.value[section.value.uid] ?? null : null));
+const sectionCarryLines = computed<string[]>(() => {
+    const notice = section.value ? props.store.carryNotices?.value[section.value.uid] : undefined;
+    return notice ? carrySentences(notice) : [];
+});
 /** M172: the same as `keyClash`, among the form's sections. */
 const sectionKeyClash = computed<{ holder: string; free: string } | null>(() => {
     const target = section.value;
@@ -816,8 +828,11 @@ watch(librarySaved, (value) => {
                             <MdsButton size="sm" variant="secondary" @click="setField('key', keyClash.free)">Use {{ keyClash.free }}</MdsButton>
                         </div>
                         <p v-else-if="keyNotice" class="config__kept-text" data-key-notice role="status">
-                            “{{ keyNotice.wanted }}” is used by another question, so this one was saved as “{{ keyNotice.kept }}”.
+                            “{{ keyNotice.wanted }}” is used by another question or section, so this one was saved as “{{ keyNotice.kept }}”.
                         </p>
+                        <div v-if="carryLines.length > 0" class="config__kept" data-carry-notice role="status">
+                            <p v-for="line in carryLines" :key="line" class="config__kept-text">{{ line }}</p>
+                        </div>
                         <MdsFormField label="Section" v-slot="{ id }">
                             <MdsSelect
                                 :id="id"
@@ -961,6 +976,12 @@ watch(librarySaved, (value) => {
                                 Used by “{{ sectionKeyClash.holder }}”. It will be saved as <code>{{ sectionKeyClash.free }}</code>.
                             </p>
                             <MdsButton size="sm" variant="secondary" @click="setSection('key', sectionKeyClash.free)">Use {{ sectionKeyClash.free }}</MdsButton>
+                        </div>
+                        <p v-else-if="sectionKeyNotice" class="config__kept-text" data-key-notice role="status">
+                            “{{ sectionKeyNotice.wanted }}” is used by another question or section, so this one was saved as “{{ sectionKeyNotice.kept }}”.
+                        </p>
+                        <div v-if="sectionCarryLines.length > 0" class="config__kept" data-carry-notice role="status">
+                            <p v-for="line in sectionCarryLines" :key="line" class="config__kept-text">{{ line }}</p>
                         </div>
                         <MdsFormField label="Description" v-slot="{ id }">
                             <ReferenceInput

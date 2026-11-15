@@ -97,10 +97,30 @@ final class FormBuilderService
      */
     public function updateSection(Form $form, FormSection $section, array $data, string $expectedVersion): FormSection
     {
+        return $this->updateSectionCarrying($form, $section, $data, $expectedVersion, null)[0];
+    }
+
+    /**
+     * M242 (`R-ade0b598`) — {@see updateSection()}, and what a rename of the section's key carried into the rest of the
+     * draft (`count(${roster})`, a repeat's piped answers); null when the key did not change. `$user` is who the
+     * rewritten questions' history names.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: FormSection, 1: ?CarriedReferences}
+     */
+    public function updateSectionCarrying(Form $form, FormSection $section, array $data, string $expectedVersion, ?User $user): array
+    {
         $this->assertDraftChild($form, $section);
 
-        return DB::transaction(function () use ($form, $section, $data, $expectedVersion): FormSection {
+        return DB::transaction(function () use ($form, $section, $data, $expectedVersion, $user): array {
             $this->assertStillDraftChild($form, $section);
+
+            // M242: a rename rewrites other rows, so it takes the draft's locks first, in publish's order (writeField()).
+            $renaming = (string) $data['key'] !== $section->key;
+
+            if ($renaming) {
+                $this->lockForRename($form);
+            }
 
             // M196 (`R-036f3226`, `D189`): the one section row, locked, then the token checked against it — convertField()'s
             // order. It is the row the UPDATE below locks anyway, so no new acquisition order is introduced. A locking
@@ -125,7 +145,11 @@ final class FormBuilderService
                 'relevant_expression' => $data['relevant_expression'] ?? null,
             ])->save();
 
-            return $section->refresh();
+            $carried = $renaming && $locked->key !== $section->key
+                ? app(KeyRenameCarrier::class)->carry($form, $section->form_version_id, $locked->key, $section->key, null, $user)
+                : null;
+
+            return [$section->refresh(), $carried];
         });
     }
 
@@ -224,6 +248,18 @@ final class FormBuilderService
      */
     public function updateField(Form $form, FormField $field, User $user, array $data, string $expectedVersion): FormField
     {
+        return $this->updateFieldCarrying($form, $field, $user, $data, $expectedVersion)[0];
+    }
+
+    /**
+     * M242 (`R-ade0b598`) — {@see updateField()}, and what a rename of the question's key carried into the rest of the
+     * draft; null when the key did not change.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: FormField, 1: ?CarriedReferences}
+     */
+    public function updateFieldCarrying(Form $form, FormField $field, User $user, array $data, string $expectedVersion): array
+    {
         $this->assertDraftChild($form, $field);
 
         try {
@@ -250,11 +286,23 @@ final class FormBuilderService
 
     /**
      * @param  array<string, mixed>  $data
+     * @return array{0: FormField, 1: ?CarriedReferences}
      */
-    private function writeField(Form $form, FormField $field, User $user, array $data, string $expectedVersion): FormField
+    private function writeField(Form $form, FormField $field, User $user, array $data, string $expectedVersion): array
     {
-        return DB::transaction(function () use ($form, $field, $user, $data, $expectedVersion): FormField {
+        return DB::transaction(function () use ($form, $field, $user, $data, $expectedVersion): array {
             $this->assertStillDraftChild($form, $field);
+
+            // ⛔ M242 (`R-ade0b598`) — A RENAME TAKES THE DRAFT'S LOCKS FIRST, AND ONLY A RENAME. It rewrites other rows of the
+            // draft ({@see KeyRenameCarrier}), so it takes the `forms` row and then every section, question and rule in
+            // publish's order before anything below; the lock set below then re-locks rows this transaction already
+            // holds. An edit that keeps its key takes no `forms` lock, as §3.4 says. Decided against the bound copy: a
+            // rename that landed since binding moved the token, and the check below answers it with a 409.
+            $renaming = (string) $data['key'] !== $field->key;
+
+            if ($renaming) {
+                $this->lockForRename($form);
+            }
 
             // ⛔ M91 — THE ACQUISITION ORDER, MADE UNCONDITIONAL. Without this the order of row touches
             // depends on whether the payload is DIRTY. Eloquent's save() checks isDirty() before it
@@ -353,14 +401,33 @@ final class FormBuilderService
 
             $this->replaceValidations($field, $data['validations'] ?? [], $siblingIdByKey);
 
+            // M242 — before this save is recorded, so its record holds the question's own carried text with the rename.
+            $carried = $renaming && $current->key !== $field->key
+                ? app(KeyRenameCarrier::class)->carry($form, $field->form_version_id, $current->key, $field->key, $field->id, $user)
+                : null;
+
             $field->refresh();
             // Last, after every lock this save takes: the revision's only foreign keys are to `tenants` and `users`, which
             // no builder path locks, so the M91/M92 order is unchanged. `put_back_of` names the entry a Put back restores.
             $putBackOf = $data['put_back_of'] ?? null;
             $recorder->recordEdit($form, $field, $user, $before, $recorder->snapshot($field), is_string($putBackOf) ? $putBackOf : null);
 
-            return $field;
+            return [$field, $carried];
         });
+    }
+
+    /**
+     * M242 — a rename's locks: the `forms` row (as every structural mutator and publish take it), then the draft's
+     * sections, questions and rules, each by ascending id — {@see PublishService}'s order, so a rename and a publish
+     * cannot each hold what the other wants.
+     */
+    private function lockForRename(Form $form): void
+    {
+        $draft = $this->lockDraft($form);
+
+        FormSection::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
+        FormField::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
+        FormFieldValidation::query()->where('form_version_id', $draft->id)->orderBy('id')->lockForUpdate()->pluck('id');
     }
 
     /**
@@ -1268,11 +1335,22 @@ final class FormBuilderService
      * no longer checks uniqueness at all — the user's words were *"auto adjust the key naming to avoid conflicts"*.
      * Kept inside the column's 150 characters by shortening the requested part, never the suffix.
      *
+     * M242 (`R-ade0b598`) — a key that CHANGES is free only when no question and no section of the version holds it, the
+     * one key space a copy already keeps (`DraftCopier`): a rename now carries every `${old}` to the new key, and a key a
+     * section also held would re-point them at an ambiguous name the publish gate accepts. A key kept as it is is
+     * checked within its own table only, as before, so a question already sharing a section's key is never renamed by
+     * an unrelated edit.
+     *
      * @param  Builder<FormSection>|Builder<FormField>  $query
      */
     private function freeKey(Builder $query, FormSection|FormField $row, string $wanted): string
     {
         $taken = $query->where('form_version_id', $row->form_version_id)->whereKeyNot($row->getKey())->pluck('key')->flip();
+
+        if ($wanted !== $row->key) {
+            $other = $row instanceof FormField ? FormSection::query() : FormField::query();
+            $taken = $taken->union($other->where('form_version_id', $row->form_version_id)->pluck('key')->flip());
+        }
 
         if (! $taken->has($wanted)) {
             return $wanted;

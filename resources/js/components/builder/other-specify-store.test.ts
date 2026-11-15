@@ -114,17 +114,23 @@ describe('turning "Other, please specify" off', () => {
 });
 
 describe('a renamed key keeps the pair linked', () => {
-    function echoing() {
+    /**
+     * M242 (`R-ade0b598`): the SERVER carries a rename into the partner and replies with it under `carried`, token and
+     * all; the store takes it in place and sends nothing more. Until M242 the store rewrote the partner here and re-saved
+     * it, a request that would now meet the token the carry moved.
+     */
+    function carrying(partner: (sent: Record<string, unknown>) => ServerField) {
         return fetchMock().mockImplementation((url: string, init?: RequestInit) => {
             const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
             const row = [PAIRED_PARENT, CHILD].find((r) => url.endsWith(`/fields/${r.id}`));
+            const carried = body.key === row?.key ? undefined : { from: row?.key, to: body.key, fields: [partner(body)], sections: [], unread: [], confirmation: null };
 
-            return Promise.resolve(jsonResponse(200, { ...(row ?? {}), ...body, version: 'v9' }));
+            return Promise.resolve(jsonResponse(200, { ...(row ?? {}), ...body, version: 'v9', ...(carried ? { carried } : {}) }));
         });
     }
 
-    it('rewrites the Please specify condition when the choice question’s key changes', async () => {
-        const mock = echoing();
+    it('takes the Please specify condition the server rewrote when the choice question’s key changes', async () => {
+        const mock = carrying(() => ({ ...CHILD, sequence: 1, relevant_expression: "selected(${job}, 'other')", version: 'v-child' }));
         const store = useBuilderStore(pageProps({ fields: [PAIRED_PARENT, { ...CHILD, sequence: 1 }] }));
         const parent = store.fields.value[0];
 
@@ -136,13 +142,14 @@ describe('a renamed key keeps the pair linked', () => {
 
         const child = store.fields.value.find((field) => field.id === 'f-other')!;
         expect(child.relevant_expression).toBe("selected(${job}, 'other')");
-        const childSave = requestLog(mock).find((r) => r.method === 'PATCH' && r.url.endsWith('/f-other'));
-        expect(childSave?.body).toMatchObject({ relevant_expression: "selected(${job}, 'other')" });
+        expect(child.version).toBe('v-child');
+        expect(requestLog(mock).filter((r) => r.method === 'PATCH').map((r) => r.url)).toEqual(['/forms/form-1/fields/f-job']);
         expect(store.canUndo.value).toBe(true);
+        expect(store.saveState.value).toBe('saved');
     });
 
-    it('follows the Please specify question’s new key from the choice question', async () => {
-        const mock = echoing();
+    it('takes the choice question’s link the server rewrote when the Please specify question’s key changes', async () => {
+        const mock = carrying(() => ({ ...PAIRED_PARENT, config: { ...PAIRED_PARENT.config, other_specify_key: 'occupation_detail' }, version: 'v-parent' }));
         const store = useBuilderStore(pageProps({ fields: [PAIRED_PARENT, { ...CHILD, sequence: 1 }] }));
         const child = store.fields.value[1];
 
@@ -153,7 +160,7 @@ describe('a renamed key keeps the pair linked', () => {
         await store.whenIdle();
 
         expect(store.fields.value[0].config.other_specify_key).toBe('occupation_detail');
-        const parentSave = requestLog(mock).find((r) => r.method === 'PATCH' && r.url.endsWith('/f-job'));
-        expect((parentSave?.body as { config?: Record<string, unknown> } | undefined)?.config?.other_specify_key).toBe('occupation_detail');
+        expect(store.fields.value[0].version).toBe('v-parent');
+        expect(requestLog(mock).filter((r) => r.method === 'PATCH').map((r) => r.url)).toEqual(['/forms/form-1/fields/f-other']);
     });
 });

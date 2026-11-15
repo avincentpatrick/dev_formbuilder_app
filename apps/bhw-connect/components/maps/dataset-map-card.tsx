@@ -323,8 +323,16 @@ export function DatasetMapCard({
               aria-label={`${definition.title} map navigation`}
               className="flex gap-4 text-sm underline"
             >
-              <button type="button" onClick={reset}>
-                Philippines
+              <button
+                type="button"
+                onClick={reset}
+                aria-label={
+                  workspace && choice.level === "national"
+                    ? "Reset map selection to Philippines"
+                    : undefined
+                }
+              >
+                {workspace && choice.level === "national" ? "Reset" : "Philippines"}
               </button>
               {trail.map((step, index) => (
                 <button

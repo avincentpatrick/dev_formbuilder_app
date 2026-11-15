@@ -7,6 +7,7 @@ use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormFieldValidation;
+use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\StructuralValidationGate;
@@ -33,7 +34,7 @@ beforeEach(function (): void {
 });
 
 /** @return list<array{field: ?string, code: string}> */
-function publishRefusals(App\Models\FormVersion $version): array
+function publishRefusals(FormVersion $version): array
 {
     try {
         (new StructuralValidationGate)->assertPublishable($version->refresh());

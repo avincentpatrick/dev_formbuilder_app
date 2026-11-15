@@ -29,6 +29,7 @@ import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { RankedMapBars } from "./ranked-map-bars";
 import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
@@ -670,6 +671,17 @@ export function DatasetMapCard({
                         </p>
                       )}
                     </div>
+                  )}
+                  {workspace && supportsCircles(choice) && metric && (
+                    <RankedMapBars
+                      rows={data.rows}
+                      area={data.area}
+                      label={metric.label}
+                      unit={metric.unit}
+                      period={metric.period}
+                      selected={selected?.code ?? null}
+                      onSelect={(code) => setChoice((current) => ({ ...current, selected: code }))}
+                    />
                   )}
                   <details>
                     <summary className="cursor-pointer text-sm font-medium">

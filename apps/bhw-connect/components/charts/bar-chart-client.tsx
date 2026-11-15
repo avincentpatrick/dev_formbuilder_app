@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { horizontalBarSpec, type BarDatum } from "@/lib/charts/bar-chart";
+import type { BarDatum } from "@/lib/charts/bar-chart";
 import { styleAxisTitles } from "@/lib/charts/style-axis";
 import { usePaletteAccent } from "@/lib/charts/use-palette-accent";
 
@@ -57,20 +57,30 @@ export function BarChartClient({
     let plot: (SVGSVGElement | HTMLElement) & { remove: () => void };
     let cancelled = false;
 
-    import("@observablehq/plot").then((Plot) => {
-      if (cancelled || !containerRef.current) return;
-      plot = Plot.plot(
-        horizontalBarSpec(data, { xLabel, yLabel, valueSuffix, valueFormat, width: plotWidth, barHeight, fill: resolvedFill }),
-      );
-      // Bold/enlarge the axis titles so they read clearly against the tick labels.
-      styleAxisTitles(plot);
-      // The wrapping div already carries role="img" + a full text aria-label
-      // (below); Plot's internal <g aria-label="..."> marks on plain <g>
-      // elements otherwise trip aria-prohibited-attr, so hide the SVG itself
-      // from the accessibility tree rather than exposing it redundantly.
-      plot.setAttribute("aria-hidden", "true");
-      containerRef.current.replaceChildren(plot);
-    });
+    Promise.all([import("@observablehq/plot"), import("@/lib/charts/bar-chart")]).then(
+      ([Plot, { horizontalBarSpec }]) => {
+        if (cancelled || !containerRef.current) return;
+        plot = Plot.plot(
+          horizontalBarSpec(data, {
+            xLabel,
+            yLabel,
+            valueSuffix,
+            valueFormat,
+            width: plotWidth,
+            barHeight,
+            fill: resolvedFill,
+          }),
+        );
+        // Bold/enlarge the axis titles so they read clearly against the tick labels.
+        styleAxisTitles(plot);
+        // The wrapping div already carries role="img" + a full text aria-label
+        // (below); Plot's internal <g aria-label="..."> marks on plain <g>
+        // elements otherwise trip aria-prohibited-attr, so hide the SVG itself
+        // from the accessibility tree rather than exposing it redundantly.
+        plot.setAttribute("aria-hidden", "true");
+        containerRef.current.replaceChildren(plot);
+      },
+    );
 
     return () => {
       cancelled = true;
@@ -91,5 +101,52 @@ export function BarChartClient({
       // default near-black fill.
       className="w-full overflow-x-auto text-foreground"
     />
+  );
+}
+
+/** Selectable counterpart to the Plot chart: full names and native buttons work on touch/keyboard. */
+export function SelectableBarChart({
+  data,
+  selected,
+  onSelect,
+  label,
+}: {
+  data: BarDatum[];
+  selected: string | null;
+  onSelect: (code: string) => void;
+  label: string;
+}) {
+  const fill = usePaletteAccent();
+  const maximum = Math.max(0, ...data.map((row) => row.value));
+  return (
+    <ul aria-label={label} className="space-y-2">
+      {data.map((row) => (
+        <li key={row.geoCode}>
+          <button
+            type="button"
+            aria-pressed={selected === row.geoCode}
+            onClick={() => {
+              if (row.geoCode) onSelect(row.geoCode);
+            }}
+            className="w-full rounded border border-border p-2 text-left text-sm hover:bg-surface focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <span className="flex flex-wrap justify-between gap-x-3">
+              <span className="min-w-0 break-words">{row.label}</span>
+              <span className="font-medium tabular-nums">{row.value.toLocaleString()}</span>
+            </span>
+            {selected === row.geoCode && <span className="block font-semibold">Selected</span>}
+            <span aria-hidden="true" className="mt-1 block h-3 border-l border-border bg-surface">
+              <span
+                className="block h-full"
+                style={{
+                  backgroundColor: fill,
+                  width: `${maximum > 0 ? (row.value / maximum) * 100 : 0}%`,
+                }}
+              />
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -155,7 +155,12 @@ export async function composeMapPng(frame: HTMLCanvasElement, data: Context): Pr
   let y = headerHeight + frame.height + margin;
   for (const item of [
     ...legend,
-    { color: NO_DATA_COLOR, text: "Unavailable value / navigation only" },
+    {
+      color: NO_DATA_COLOR,
+      text: data.legend.symbols
+        ? "Geographic context; counts use circles, hollow markers mean zero"
+        : "Unavailable value / navigation only",
+    },
   ]) {
     context.fillStyle = item.color;
     context.fillRect(margin, y, 18, 18);

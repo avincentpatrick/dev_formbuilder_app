@@ -16108,7 +16108,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
     - The same blindness takes Larastan's undefined-argument rule with it, filed as `larastan-console-commands-blind`.
   - It merges first at the next merge point, ahead of #519.
 
-- **`minor` · `publish-gate-field-order` — A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ.**
+- ✅ **CLOSED BY `M241` (2026-11-15) — ****`minor` · `publish-gate-field-order` — A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ.**
   Found by `M238` (2026-11-14), in #519's run 43550232199. Pest's only failure of 7,591 tests was in `NoteContentShapeTest`: *"it refuses at publish every image that is not this form's own usable upload, and passes its own"*. #519 touches neither that test nor the gate.
   - The test expected the seven notes in the order they were added, and got `deleted` and `undescribed` first.
   - The run before it, 43545115637, passed the same test on the same code.
@@ -16120,6 +16120,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read the gate's fields in the form's order, so the list follows the form and the test's order holds by construction.
 
   **Live.** Filed by `M238`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M241` (2026-11-15), at the merge point of the same day.** It failed all three attempts of #519's run 43711581650, each time in a different order. That is more often than the row says, so the user chose to fix it before #519 merged.
+  - `StructuralValidationGate::collect()` reads a version's questions ordered by `[sequence, id]`, as the builder does. Rules follow their question's position, then their own `[sequence, id]`.
+  - Its `sections()` read stays unordered. Sections are only looked up and never iterated for a refusal, so their order changes nothing.
+  - `PublishGateOrderTest` saves questions and rules out of form order, so an unordered read fails it every time, not by chance. Three mutants were caught: the question read unordered, the rule read without its sort, and the rule read with no order at all. The last first **survived**, because Postgres read the rules through an index on the owning question's id, and the test had saved its questions in form order. The case now saves them out of order too.
 
 - **`nit` · `larastan-console-commands-blind` — Since Laravel 13.38, Larastan no longer finds this app's console commands, so it neither types their arguments nor checks that an argument a command reads is in its signature.**
   Found by `M238` (2026-11-14), when the bump to 13.42.0 turned PHPStan red on nine commands.

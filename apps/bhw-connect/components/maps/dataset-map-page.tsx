@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getDatasetMap } from "@/lib/maps/definitions";
 import { MAP_SUBJECTS, subjectReleases } from "@/lib/maps/subjects";
 import {
   initialMapChoice,
   mapHref,
+  parseMapChoice,
   prototypeIndicators,
   type MapChoice,
 } from "@/lib/maps/prototype";
@@ -15,13 +16,17 @@ import { DISTRICT_MAP_SLUG, type DistrictView } from "@/lib/maps/district-view";
 import { DatasetMapCard } from "./dataset-map-card";
 import { DistrictMapCard } from "./district-map-card";
 export function DatasetMapPage({
-  choice,
+  choice: routeChoice,
   districtView,
 }: {
   choice: MapChoice | null;
   districtView?: DistrictView;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Native map edits update the URL without a server navigation. Read those
+  // settings when a cached route remounts (for example after a dataset switch).
+  const choice = parseMapChoice(new URLSearchParams(searchParams.toString()));
   const workspace = choice?.dataset === "bhw-stepzero-2026" || choice?.dataset === "bhw-2025";
   const current = useRef(choice);
   const trackChoice = useCallback((value: MapChoice) => {
@@ -82,7 +87,7 @@ export function DatasetMapPage({
         <DistrictMapCard initial={districtView} />
       ) : choice ? (
         <DatasetMapCard
-          key={mapHref(choice)}
+          key={routeChoice ? mapHref(routeChoice) : "empty"}
           dataset={choice.dataset}
           initial={choice}
           expanded
@@ -90,8 +95,8 @@ export function DatasetMapPage({
         />
       ) : (
         <p role="status">
-          Choose a dataset to open its map. If a shared link has an unsupported indicator, period or
-          geography, select the dataset again.
+          Choose a dataset to open its map. If a shared link has an unsupported indicator, period,
+          geography, count range or classification, select the dataset again.
         </p>
       )}
     </div>

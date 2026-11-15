@@ -6,6 +6,8 @@ import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
 import type { MapRow } from "@/lib/maps/prototype";
+import { mapLabelPoints } from "@/lib/maps/orientation";
+import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
 import { boundaryCenter, symbolMaximum, symbolRadius } from "@/lib/maps/symbols";
 
 export function DatasetCanvas({
@@ -20,6 +22,8 @@ export function DatasetCanvas({
   expanded,
   emphasis,
   compact = false,
+  labels = false,
+  excludedCodes = [],
   view = "choropleth",
 }: {
   url: string;
@@ -27,7 +31,7 @@ export function DatasetCanvas({
   bins: ColorBin[];
   selected: string | null;
   onSelect: (code: string) => void;
-  onGeometry: (codes: string[]) => void;
+  onGeometry: (codes: string[], geometry?: BoundaryCollection) => void;
   onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
   onRetry: () => void;
@@ -35,6 +39,9 @@ export function DatasetCanvas({
   emphasis?: readonly string[];
   /** BHW workspace fits a useful visual beside its legend on phones. */
   compact?: boolean;
+  /** Collision-managed names from the accepted area rows; no remote font source. */
+  labels?: boolean;
+  excludedCodes?: readonly string[];
   view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -49,6 +56,7 @@ export function DatasetCanvas({
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
+  const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
@@ -69,6 +77,7 @@ export function DatasetCanvas({
         if (disposed || !container.current) return;
         if (geometry.type !== "FeatureCollection" || !Array.isArray(geometry.features))
           throw new Error("Invalid boundary");
+        const excluded = new Set(excludedKey.split(",").filter(Boolean));
         const byCode = new Map(rows.map((r) => [r.code, r]));
         const codes: string[] = [];
         const bounds = new gl.LngLatBounds();
@@ -86,7 +95,13 @@ export function DatasetCanvas({
           codes.push(code);
           const row = byCode.get(code)!;
           const center = boundaryCenter(feature.geometry);
-          if (center && row.value !== null && Number.isFinite(row.value) && row.value >= 0)
+          if (
+            !excluded.has(code) &&
+            center &&
+            row.value !== null &&
+            Number.isFinite(row.value) &&
+            row.value >= 0
+          )
             points.push({
               type: "Feature",
               geometry: { type: "Point", coordinates: center },
@@ -96,12 +111,13 @@ export function DatasetCanvas({
                 radius: symbolRadius(row.value, maximum),
               },
             });
+          feature.properties.excluded = excluded.has(code);
           feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
         }
-        callbacks.current.onGeometry(codes);
+        callbacks.current.onGeometry(codes, geometry);
         map = new gl.Map({
           container: container.current,
           style: {
@@ -134,7 +150,12 @@ export function DatasetCanvas({
             type: "fill",
             source: "areas",
             paint: {
-              "fill-color": view === "circles" ? "#e5e7eb" : ["get", "color"],
+              "fill-color": [
+                "case",
+                ["==", ["get", "excluded"], true],
+                "#ffffff",
+                view === "circles" ? "#e5e7eb" : ["get", "color"],
+              ],
               "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
             },
           });
@@ -143,6 +164,13 @@ export function DatasetCanvas({
             type: "line",
             source: "areas",
             paint: { "line-color": "#fff", "line-width": 1 },
+          });
+          map.addLayer({
+            id: "excluded-range",
+            type: "line",
+            source: "areas",
+            filter: ["==", ["get", "excluded"], true],
+            paint: { "line-color": "#6b7280", "line-width": 1.5, "line-dasharray": [3, 2] },
           });
           map.addLayer({
             id: "small-sample",
@@ -203,6 +231,39 @@ export function DatasetCanvas({
                 if (typeof code === "string") callbacks.current.onSelect(code);
               });
           }
+          if (labels) {
+            map.addSource("place-names", {
+              type: "geojson",
+              data: mapLabelPoints(
+                rows.filter((row) => !excluded.has(row.code)),
+                geometry,
+              ),
+            });
+            map.addLayer({
+              id: "place-labels",
+              type: "symbol",
+              source: "place-names",
+              layout: {
+                "text-field": ["get", "name"],
+                "text-font": ["sans-serif"],
+                "text-size": 13,
+                "text-max-width": 10,
+                "text-padding": 4,
+                "text-variable-anchor": ["top", "bottom", "left", "right"],
+                "text-radial-offset": view === "circles" ? 1.8 : 0.4,
+                "text-allow-overlap": false,
+              },
+              paint: {
+                "text-color": "#111827",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.5,
+              },
+            });
+            map.on("click", "place-labels", (e) => {
+              const code = e.features?.[0]?.properties?.geo_code;
+              if (typeof code === "string") callbacks.current.onSelect(code);
+            });
+          }
           map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
           resetView.current = () => {
@@ -222,7 +283,11 @@ export function DatasetCanvas({
                 ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
                     ?.properties?.geo_code
                 : undefined;
-            const code = symbolCode ?? e.features?.[0]?.properties?.geo_code;
+            const labelCode = labels
+              ? map?.queryRenderedFeatures(e.point, { layers: ["place-labels"] })[0]?.properties
+                  ?.geo_code
+              : undefined;
+            const code = labelCode ?? symbolCode ?? e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
@@ -243,7 +308,7 @@ export function DatasetCanvas({
       mapRef.current = null;
       resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey, view]);
+  }, [url, rows, bins, emphasisKey, view, labels, excludedKey]);
   return (
     <div>
       <div

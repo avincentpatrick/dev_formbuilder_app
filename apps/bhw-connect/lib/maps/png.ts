@@ -4,9 +4,10 @@ import type { datasetMapExport } from "./export";
 import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
 
 type Context = ReturnType<typeof datasetMapExport>;
+export type MapFrame = HTMLCanvasElement & { cssPixelScale?: number };
 
 /** Copy synchronously during MapLibre's render event, before WebGL discards its drawing buffer. */
-export function captureMapFrame(map: LibreMap): Promise<HTMLCanvasElement> {
+export function captureMapFrame(map: LibreMap): Promise<MapFrame> {
   return new Promise((resolve, reject) => {
     const cleanup = () => {
       clearTimeout(timer);
@@ -23,9 +24,11 @@ export function captureMapFrame(map: LibreMap): Promise<HTMLCanvasElement> {
       try {
         const source = map.getCanvas();
         if (!source.width || !source.height) throw new Error("Map has no image");
-        const copy = document.createElement("canvas");
+        const copy: MapFrame = document.createElement("canvas");
         // Bound export memory on high-DPI devices without changing the live map.
         copy.width = 1200;
+        // MapLibre radii are CSS pixels, while the WebGL buffer may be high-DPI.
+        copy.cssPixelScale = copy.width / (source.clientWidth || source.width);
         copy.height = Math.max(1, Math.round((1200 * source.height) / source.width));
         if (copy.height > 4096) throw new Error("Map viewport is too tall to export");
         const context = copy.getContext("2d");
@@ -60,7 +63,20 @@ export function pngNotes(data: Context): string[] {
   return [
     `${data.dataset.title} — ${data.indicator.label}`,
     `${data.indicator.period} | ${data.indicator.unit} | ${data.geography.area}`,
+    ...(data.classification
+      ? [`Color settings (choropleth only): ${data.classification.note}`]
+      : []),
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
+    ...(data.valueFilter
+      ? [
+          `Count range: ${data.valueFilter.minimum ?? "no minimum"} to ${data.valueFilter.maximum ?? "no maximum"}, inclusive. ${data.valueFilter.included} included; ${data.valueFilter.excluded} excluded; ${data.valueFilter.unavailable} unavailable. ${data.valueFilter.note} Selected area: ${selected?.filterState ?? "none"}.`,
+        ]
+      : []),
+    ...(data.dataset.slug === "bhw-stepzero-2026" || data.dataset.slug === "bhw-2025"
+      ? [
+          "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom. The national locator and live scale bar are not included in this image.",
+        ]
+      : []),
     `Legend: ${data.legend.method}. ${data.legend.symbols ? "Neutral shapes provide geographic context; counts use circles." : "Gray: unavailable value or navigation-only geography; not zero."}`,
     ...(data.legend.symbols
       ? [
@@ -96,7 +112,7 @@ export function pngNotes(data: Context): string[] {
 }
 
 /** Compose the real map image with readable metadata. No DOM screenshot or external fonts. */
-export async function composeMapPng(frame: HTMLCanvasElement, data: Context): Promise<Blob> {
+export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blob> {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Image export unavailable");
@@ -139,10 +155,33 @@ export async function composeMapPng(frame: HTMLCanvasElement, data: Context): Pr
         ? bin.label
         : `${bin.min}–${bin.openEnded ? "and above" : bin.max}`,
   }));
+  const scale = frame.cssPixelScale ?? 1;
+  if (!Number.isFinite(scale) || scale <= 0) throw new Error("Invalid map image scale");
+  const symbols = data.legend.symbols;
+  const symbolRows = symbols
+    ? [
+        ...symbols.sizes.map(({ value, radius }) => ({
+          radius: radius * scale,
+          label: `${value.toLocaleString("en-PH")} ${data.indicator.unit}`,
+          zero: false,
+        })),
+        { radius: 3 * scale, label: "0 — reported zero (hollow marker)", zero: true },
+      ]
+    : [];
+  const symbolHeight = symbols
+    ? lineHeight +
+      (symbols.sizes.length ? 0 : lineHeight) +
+      symbolRows.reduce((sum, row) => sum + Math.max(lineHeight, Math.ceil(row.radius * 2 + 16)), 0)
+    : 0;
+  const maxRadius = Math.max(0, ...symbolRows.map((row) => row.radius));
   const headerHeight = margin * 2 + heading.length * lineHeight;
   canvas.width = width;
   canvas.height =
-    headerHeight + frame.height + margin * 2 + (footer.length + legend.length + 1) * lineHeight;
+    headerHeight +
+    frame.height +
+    symbolHeight +
+    margin * 2 +
+    (footer.length + legend.length + 1) * lineHeight;
   if (canvas.height > 16384)
     throw new Error("Export metadata exceeds image size limit; use JSON data");
   context.fillStyle = "white";
@@ -153,6 +192,29 @@ export async function composeMapPng(frame: HTMLCanvasElement, data: Context): Pr
   heading.forEach((line, i) => context.fillText(line, margin, margin + i * lineHeight));
   context.drawImage(frame, 0, headerHeight);
   let y = headerHeight + frame.height + margin;
+  if (symbols) {
+    context.fillText("Circle area represents BHW count", margin, y);
+    y += lineHeight;
+    if (!symbols.sizes.length) {
+      context.fillText("No positive counts are available for size comparison.", margin, y);
+      y += lineHeight;
+    }
+    for (const row of symbolRows) {
+      const height = Math.max(lineHeight, Math.ceil(row.radius * 2 + 16));
+      context.beginPath();
+      context.arc(margin + maxRadius + 4, y + height / 2, row.radius, 0, Math.PI * 2);
+      if (!row.zero) {
+        context.fillStyle = "rgba(12, 116, 123, 0.85)";
+        context.fill();
+      }
+      context.strokeStyle = row.zero ? "#0c747b" : "white";
+      context.lineWidth = (row.zero ? 2 : 1) * scale;
+      context.stroke();
+      context.fillStyle = "#111827";
+      context.fillText(row.label, margin + maxRadius * 2 + 24, y + (height - lineHeight) / 2);
+      y += height;
+    }
+  }
   for (const item of [
     ...legend,
     {

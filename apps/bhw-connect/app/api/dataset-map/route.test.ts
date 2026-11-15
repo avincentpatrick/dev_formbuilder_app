@@ -1,9 +1,9 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const mock = vi.hoisted(() => ({ source: vi.fn(), geo: vi.fn(), from: vi.fn() }));
+const mock = vi.hoisted(() => ({ source: vi.fn(), geo: vi.fn(), ancestors: vi.fn(), from: vi.fn() }));
 vi.mock("@/lib/db/dataset", () => ({ readDatasetBySlug: mock.source }));
-vi.mock("@/lib/db/geo", () => ({ getGeoByCode: mock.geo }));
+vi.mock("@/lib/db/geo", () => ({ getGeoByCode: mock.geo, getGeoAncestors: mock.ancestors }));
 vi.mock("@/lib/db/supabase", () => ({ createSupabaseServerClient: () => ({ from: mock.from }) }));
 // The 2026 profiling release is hidden in production; its tests below show it to keep its reader proved.
 const visibility = vi.hoisted(() => ({ profilingShown: false }));
@@ -25,6 +25,7 @@ function query(result: unknown) {
 beforeEach(() => {
   vi.resetAllMocks();
   visibility.profilingShown = false;
+  mock.ancestors.mockResolvedValue({ region: null, province: null, citymun: null });
   mock.source.mockResolvedValue({
     state: "available",
     value: {
@@ -600,4 +601,33 @@ it("tells the card a municipality can drill only for a supported indicator with 
     expect(data.barangayDrill, `${release}/${indicator}`).toBe(expected);
   }
   vi.unstubAllEnvs();
+});
+
+it("returns resolved parent names for a direct BHW province map", async () => {
+  mock.geo.mockResolvedValue({ geoCode: "07022", geoLevel: "province", geoName: "Cebu" });
+  mock.ancestors.mockResolvedValue({
+    region: { geoCode: "07", geoLevel: "region", geoName: "Region VII", incomeClass: null },
+    province: null, citymun: null,
+  });
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "0702234", geo_name: "City of Naga" }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "0702234", n_total_bhw: 10 }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "07022", n_total_bhw: 99 }], error: null }));
+  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&level=province&code=07022"));
+  expect(response.status).toBe(200);
+  expect((await response.json()).navigation).toEqual({ parents: [{ level: "region", code: "07", name: "Region VII" }], complete: true });
+  expect(mock.ancestors).toHaveBeenCalledWith("07022", "province");
+});
+it("keeps BHW map values available when parent-name lookup fails", async () => {
+  mock.geo.mockResolvedValue({ geoCode: "07022", geoLevel: "province", geoName: "Cebu" });
+  mock.ancestors.mockRejectedValue(new Error("Synthetic failure"));
+  mock.from
+    .mockReturnValueOnce(query({ data: [{ geo_code: "0702234", geo_name: "City of Naga" }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "0702234", n_total_bhw: 10 }], error: null }))
+    .mockReturnValueOnce(query({ data: [{ geo_code: "07022", n_total_bhw: 99 }], error: null }));
+  const response = await GET(new NextRequest("http://localhost/api/dataset-map?dataset=bhw-stepzero-2026&level=province&code=07022"));
+  const payload = await response.json();
+  expect(response.status).toBe(200);
+  expect(payload.total).toBe(99);
+  expect(payload.navigation).toEqual({ parents: [], complete: false });
 });

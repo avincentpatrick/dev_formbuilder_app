@@ -16,7 +16,43 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (m240-builder-copy-section)
+## Status: ACTIVE CLAIM — `M241`, `publish-gate-field-order`: the publish gate reads a version's questions, sections and rules in the form's order, so a refusal lists its problems in that order (m241-publish-gate-field-order)
+
+Taken 2026-11-15, during the merge point of the same day (`D137`; the user's "all four": #520, #519, #521, #526). #520 merged as `2d4524b9`. Then #519's Pest failed three attempts running (run 43711581650) on `NoteContentShapeTest`'s order assertion, each time in a different order. The user chose to fix the row first, as a fifth pull request that merges before #519 (asked in chat, 2026-11-15: *"Fix it first, as a 5th PR"*).
+Branch `m241-publish-gate-field-order`, cut from `origin/main` at `b5d8f49e`. PR into main, **second at this merge point**, ahead of #519. **A change a tester sees** (the order of the problems a publish refusal lists): `VERSION` 0.20.1 → 0.20.2 with its notes.
+Row: `publish-gate-field-order`, *"A publish refusal lists its problems in the order the database hands a version's fields back, not the form's order, and `NoteContentShapeTest` fails whenever the two differ."*
+
+### Evidence verified
+- `StructuralValidationGate::collect()` reads `$version->fields()->get()`, and `FormVersion::fields()` is a bare `hasMany` with no order: **held**.
+- `BuilderPresenter` orders the same fields by `sequence`: **held**. So do the PDF, the encode screen, the inbox and the semantic validator.
+- *"`NoteContentShapeTest` fails whenever the two differ"*: **held, and more often than the row says**. It failed #519's run 43550232199, #526's run 43690519220, and all three attempts of #519's run 43711581650, in three different orders. It passes on the trunk and on #520.
+
+### Premise verified
+- The gate's `sections()` and `validations()` reads are unordered too, which the row does not say: **moved**. A refusal about a section or a rule follows storage order as well, so the remedy covers all three reads.
+- Rule groups are already sorted by `[sequence, id]` inside the gate: **held**. Nothing else in `collect()` depends on read order.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+The row's remedy (read the gate's fields in the form's order) **works by reading**: every loop that emits a violation iterates one of the three reads.
+- Questions and sections are ordered by `[sequence, id]`, as the builder orders them.
+- Rules are ordered by their question's position in the form, then by their own `[sequence, id]`.
+
+A new test writes rows in an order that differs from `sequence`, so the unordered read returns insertion order, deterministically, rather than by chance. It is measured red without the fix before it is kept.
+
+Files: `app/Services/Forms/StructuralValidationGate.php`; new `tests/Feature/Forms/PublishGateOrderTest.php`; `VERSION`, `database/data/releases.json`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from the ADR or migration namespaces.
+Prediction:
+- The new test is red without the fix, every time, and green with it.
+- `NoteContentShapeTest` holds by construction on every run.
+- No other test asserted an order the database happened to give.
+
+The one most likely wrong is that last line: a test somewhere may pin the old storage order of a multi-problem refusal.
+
+---
+
+## HELD — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (m240-builder-copy-section) — BUILT AND HELD: PR #526, stacked on #521, waiting for the merge point of 2026-11-15, where it goes last
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-the-next-nhete-temporal-crab.md`). NHETE Phase 2, recommendation 1 of the NHETE plan, taken next by `D222`. The line shows the row `blocked (precondition: row is not-live)`; that is the generator's rule for every request row (`scripts/pipeline.php`, `read_defects()`), and `D222` is the user's signal to take it.
 Branch `m240-builder-copy-section`, cut from `origin/m239-nhete-browser-walk` at `7d968105`, so it is **stacked on #521 (and through it on #519)**: the row, `tests/Support/Nhete/` and `tests/e2e/nhete-builder-block.spec.ts` exist only there. `origin/main` is merged in for the claim files. PR into main, **fourth at the next merge point** (#520, #519, #521, this). **A change a tester sees: `VERSION` 0.20.1 → 0.21.0 with its release notes.** Held green for a merge point on the user's word (`D137`).

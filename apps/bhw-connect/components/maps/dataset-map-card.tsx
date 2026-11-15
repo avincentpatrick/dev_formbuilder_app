@@ -12,10 +12,19 @@ import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type SetStateAction,
+} from "react";
 import { getDatasetMap } from "@/lib/maps/definitions";
 import {
   initialMapChoice,
+  parseMapChoice,
   mapHref,
   prototypeIndicators,
   type MapChoice,
@@ -28,6 +37,14 @@ import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
+import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { hasValueFilter, valueFilterState, countFilterSummary } from "@/lib/maps/value-filter";
+import { countClassificationBins, classificationDescription } from "@/lib/maps/classification";
+import { ClassificationControls } from "./classification-controls";
+import { ValueFilterControls } from "./value-filter-controls";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { RankedMapBars } from "./ranked-map-bars";
+import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
@@ -55,17 +72,50 @@ export function DatasetMapCard({
 }) {
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
-  const [choice, setChoice] = useState(() => initial ?? initialMapChoice(dataset));
+  // Embedded previews do not own the page URL. Only the BHW map workspace
+  // records analysis edits; Next integrates native history without a server reload.
+  const historyEnabled =
+    Boolean(onChoiceChange) && (dataset === "bhw-stepzero-2026" || dataset === "bhw-2025");
+  const [choice, updateChoice] = useState(() => initial ?? initialMapChoice(dataset));
+  const latestChoice = useRef(choice);
+  const setChoice = useCallback(
+    (action: SetStateAction<MapChoice>) => {
+      const previous = latestChoice.current;
+      const next = typeof action === "function" ? action(previous) : action;
+      if (mapHref(previous) === mapHref(next)) return;
+      latestChoice.current = next;
+      if (historyEnabled) window.history.pushState(null, "", withBasePath(mapHref(next)));
+      updateChoice(next);
+    },
+    [historyEnabled],
+  );
   useEffect(() => {
     onChoiceChange?.(choice);
   }, [choice, onChoiceChange]);
   const [trail, setTrail] = useState<MapChoice[]>([]);
+  useEffect(() => {
+    if (!historyEnabled) return;
+    const restore = () => {
+      const next = parseMapChoice(new URLSearchParams(window.location.search));
+      // Cross-route/dataset entries belong to Next's router, not this card.
+      if (window.location.pathname !== withBasePath("/map") || next?.dataset !== dataset) return;
+      latestChoice.current = next;
+      updateChoice(next);
+      setTrail([]);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [dataset, historyEnabled]);
   const [search, setSearch] = useState({ scope: "", text: "" });
   const searchStatusId = useId();
   const searchScope = `${dataset}:${choice.level}:${choice.code}`;
   const searchText = search.scope === searchScope ? search.text : "";
   const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
-  const [geometry, setGeometry] = useState<{ key: string; codes: string[] } | null>(null);
+  const [geometry, setGeometry] = useState<{
+    key: string;
+    codes: string[];
+    collection?: BoundaryCollection;
+  } | null>(null);
   const [visible, setVisible] = useState(expanded);
   const active = useMapActivity(visible && metrics.length > 0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -78,9 +128,18 @@ export function DatasetMapCard({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const query = mapHref({ ...choice, selected: null }).split("?")[1];
+  const query = mapHref({
+    ...choice,
+    selected: null,
+    valueMin: undefined,
+    valueMax: undefined,
+    classification: undefined,
+    classCount: undefined,
+    classBreaks: undefined,
+  }).split("?")[1];
   const key = `${query}&retry=${retry}`;
-  const exportVersion = `${key}:${choice.selected ?? ""}`;
+  const classificationKey = `${choice.classification}:${choice.classCount}:${choice.classBreaks?.join(",")}`;
+  const exportVersion = `${key}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}:${classificationKey}`;
   const currentExportVersion = useRef(exportVersion);
   useEffect(() => {
     currentExportVersion.current = exportVersion;
@@ -135,11 +194,40 @@ export function DatasetMapCard({
               ? INCOME_BINS
               : poverty
                 ? POVERTY_BINS
-                : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
-    [data, poverty, income, profiling, navigationOnly, accreditation],
+                : supportsCircles({ dataset, indicator: choice.indicator })
+                  ? countClassificationBins(
+                      {
+                        classification: choice.classification,
+                        classCount: choice.classCount,
+                        classBreaks: choice.classBreaks,
+                      },
+                      data?.rows.map((r) => r.value) ?? [],
+                    )
+                  : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
+    [
+      data,
+      poverty,
+      income,
+      profiling,
+      navigationOnly,
+      accreditation,
+      dataset,
+      choice.indicator,
+      choice.classification,
+      choice.classCount,
+      choice.classBreaks,
+    ],
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const view = mapView(choice);
+  const filtering = hasValueFilter(choice);
+  const filterSummary = data && filtering ? countFilterSummary(data.rows, choice) : null;
+  const excludedCodes =
+    data && filtering
+      ? data.rows
+          .filter((row) => valueFilterState(row, choice) === "Excluded by range")
+          .map((row) => row.code)
+      : [];
   const bhw = dataset === "bhw-stepzero-2026" || dataset === "bhw-2025";
   const workspace = bhw && expanded;
   const [panel, setPanel] = useState<"map" | "areas">("map");
@@ -167,36 +255,48 @@ export function DatasetMapCard({
     view === "circles" ? (
       <SizeLegend rows={data.rows} compact={workspace} />
     ) : (
-      <MapLegend
-        bins={bins}
-        categoryLabels={
-          profiling || accreditation
-            ? {
-                0: "0–<25%",
-                25: "25–<50%",
-                50: "50–<75%",
-                75: "75–<100%",
-                100: accreditation ? "100%" : "100% or more",
-              }
-            : income
-              ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
-              : undefined
-        }
-        valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
-        noDataLabel={
-          accreditation
-            ? "Unavailable published share — see table"
-            : profiling
-              ? "Missing snapshot or unavailable share — see table"
+      <div className="space-y-1">
+        {supportsCircles(choice) && (
+          <p className="text-xs font-medium">
+            {choice.classification === "custom"
+              ? "Custom cut points"
+              : choice.classification === "equal"
+                ? "Equal-width groups"
+                : "Quantiles"}{" "}
+            · {bins.length} groups · all child areas
+          </p>
+        )}
+        <MapLegend
+          bins={bins}
+          categoryLabels={
+            profiling || accreditation
+              ? {
+                  0: "0–<25%",
+                  25: "25–<50%",
+                  50: "50–<75%",
+                  75: "75–<100%",
+                  100: accreditation ? "100%" : "100% or more",
+                }
               : income
-                ? "Unclassified or unmatched — see table"
-                : poverty
-                  ? "Missing coverage (not zero)"
-                  : undefined
-        }
-        hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
-        hasSmallN={data.rows.some((row) => row.smallSample === true)}
-      />
+                ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
+                : undefined
+          }
+          valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
+          noDataLabel={
+            accreditation
+              ? "Unavailable published share — see table"
+              : profiling
+                ? "Missing snapshot or unavailable share — see table"
+                : income
+                  ? "Unclassified or unmatched — see table"
+                  : poverty
+                    ? "Missing coverage (not zero)"
+                    : undefined
+          }
+          hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
+          hasSmallN={data.rows.some((row) => row.smallSample === true)}
+        />
+      </div>
     )
   ) : null;
   async function downloadPng() {
@@ -262,13 +362,26 @@ export function DatasetMapCard({
                 onChange={(e) => {
                   const m = metrics.find((i) => i.id === e.target.value)!;
                   // A barangay view only exists for indicators with a barangay reader.
-                  const next = clampBarangayScope({ ...choice, indicator: m.id, period: m.period });
+                  const next = clampBarangayScope({
+                    ...choice,
+                    valueMin: undefined,
+                    valueMax: undefined,
+                    classification: undefined,
+                    classCount: undefined,
+                    classBreaks: undefined,
+                    indicator: m.id,
+                    period: m.period,
+                  });
                   if (next.view === "circles" && !supportsCircles(next)) next.view = "choropleth";
                   if (next.level !== choice.level) setTrail(trail.slice(0, -1));
                   setNotice(
                     next.level !== choice.level
                       ? "This indicator has no barangay map, so it is shown for the province."
-                      : null,
+                      : choice.classification
+                        ? "Color classification and count range reset for the new indicator."
+                        : filtering
+                          ? "Count range reset for the new indicator."
+                          : null,
                   );
                   setChoice(next);
                 }}
@@ -319,34 +432,63 @@ export function DatasetMapCard({
             <p className="text-sm">
               {metric?.period} · {metric?.unit} · {data?.area ?? choice.code}
             </p>
-            <nav
-              aria-label={`${definition.title} map navigation`}
-              className="flex gap-4 text-sm underline"
-            >
-              <button
-                type="button"
-                onClick={reset}
-                aria-label={
-                  workspace && choice.level === "national"
-                    ? "Reset map selection to Philippines"
-                    : undefined
-                }
+            {workspace && choice.level !== "national" && data ? (
+              <div className="min-w-0 space-y-1">
+                <Breadcrumbs
+                  label="Map geography"
+                  items={[
+                    {
+                      label: "Philippines",
+                      href: mapHref({ ...choice, level: "national", code: "PH", selected: null }),
+                    },
+                    ...(data.navigation?.parents ?? []).map((parent) => ({
+                      label: parent.name,
+                      href: mapHref({
+                        ...choice,
+                        level: parent.level,
+                        code: parent.code,
+                        selected: null,
+                      }),
+                    })),
+                    { label: data.area },
+                  ]}
+                />
+                {data.navigation?.complete === false && (
+                  <p role="status" className="text-xs text-muted">
+                    Some parent place names are unavailable. No parent links are inferred.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <nav
+                aria-label={`${definition.title} map navigation`}
+                className="flex gap-4 text-sm underline"
               >
-                {workspace && choice.level === "national" ? "Reset" : "Philippines"}
-              </button>
-              {trail.map((step, index) => (
                 <button
-                  key={`${step.level}-${step.code}`}
                   type="button"
-                  onClick={() => {
-                    setChoice({ ...step, indicator: choice.indicator, period: choice.period });
-                    setTrail(trail.slice(0, index));
-                  }}
+                  onClick={reset}
+                  aria-label={
+                    workspace && choice.level === "national"
+                      ? "Reset map selection to Philippines"
+                      : undefined
+                  }
                 >
-                  {step.code}
+                  {workspace && choice.level === "national" ? "Reset" : "Philippines"}
                 </button>
-              ))}
-            </nav>
+                {trail.map((step, index) => (
+                  <button
+                    key={`${step.level}-${step.code}`}
+                    type="button"
+                    onClick={() => {
+                      setChoice({ ...step, indicator: choice.indicator, period: choice.period });
+                      setTrail(trail.slice(0, index));
+                    }}
+                  >
+                    {step.code}
+                  </button>
+                ))}
+              </nav>
+            )}
           </div>
           {workspace && (
             <div role="group" aria-label="Map workspace panels" className="flex gap-2 lg:hidden">
@@ -397,13 +539,13 @@ export function DatasetMapCard({
                 <>
                   {workspace && legend}
                   <DatasetCanvas
-                    key={`${key}:render=${renderAttempt}`}
+                    key={`${key}:render=${renderAttempt}:range=${choice.valueMin}:${choice.valueMax}:classification=${classificationKey}`}
                     url={data.geometryUrl}
                     rows={data.rows}
                     bins={bins}
                     selected={choice.selected}
                     onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
-                    onGeometry={(codes) => setGeometry({ key, codes })}
+                    onGeometry={(codes, collection) => setGeometry({ key, codes, collection })}
                     onCapture={(run) => setCapture(run ? { key, run } : null)}
                     onRetry={() => {
                       setGeometry(null);
@@ -413,8 +555,38 @@ export function DatasetMapCard({
                     }}
                     expanded={expanded}
                     compact={workspace}
+                    labels={bhw}
+                    excludedCodes={excludedCodes}
                     view={view}
                   />
+                  {supportsCircles(choice) && view === "choropleth" && (
+                    <p className="text-xs text-muted" aria-label="Effective classification">
+                      {classificationDescription(choice, bins)}
+                    </p>
+                  )}
+                  {filterSummary && (
+                    <p role="status" className="rounded border border-border p-2 text-sm">
+                      Count range: {choice.valueMin ?? "no minimum"} to{" "}
+                      {choice.valueMax ?? "no maximum"}, inclusive. {filterSummary.included}{" "}
+                      included, {filterSummary.excluded} excluded, {filterSummary.unavailable}{" "}
+                      unavailable. Published total and complete table unchanged. White shapes with
+                      dashed outlines are excluded. Scales and classification use all areas.
+                      {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
+                    </p>
+                  )}
+                  {workspace && (choice.level !== "national" || selected) && (
+                    <NationalMapLocator
+                      geometry={geometry?.key === key ? geometry.collection : undefined}
+                      selected={selected?.code ?? null}
+                      name={selected?.name ?? data.area}
+                    />
+                  )}
+                  {bhw && (
+                    <p className="text-xs text-muted">
+                      Place labels adjust with zoom to avoid overlaps. Use the area selector for
+                      every name, including missing shapes.
+                    </p>
+                  )}
                   {workspace && selected && (
                     <p role="status" className="rounded bg-surface p-2 text-sm">
                       Selected: {selected.name} · {selected.value ?? "Not reported"}
@@ -437,7 +609,9 @@ export function DatasetMapCard({
                               ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero percent."
                               : profiling
                                 ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
-                                : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                                : supportsCircles(choice)
+                                  ? "Color classification uses all reported child-area counts. Gray means no reported value."
+                                  : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
                     Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
                     pan.
                   </p>
@@ -535,6 +709,33 @@ export function DatasetMapCard({
                       route uses only barangays with evaluable provincial benchmarks.{" "}
                       {data.totalNote}
                     </p>
+                  )}
+                  {workspace && supportsCircles(choice) && view === "choropleth" && (
+                    <ClassificationControls
+                      key={`${choice.indicator}:${classificationKey}`}
+                      settings={choice}
+                      onApply={(settings) =>
+                        setChoice((current) => ({
+                          ...current,
+                          classification: settings.classification,
+                          classCount: settings.classCount,
+                          classBreaks: settings.classBreaks,
+                        }))
+                      }
+                    />
+                  )}
+                  {workspace && supportsCircles(choice) && (
+                    <ValueFilterControls
+                      key={`${choice.indicator}:${choice.valueMin}:${choice.valueMax}`}
+                      range={choice}
+                      onApply={(range) =>
+                        setChoice((current) => ({
+                          ...current,
+                          valueMin: range.valueMin,
+                          valueMax: range.valueMax,
+                        }))
+                      }
+                    />
                   )}
                   <label className="block text-sm">
                     Search areas by name or PSGC code
@@ -651,6 +852,18 @@ export function DatasetMapCard({
                       )}
                     </div>
                   )}
+                  {workspace && supportsCircles(choice) && metric && (
+                    <RankedMapBars
+                      range={choice}
+                      rows={data.rows}
+                      area={data.area}
+                      label={metric.label}
+                      unit={metric.unit}
+                      period={metric.period}
+                      selected={selected?.code ?? null}
+                      onSelect={(code) => setChoice((current) => ({ ...current, selected: code }))}
+                    />
+                  )}
                   <details>
                     <summary className="cursor-pointer text-sm font-medium">
                       Complete area table ({data.rows.length})
@@ -676,6 +889,7 @@ export function DatasetMapCard({
                             )}
                             {(income || profiling || uucRoute || accreditation || censusMean) &&
                               !navigationOnly && <th scope="col">Source context</th>}
+                            {filtering && <th scope="col">Count range</th>}
                             <th scope="col">Geometry</th>
                           </tr>
                         </thead>
@@ -709,6 +923,7 @@ export function DatasetMapCard({
                               )}
                               {(income || profiling || uucRoute || accreditation || censusMean) &&
                                 !navigationOnly && <td>{r.note ?? "—"}</td>}
+                              {filtering && <td>{valueFilterState(r, choice)}</td>}
                               <td>
                                 {shapeCodes
                                   ? shapeCodes.includes(r.code)

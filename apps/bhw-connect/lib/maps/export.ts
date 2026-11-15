@@ -1,3 +1,4 @@
+import { classificationDescription } from "./classification";
 import { hasValueFilter, valueFilterState, countFilterSummary } from "./value-filter";
 import { mapBinLabel } from "./legend-label";
 import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
@@ -36,6 +37,18 @@ export function datasetMapExport(
     choice.dataset === "bhw-profiling-status-2026";
   return {
     schemaVersion: 1,
+    ...(choice.classification
+      ? {
+          classification: {
+            method: choice.classification,
+            requestedGroups: choice.classCount ?? null,
+            cutPoints: choice.classBreaks ?? null,
+            actualGroups: bins.length,
+            appliesTo: "count-choropleth",
+            note: classificationDescription(choice, bins),
+          },
+        }
+      : {}),
     ...(hasValueFilter(choice) ? { valueFilter: countFilterSummary(data.rows, choice) } : {}),
     dataset: { slug: definition.slug, title: definition.title },
     selection: {
@@ -77,7 +90,11 @@ export function datasetMapExport(
           ? "circle-area-proportional-to-count"
           : fixed
             ? "fixed"
-            : "quantiles-relative-to-displayed-areas",
+            : choice.classification === "custom"
+              ? "custom-count-cut-points"
+              : choice.classification === "equal"
+                ? "equal-width-count-intervals"
+                : "quantiles-relative-to-displayed-areas",
       ...(circles
         ? {
             symbols: {

@@ -30,6 +30,8 @@ import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
 import { hasValueFilter, valueFilterState, countFilterSummary } from "@/lib/maps/value-filter";
+import { countClassificationBins, classificationDescription } from "@/lib/maps/classification";
+import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { RankedMapBars } from "./ranked-map-bars";
@@ -93,9 +95,13 @@ export function DatasetMapCard({
     selected: null,
     valueMin: undefined,
     valueMax: undefined,
+    classification: undefined,
+    classCount: undefined,
+    classBreaks: undefined,
   }).split("?")[1];
   const key = `${query}&retry=${retry}`;
-  const exportVersion = `${key}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}`;
+  const classificationKey = `${choice.classification}:${choice.classCount}:${choice.classBreaks?.join(",")}`;
+  const exportVersion = `${key}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}:${classificationKey}`;
   const currentExportVersion = useRef(exportVersion);
   useEffect(() => {
     currentExportVersion.current = exportVersion;
@@ -150,8 +156,29 @@ export function DatasetMapCard({
               ? INCOME_BINS
               : poverty
                 ? POVERTY_BINS
-                : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
-    [data, poverty, income, profiling, navigationOnly, accreditation],
+                : supportsCircles({ dataset, indicator: choice.indicator })
+                  ? countClassificationBins(
+                      {
+                        classification: choice.classification,
+                        classCount: choice.classCount,
+                        classBreaks: choice.classBreaks,
+                      },
+                      data?.rows.map((r) => r.value) ?? [],
+                    )
+                  : computeQuantileBins(data?.rows.map((r) => r.value) ?? []),
+    [
+      data,
+      poverty,
+      income,
+      profiling,
+      navigationOnly,
+      accreditation,
+      dataset,
+      choice.indicator,
+      choice.classification,
+      choice.classCount,
+      choice.classBreaks,
+    ],
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const view = mapView(choice);
@@ -190,36 +217,48 @@ export function DatasetMapCard({
     view === "circles" ? (
       <SizeLegend rows={data.rows} compact={workspace} />
     ) : (
-      <MapLegend
-        bins={bins}
-        categoryLabels={
-          profiling || accreditation
-            ? {
-                0: "0–<25%",
-                25: "25–<50%",
-                50: "50–<75%",
-                75: "75–<100%",
-                100: accreditation ? "100%" : "100% or more",
-              }
-            : income
-              ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
-              : undefined
-        }
-        valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
-        noDataLabel={
-          accreditation
-            ? "Unavailable published share — see table"
-            : profiling
-              ? "Missing snapshot or unavailable share — see table"
+      <div className="space-y-1">
+        {supportsCircles(choice) && (
+          <p className="text-xs font-medium">
+            {choice.classification === "custom"
+              ? "Custom cut points"
+              : choice.classification === "equal"
+                ? "Equal-width groups"
+                : "Quantiles"}{" "}
+            · {bins.length} groups · all child areas
+          </p>
+        )}
+        <MapLegend
+          bins={bins}
+          categoryLabels={
+            profiling || accreditation
+              ? {
+                  0: "0–<25%",
+                  25: "25–<50%",
+                  50: "50–<75%",
+                  75: "75–<100%",
+                  100: accreditation ? "100%" : "100% or more",
+                }
               : income
-                ? "Unclassified or unmatched — see table"
-                : poverty
-                  ? "Missing coverage (not zero)"
-                  : undefined
-        }
-        hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
-        hasSmallN={data.rows.some((row) => row.smallSample === true)}
-      />
+                ? Object.fromEntries(INCOME_CLASSES.map((c) => [c.value, c.label]))
+                : undefined
+          }
+          valueSuffix={poverty || profiling || accreditation ? "%" : censusMean ? " years" : ""}
+          noDataLabel={
+            accreditation
+              ? "Unavailable published share — see table"
+              : profiling
+                ? "Missing snapshot or unavailable share — see table"
+                : income
+                  ? "Unclassified or unmatched — see table"
+                  : poverty
+                    ? "Missing coverage (not zero)"
+                    : undefined
+          }
+          hasNoData={!navigationOnly && data.rows.some((r) => r.value === null)}
+          hasSmallN={data.rows.some((row) => row.smallSample === true)}
+        />
+      </div>
     )
   ) : null;
   async function downloadPng() {
@@ -289,6 +328,9 @@ export function DatasetMapCard({
                     ...choice,
                     valueMin: undefined,
                     valueMax: undefined,
+                    classification: undefined,
+                    classCount: undefined,
+                    classBreaks: undefined,
                     indicator: m.id,
                     period: m.period,
                   });
@@ -297,9 +339,11 @@ export function DatasetMapCard({
                   setNotice(
                     next.level !== choice.level
                       ? "This indicator has no barangay map, so it is shown for the province."
-                      : filtering
-                        ? "Count range reset for the new indicator."
-                        : null,
+                      : choice.classification
+                        ? "Color classification and count range reset for the new indicator."
+                        : filtering
+                          ? "Count range reset for the new indicator."
+                          : null,
                   );
                   setChoice(next);
                 }}
@@ -457,7 +501,7 @@ export function DatasetMapCard({
                 <>
                   {workspace && legend}
                   <DatasetCanvas
-                    key={`${key}:render=${renderAttempt}:range=${choice.valueMin}:${choice.valueMax}`}
+                    key={`${key}:render=${renderAttempt}:range=${choice.valueMin}:${choice.valueMax}:classification=${classificationKey}`}
                     url={data.geometryUrl}
                     rows={data.rows}
                     bins={bins}
@@ -477,6 +521,11 @@ export function DatasetMapCard({
                     excludedCodes={excludedCodes}
                     view={view}
                   />
+                  {supportsCircles(choice) && view === "choropleth" && (
+                    <p className="text-xs text-muted" aria-label="Effective classification">
+                      {classificationDescription(choice, bins)}
+                    </p>
+                  )}
                   {filterSummary && (
                     <p role="status" className="rounded border border-border p-2 text-sm">
                       Count range: {choice.valueMin ?? "no minimum"} to{" "}
@@ -522,7 +571,9 @@ export function DatasetMapCard({
                               ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero percent."
                               : profiling
                                 ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
-                                : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                                : supportsCircles(choice)
+                                  ? "Color classification uses all reported child-area counts. Gray means no reported value."
+                                  : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
                     Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
                     pan.
                   </p>
@@ -620,6 +671,20 @@ export function DatasetMapCard({
                       route uses only barangays with evaluable provincial benchmarks.{" "}
                       {data.totalNote}
                     </p>
+                  )}
+                  {workspace && supportsCircles(choice) && view === "choropleth" && (
+                    <ClassificationControls
+                      key={`${choice.indicator}:${classificationKey}`}
+                      settings={choice}
+                      onApply={(settings) =>
+                        setChoice((current) => ({
+                          ...current,
+                          classification: settings.classification,
+                          classCount: settings.classCount,
+                          classBreaks: settings.classBreaks,
+                        }))
+                      }
+                    />
                   )}
                   {workspace && supportsCircles(choice) && (
                     <ValueFilterControls

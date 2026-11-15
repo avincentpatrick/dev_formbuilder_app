@@ -109,8 +109,11 @@ final class DraftCopier
 
         if ($newSection === null) {
             // A move does the same in the builder (`forgetSectionPlaces`): an imported form's per-section numbers would
-            // otherwise sort each copy next to its source at runtime rather than where it was placed.
-            FormField::query()->where('form_version_id', $draft->id)->toBase()->update(['section_sequence' => null]);
+            // otherwise sort each copy next to its source at runtime rather than where it was placed. Only the rows that
+            // carry one: rewriting every question of the draft on every copy took a row lock on each and left a dead
+            // version of each behind, and NHETE's copy-built form ran every later save about three times slower.
+            FormField::query()->where('form_version_id', $draft->id)->whereNotNull('section_sequence')
+                ->toBase()->update(['section_sequence' => null]);
         }
 
         return new DraftCopy($draft, $newSection, array_map(static function (array $pair): array {

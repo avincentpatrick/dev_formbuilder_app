@@ -20,6 +20,7 @@ Confirmed requirements:
 - Offer appropriate map and non-map views, rather than forcing every measure into a choropleth.
 - Shareable links and exports suffice initially. Named saved configurations are deferred.
 - Phone and desktop are equally required; adapt the interaction rather than shrinking the desktop screen.
+- The initial rollout uses English only for the explanatory story and interface copy. Use plain language and explain technical terms; Filipino localization is outside the initial scope.
 - Follow-up visualizations must have explicit phases and acceptance criteria.
 
 ## 2. Evidence and limits

@@ -10,6 +10,7 @@ import {
   type MapChoice,
 } from "@/lib/maps/prototype";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
+import { supportsCircles } from "@/lib/maps/symbols";
 import { DISTRICT_MAP_SLUG, type DistrictView } from "@/lib/maps/district-view";
 import { DatasetMapCard } from "./dataset-map-card";
 import { DistrictMapCard } from "./district-map-card";
@@ -39,6 +40,11 @@ export function DatasetMapPage({
               next.code = current.current.code;
               next.level = current.current.level;
               next.selected = current.current.selected;
+              if (
+                current.current.view === "choropleth" ||
+                (current.current.view === "circles" && supportsCircles(next))
+              )
+                next.view = current.current.view;
             }
             router.push(mapHref(clampBarangayScope(next)));
           }}

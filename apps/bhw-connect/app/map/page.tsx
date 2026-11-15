@@ -26,11 +26,18 @@ export default async function MapPage({
     : subject.id === "districts"
       ? { href: "/districts", label: "Legislative districts" }
       : {
-          href: catalogHref({ mode: "all" }, subject.id as CatalogId),
+          href: catalogHref(
+            choice && subject.id === "bhw"
+              ? { mode: "psgc", level: choice.level, code: choice.code }
+              : { mode: "all" },
+            subject.id as CatalogId,
+          ),
           label: `${subject.title} dataset`,
         };
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
+    <div
+      className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl" : "max-w-6xl"} space-y-6 px-4 py-8`}
+    >
       <Link href={back.href} className="text-sm underline">
         ← {back.label}
       </Link>

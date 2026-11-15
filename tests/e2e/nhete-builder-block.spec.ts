@@ -193,7 +193,8 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
 
         await page.reload({ waitUntil: 'networkidle' });
         await structure(page);
-        const sections = page.locator('[data-section-uid]');
+        // A section's group: its head (`[data-section-uid]`) and, beside it, the list holding its questions.
+        const sections = page.locator('.canvas__group').filter({ has: page.locator('[data-section-uid]') });
         await expect(sections).toHaveCount(2, { timeout: 15_000 });
         await expect(sections.nth(1).locator('.canvas__section-label')).toHaveText('New section (copy)');
         await expect(sections.nth(1).locator('[data-field-uid]')).toHaveCount(6);

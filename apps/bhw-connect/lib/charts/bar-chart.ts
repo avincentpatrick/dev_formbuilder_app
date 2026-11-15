@@ -1,7 +1,13 @@
 import * as Plot from "@observablehq/plot";
 import { accent } from "./palette";
 
-export type BarDatum = { label: string; value: number; count?: number; geoCode?: string };
+export type BarDatum = {
+  label: string;
+  shortLabel?: string;
+  value: number;
+  count?: number;
+  geoCode?: string;
+};
 
 /**
  * Horizontal bar chart spec, shared between the client-rendered explore
@@ -63,7 +69,16 @@ export function horizontalBarSpec(
     // styleAxisTitles; text color is themed via `fill: currentColor` there.
     style: { fontSize: "13px" },
     x: { label: options.xLabel ?? null, grid: true, nice: true },
-    y: { label: options.yLabel ?? null, labelAnchor: "top" },
+    y: {
+      label: options.yLabel ?? null,
+      labelAnchor: "top",
+      // Compact labels are display-only; full names remain in tables, ARIA and tips.
+      ...(compact && data.some((d) => d.shortLabel)
+        ? {
+            tickFormat: (label: string) => data.find((d) => d.label === label)?.shortLabel ?? label,
+          }
+        : {}),
+    },
     marks: [
       // Base bars render slightly dimmed; the pointerY overlay below brings
       // the hovered row back to full opacity so it visually pops.

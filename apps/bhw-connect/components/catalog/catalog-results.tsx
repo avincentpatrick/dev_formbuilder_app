@@ -123,7 +123,11 @@ export function CatalogResults({
             <h2 className="mt-1 text-xl font-semibold">
               <Link
                 prefetch={false}
-                href={catalogHref(catalog.selection, dataset.id)}
+                href={
+                  dataset.id === "bhw" && catalog.selection.mode === "all"
+                    ? "/bhw"
+                    : catalogHref(catalog.selection, dataset.id)
+                }
                 className="underline decoration-transparent underline-offset-4 hover:decoration-current"
               >
                 {dataset.title}
@@ -216,7 +220,13 @@ export function CatalogResults({
 }
 
 /** The dataset's own full-size map, at the place chosen here (docs/DATASET_HUB_PLAN.md). */
-function FullMapLink({ dataset, selection }: { dataset: CatalogDataset; selection: CatalogSelection }) {
+function FullMapLink({
+  dataset,
+  selection,
+}: {
+  dataset: CatalogDataset;
+  selection: CatalogSelection;
+}) {
   const href = subjectMapHref(dataset.id, selection);
   if (!href) return null;
   return (

@@ -1,7 +1,12 @@
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { policySourcesSchema, type PolicyContext } from "./schema";
 import { toPolicyHit, type PolicyHit } from "./tools";
-const { loop } = vi.hoisted(() => ({ loop: vi.fn() }));
+const { loop, research } = vi.hoisted(() => ({ loop: vi.fn(), research: vi.fn() }));
+vi.mock("@/lib/policy-research/research", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/policy-research/research")>()),
+  prepareResearch: research,
+}));
+beforeEach(() => research.mockReset());
 vi.mock("@/lib/ai/agent-loop", () => ({ runToolLoop: loop }));
 vi.mock("@/lib/ai/dataset-tools", () => ({ createInternalTools: () => [] }));
 vi.mock("@/lib/ai/route-request", () => ({
@@ -41,9 +46,9 @@ const b: PolicyHit = {
   extraction_id: "44444444-4444-4444-8444-444444444444",
   publication_date: "2025-01-01",
 };
-async function answer(text: string, hits: PolicyHit[], data: unknown[] = []) {
+async function answer(text: string, hits: PolicyHit[], data: unknown[] = [], online = false) {
   const results = hits.map((h) => toPolicyHit(h, true));
-  const sources = policySourcesSchema.parse({ mode: "active" });
+  const sources = policySourcesSchema.parse({ mode: "active", online });
   const context: PolicyContext = {
     actor: "admin",
     sources,
@@ -121,4 +126,27 @@ it("combines computed dataset observations with policy evidence and withholds in
   expect(text).not.toContain("97 workers");
   expect(text).toContain("withheld");
   expect(text).toContain("does not establish compliance");
+});
+
+it("keeps online off by default and supplies no network tools even when the user opts in", async () => {
+  const hit = toPolicyHit(a, true);
+  await answer(`Policy requirement: keep records for 20 days ${hit.evidenceToken}`, [a]);
+  expect(research).not.toHaveBeenCalled();
+  research.mockResolvedValue({
+    id: "synthetic",
+    available: false,
+    results: [],
+    gaps: ["Online provider unavailable; internal sources remain available."],
+  });
+  const events = await answer(
+    `Policy requirement: keep records for 20 days ${hit.evidenceToken}`,
+    [a],
+    [],
+    true,
+  );
+  expect(research).toHaveBeenCalledTimes(1);
+  expect(events.find((e) => e.type === "message").content).toContain("Online provider unavailable");
+  expect(events.find((e) => e.type === "message").content).toContain(a.version_id);
+  expect(loop.mock.calls.at(-1)?.[0].at(-1).content).toContain("untrustedOnlineResearch");
+  expect(loop.mock.calls.at(-1)?.[2]).toEqual([]);
 });

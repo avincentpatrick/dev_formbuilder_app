@@ -1,0 +1,87 @@
+import { expect, it } from "vitest";
+import { overviewMeasures, publicValues, scalar, measureStatus } from "./overview";
+import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
+
+const indicator = (
+  id: string,
+  value: number | null,
+  state: CatalogIndicator["state"] = "available",
+): CatalogIndicator => ({
+  id,
+  label: id,
+  unit: "people",
+  sourceSlug: "bhw-stepzero-2026",
+  state,
+  values: value === null ? [] : [{ value }],
+  reason: null,
+  reportedAreaRecords: 1,
+});
+const dataset = (indicators: CatalogIndicator[]): CatalogDataset => ({
+  id: "bhw",
+  title: "BHW",
+  category: "Health workforce",
+  state: "available",
+  availableIndicators: 4,
+  totalIndicators: 4,
+  supportedLevels: ["national"],
+  detailHref: "/bhw",
+  sources: [],
+  indicators,
+});
+
+it("keeps real zero while refusing withheld/failed values even in a malformed payload", () => {
+  expect(scalar(indicator("bhw.total", 0))).toBe(0);
+  for (const state of ["suppressed", "failed", "unavailable", "unsupported"] as const) {
+    const item = indicator("bhw.demographics.education", 12345, state);
+    expect(publicValues(item)).toEqual([]);
+    expect(scalar(item)).toBeNull();
+    expect(measureStatus(item)).not.toBe("");
+  }
+});
+it("never substitutes profiles or a partial registration split for missing headcount", () => {
+  const result = overviewMeasures(
+    dataset([
+      indicator("bhw.total", null, "unavailable"),
+      indicator("bhw.validated-profiles", 50),
+      indicator("bhw.registered", 30),
+      indicator("bhw.registered-accredited", 20),
+      indicator("bhw.nonregistered", null),
+    ]),
+  );
+  expect(result.total).toBeNull();
+  expect(result.parts).toBeNull();
+});
+it("only draws a complete split that reconciles with the published headcount", () => {
+  const rows = [
+    indicator("bhw.total", 100),
+    indicator("bhw.registered", 60),
+    indicator("bhw.registered-accredited", 30),
+    indicator("bhw.nonregistered", 10),
+  ];
+  expect(overviewMeasures(dataset(rows)).parts).toEqual([60, 30, 10]);
+  expect(
+    overviewMeasures(dataset([indicator("bhw.total", 101), ...rows.slice(1)])).parts,
+  ).toBeNull();
+  expect(
+    overviewMeasures(dataset(rows.map((r) => ({ ...r, values: [{ value: 0 }] })))).parts,
+  ).toEqual([0, 0, 0]);
+});
+it("keeps partial-data explanations rather than silently treating partial values as complete", () => {
+  const partial = {
+    ...indicator("bhw.demographics.education", 10, "partial"),
+    reason: "Some categories have no reported value.",
+  };
+  expect(publicValues(partial)).toEqual([{ value: 10 }]);
+  expect(measureStatus(partial)).toBe(partial.reason);
+});
+
+it("keeps full names in chart data while using optional compact tick labels on phones", async () => {
+  const { horizontalBarSpec } = await import("@/lib/charts/bar-chart");
+  const data = [
+    { label: "BHW Reference Manual training", shortLabel: "Manual training", value: 25 },
+  ];
+  const phone = horizontalBarSpec(data, { width: 320 });
+  expect((phone.y?.tickFormat as (v: string) => string)(data[0].label)).toBe("Manual training");
+  expect(horizontalBarSpec(data, { width: 800 }).y?.tickFormat).toBeUndefined();
+  expect(data[0].label).toBe("BHW Reference Manual training");
+});

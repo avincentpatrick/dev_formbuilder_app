@@ -6,6 +6,7 @@ import { applyComplementarySuppression } from "@/lib/db/area-profile-suppression
 import { datasetState, hasAvailableValue, summarizeCatalog } from "./summary";
 import type {
   CatalogDataset,
+  CatalogId,
   CatalogIndicator,
   CatalogSelection,
   PublicCatalog,
@@ -162,13 +163,15 @@ function validateSelection(selection: CatalogSelection): void {
 export async function getPublicCatalog(
   selection: CatalogSelection,
   reader: CatalogReader = createCatalogReader(),
+  datasetId?: CatalogId,
 ): Promise<PublicCatalog> {
   validateSelection(selection);
+  const definitions = datasetId ? CATALOG.filter((dataset) => dataset.id === datasetId) : CATALOG;
   const sources = new Map<string, PublicSource>();
   const byDataset = new Map<string, CatalogIndicator[]>();
   // One pool across all datasets, not six pools of four requests each.
   await mapBounded(
-    CATALOG.flatMap((dataset) => dataset.indicators.map((spec) => ({ dataset, spec }))),
+    definitions.flatMap((dataset) => dataset.indicators.map((spec) => ({ dataset, spec }))),
     async ({ dataset, spec }) => {
       let item = base(spec);
       try {
@@ -360,7 +363,7 @@ export async function getPublicCatalog(
       byDataset.set(dataset.id, list);
     },
   );
-  const datasets: CatalogDataset[] = CATALOG.map((spec) => {
+  const datasets: CatalogDataset[] = definitions.map((spec) => {
     const unordered = byDataset.get(spec.id) ?? [];
     const indicators = spec.indicators.map((i) => unordered.find((v) => v.id === i.id)!);
     const slugs = new Set(spec.indicators.map((i) => i.source));
@@ -378,4 +381,16 @@ export async function getPublicCatalog(
     };
   });
   return { selection, datasets, overview: summarizeCatalog(datasets) };
+}
+
+/** A dataset overview uses exactly the catalog's disclosure/validation contract, without
+ * probing unrelated sources. Never call legacy readers to fill a withheld catalog value. */
+export async function getPublicDataset(
+  id: CatalogId,
+  selection: CatalogSelection,
+  reader: CatalogReader = createCatalogReader(),
+): Promise<CatalogDataset> {
+  const result = await getPublicCatalog(selection, reader, id);
+  if (!result.datasets[0]) throw new Error("Unknown dataset");
+  return result.datasets[0];
 }

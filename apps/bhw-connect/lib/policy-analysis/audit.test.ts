@@ -187,3 +187,38 @@ it("retains dates from actual dataset fields and rejects a fabricated reporting 
     auditPolicyAnswer("Dataset observation: reporting date 2023-04-15.", [], [payload]).text,
   ).toBe("");
 });
+it("grounds online evidence in its own exact token and reported dates, never an uploaded version", () => {
+  const id = "33333333-3333-4333-8333-333333333333",
+    token = `[[web:${id}:0]]`;
+  const web = citation({
+    versionId: undefined,
+    extractionId: undefined,
+    chunkId: -7,
+    document: "web:source",
+    documentTitle: "Official synthetic issuance",
+    sourceKind: "policy-web",
+    sourceId: id,
+    evidenceToken: token,
+    url: "https://doh.gov.ph/issuance",
+    retrievedAt: "2026-11-15T10:00:00Z",
+    publicationDate: "2025-01-02",
+    effectiveDate: "2025-02-01",
+  });
+  const answer = auditPolicyAnswer(
+    `Online evidence: “Clinics must retain records for 20 days.” ${token}`,
+    [web],
+    [],
+  );
+  expect(answer.rejected).toEqual([]);
+  expect(answer.text).toContain("Online evidence: Official synthetic issuance");
+  expect(answer.text).toContain("publication 2025-01-02; effective 2025-02-01");
+  expect(answer.text).not.toContain("version undefined");
+  for (const claim of [
+    `Policy requirement: retain records for 999 days. ${token}`,
+    `Online evidence: “An invented requirement.” ${token}`,
+    `Online evidence supersedes the uploaded policy. ${token}`,
+    `Policy requirement: retain records. [[web:${id}:99]]`,
+    `Online evidence: effective 2026-11-15. ${token}`,
+  ])
+    expect(auditPolicyAnswer(claim, [web], []).text).toBe("");
+});

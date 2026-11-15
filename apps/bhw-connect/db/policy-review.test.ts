@@ -373,4 +373,94 @@ describe.skipIf(!database)("full policy review PostgreSQL contracts", () => {
       await db.query("rollback");
     }
   });
+  const research = async (op: string, payload: Record<string, unknown>, who = actor) =>
+    (
+      await db.query("select policy_research_api($1,$2,$3) as data", [
+        who,
+        op,
+        JSON.stringify(payload),
+      ])
+    ).rows[0].data;
+  const onlineCreate = (key = randomUUID(), online = true) =>
+    research("create_run", {
+      requestKey: key,
+      question: "Review referrals",
+      sources: {
+        mode: "selected",
+        versions: [b.version],
+        revisions: [],
+        online,
+        research: { site: "doh.gov.ph", topic: "referrals", reference: "2025-01" },
+      },
+      datasets: { definitions: [], exactRowsFrozen: false },
+      budget: 10,
+    });
+  it("freezes run opt-in and retains one research snapshot across section workers and idempotent retries", async () => {
+    const key = randomUUID();
+    const { id } = await onlineCreate(key);
+    expect((await api("get", { run: id })).run.settings.online).toBe(true);
+    const lease = await research("begin", { id, run: true });
+    expect(lease.lease).toBeTruthy();
+    expect(await research("begin", { id, run: true })).toEqual({ busy: true });
+    const snapshot = {
+      id,
+      available: true,
+      results: [{ text: "Synthetic official evidence" }],
+      gaps: [],
+    };
+    await research("save", { id, lease: lease.lease, snapshot });
+    expect(await research("begin", { id, run: true })).toEqual({ snapshot });
+    expect((await onlineCreate(key, false)).id).toBe(id);
+    expect((await api("get", { run: id })).run.settings.online).toBe(true);
+    await api("cancel", { run: id });
+    await expect(research("begin", { id, run: true })).rejects.toThrow("inactive");
+    expect((await research("get", { id })).snapshot).toEqual(snapshot);
+  });
+  it("keeps offline run retries offline and prevents cross-owner source access", async () => {
+    const key = randomUUID();
+    const { id } = await onlineCreate(key, false);
+    await onlineCreate(key, true);
+    expect((await api("get", { run: id })).run.settings.online).toBe(false);
+    await expect(research("get", { id })).rejects.toMatchObject({ code: "42501" });
+    const quick = randomUUID();
+    await research("begin", { id: quick, settings: { site: "doh.gov.ph" } });
+    await expect(research("get", { id: quick }, other)).rejects.toMatchObject({ code: "42501" });
+    await expect(research("get", { id: quick }, editor)).rejects.toMatchObject({ code: "42501" });
+  });
+  it("recovers expired research leases, rejects stale saves and bounds repeated interruption", async () => {
+    const id = randomUUID();
+    const old = await research("begin", { id, settings: { site: "doh.gov.ph" } });
+    await db.query(
+      "update policy_research_evidence set lease_until=now()-interval '1 second' where id=$1",
+      [id],
+    );
+    const fresh = await research("begin", { id });
+    expect(fresh.lease).not.toBe(old.lease);
+    await expect(research("save", { id, lease: old.lease, snapshot: {} })).rejects.toThrow("Lease");
+    await db.query(
+      "update policy_research_evidence set lease_until=now()-interval '1 second',attempts=3 where id=$1",
+      [id],
+    );
+    expect((await research("begin", { id })).snapshot).toMatchObject({
+      available: false,
+      results: [],
+    });
+  });
+  it("cannot publish online evidence after cancellation or expose its tables to browser roles", async () => {
+    const { id } = await onlineCreate();
+    const lease = await research("begin", { id, run: true });
+    await api("cancel", { run: id });
+    await expect(research("save", { id, lease: lease.lease, snapshot: {} })).rejects.toThrow(
+      "inactive",
+    );
+    await db.query("begin");
+    try {
+      await db.query("set local role anon");
+      await expect(db.query("select * from policy_research_evidence")).rejects.toMatchObject({
+        code: "42501",
+      });
+    } finally {
+      await db.query("rollback");
+    }
+  });
 });

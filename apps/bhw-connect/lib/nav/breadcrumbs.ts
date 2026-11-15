@@ -40,6 +40,8 @@ const ADMIN_CRUMB: Crumb = { label: "Admin", href: "/admin" };
 /** Trails below the 2025 BHW Census, which uses the shared site header. */
 const BHW_TRAILS: Record<string, Crumb[]> = {
   "/bhw": [BHW_CRUMB],
+  "/bhw/search": [BHW_CRUMB, { label: "Search places and indicators" }],
+  "/bhw/measure": [BHW_CRUMB, { label: "Selected measure" }],
   "/explore": [BHW_CRUMB, { label: "Explore" }],
   "/compare": [BHW_CRUMB, { label: "Compare" }],
   "/methodology": [BHW_CRUMB, { label: "Methodology" }],

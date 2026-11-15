@@ -28,17 +28,44 @@ export type GeoSearchResult = {
  * rationale. Blank/whitespace-only queries return no results rather than
  * querying every row.
  */
-export async function searchGeo(query: string, limit = 8): Promise<GeoSearchResult[]> {
+export async function searchGeo(
+  query: string,
+  limit = 8,
+  options: { throwOnError?: boolean } = {},
+): Promise<GeoSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
   const supabase = createSupabaseServerClient();
+  // Codes need an exact dimension lookup: the name/full-text RPC need not index them.
+  if (/^\d{2,10}$/.test(trimmed)) {
+    const { data, error } = await supabase
+      .from("dim_geo")
+      .select("geo_code, geo_level, geo_name")
+      .eq("geo_code", trimmed)
+      .maybeSingle();
+    if (error && options.throwOnError) throw new Error("Geography search failed");
+    return data && !error
+      ? [
+          {
+            geoCode: data.geo_code,
+            geoLevel: data.geo_level,
+            geoName: data.geo_name,
+            nTotal: null,
+            parentChain: {},
+          },
+        ]
+      : [];
+  }
   const { data, error } = await supabase.rpc("search_geo", {
     search_query: trimmed,
     result_limit: limit,
   });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (options.throwOnError) throw new Error("Geography search failed");
+    return [];
+  }
 
   return data.map((row) => ({
     geoCode: row.geo_code,

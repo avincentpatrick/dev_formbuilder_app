@@ -127,3 +127,13 @@ single top search hit, closes the browser during worker execution, pauses/resume
 on budget, opens the exact hash-verified source, and distinguishes clean coverage
 from warning-limited partial results. It does not validate a real provider's
 semantic quality or Windows compatibility.
+
+
+## Phase 6 addition — optional online evidence
+
+New runs can explicitly opt into official-source research. Creation atomically
+freezes that choice; the worker retains and reuses one private web snapshot.
+Existing offline runs and ordinary quick retrieval remain offline by default.
+Online excerpts/gaps are shown separately from internal section coverage. They
+do not alter the frozen policy inventory, dataset scope, or canonical text.
+See POLICY_ONLINE_RESEARCH.md for query/privacy bounds, limits and recovery.

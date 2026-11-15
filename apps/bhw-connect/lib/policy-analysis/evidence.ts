@@ -26,10 +26,6 @@ export async function resolvePolicyContext(
   raw: PolicySources,
 ): Promise<PolicyContext> {
   const sources = policySourcesSchema.parse(raw);
-  if (sources.online)
-    throw new Error(
-      "Online policy research is unavailable; use internal sources for this question",
-    );
   const records = await policyCall<PolicyRecord[]>(actor, "select", sources);
   if (!records.length || records.length > 100)
     throw new Error("Choose between 1 and 100 available policy revisions");

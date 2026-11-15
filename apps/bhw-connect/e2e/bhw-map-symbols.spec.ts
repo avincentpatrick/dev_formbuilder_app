@@ -69,6 +69,8 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "Reset map view", exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(page.locator(".maplibregl-ctrl-scale")).toBeVisible();
+    if (width < 1024)
+      await page.getByRole("button", { name: "Areas and data", exact: true }).click();
     await page.getByText(/Complete area table/).click();
     await page.getByRole("button", { name: "Synthetic missing shape", exact: true }).click();
     await expect(page.getByLabel("BHW Headcount 2025 area")).toHaveValue("99");

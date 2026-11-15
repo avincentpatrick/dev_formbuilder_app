@@ -36,12 +36,12 @@ export default async function MapPage({
         };
   return (
     <div
-      className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl" : "max-w-6xl"} space-y-6 px-4 py-8`}
+      className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl space-y-2 px-3 py-2" : "max-w-6xl space-y-6 px-4 py-8"}`}
     >
       <Link href={back.href} className="text-sm underline">
         ← {back.label}
       </Link>
-      <h1 className="text-3xl font-semibold">
+      <h1 className={subject?.id === "bhw" ? "text-2xl font-semibold" : "text-3xl font-semibold"}>
         {subject ? `${subject.title} map` : "Dataset maps"}
       </h1>
       <DatasetMapPage

@@ -19,6 +19,7 @@ export function DatasetCanvas({
   onRetry,
   expanded,
   emphasis,
+  compact = false,
   view = "choropleth",
 }: {
   url: string;
@@ -32,6 +33,8 @@ export function DatasetCanvas({
   onRetry: () => void;
   /** Areas to outline strongly, e.g. one district's members among their province's municipalities. */
   emphasis?: readonly string[];
+  /** BHW workspace fits a useful visual beside its legend on phones. */
+  compact?: boolean;
   view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -250,23 +253,25 @@ export function DatasetCanvas({
       >
         <button
           type="button"
-          className="rounded border border-border p-2"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
           onClick={() => mapRef.current?.zoomIn()}
+          aria-label="Zoom in"
         >
-          Zoom in
+          {compact ? "+" : "Zoom in"}
         </button>
         <button
           type="button"
-          className="rounded border border-border p-2"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
           onClick={() => mapRef.current?.zoomOut()}
+          aria-label="Zoom out"
         >
-          Zoom out
+          {compact ? "−" : "Zoom out"}
         </button>
         <button
           type="button"
-          className="rounded border border-border p-2"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
           onClick={() => resetView.current?.()}
         >
@@ -278,9 +283,11 @@ export function DatasetCanvas({
         data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
         className={
-          expanded
-            ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
-            : "h-64 w-full rounded-lg border border-border"
+          compact
+            ? "h-[32svh] min-h-60 w-full rounded-lg border border-border lg:h-[55vh]"
+            : expanded
+              ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+              : "h-64 w-full rounded-lg border border-border"
         }
       />
       {!ready && !failed && (

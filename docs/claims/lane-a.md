@@ -78,6 +78,7 @@ The one most likely wrong: the builder store's undo and redo across a section co
   - Pest: 7,618 passed and 1 skipped (36,545 assertions).
   - E2E: 924 passed in 38.9 min. `nhete-builder-block.spec.ts` takes about 27 s per width, against M239's 20 s.
   - Static stopped at the pipeline lint, because the line had drifted after a late backlog edit. The line was regenerated in `df08af51`.
+  - **Run 43695896934 on `df08af51`:** every job green with real step counts (Pest 11 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · BHW Connect 22 · Scope 5). Static stops only at `Composer audit (SCA)`.
   - The run before it (43690519220) also showed `NoteContentShapeTest`'s known order flake (`publish-gate-field-order`, filed in #520). Static stops at `Composer audit (SCA)` until #520 merges.
 - **9 of 9 mutants caught:** five server ones through `mutate.php`, and four store ones through a byte-restoring Vitest harness.
 - **Local runs:**

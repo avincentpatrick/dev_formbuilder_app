@@ -1,5 +1,9 @@
 # BHW analytics — place and indicator discovery
 
+Historical scope of #530. The comparison follow-up is now documented in
+`BHW_COMPARISON_INCREMENT.md`; its implementation supersedes the unsupported
+comparison behavior described below.
+
 This is the next reviewable Phase 1 slice after overview PR #529. The requirements
 remain those in draft #525 (`docs/bhw-card-analytics-assessment`); the Phase 0 audit
 in #527 remains a sampled audit, not nationwide or physical-device certification.

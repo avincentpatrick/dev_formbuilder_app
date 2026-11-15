@@ -193,6 +193,28 @@ it("gives each card and the dataset view its own full map, at the chosen place",
     const { document } = parseHTML(markup);
     const link = document.querySelector('a[aria-label="Open full NHFR map"]');
     expect(link?.textContent).toBe("Open full map →");
-    expect(link?.getAttribute("href")).toMatch(/^\/map\?dataset=nhfr-2026-09&.*level=region&code=01/);
+    expect(link?.getAttribute("href")).toMatch(
+      /^\/map\?dataset=nhfr-2026-09&.*level=region&code=01/,
+    );
   }
+});
+
+it("opens BHW visuals from the all-location card while retaining scoped indicator links", () => {
+  const bhw = { ...dataset, id: "bhw" as const, title: "BHW", detailHref: "/bhw" };
+  const all = { ...catalog([bhw]), selection: { mode: "all" } as const };
+  const national = parseHTML(
+    renderToStaticMarkup(<CatalogResults catalog={all} locationName="All locations" />),
+  ).document;
+  expect(national.querySelector("article h2 a")?.getAttribute("href")).toBe("/bhw");
+  expect(
+    [...national.querySelectorAll("article a")].some(
+      (a) => a.getAttribute("href") === "/catalog?mode=all&dataset=bhw",
+    ),
+  ).toBe(true);
+  const scoped = parseHTML(
+    renderToStaticMarkup(<CatalogResults catalog={catalog([bhw])} locationName="Region I" />),
+  ).document;
+  expect(scoped.querySelector("article h2 a")?.getAttribute("href")).toContain(
+    "location=region%3A01&dataset=bhw",
+  );
 });

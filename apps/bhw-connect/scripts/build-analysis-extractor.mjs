@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 await build({
-  entryPoints: ["lib/analysis-sources/extract.mjs"],
+  entryPoints: ["lib/analysis-sources/extract-cli.mjs"],
   outfile: ".next/standalone/analysis-extractor.mjs",
   bundle: true,
   platform: "node",

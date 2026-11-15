@@ -71,7 +71,7 @@ test("catalog opens available-source details without claiming national values", 
   await page.goto("catalog");
   const firstCard = page.locator("article").first();
   await expect(firstCard).toBeVisible();
-  await firstCard.getByRole("link").first().click();
+  await firstCard.getByRole("link", { name: /^View .* indicators/ }).click();
   await expect(page).toHaveURL(/mode=all.*dataset=/);
   await expect(
     page.getByText("This is an availability summary, not a national data table.", { exact: false }),
@@ -125,6 +125,10 @@ test("home starts with the catalog and every available card has consistent detai
   expect(links.length).toBeLessThanOrEqual(6);
   for (const href of links) {
     await page.goto(href);
+    if (new URL(page.url()).pathname.endsWith("/bhw")) {
+      await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
+      await page.goto("catalog?mode=all&dataset=bhw");
+    }
     await expect(page.getByRole("table")).toBeVisible();
     await expect(page.getByText("Accepted release:", { exact: false }).first()).toBeVisible();
     await expect(page.getByRole("table")).not.toContainText("Definition unavailable.");

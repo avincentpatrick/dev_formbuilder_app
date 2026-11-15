@@ -1,14 +1,25 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
 import { isReleasePublic } from "@/lib/releases/visibility";
+import {
+  parseCountClassification,
+  classificationBreaksText,
+  type CountClassification,
+} from "./classification";
+import { parseCountRange, hasValueFilter } from "./value-filter";
+import { supportsCircles } from "./symbols";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
-export type MapChoice = MapScope & {
-  dataset: string;
-  indicator: string;
-  period: string;
-  selected: string | null;
-};
+export type MapChoice = MapScope &
+  CountClassification & {
+    valueMin?: number;
+    valueMax?: number;
+    dataset: string;
+    indicator: string;
+    period: string;
+    selected: string | null;
+    view?: "circles" | "choropleth";
+  };
 export type MapRow = {
   code: string;
   name: string;
@@ -19,6 +30,7 @@ export type MapRow = {
   smallSample?: boolean;
 };
 export type MapPayload = {
+  navigation?: { parents: import("./breadcrumbs").NamedMapScope[]; complete: boolean };
   state: "available";
   rows: MapRow[];
   total: number | null;
@@ -57,7 +69,13 @@ export function prototypeIndicators(slug: string) {
       "nhfr.beds",
       "nhfr.barangay-presence",
     ],
-    "bhw-2025": ["bhw.validated-profiles", "bhw.profile-accreditation", "bhw.any-honorarium", "bhw.active-years", ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`)],
+    "bhw-2025": [
+      "bhw.validated-profiles",
+      "bhw.profile-accreditation",
+      "bhw.any-honorarium",
+      "bhw.active-years",
+      ...TRAINING_TOPICS.map(([topic]) => `bhw.training.${topic}`),
+    ],
     "bhw-stepzero-2026": [
       "bhw.total",
       "bhw.registered",
@@ -88,7 +106,22 @@ export function initialMapChoice(dataset: string): MapChoice {
 }
 export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   // One meaning per shareable choice; never silently pick the first duplicated value.
-  if (["dataset", "indicator", "period", "level", "code", "selected"].some(key => params.getAll(key).length > 1))
+  if (
+    [
+      "dataset",
+      "indicator",
+      "period",
+      "level",
+      "code",
+      "selected",
+      "view",
+      "valueMin",
+      "valueMax",
+      "classification",
+      "classCount",
+      "classBreaks",
+    ].some((key) => params.getAll(key).length > 1)
+  )
     return null;
   const dataset = params.get("dataset");
   if (!dataset || !getDatasetMap(dataset) || !isReleasePublic(dataset)) return null;
@@ -120,10 +153,34 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
     return null;
   const selected = params.get("selected");
   if (selected !== null) {
-    const childLength = level === "national" ? 2 : level === "region" ? 5 : level === "province" ? 7 : 10;
+    const childLength =
+      level === "national" ? 2 : level === "region" ? 5 : level === "province" ? 7 : 10;
     if (!metrics.length || !new RegExp(`^\\d{${childLength}}$`).test(selected)) return null;
   }
-  return { dataset, indicator, period, level: level as MapScope["level"], code, selected };
+  // Districts own a separate province/district view contract, parsed by parseDistrictView.
+  const view = dataset === "ph-legislative-districts" ? null : params.get("view");
+  if (view !== null && view !== "circles" && view !== "choropleth") return null;
+  if (view === "circles" && !supportsCircles({ dataset, indicator })) return null;
+  const grouping = parseCountClassification(
+    params.get("classification"),
+    params.get("classCount"),
+    params.get("classBreaks"),
+  );
+  if (!grouping || (grouping.classification && !supportsCircles({ dataset, indicator })))
+    return null;
+  const range = parseCountRange(params.get("valueMin"), params.get("valueMax"));
+  if (!range || (hasValueFilter(range) && !supportsCircles({ dataset, indicator }))) return null;
+  return {
+    ...range,
+    ...grouping,
+    dataset,
+    indicator,
+    period,
+    level: level as MapScope["level"],
+    code,
+    selected,
+    ...(view ? { view } : {}),
+  };
 }
 export function mapHref(choice: MapChoice) {
   const params = new URLSearchParams({ dataset: choice.dataset });
@@ -134,6 +191,15 @@ export function mapHref(choice: MapChoice) {
   params.set("level", choice.level);
   params.set("code", choice.code);
   if (choice.selected) params.set("selected", choice.selected);
+  if (choice.classification) {
+    params.set("classification", choice.classification);
+    if (choice.classification === "custom")
+      params.set("classBreaks", classificationBreaksText(choice.classBreaks ?? []));
+    else params.set("classCount", String(choice.classCount ?? 5));
+  }
+  if (choice.view) params.set("view", choice.view);
+  if (choice.valueMin !== undefined) params.set("valueMin", String(choice.valueMin));
+  if (choice.valueMax !== undefined) params.set("valueMax", String(choice.valueMax));
   return `/map?${params}`;
 }
 /** Preserve zero and missing rows; never coerce absent, invalid or duplicate values into zero. */

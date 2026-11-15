@@ -539,3 +539,53 @@ it("preserves exact FHSIS source inputs while retaining legacy fallback and publ
   ]);
   expect(find(result, "fhsis.anc4").values).toEqual([{ value: 0, numerator: 0, denominator: 20 }]);
 });
+
+it.each(["suppressed", "failed"] as const)(
+  "the BHW-only overview does not read protected values when privacy is %s",
+  async (state) => {
+    const { getPublicDataset } = await import("./catalog");
+    const db = reader({
+      agg_bhw_stepzero_counts: [
+        { n_total_bhw: 100, n_registered: 60, n_registered_accredited: 30, n_non_registered: 10 },
+      ],
+      agg_bhw_counts: [{ n_total: 80 }],
+      agg_demographics: [
+        { dimension: "education", category: "Protected example", n: 987654, is_suppressed: false },
+      ],
+      agg_honorarium: [{ payer_level: "region", pct_receiving: 98.7654, is_suppressed: false }],
+    });
+    db.privacy = vi.fn(async () => state);
+    const result = await getPublicDataset(
+      "bhw",
+      { mode: "psgc", level: "national", code: "PH" },
+      db,
+    );
+    expect(result.indicators).toHaveLength(66);
+    expect(result.indicators.find((i) => i.id === "bhw.total")?.values).toEqual([{ value: 100 }]);
+    for (const indicator of result.indicators.filter((i) =>
+      /demographics|honorarium\./.test(i.id),
+    )) {
+      expect(indicator.state).toBe(state);
+      expect(indicator.values).toEqual([]);
+    }
+    expect(db.rows).not.toHaveBeenCalledWith(
+      expect.objectContaining({ suppression: "is_suppressed" }),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(db.source).toHaveBeenCalledWith("bhw-stepzero-2026");
+    expect(db.source).toHaveBeenCalledWith("bhw-2025");
+    expect(
+      vi
+        .mocked(db.source)
+        .mock.calls.every(([slug]) => slug === "bhw-2025" || slug === "bhw-stepzero-2026"),
+    ).toBe(true);
+    expect(db.probe).not.toHaveBeenCalled();
+    expect(db.rows).toHaveBeenCalledWith(expect.anything(), 42, {
+      mode: "psgc",
+      level: "national",
+      code: "PH",
+    });
+    expect(JSON.stringify(result)).not.toContain("987654");
+  },
+);

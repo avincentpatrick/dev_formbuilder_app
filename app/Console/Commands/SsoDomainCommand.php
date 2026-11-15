@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Models\SsoVerifiedDomain;
 use App\Models\Tenant;
 use App\Services\Sso\SsoDomainService;
@@ -43,6 +44,8 @@ use Illuminate\Console\Command;
  */
 final class SsoDomainCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'sso:domains {tenant : The tenant id, slug or primary domain}
                             {--claim= : Mint a challenge token for this email domain}
                             {--verify= : Look up the challenge TXT record for this email domain}
@@ -52,7 +55,7 @@ final class SsoDomainCommand extends Command
 
     public function handle(SsoDomainService $domains): int
     {
-        $tenant = TenantLocator::find((string) $this->argument('tenant'));
+        $tenant = TenantLocator::find($this->textArgument('tenant'));
 
         if ($tenant === null) {
             $this->error('No tenant matches that id, slug or domain.');

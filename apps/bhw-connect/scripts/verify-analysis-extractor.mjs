@@ -23,6 +23,8 @@ try {
       process.execPath,
       [
         "--max-old-space-size=512",
+        // Keep the junction spelling to catch entry guards that compare unlike path forms.
+        "--preserve-symlinks-main",
         join(current, "analysis-extractor.mjs"),
         input,
         name,

@@ -4,8 +4,8 @@ import { DatasetMapPage } from "@/components/maps/dataset-map-page";
 import { parseMapChoice } from "@/lib/maps/prototype";
 import { DISTRICT_MAP_SLUG, parseDistrictView } from "@/lib/maps/district-view";
 import { MAP_SUBJECTS, subjectMapHref, subjectOfRelease } from "@/lib/maps/subjects";
-import { catalogHref } from "@/lib/catalog/navigation";
 import type { CatalogId } from "@/lib/catalog/types";
+import { DatasetMapBackLink } from "@/components/maps/dataset-map-back-link";
 export const metadata: Metadata = { title: "Dataset maps" };
 export default async function MapPage({
   searchParams,
@@ -20,21 +20,12 @@ export default async function MapPage({
   }
   const choice = parseMapChoice(params);
   const subject = choice ? subjectOfRelease(choice.dataset) : undefined;
-  // Back to the card this map belongs to; districts have their own page rather than a catalog card.
-  const back = !subject
-    ? { href: "/", label: "Dataset portal" }
-    : subject.id === "districts"
-      ? { href: "/districts", label: "Legislative districts" }
-      : {
-          href: catalogHref({ mode: "all" }, subject.id as CatalogId),
-          label: `${subject.title} dataset`,
-        };
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
-      <Link href={back.href} className="text-sm underline">
-        ← {back.label}
-      </Link>
-      <h1 className="text-3xl font-semibold">
+    <div
+      className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl space-y-2 px-3 py-2" : "max-w-6xl space-y-6 px-4 py-8"}`}
+    >
+      <DatasetMapBackLink />
+      <h1 className={subject?.id === "bhw" ? "text-2xl font-semibold" : "text-3xl font-semibold"}>
         {subject ? `${subject.title} map` : "Dataset maps"}
       </h1>
       <DatasetMapPage

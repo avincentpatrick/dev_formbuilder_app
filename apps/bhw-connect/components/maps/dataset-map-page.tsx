@@ -1,37 +1,48 @@
 "use client";
 import { useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getDatasetMap } from "@/lib/maps/definitions";
 import { MAP_SUBJECTS, subjectReleases } from "@/lib/maps/subjects";
 import {
   initialMapChoice,
   mapHref,
+  parseMapChoice,
   prototypeIndicators,
   type MapChoice,
 } from "@/lib/maps/prototype";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
+import { supportsCircles } from "@/lib/maps/symbols";
 import { DISTRICT_MAP_SLUG, type DistrictView } from "@/lib/maps/district-view";
 import { DatasetMapCard } from "./dataset-map-card";
 import { DistrictMapCard } from "./district-map-card";
 export function DatasetMapPage({
-  choice,
+  choice: routeChoice,
   districtView,
 }: {
   choice: MapChoice | null;
   districtView?: DistrictView;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Native map edits update the URL without a server navigation. Read those
+  // settings when a cached route remounts (for example after a dataset switch).
+  const choice = parseMapChoice(new URLSearchParams(searchParams.toString()));
+  const workspace = choice?.dataset === "bhw-stepzero-2026" || choice?.dataset === "bhw-2025";
   const current = useRef(choice);
   const trackChoice = useCallback((value: MapChoice) => {
     current.current = value;
   }, []);
   return (
-    <div className="space-y-5">
-      <label className="block">
+    <div className={workspace ? "space-y-2" : "space-y-5"}>
+      <label className={workspace ? "flex min-w-0 items-center gap-3 text-sm" : "block"}>
         Dataset
         <select
           aria-label="Map dataset"
-          className="mt-2 w-full rounded border border-border bg-background p-3"
+          className={
+            workspace
+              ? "min-w-0 flex-1 rounded border border-border bg-background p-2"
+              : "mt-2 w-full rounded border border-border bg-background p-3"
+          }
           value={choice?.dataset ?? ""}
           onChange={(e) => {
             const next = initialMapChoice(e.target.value);
@@ -39,6 +50,11 @@ export function DatasetMapPage({
               next.code = current.current.code;
               next.level = current.current.level;
               next.selected = current.current.selected;
+              if (
+                current.current.view === "choropleth" ||
+                (current.current.view === "circles" && supportsCircles(next))
+              )
+                next.view = current.current.view;
             }
             router.push(mapHref(clampBarangayScope(next)));
           }}
@@ -58,16 +74,20 @@ export function DatasetMapPage({
           ))}
         </select>
       </label>
-      <p className="text-sm text-muted">
-        Switching between available maps retains the supported area. Pending maps open their
-        national availability view; they do not inherit another dataset’s values. Legislative
-        districts open their own view, through member cities and municipalities.
-      </p>
+      {!workspace && (
+        <>
+          <p className="text-sm text-muted">
+            Switching between available maps retains the supported area. Pending maps open their
+            national availability view; they do not inherit another dataset’s values. Legislative
+            districts open their own view, through member cities and municipalities.
+          </p>
+        </>
+      )}
       {choice?.dataset === DISTRICT_MAP_SLUG && districtView ? (
         <DistrictMapCard initial={districtView} />
       ) : choice ? (
         <DatasetMapCard
-          key={mapHref(choice)}
+          key={routeChoice ? mapHref(routeChoice) : "empty"}
           dataset={choice.dataset}
           initial={choice}
           expanded
@@ -75,8 +95,8 @@ export function DatasetMapPage({
         />
       ) : (
         <p role="status">
-          Choose a dataset to open its map. If a shared link has an unsupported indicator, period or
-          geography, select the dataset again.
+          Choose a dataset to open its map. If a shared link has an unsupported indicator, period,
+          geography, count range or classification, select the dataset again.
         </p>
       )}
     </div>

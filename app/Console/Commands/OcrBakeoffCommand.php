@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Exceptions\Ocr\OcrProviderException;
 use App\Services\Forms\BlankFormPrintPresenter;
 use App\Services\Forms\CapabilityFlags;
@@ -57,6 +58,8 @@ use InvalidArgumentException;
  */
 final class OcrBakeoffCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'ocr:bakeoff
         {folder : The folder of scans — each image or PDF in it is one scan, each subfolder one scan of several pages}
         {--layout= : The layout file from ocr:bakeoff-layout (default: layout.json in the folder)}
@@ -80,7 +83,7 @@ final class OcrBakeoffCommand extends Command
 
     public function handle(GoogleVisionClient $client, VisionDocumentParser $parser, PrintedFormMatcher $matcher, BlankFormPrintPresenter $presenter, OcrBakeoffScorer $scorer): int
     {
-        $folder = rtrim((string) $this->argument('folder'), '/\\');
+        $folder = rtrim($this->textArgument('folder'), '/\\');
         if (! is_dir($folder)) {
             $this->error("No folder at {$folder}.");
 

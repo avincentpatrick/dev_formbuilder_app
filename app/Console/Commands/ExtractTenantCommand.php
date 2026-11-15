@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Models\Tenant;
 use App\Services\Tenancy\Extraction\ExtractManifest;
 use App\Services\Tenancy\Extraction\ExtractWriter;
@@ -28,6 +29,8 @@ use Illuminate\Console\Command;
  */
 final class ExtractTenantCommand extends Command
 {
+    use ReadsTextInput;
+
     protected $signature = 'tenants:extract {tenant : The tenant id, slug or primary domain}
                             {--path= : Destination directory (default: storage/app/tenant-extracts/<slug>-<timestamp>)}';
 
@@ -37,7 +40,7 @@ final class ExtractTenantCommand extends Command
     {
         // The three-way lookup moved to `TenantLocator` in K1c, when a second operator command needed the
         // identical one — including its uuid guard, which is the part a second copy would have lost.
-        $tenant = TenantLocator::find((string) $this->argument('tenant'));
+        $tenant = TenantLocator::find($this->textArgument('tenant'));
 
         if ($tenant === null) {
             $this->error('No tenant matches that id, slug or domain.');

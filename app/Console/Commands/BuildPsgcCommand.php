@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsTextInput;
 use App\Services\Psgc\PsgcDataFile;
 use App\Services\Psgc\PsgcTiers;
 use App\Services\Psgc\PsgcWorkbookReader;
@@ -22,6 +23,8 @@ use InvalidArgumentException;
  */
 final class BuildPsgcCommand extends Command
 {
+    use ReadsTextInput;
+
     /** The status for "the totals could not be measured" — distinct from a refusal. */
     public const int CANNOT_MEASURE = 2;
 
@@ -36,9 +39,9 @@ final class BuildPsgcCommand extends Command
 
     public function handle(PsgcWorkbookReader $reader): int
     {
-        $workbook = (string) $this->argument('workbook');
-        $publication = (string) $this->option('publication');
-        $released = (string) $this->option('released');
+        $workbook = $this->textArgument('workbook');
+        $publication = $this->textOption('publication');
+        $released = $this->textOption('released');
 
         if (preg_match(PsgcDataFile::PUBLICATION, $publication) !== 1) {
             $this->error('Name the quarter with --publication, like 2026Q3.');
@@ -112,7 +115,7 @@ final class BuildPsgcCommand extends Command
 
         try {
             $rows = PsgcTiers::build($read['places']);
-            $out = (string) ($this->option('out') ?: database_path('data/psgc'));
+            $out = $this->textOption('out') ?: database_path('data/psgc');
             $manifest = PsgcDataFile::write($out, $rows, [
                 'publication' => $publication,
                 'released_on' => $released,
@@ -144,7 +147,7 @@ final class BuildPsgcCommand extends Command
      */
     private function expected(): array
     {
-        $raw = trim((string) $this->option('expect'));
+        $raw = trim($this->textOption('expect'));
         if ($raw === '') {
             return [];
         }

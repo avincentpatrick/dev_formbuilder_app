@@ -7,6 +7,8 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("bhw");
     await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
+    const firstVisual = await page.getByTestId("bhw-first-visual").boundingBox();
+    expect(firstVisual!.y).toBeLessThan(page.viewportSize()!.height - 120);
     const nav = page.getByRole("navigation", { name: "BHW analysis" });
     await nav.getByRole("link", { name: "Qualifications and training" }).click();
     await expect(page).toHaveURL(/#qualifications$/);

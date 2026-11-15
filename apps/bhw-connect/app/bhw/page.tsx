@@ -22,7 +22,7 @@ export default function Home() {
         <p className="max-w-3xl text-muted">
           Workforce, qualifications and support. Philippines · 2025.
         </p>
-        <BhwSearchForm />
+        <BhwSearchForm compact />
       </header>
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
         <OverviewContent />

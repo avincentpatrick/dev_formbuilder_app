@@ -1,6 +1,12 @@
 import { withBasePath } from "@/lib/base-path";
 
-export function BhwSearchForm({ query = "" }: { query?: string }) {
+export function BhwSearchForm({
+  query = "",
+  compact = false,
+}: {
+  query?: string;
+  compact?: boolean;
+}) {
   return (
     <form action={withBasePath("/bhw/search")} method="get" role="search" className="space-y-2">
       <label htmlFor="bhw-search" className="block font-medium">
@@ -20,8 +26,9 @@ export function BhwSearchForm({ query = "" }: { query?: string }) {
         <button className="rounded-md bg-accent px-4 py-3 font-medium text-white">Search</button>
       </div>
       <p id="bhw-search-help" className="text-sm text-muted">
-        Try a place name or PSGC code, “headcount”, “education”, or “Cebu accreditation”. Choose
-        among matching places and measures before opening a figure.
+        {compact
+          ? "Place, PSGC code, or indicator."
+          : "Try a place name or PSGC code, “headcount”, “education”, or “Cebu accreditation”. Choose among matching places and measures before opening a figure."}
       </p>
     </form>
   );

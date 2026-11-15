@@ -1,6 +1,6 @@
 import { auditNarrative, extractNumbers } from "@/lib/ai/audit";
 import { extractPageReferences, type Citation } from "@/lib/ai/citations";
-const TOKEN = /\[\[policy:[^\]]*\]\]/g;
+const TOKEN = /\[\[(?:policy|web):[^\]]*\]\]/g;
 const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLocaleLowerCase();
 const numericValues = (value: unknown): number[] => {
   if (typeof value === "number" && Number.isFinite(value)) return [value];
@@ -30,13 +30,21 @@ export function auditPolicyAnswer(
   }> = [],
 ) {
   const policy = citations.filter((c) => c.evidenceToken && c.versionId && c.extractionId);
+  const web = citations.filter(
+    (c) =>
+      c.sourceKind === "policy-web" &&
+      c.sourceId &&
+      c.evidenceToken?.startsWith(`[[web:${c.sourceId}:`) &&
+      /^\[\[web:[0-9a-f-]+:\d+\]\]$/i.test(c.evidenceToken),
+  );
   const known = new Map(
-    policy
-      .filter(
+    [
+      ...web,
+      ...policy.filter(
         (c) =>
           c.evidenceToken === `[[policy:${c.versionId}:${c.extractionId}:${c.chunkId}:${c.page}]]`,
-      )
-      .map((c) => [c.evidenceToken!, c]),
+      ),
+    ].map((c) => [c.evidenceToken!, c]),
   );
   const datasetPayloads = payloads.filter((p) => {
     if (!p || typeof p !== "object") return true;
@@ -47,11 +55,12 @@ export function auditPolicyAnswer(
   const rejected: string[] = [];
   const kept: string[] = [];
   for (const sentence of raw
-    .split(/(?<=[.!?]|\]\])\s+(?!\s*\[\[policy:)/)
+    .split(/(?<=[.!?]|\]\])\s+(?!\s*\[\[(?:policy|web):)/)
     .map((s) => s.trim())
     .filter(Boolean)) {
     if (/dataset observations?/i.test(sentence)) category = "dataset";
-    if (/policy requirements?|documentary figures?/i.test(sentence)) category = "document";
+    if (/policy requirements?|documentary figures?|online evidence/i.test(sentence))
+      category = "document";
     if (/analytical conclusions?/i.test(sentence)) category = "mixed";
     const tokens = sentence.match(TOKEN) ?? [];
     const selected = tokens.map((t) => known.get(t));
@@ -66,7 +75,7 @@ export function auditPolicyAnswer(
     );
     const names = [
       ...identities,
-      ...policy.map((c) => ({ title: c.documentTitle, document: c.document })),
+      ...[...policy, ...web].map((c) => ({ title: c.documentTitle, document: c.document })),
     ];
     const wrongTitle = names.some(
       (c) =>
@@ -105,10 +114,14 @@ export function auditPolicyAnswer(
     );
     const quotedLink = quotes.some((q) => supersession.test(q));
     const unsupportedSupersession =
-      supersession.test(sentence) && !limitation && !declaredLink && !quotedLink;
+      supersession.test(sentence) &&
+      !limitation &&
+      (matched.some((c) => c.sourceKind === "policy-web") || (!declaredLink && !quotedLink));
     const policyDates = matched
       .flatMap((c) => [
         c.asOf,
+        c.publicationDate,
+        c.effectiveDate,
         ...(c.text.match(/\b\d{4}-\d{2}-\d{2}\b/g) ?? []),
         ...identities
           .filter((r) => r.document === c.document)
@@ -132,7 +145,7 @@ export function auditPolicyAnswer(
         !observed ||
         /\b(missing|absent|unavailable|not recorded)\b/i.test(sentence));
     if (
-      (sentence.includes("[[policy:") && !tokens.length) ||
+      ((sentence.includes("[[policy:") || sentence.includes("[[web:")) && !tokens.length) ||
       unsupportedRegulatoryClaim ||
       unsupportedSupersession ||
       badDate ||
@@ -173,6 +186,8 @@ export function auditPolicyAnswer(
     kept.push(
       sentence.replace(TOKEN, (t) => {
         const c = known.get(t)!;
+        if (c.sourceKind === "policy-web")
+          return `(Online evidence: ${c.documentTitle}; ${c.url}; retrieved ${c.retrievedAt}; publication ${c.publicationDate ?? "not stated"}; effective ${c.effectiveDate ?? "not stated"})`;
         return `(${c.documentTitle}; version ${c.versionId}; extraction ${c.extractionId}; physical PDF page ${c.page})`;
       }),
     );

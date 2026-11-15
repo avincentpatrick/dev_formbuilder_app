@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { researchSchema } from "@/lib/policy-research/schema";
 export const policySourcesSchema = z
   .object({
     mode: z.enum(["active", "selected"]).default("active"),
@@ -17,6 +18,7 @@ export const policySourcesSchema = z
       .max(100)
       .default([]),
     online: z.boolean().default(false),
+    research: researchSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.mode === "selected" && !value.versions.length && !value.revisions.length)

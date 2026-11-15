@@ -94,7 +94,7 @@ export function toRegisteredDataset(
   // Project/approval/job records are never part of the shared analysis catalogue.
   // Registration or profiling must not turn private conversations into queryable datasets.
   if (
-    ["analysis_", "policy_review_"].some((prefix) =>
+    ["analysis_", "policy_review_", "policy_research_"].some((prefix) =>
       registry.table_name.toLowerCase().startsWith(prefix),
     )
   )

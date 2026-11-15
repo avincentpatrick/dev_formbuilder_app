@@ -60,7 +60,7 @@ describe("private full-review request boundary", () => {
     expect((await post({ ...input(), question: "x".repeat(70000) })).status).toBe(400);
     expect(m.call).not.toHaveBeenCalled();
   });
-  it("fails closed on missing registered tables and online mode", async () => {
+  it("fails closed on missing registered tables", async () => {
     m.datasets.mockResolvedValue([]);
     expect((await post(input())).status).toBe(400);
     expect((await post({ ...input(), sources: { ...input().sources, online: true } })).status).toBe(

@@ -15,6 +15,7 @@ Confirmed requirements:
 - Search spans all supported geography and indicators within BHW, independent of the current region. It also supports structured requests such as “compare Cebu and Bohol accreditation.”
 - Relevant contextual datasets are allowed when dates, geography, populations, and denominators permit a defensible interpretation.
 - Provide an overview map preview and a dedicated interactive map workspace.
+- Default to LGU-reported BHW headcount shown as proportional circles, with circle area proportional to count. Accreditation and other supported indicators remain selectable, using suitable visual defaults. Circles represent geographic aggregates, not worker locations.
 - Allow indicator selection, value-range filtering, automatic classification, editable class count and boundaries, and reset controls.
 - Include readable labels, a visible legend, locator inset of the Philippines on locality drill-down, scale bar, attribution, and navigation controls.
 - Offer appropriate map and non-map views, rather than forcing every measure into a choropleth.
@@ -129,6 +130,7 @@ Acceptance:
 - Searching a municipality/barangay from another region works; duplicate place names show their parent chain. An indicator-only query and combined place/indicator query reach relevant analysis.
 - A supported comparison query opens the requested places and measure; ambiguous terms require selection within the search flow. Basic comparison is included here; synchronized comparison maps follow in Phase 2.
 - Map indicator switching, drill-down, reset, filtering and custom group edits work with touch and keyboard-accessible alternatives. Controls and legend remain available in expanded view.
+- A fresh map opens on BHW headcount with proportional circles and a size legend; a shared link restores its explicit indicator/view instead. Zero counts are distinguishable from missing observations through the linked details/table and legend. Source/coverage checks must not substitute profile counts for unavailable headcount.
 - Phone layout provides a usable map with panels/tabs or sheets; desktop uses available width with adjacent details. Ordinary content does not overflow horizontally; wide tables use labeled scroll regions.
 - Map, bars and table agree on values and inclusion rules. Share links restore settings and exports include the effective legend and provenance.
 - No source becomes publicly accessible merely because search or a new visual supports it.
@@ -176,7 +178,7 @@ Before each implementation PR, Sol should state: user question answered, existin
 ## 8. Remaining planning decisions
 
 - Live review and baseline measurements remain outstanding.
-- Decide default map measure and overview headline order after the source/coverage audit.
+- Decide overview headline order after the source/coverage audit. The default map is agreed: BHW headcount with proportional circles.
 - Set bounded comparison limits and search grammar using realistic phone and desktop tasks.
 - Choose a lightweight evaluation exercise for general readers, LGU users and analytical users.
 

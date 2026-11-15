@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { BhwOverview } from "@/components/bhw/overview";
 import { ChatLauncher } from "@/components/chat/chat-launcher";
-import { GeoSearch } from "@/components/home/geo-search";
+import { BhwSearchForm } from "@/components/bhw/search-form";
 
 export const metadata: Metadata = { title: "BHW 2025" };
 
@@ -22,12 +22,14 @@ export default function Home() {
         <p className="max-w-3xl text-muted">
           Workforce, qualifications and support. Philippines · 2025.
         </p>
-        <GeoSearch />
+        <BhwSearchForm compact />
       </header>
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
         <OverviewContent />
       </Suspense>
-      <ChatLauncher geoCode="PH" geoLevel="national" />
+      <div>
+        <ChatLauncher geoCode="PH" geoLevel="national" placement="inline" />
+      </div>
     </div>
   );
 }

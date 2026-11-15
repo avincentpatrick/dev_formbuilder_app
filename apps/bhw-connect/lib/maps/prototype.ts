@@ -136,7 +136,8 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
       level === "national" ? 2 : level === "region" ? 5 : level === "province" ? 7 : 10;
     if (!metrics.length || !new RegExp(`^\\d{${childLength}}$`).test(selected)) return null;
   }
-  const view = params.get("view");
+  // Districts own a separate province/district view contract, parsed by parseDistrictView.
+  const view = dataset === "ph-legislative-districts" ? null : params.get("view");
   if (view !== null && view !== "circles" && view !== "choropleth") return null;
   if (view === "circles" && !supportsCircles({ dataset, indicator })) return null;
   return {

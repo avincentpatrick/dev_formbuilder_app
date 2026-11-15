@@ -29,6 +29,15 @@ it("defaults BHW counts to circles and preserves explicit view links", () => {
     expect(parseMapChoice(new URLSearchParams(query))).toBeNull();
   expect(mapView(initialMapChoice("nhfr-2026-09"))).toBe("choropleth");
 });
+it("leaves district view links to their separate parser", () => {
+  for (const view of ["province", "district"]) {
+    expect(
+      parseMapChoice(
+        new URLSearchParams(`dataset=ph-legislative-districts&view=${view}&district=syn-1st`),
+      ),
+    ).toEqual(initialMapChoice("ph-legislative-districts"));
+  }
+});
 it("does not fabricate positions for missing geometry", () => {
   expect(boundaryCenter(null)).toBeNull();
   expect(

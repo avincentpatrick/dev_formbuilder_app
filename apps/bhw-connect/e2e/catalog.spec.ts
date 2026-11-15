@@ -136,3 +136,30 @@ test("home starts with the catalog and every available card has consistent detai
   await page.getByRole("link", { name: "Congressional districts", exact: true }).click();
   await expect(page.getByLabel("Congressional district", { exact: true })).toBeVisible();
 });
+
+test("BHW details retain the dataset through location selection, ancestors and history", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("catalog?mode=all&dataset=bhw");
+  await page.getByLabel("Choose a region", { exact: true }).selectOption("region:01");
+  await page.getByRole("button", { name: "Show datasets" }).click();
+  await expect(page).toHaveURL(/dataset=bhw/);
+  await expect(page).toHaveURL(/location=region%3A01/);
+  await page.reload();
+  await expect(page.getByTestId("catalog-scope")).toContainText("REGION I");
+  await page.locator('select[name="location"]').selectOption("province:01028");
+  await page.getByRole("button", { name: "Show datasets" }).click();
+  await page
+    .getByRole("navigation", { name: "Location ancestors" })
+    .getByRole("link", { name: /REGION I/ })
+    .click();
+  await expect(page).toHaveURL(/dataset=bhw/);
+  await expect(page).toHaveURL(/location=region%3A01/);
+  await page.getByRole("link", { name: "All locations", exact: true }).click();
+  await expect(page).toHaveURL(/mode=all&dataset=bhw/);
+  await page.goBack();
+  await expect(page).toHaveURL(/dataset=bhw/);
+  await expect(page.getByTestId("catalog-scope")).toContainText("REGION I");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

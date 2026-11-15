@@ -83,7 +83,11 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
   const dataset = request.dataset ? catalog.datasets.find((d) => d.id === request.dataset) : null;
   return (
     <div className="space-y-6">
-      <LocationControls geography={geography} selection={request.selection} />
+      <LocationControls
+        geography={geography}
+        selection={request.selection}
+        dataset={request.dataset}
+      />
       <div>
         <h2 className="text-2xl font-semibold" data-testid="catalog-scope">
           {locationName}

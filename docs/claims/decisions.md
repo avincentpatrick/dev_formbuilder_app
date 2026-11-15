@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D222`, the last filed, was asked and answered on 2026-11-14 in the planning of `M237`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D223`, the last filed, was asked and answered on 2026-11-14 in the planning of `M238` and `M239`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D223 — The NHETE browser walk fills about 49 pages and submits, once per screen width. Where does it run? **A — on every CI run, at all three widths.**
+
+**Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M238` and `M239`.** The planning estimate was 6 to 12 more minutes on CI's E2E job, which took about 32 then; `M239` measures the real figure.
+- **A — every CI run, all three widths (chosen, the session's recommendation).** It becomes the standing check for very large forms (`D222`'s *"the standing regression test for complex forms"*).
+- **B — every CI run at phone width only**, with tablet and desktop in the nightly scheduled run. Cheaper, but a break at those widths shows the morning after it merges.
+- **C — the nightly scheduled run only.** Merge points stay as fast as before, and every break shows the morning after.
+
+**What it creates:** `tests/e2e/nhete-walk.spec.ts` runs in every E2E job, at the three projects. Nothing filed.
+
 ### D222 — Where do the rows the NHETE stress test finds go in the work queue? **A — the testing tier (`during-testing`), taken next, ahead of the other rows of that tier.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M237`.**

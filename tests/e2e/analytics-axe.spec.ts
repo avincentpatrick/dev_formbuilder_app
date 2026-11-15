@@ -101,10 +101,16 @@ for (const theme of themes) {
 
         // `.first()` because BOTH tiles carry the note — which is §D5's point, not an accident, so an
         // unqualified locator is a strict-mode violation rather than a missing element.
-        await expect(page.getByText(/draft retention window/).first()).toBeVisible();
-        await expect(page.getByText(/draft retention window/)).toHaveCount(2);
+        //
+        // M239: both reads are scoped to the tiles. The question picker below them lists every question of every
+        // form, and the seeded NHETE module's labels carry figures like "70%", which a page-wide substring read
+        // of '0%' counted (20 of them, CI run 43568612961). The two notes counted INSIDE the scope are what prove
+        // the scope holds both draft tiles, so the zero read there is not blind.
+        const tiles = page.locator('.analytics__tiles');
+        await expect(tiles.getByText(/draft retention window/).first()).toBeVisible();
+        await expect(tiles.getByText(/draft retention window/)).toHaveCount(2);
         // Suppressed means an em dash, never a zero.
-        await expect(page.getByText('0%')).toHaveCount(0);
+        await expect(tiles.getByText('0%')).toHaveCount(0);
 
         await scanPane(page, '.analytics__tiles', `analytics suppressed tiles ${theme}`);
     });

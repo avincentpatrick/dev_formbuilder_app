@@ -871,6 +871,9 @@ jobs:
         run: |
           php artisan migrate --force
           php artisan db:seed --class="Database\\Seeders\\E2eSeeder" --force
+          # M239 (`nhete-browser-walk`): the NHETE module at /f/nhete for `nhete-walk.spec.ts`. Its own seeder, never a
+          # block inside E2eSeeder, which ten Pest runs execute; in this step, so the job's step count does not move.
+          php artisan db:seed --class="Database\\Seeders\\NheteE2eSeeder" --force
 
       - name: Install Playwright (chromium)
         run: npx playwright install --with-deps chromium

@@ -21,6 +21,7 @@ Confirmed requirements:
 - Offer appropriate map and non-map views, rather than forcing every measure into a choropleth.
 - Shareable links and exports suffice initially. Named saved configurations are deferred.
 - Phone and desktop are equally required; adapt the interaction rather than shrinking the desktop screen.
+- Place comparison starts with two places and can expand to four. Phones use an A/B switch for two places and a clearly labeled place switcher for three or four, retaining all selections and common analysis settings.
 - The initial rollout uses English only for the explanatory story and interface copy. Use plain language and explain technical terms; Filipino localization is outside the initial scope.
 - Follow-up visualizations must have explicit phases and acceptance criteria.
 
@@ -129,6 +130,7 @@ Acceptance:
 - Opening BHW yields meaningful visuals without choosing a region first; unavailable observations are honestly represented.
 - Searching a municipality/barangay from another region works; duplicate place names show their parent chain. An indicator-only query and combined place/indicator query reach relevant analysis.
 - A supported comparison query opens the requested places and measure; ambiguous terms require selection within the search flow. Basic comparison is included here; synchronized comparison maps follow in Phase 2.
+- Users can add, replace and remove comparison places up to four. Phone switching retains the selected indicator and comparison context; shared links restore all selected places. Requests exceeding four explain the limit and let the user choose places rather than silently dropping results.
 - Map indicator switching, drill-down, reset, filtering and custom group edits work with touch and keyboard-accessible alternatives. Controls and legend remain available in expanded view.
 - A fresh map opens on BHW headcount with proportional circles and a size legend; a shared link restores its explicit indicator/view instead. Zero counts are distinguishable from missing observations through the linked details/table and legend. Source/coverage checks must not substitute profile counts for unavailable headcount.
 - Phone layout provides a usable map with panels/tabs or sheets; desktop uses available width with adjacent details. Ordinary content does not overflow horizontally; wide tables use labeled scroll regions.
@@ -179,7 +181,7 @@ Before each implementation PR, Sol should state: user question answered, existin
 
 - Live review and baseline measurements remain outstanding.
 - Decide overview headline order after the source/coverage audit. The default map is agreed: BHW headcount with proportional circles.
-- Set bounded comparison limits and search grammar using realistic phone and desktop tasks.
+- Refine the supported search grammar using realistic phone and desktop tasks. Comparison size is agreed: start with two places, expandable to four.
 - Choose a lightweight evaluation exercise for general readers, LGU users and analytical users.
 
 Named saved configurations remain intentionally outside the early phases. The follow-up visualizations in Phases 2–3 are explicitly tracked scope, subject to their stated data prerequisites.

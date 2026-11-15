@@ -28,6 +28,8 @@ import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
+import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
@@ -65,7 +67,11 @@ export function DatasetMapCard({
   const searchScope = `${dataset}:${choice.level}:${choice.code}`;
   const searchText = search.scope === searchScope ? search.text : "";
   const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
-  const [geometry, setGeometry] = useState<{ key: string; codes: string[] } | null>(null);
+  const [geometry, setGeometry] = useState<{
+    key: string;
+    codes: string[];
+    collection?: BoundaryCollection;
+  } | null>(null);
   const [visible, setVisible] = useState(expanded);
   const active = useMapActivity(visible && metrics.length > 0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -403,7 +409,7 @@ export function DatasetMapCard({
                     bins={bins}
                     selected={choice.selected}
                     onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
-                    onGeometry={(codes) => setGeometry({ key, codes })}
+                    onGeometry={(codes, collection) => setGeometry({ key, codes, collection })}
                     onCapture={(run) => setCapture(run ? { key, run } : null)}
                     onRetry={() => {
                       setGeometry(null);
@@ -413,8 +419,22 @@ export function DatasetMapCard({
                     }}
                     expanded={expanded}
                     compact={workspace}
+                    labels={bhw}
                     view={view}
                   />
+                  {workspace && (choice.level !== "national" || selected) && (
+                    <NationalMapLocator
+                      geometry={geometry?.key === key ? geometry.collection : undefined}
+                      selected={selected?.code ?? null}
+                      name={selected?.name ?? data.area}
+                    />
+                  )}
+                  {bhw && (
+                    <p className="text-xs text-muted">
+                      Place labels adjust with zoom to avoid overlaps. Use the area selector for
+                      every name, including missing shapes.
+                    </p>
+                  )}
                   {workspace && selected && (
                     <p role="status" className="rounded bg-surface p-2 text-sm">
                       Selected: {selected.name} · {selected.value ?? "Not reported"}

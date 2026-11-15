@@ -6,6 +6,8 @@ import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
 import type { MapRow } from "@/lib/maps/prototype";
+import { mapLabelPoints } from "@/lib/maps/orientation";
+import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
 import { boundaryCenter, symbolMaximum, symbolRadius } from "@/lib/maps/symbols";
 
 export function DatasetCanvas({
@@ -20,6 +22,7 @@ export function DatasetCanvas({
   expanded,
   emphasis,
   compact = false,
+  labels = false,
   view = "choropleth",
 }: {
   url: string;
@@ -27,7 +30,7 @@ export function DatasetCanvas({
   bins: ColorBin[];
   selected: string | null;
   onSelect: (code: string) => void;
-  onGeometry: (codes: string[]) => void;
+  onGeometry: (codes: string[], geometry?: BoundaryCollection) => void;
   onCapture: (capture: (() => Promise<HTMLCanvasElement>) | null) => void;
   expanded: boolean;
   onRetry: () => void;
@@ -35,6 +38,8 @@ export function DatasetCanvas({
   emphasis?: readonly string[];
   /** BHW workspace fits a useful visual beside its legend on phones. */
   compact?: boolean;
+  /** Collision-managed names from the accepted area rows; no remote font source. */
+  labels?: boolean;
   view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -101,7 +106,7 @@ export function DatasetCanvas({
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
         }
-        callbacks.current.onGeometry(codes);
+        callbacks.current.onGeometry(codes, geometry);
         map = new gl.Map({
           container: container.current,
           style: {
@@ -203,6 +208,33 @@ export function DatasetCanvas({
                 if (typeof code === "string") callbacks.current.onSelect(code);
               });
           }
+          if (labels) {
+            map.addSource("place-names", { type: "geojson", data: mapLabelPoints(rows, geometry) });
+            map.addLayer({
+              id: "place-labels",
+              type: "symbol",
+              source: "place-names",
+              layout: {
+                "text-field": ["get", "name"],
+                "text-font": ["sans-serif"],
+                "text-size": 13,
+                "text-max-width": 10,
+                "text-padding": 4,
+                "text-variable-anchor": ["top", "bottom", "left", "right"],
+                "text-radial-offset": view === "circles" ? 1.8 : 0.4,
+                "text-allow-overlap": false,
+              },
+              paint: {
+                "text-color": "#111827",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1.5,
+              },
+            });
+            map.on("click", "place-labels", (e) => {
+              const code = e.features?.[0]?.properties?.geo_code;
+              if (typeof code === "string") callbacks.current.onSelect(code);
+            });
+          }
           map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
           resetView.current = () => {
@@ -222,7 +254,11 @@ export function DatasetCanvas({
                 ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
                     ?.properties?.geo_code
                 : undefined;
-            const code = symbolCode ?? e.features?.[0]?.properties?.geo_code;
+            const labelCode = labels
+              ? map?.queryRenderedFeatures(e.point, { layers: ["place-labels"] })[0]?.properties
+                  ?.geo_code
+              : undefined;
+            const code = labelCode ?? symbolCode ?? e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
@@ -243,7 +279,7 @@ export function DatasetCanvas({
       mapRef.current = null;
       resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey, view]);
+  }, [url, rows, bins, emphasisKey, view, labels]);
   return (
     <div>
       <div

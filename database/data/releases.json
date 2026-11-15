@@ -1,5 +1,15 @@
 [
     {
+        "version": "0.20.2",
+        "title": "Publish problems listed in your form's order",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "When a form can't be published yet, the list of things to fix now follows the form, from the first question to the last. Before, the same problems could come back in a different order each time you tried."
+            }
+        ]
+    },
+    {
         "version": "0.20.1",
         "title": "Meridian has a new address: iconnect.com.de",
         "items": [

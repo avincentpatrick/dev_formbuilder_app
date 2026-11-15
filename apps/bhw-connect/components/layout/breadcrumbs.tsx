@@ -16,11 +16,19 @@ import type { Crumb } from "@/lib/nav/breadcrumbs";
  * Profiling Status sections had grown independently ("›", text-sm muted, the
  * current page in foreground weight), which this replaces.
  */
-export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
+export function Breadcrumbs({
+  items,
+  className,
+  label = "Breadcrumb",
+}: {
+  items: Crumb[];
+  className?: string;
+  label?: string;
+}) {
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className={`text-sm text-muted ${className ?? ""}`}>
+    <nav aria-label={label} className={`text-sm text-muted ${className ?? ""}`}>
       <ol className="flex flex-wrap items-center gap-1">
         {items.map((crumb, i) => {
           const isLast = i === items.length - 1;

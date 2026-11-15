@@ -61,8 +61,11 @@ it('lists question problems in the form’s order, not the order the questions w
 
 it('lists rule problems in the order of the questions that own them, not the order the rules were saved in', function (): void {
     $version = makeDraftVersion(makeForm($this->user));
-    $first = addFormField($version, $this->user, 'first_num', FieldType::Integer, 0);
+    // The second question is saved before the first, so neither the rows' storage order nor an index on the
+    // owning question's id (ids are time-ordered) can hand the rules back in the form's order by accident.
+    // Measured: with the questions saved in form order, an unordered read passed through that index.
     $second = addFormField($version, $this->user, 'second_num', FieldType::Integer, 1);
+    $first = addFormField($version, $this->user, 'first_num', FieldType::Integer, 0);
 
     // The second question's rule is saved before the first's. Each names no question to compare with.
     foreach ([$second, $first] as $owner) {

@@ -11,7 +11,7 @@ test("home -> explore -> filter to barangay -> export CSV", async ({ page }) => 
   await page.goto("bhw");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Barangay Health Workers");
 
-  await page.getByRole("link", { name: "Explore" }).click();
+  await page.getByRole("link", { name: "Explore", exact: true }).click();
   await expect(page).toHaveURL(/\/explore/);
   await expect(page.getByText(/^N = /).first()).toBeVisible();
 
@@ -21,7 +21,7 @@ test("home -> explore -> filter to barangay -> export CSV", async ({ page }) => 
 
   await page.selectOption("#geo-select-Province", { index: 1 });
   await page.waitForURL(/geoLevel=province/);
-  await page.waitForSelector('#geo-select-City\\/Municipality:not([disabled])');
+  await page.waitForSelector("#geo-select-City\\/Municipality:not([disabled])");
 
   await page.selectOption("#geo-select-City\\/Municipality", { index: 1 });
   await page.waitForURL(/geoLevel=citymun/);

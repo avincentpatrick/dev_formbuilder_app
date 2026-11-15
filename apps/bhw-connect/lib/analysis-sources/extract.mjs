@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdtemp, rm, stat, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdtemp, rm, stat, mkdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, extname, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -440,7 +440,10 @@ export async function extractFile(bytes, name, options = {}) {
     };
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Production runs through a current directory junction. Node resolves import.meta.url to
+// the real release, while argv keeps the junction path; compare canonical paths.
+const entryPath = process.argv[1] ? await realpath(process.argv[1]).catch(() => null) : null;
+if (entryPath && import.meta.url === pathToFileURL(entryPath).href) {
   const [input, name, options = "{}", output] = process.argv.slice(2);
   const result = await extractFile(
     new Uint8Array(await readFile(input)),

@@ -6,6 +6,7 @@ import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
 import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
 import type { MapRow } from "@/lib/maps/prototype";
+import { boundaryCenter, symbolMaximum, symbolRadius } from "@/lib/maps/symbols";
 
 export function DatasetCanvas({
   url,
@@ -18,6 +19,8 @@ export function DatasetCanvas({
   onRetry,
   expanded,
   emphasis,
+  compact = false,
+  view = "choropleth",
 }: {
   url: string;
   rows: MapRow[];
@@ -30,9 +33,13 @@ export function DatasetCanvas({
   onRetry: () => void;
   /** Areas to outline strongly, e.g. one district's members among their province's municipalities. */
   emphasis?: readonly string[];
+  /** BHW workspace fits a useful visual beside its legend on phones. */
+  compact?: boolean;
+  view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
+  const resetView = useRef<(() => void) | null>(null);
   const selectedRef = useRef(selected);
   useEffect(() => {
     selectedRef.current = selected;
@@ -65,6 +72,8 @@ export function DatasetCanvas({
         const byCode = new Map(rows.map((r) => [r.code, r]));
         const codes: string[] = [];
         const bounds = new gl.LngLatBounds();
+        const maximum = symbolMaximum(rows);
+        const points: GeoJSON.Feature<GeoJSON.Point>[] = [];
         // Retain only children in the authoritative geography table, not unrelated shapes.
         geometry.features = geometry.features.filter(
           (f: { properties?: { geo_code?: string }; geometry?: unknown }) => {
@@ -76,6 +85,17 @@ export function DatasetCanvas({
           const code = feature.properties.geo_code;
           codes.push(code);
           const row = byCode.get(code)!;
+          const center = boundaryCenter(feature.geometry);
+          if (center && row.value !== null && Number.isFinite(row.value) && row.value >= 0)
+            points.push({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: center },
+              properties: {
+                geo_code: code,
+                value: row.value,
+                radius: symbolRadius(row.value, maximum),
+              },
+            });
           feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
@@ -114,7 +134,7 @@ export function DatasetCanvas({
             type: "fill",
             source: "areas",
             paint: {
-              "fill-color": ["get", "color"],
+              "fill-color": view === "circles" ? "#e5e7eb" : ["get", "color"],
               "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
             },
           });
@@ -146,17 +166,63 @@ export function DatasetCanvas({
             filter: ["==", "geo_code", selectedRef.current ?? ""],
             paint: { "line-color": "#111827", "line-width": 3 },
           });
+          if (view === "circles") {
+            map.addSource("symbols", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: points },
+            });
+            map.addLayer({
+              id: "counts",
+              type: "circle",
+              source: "symbols",
+              filter: [">", "value", 0],
+              layout: { "circle-sort-key": ["-", 0, ["get", "value"]] },
+              paint: {
+                "circle-radius": ["get", "radius"],
+                "circle-color": "#0c747b",
+                "circle-opacity": 0.85,
+                "circle-stroke-width": 1,
+                "circle-stroke-color": "white",
+              },
+            });
+            map.addLayer({
+              id: "zeros",
+              type: "circle",
+              source: "symbols",
+              filter: ["==", "value", 0],
+              paint: {
+                "circle-radius": 3,
+                "circle-opacity": 0,
+                "circle-stroke-width": 2,
+                "circle-stroke-color": "#0c747b",
+              },
+            });
+            for (const layer of ["counts", "zeros"])
+              map.on("click", layer, (e) => {
+                const code = e.features?.[0]?.properties?.geo_code;
+                if (typeof code === "string") callbacks.current.onSelect(code);
+              });
+          }
+          map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
+          resetView.current = () => {
+            if (!bounds.isEmpty()) map?.fitBounds(bounds, { padding: 20, animate: false });
+          };
           map.getCanvas().tabIndex = -1;
           map.once("idle", () => {
-            if (!disposed && map && codes.length) {
+            if (!disposed && map) {
               setReady(true);
               const readyMap = map;
-              callbacks.current.onCapture(() => captureMapFrame(readyMap));
+              callbacks.current.onCapture(codes.length ? () => captureMapFrame(readyMap) : null);
             }
           });
           map.on("click", "fill", (e) => {
-            const code = e.features?.[0]?.properties?.geo_code;
+            const symbolCode =
+              view === "circles"
+                ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
+                    ?.properties?.geo_code
+                : undefined;
+            const code = symbolCode ?? e.features?.[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
@@ -175,18 +241,53 @@ export function DatasetCanvas({
       resize?.disconnect();
       map?.remove();
       mapRef.current = null;
+      resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey]);
+  }, [url, rows, bins, emphasisKey, view]);
   return (
     <div>
+      <div
+        aria-label="Map viewport controls"
+        role="group"
+        className="mb-2 flex flex-wrap gap-3 text-sm"
+      >
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => mapRef.current?.zoomIn()}
+          aria-label="Zoom in"
+        >
+          {compact ? "+" : "Zoom in"}
+        </button>
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => mapRef.current?.zoomOut()}
+          aria-label="Zoom out"
+        >
+          {compact ? "−" : "Zoom out"}
+        </button>
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded border border-border p-2"
+          disabled={!ready || failed}
+          onClick={() => resetView.current?.()}
+        >
+          Reset map view
+        </button>
+      </div>
       <div
         aria-hidden="true"
         data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
         className={
-          expanded
-            ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
-            : "h-64 w-full rounded-lg border border-border"
+          compact
+            ? "h-[32svh] min-h-60 w-full rounded-lg border border-border lg:h-[55vh]"
+            : expanded
+              ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+              : "h-64 w-full rounded-lg border border-border"
         }
       />
       {!ready && !failed && (

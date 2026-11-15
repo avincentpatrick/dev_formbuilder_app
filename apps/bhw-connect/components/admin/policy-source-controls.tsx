@@ -1,4 +1,5 @@
 "use client";
+import { researchSchema, RESEARCH_TOPICS } from "@/lib/policy-research/schema";
 import type { PolicySources, PolicyRecord } from "@/lib/policy-analysis/schema";
 export type PolicyOptions = {
   policies: PolicyRecord[];
@@ -141,9 +142,78 @@ export function PolicySourceControls({
         </div>
       )}
       <label>
-        <input type="checkbox" checked={false} disabled /> Online research: off (not yet available
-        in policy mode)
+        <input
+          type="checkbox"
+          checked={value.online}
+          onChange={(e) => change({ online: e.target.checked })}
+        />{" "}
+        Research official sources for this question or new run
       </label>
+      {value.online && (
+        <div className="grid gap-2">
+          <p>
+            Only these public search settings leave the app. Questions, uploaded passages and
+            personal dataset records are never included in search requests. Enable again for each
+            quick question; a full run freezes its choice.
+          </p>
+          <label>
+            Official publisher
+            <select
+              className="block w-full rounded border p-2"
+              value={value.research?.site ?? "doh.gov.ph"}
+              onChange={(e) =>
+                change({
+                  research: researchSchema.parse({ ...value.research, site: e.target.value }),
+                })
+              }
+            >
+              {["doh.gov.ph", "pitahc.gov.ph", "officialgazette.gov.ph"].map((site) => (
+                <option key={site}>{site}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Public research topic
+            <select
+              className="block w-full rounded border p-2"
+              value={value.research?.topic ?? "barangay-health-workers"}
+              onChange={(e) =>
+                change({
+                  research: researchSchema.parse({ ...value.research, topic: e.target.value }),
+                })
+              }
+            >
+              {Object.entries(RESEARCH_TOPICS).map(([key, title]) => (
+                <option key={key} value={key}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Public issuance number (optional; digits and hyphens)
+            <input
+              className="block w-full rounded border p-2"
+              maxLength={24}
+              value={value.research?.reference ?? ""}
+              onChange={(e) => {
+                if (/^[0-9-]*$/.test(e.target.value))
+                  change({
+                    research: researchSchema.parse({
+                      ...value.research,
+                      reference: e.target.value,
+                    }),
+                  });
+              }}
+            />
+          </label>
+          <p className="text-xs">
+            Uses Brave Search when configured. Online excerpts are separate evidence; they do not
+            change the library or establish legal supersession. Missing search configuration is
+            reported as a gap.
+          </p>
+        </div>
+      )}
       <p className="text-xs text-muted">
         Answers should distinguish policy requirements, figures printed in documents, dataset
         observations and analytical conclusions. OCR, missing fields and incompatible dates or

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PublicComparison } from "@/components/compare/public-comparison";
 import { loadFilterState } from "@/lib/filters/codec";
 import { DEFAULT_BREAKDOWNS, NATIONAL_GEO_CODE, type GeoLevel } from "@/lib/filters/schema";
 import { getChildGeos, getGeoAncestors, getGeoByCode, type GeoOption } from "@/lib/db/geo";
@@ -89,6 +90,9 @@ export default async function ComparePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
+  // Presence, not validity, selects the public contract: malformed settings must
+  // never fall through to the legacy local-suppression readers below.
+  if (rawParams.measure !== undefined) return <PublicComparison params={rawParams} />;
   const filters = loadFilterState(rawParams);
 
   // D3.3 — "/compare: district vs district." A district isn't a `dim_geo` row (plan §1), so it

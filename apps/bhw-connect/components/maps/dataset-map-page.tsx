@@ -10,6 +10,7 @@ import {
   type MapChoice,
 } from "@/lib/maps/prototype";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
+import { supportsCircles } from "@/lib/maps/symbols";
 import { DISTRICT_MAP_SLUG, type DistrictView } from "@/lib/maps/district-view";
 import { DatasetMapCard } from "./dataset-map-card";
 import { DistrictMapCard } from "./district-map-card";
@@ -21,17 +22,22 @@ export function DatasetMapPage({
   districtView?: DistrictView;
 }) {
   const router = useRouter();
+  const workspace = choice?.dataset === "bhw-stepzero-2026" || choice?.dataset === "bhw-2025";
   const current = useRef(choice);
   const trackChoice = useCallback((value: MapChoice) => {
     current.current = value;
   }, []);
   return (
-    <div className="space-y-5">
-      <label className="block">
+    <div className={workspace ? "space-y-2" : "space-y-5"}>
+      <label className={workspace ? "flex min-w-0 items-center gap-3 text-sm" : "block"}>
         Dataset
         <select
           aria-label="Map dataset"
-          className="mt-2 w-full rounded border border-border bg-background p-3"
+          className={
+            workspace
+              ? "min-w-0 flex-1 rounded border border-border bg-background p-2"
+              : "mt-2 w-full rounded border border-border bg-background p-3"
+          }
           value={choice?.dataset ?? ""}
           onChange={(e) => {
             const next = initialMapChoice(e.target.value);
@@ -39,6 +45,11 @@ export function DatasetMapPage({
               next.code = current.current.code;
               next.level = current.current.level;
               next.selected = current.current.selected;
+              if (
+                current.current.view === "choropleth" ||
+                (current.current.view === "circles" && supportsCircles(next))
+              )
+                next.view = current.current.view;
             }
             router.push(mapHref(clampBarangayScope(next)));
           }}
@@ -58,11 +69,15 @@ export function DatasetMapPage({
           ))}
         </select>
       </label>
-      <p className="text-sm text-muted">
-        Switching between available maps retains the supported area. Pending maps open their
-        national availability view; they do not inherit another dataset’s values. Legislative
-        districts open their own view, through member cities and municipalities.
-      </p>
+      {!workspace && (
+        <>
+          <p className="text-sm text-muted">
+            Switching between available maps retains the supported area. Pending maps open their
+            national availability view; they do not inherit another dataset’s values. Legislative
+            districts open their own view, through member cities and municipalities.
+          </p>
+        </>
+      )}
       {choice?.dataset === DISTRICT_MAP_SLUG && districtView ? (
         <DistrictMapCard initial={districtView} />
       ) : choice ? (

@@ -217,16 +217,16 @@ selected document. Interruptions and unreadable pages prevent a false completene
 
 ## Phase 6 — Optional online research
 
-- [ ] Integrate a supported search/fetch provider into the existing assistant, enabled only for
+- [x] Integrate a supported search/fetch provider into the existing assistant, enabled only for
   the current question/run. Provider choice and deployment configuration are implementation tasks.
-- [ ] Prefer official issuing agencies and original issuances; capture source URL, title,
+- [x] Prefer official issuing agencies and original issuances; capture source URL, title,
   retrieval time, relevant quoted text, and publication/effective date when available.
-- [ ] Label web evidence separately from uploaded policy and dataset evidence. A web result must
+- [x] Label web evidence separately from uploaded policy and dataset evidence. A web result must
   not silently supersede an uploaded policy or become a permanent library entry.
-- [ ] Build queries without private document passages or personal dataset records. Constrain URL
+- [x] Build queries without private document passages or personal dataset records. Constrain URL
   fetching against private/local addresses, unsafe redirects, oversized responses, and timeouts.
-- [ ] Treat fetched pages as untrusted text and retain evidence needed to explain cited claims.
-- [ ] If search is unavailable, finish with available internal evidence and explain the gap.
+- [x] Treat fetched pages as untrusted text and retain evidence needed to explain cited claims.
+- [x] If search is unavailable, finish with available internal evidence and explain the gap.
 
 **Acceptance:** With online research off, no search/fetch tool runs. With it on, official evidence
 is cited and dated. Web prompt injection cannot alter access, expose internal text, or trigger
@@ -276,7 +276,7 @@ assistant, and request a verifiable full-collection review with optional online 
 | 3 — Admin library | Implemented and locally verified | Upload/catalog/detail/downloads/retries/versions/archives and validated shared Ask the Data selection. Ten browser acceptance groups passed with synthetic identity/provider. Windows worker setup remains deployment work. |
 | 4 — Combined analysis | Implemented; local verification complete | Shared source controls, scoped full passages, exact version/extraction citations, registered-table restrictions and evidence audits. Online is off/unavailable until Phase 6. Windows configuration remains deferred. |
 | 5 — Full-collection review | Implemented; local acceptance verified | Private durable runs, immutable section inventory, coverage, budgets, leases/retries/cancel/resume, all-finding subject consolidation and exact source viewer. 13 PostgreSQL cases and 18 mobile browser groups passed. Windows scheduling/provider validation remains deferred. |
-| 6 — Online research | Not started | Per-question opt-in; provider not selected. |
+| 6 — Online research | Implemented; local acceptance verified | Existing Brave adapter, fixed public-only queries, selected official publishers, bounded HTML/PDF retrieval, private dated/hash-backed evidence, one-question/run opt-in and durable run reuse. 24 mobile browser groups passed; live provider/Windows checks remain deferred. |
 | 7 — Deployment and verification | Not started | Coordinate worker, OCR dependencies, and backups. |
 
 Update this table after each phase with changed paths, checks/results, unresolved dependencies,
@@ -524,3 +524,42 @@ research. Windows configuration, scheduling, backups and live-provider semantic
 acceptance remain explicitly deferred; no operator messages or shared ops files
 were changed. Schema snapshot refresh remains a deployment follow-up after the
 new schema reaches the box, alongside the prior phases' pending Windows checks.
+
+
+### Phase 6 — optional online research (2026-11-15)
+
+Phase 5 PR #518 is merged. Reused the existing Brave Search adapter, protected
+HTTPS fetcher and bundled PDF extraction sidecar. Policy mode now offers explicit
+one-question/new-run online opt-in; the checkbox resets after submission. Queries
+use only a selected official publisher, a fixed public topic and an optional
+public numeric issuance reference. Questions, private passages, metadata titles,
+dataset rows and model arguments never enter search queries. No network tools
+are given to the model. Retrieved links/scripts/instructions cannot authorize
+further requests or widen private source/data access.
+
+The additive private research facade freezes run opt-in atomically, retains one
+owner-scoped web snapshot and reuses it across section workers/resume. Sections
+store a compact reference rather than duplicate the entire snapshot. Quick
+questions retain evidence before using it. Source URL/title/publisher, retrieval
+time, reported dates, exact excerpts and byte/text hashes are available in the
+private source viewer. Online evidence is separately audited/labeled; it never
+silently supersedes an uploaded policy or enters the permanent library. Failed,
+missing or unreadable research adds a gap and preserves internal analysis.
+
+Verification: 1,923 app tests passed / 13 skipped, including 17 disposable
+PostgreSQL review/research cases. Twenty-four mobile Chromium acceptance groups
+passed with synthetic identity/AI/search/site transports and real local
+PostgreSQL/PostgREST/OCR/PDF extraction. Cases cover online-off with no requests,
+per-question/run opt-in reset, public query isolation, web injection links,
+private dated/hash-backed sources, original PDF extraction, failure fallback,
+closed-tab processing and frozen run reuse. Transport cases cover DNS pinning,
+private/unsafe redirects, credential isolation, decompressed size and timeout
+limits. Unicode excerpts preserve code-point/hash boundaries. Lint (one existing
+deliberate-fixture warning), typecheck, migration lint, the prefixed production
+build, standalone extractor verification and whitespace checks passed.
+
+See POLICY_ONLINE_RESEARCH.md for limits, setup and recovery. No new environment
+settings or shared ops/workflow changes. Existing BHW_WEB_SEARCH_API_KEY powers
+search when configured. Windows runtime/scheduling, backup/restore, schema-copy
+refresh and live-provider/official-site validation remain deferred under Phase 7;
+no operator messages were sent. Phase 7 deployment/recovery verification is next.

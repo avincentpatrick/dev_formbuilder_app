@@ -16,7 +16,214 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test)
+## Status: ACTIVE CLAIM — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (m240-builder-copy-section)
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-the-next-nhete-temporal-crab.md`). NHETE Phase 2, recommendation 1 of the NHETE plan, taken next by `D222`. The line shows the row `blocked (precondition: row is not-live)`; that is the generator's rule for every request row (`scripts/pipeline.php`, `read_defects()`), and `D222` is the user's signal to take it.
+Branch `m240-builder-copy-section`, cut from `origin/m239-nhete-browser-walk` at `7d968105`, so it is **stacked on #521 (and through it on #519)**: the row, `tests/Support/Nhete/` and `tests/e2e/nhete-builder-block.spec.ts` exist only there. `origin/main` is merged in for the claim files. PR into main, **fourth at the next merge point** (#520, #519, #521, this). **A change a tester sees: `VERSION` 0.20.1 → 0.21.0 with its release notes.** Held green for a merge point on the user's word (`D137`).
+Row: `builder-copy-section` (`R-cbb9de64`), *"The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand."*
+The user's answers in planning, recorded on this branch:
+- `D224` **A**: two ways in on one engine, **Duplicate section** and **Duplicate** for ticked questions.
+- `D225` **A**: a copy's keys **count up** (`a01_use` → `a02_use`) when the whole copy's next number is free; `_copy` otherwise.
+- `D226` **A**: `R-ade0b598` (a renamed key leaves its references broken) is its own increment, straight after, built on this one's rewriter.
+
+The one-question **Duplicate** becomes the one-question case of the same engine: its key counts up and the copy lands right below the original, as `resources/js/components/help/manual.ts` already says it does.
+
+### Evidence verified
+- `FormBuilderService::duplicateField()` copies one question, and no route copies a section: **held** (`routes/tenant.php`, only `fields/{field}/duplicate`).
+- A copied question's rules keep comparing with the **original's** siblings, and nothing in the backend rewrites a `${key}`: **held** (`duplicateField()` replicates each validation row with `related_form_field_id` unchanged; `ExpressionParser` has no printer, and template instantiation, the library, the XLSForm import and the cloner all keep keys or leave references as written).
+- *"Building NHETE took 1,725 builder requests"*: **held as a recorded figure**, not an assertion. `NheteBuilderRouteTest` writes it to its report (49×2 + 803×2 + 5×4 + 1).
+- *"Each indicator a note, four dropdowns, a calculation and a comment whose conditions name its siblings"*: **moved.**
+  - 29 of 35 blocks have four dropdowns; B03, B08, B19, B20, B21 and D03 have three (no cut-off).
+  - Nothing inside a block has a show-when condition. The comment names its siblings in a "Required when…" rule (stored by id) and in its placeholder `${…_ph}`, and the `_ph` calculation names three siblings in its formula (text).
+
+### Premise verified
+- *"Copy a whole section"* builds NHETE: **false.** The 35 blocks sit 5–12 to a page inside four domain sections (`mx_a`…`mx_d`, `NhetePlan::indicatorTable()`). Hence `D224`: ticked questions too.
+- Counting up gives NHETE's keys: **false.** Its codes run neither consecutively nor in order (A01, A07, A03, …). So the NHETE driver renames each copy's keys and, until `D226`'s increment, re-sends the two text references.
+- `RetiredFieldKeys::for()` is the set of keys a copy must not take: **false.** It omits a key the current published version still holds but the draft deleted, and every section key, yet repeat answers are stored under the section key. A new `everHeld()` reads every published version's field and section keys.
+- Placing copies in the browser and saving the order, the way other builder actions do: **wrong here.** `reorder()` calls `FieldRevisionRecorder::recordMoves()`, which would log "Moved" for the untouched questions below a ticked copy. The server places the copies inside the copy's own transaction.
+- Undoing a section copy by deleting the section: **false.** `deleteSection()` ungroups its questions (`nullOnDelete`); undo needs the questions deleted with it.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+The row's remedy (copy a section, fresh keys, re-point every condition, rule and piped reference inside the copy) **works by reading** the lexer and the template scanner:
+- An expression reference spans exactly `${key}` from the token's byte position, with no whitespace allowed, and string literals carry no escapes. A right-to-left splice is byte-exact.
+- The template scanner can record each hole's offset without changing the segments the golden vectors compare.
+
+Two corrections to the remedy:
+- **It needs a second way in (`D224`).**
+- **The copies are placed by the server, not the browser.**
+
+The tests below measure it before the build closes.
+
+Files:
+- new `app/Services/Expressions/ExpressionKeyRewriter.php`, `app/Services/Forms/KeyReferenceRewriter.php`, `app/Services/Forms/DraftCopier.php`, `app/Support/Forms/CopyKeys.php`;
+- `app/Services/Templates/TemplateParser.php`, `app/Services/Forms/RetiredFieldKeys.php`, `app/Services/Forms/FormBuilderService.php`, `app/Services/Forms/BuilderPresenter.php`, `app/Http/Controllers/Tenant/FormBuilderController.php`, `routes/tenant.php`;
+- `resources/js/components/builder/useBuilderStore.ts`, `BuilderCanvas.vue`, `resources/js/components/help/manual.ts`;
+- tests: new `tests/Feature/Forms/BuilderCopyTest.php`, unit tests for the rewriters and `CopyKeys`, a Vitest store test; `BuilderRoutesTest`, `BuilderDraftGuardTest`, `OtherSpecifyTest`, `PlatformTemplateSeedTest`; `tests/Support/Nhete/NheteBuilderDriver.php` and `tests/Feature/Forms/Nhete/NheteBuilderRouteTest.php`; `tests/e2e/nhete-builder-block.spec.ts`;
+- `VERSION`, `database/data/releases.json`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none (the rewriter is server-side only; the TypeScript engine is unchanged).
+Namespaces spent: `D224`, `D225`, `D226`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- Every copy publishes through both gates with its references re-pointed. Domain B built by copying serialises identically to domain B built by hand.
+- The NHETE builder build needs about 1,555 requests instead of 1,725. Stop 8 goes from 478 to about 308: 6 blocks by hand (80), then 29 copies at one request each, plus one rename per copied question (199). Every copied block's rules come from the copy and are not re-entered.
+- The E2E additions cost under a minute.
+
+The one most likely wrong: the builder store's undo and redo across a section copy, where the section's server id changes on redo and history entries hold section ids.
+
+**BUILT AND HELD (2026-11-15): PR #526, stacked on #521.** `VERSION` 0.21.0 with its notes.
+- **CI run 43692637135 on `d9b95b89`:** every job but Static green.
+  - Pest: 7,618 passed and 1 skipped (36,545 assertions).
+  - E2E: 924 passed in 38.9 min. `nhete-builder-block.spec.ts` takes about 27 s per width, against M239's 20 s.
+  - Static stopped at the pipeline lint, because the line had drifted after a late backlog edit. The line was regenerated in `df08af51`.
+  - **Run 43695896934 on `df08af51`:** every job green with real step counts (Pest 11 · E2E 20 · Contract 16 · Frontend 12 · axe 11 · BHW Connect 22 · Scope 5). Static stops only at `Composer audit (SCA)`.
+  - The run before it (43690519220) also showed `NoteContentShapeTest`'s known order flake (`publish-gate-field-order`, filed in #520). Static stops at `Composer audit (SCA)` until #520 merges.
+- **9 of 9 mutants caught:** five server ones through `mutate.php`, and four store ones through a byte-restoring Vitest harness.
+- **Local runs:**
+  - Pest: `BuilderCopyTest` 7, the unit tests 17, the builder and draft-guard tests 31, the NHETE group all green;
+  - Vitest: 75 builder and help files;
+  - `vue-tsc` and Pint clean;
+  - host PHPStan 0 in this branch's files;
+  - E2E against a scratch database: 87 of 90 first, then 3 of 3 after a locator fix.
+
+**How the prediction fared.**
+- **Held:**
+  - Every copy publishes through both gates with its references re-pointed.
+  - Domain B built by copying serialises exactly as domain B built by hand.
+  - The E2E additions cost under a minute (about 21 s across the three widths).
+  - The one flagged as most likely wrong was real: history entries hold section ids, and a redone section copy gets a new one. The plan's review caught it before the build, and `sectionAlias` fixes it. Two Vitest cases pin it, and both go red without it. It had already broken undo of a section's delete followed by a Move.
+- **Close:** about 1,555 requests predicted, 1,560 measured. The 5 extra are moves of a copy to its section's end, which I had not counted.
+- **Not predicted:**
+  - Each copy cleared `section_sequence` on every question of the draft, which made the copy-built NHETE form 2.7 times slower: 294 s against 107 s by hand on one box. Only rows that carry one are written now, and the copy build takes 141 s. In production the old write also row-locked every question of the draft on each copy.
+  - `mutate.php` aborts on a dirty target (four of five mutants, until I committed).
+  - Two old backlog citations went blank when my lines moved. They had already pointed at the wrong code, and are now cited by name.
+  - PHPStan wanted real lists in four places.
+  - My E2E locator read a section's head as its question list.
+  - Filed, not fixed: `copy-split-other-pair` (`before-launch`) and `copy-text-over-request-cap` (`after-launch`).
+
+---
+
+## HELD — `M239`, `nhete-browser-walk`: the NHETE module walked in a browser at three widths, and one indicator block built by clicking in the builder (m239-nhete-browser-walk) — BUILT AND HELD: PR #521, stacked on #519, every job green but Static (audit only, until #520 merges), waiting for a merge point, where it goes third
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m239-nhete-browser-walk`, cut from `origin/m237-nhete-stress-test` at `4a918ccb`, so it is **stacked on #519**: the row, the fixture and `tests/Support/Nhete/` exist only there. `origin/main` is merged in for the claim files. PR into main, after #519 at the merge point. **Tests, a test seeder and CI only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
+Row: `nhete-browser-walk`, *"The NHETE module has not been walked in a browser: the respondent app at three widths, and one indicator block built by clicking in the builder."* The user's answer in planning, recorded as `D223` on this branch: the walk runs on every CI run, at all three widths.
+
+### Evidence verified
+- `AuthScanFixturesTest` runs `E2eSeeder` five times, and `E2eSeederIdempotencyTest` five more, pinning 13 published forms: **held**.
+- `NheteWorkbook::MERIDIAN` imports and publishes: **held** (`NheteXlsformImportTest`, 5.23 s in #519's run 43550232199).
+- CI seeds only in the E2E job's *Migrate + seed the e2e fixture* step, and `docker compose run --rm e2e` seeds nothing: **held**.
+- The row's "897 KB version" is the builder-route build's (`NheteBuilderRouteTest`'s `snapshot_bytes`): **moved**. The walk's form is the Meridian import's, and the walk reports that version's size.
+- The first choice of the `keep` list is `yes`, so a filler that picks the first choice shows every parts page: **held** (the fixture's `lists.keep`).
+
+### Premise verified
+- *"The local database holds no E2E seed"*: **false.** It holds `acme`, with 427 forms (last updated 2026-11-07), and seven `@meridian.test` users, from earlier local e2e runs.
+  - The walk runs anyway against a scratch database, `meridian_e2e`, created and dropped by this session, so nothing in `meridian` changes.
+- Every database connection, the cache, the sessions and the queue read `DB_DATABASE`, and no config cache exists: **held**. So one variable isolates the scratch run.
+- An imported `begin group` becomes a section, and the guest runtime shows one section per page when `single_page_mode` is off: **held** (`XlsformImportParser`, `useFormRuntime.ts`).
+- The import renames the form to the workbook's `form_title` and takes its slug from `form_id` (`XlsformImporter::applySettings`): **held**. So the seeder finds its form by slug, not by title.
+- `.github/` is avincentpatrick's alone (`D211`), and nothing under `apps/` is read or edited: **held**.
+
+### Remedy verdict
+The row's remedy has three parts:
+- a `NheteE2eSeeder` that imports the Meridian workbook, run by CI after `E2eSeeder`;
+- a spec that answers each page with a generic first-choice filler;
+- a builder spec that clicks one indicator block into being.
+
+It **works by reading**, and the specs' first runs against the scratch database measure it. One addition: the filler reads a page again after each answer, because the parts pages reveal questions as they are answered.
+
+Files:
+- new `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/NheteE2eSeederTest.php`;
+- new `tests/e2e/nhete-walk.spec.ts` and `tests/e2e/nhete-builder-block.spec.ts`;
+- `.github/workflows/ci.yml`: one line in the existing seed step;
+- `docs/TESTING-GUIDE.md`: its claim that the suite's setup seeds `acme` is false.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md`, `docs/TESTING-GUIDE.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/*.spec.ts`.
+Paired files taken: none.
+Namespaces spent: `D223`; nothing from the ADR or migration namespaces.
+
+Prediction:
+- The walk passes at all three widths, with no sideways scroll and clean axe in both themes, and resume restores the answers.
+- The builder spec clicks the block into being, and it survives a reload.
+- CI's E2E job grows by 6 to 12 minutes.
+
+The one most likely wrong: the 141-question parts page at 375 px (a long placeholder word or a dropdown overflowing), or the filler tripping a rule on a first-choice pick.
+
+**BUILT AND HELD (2026-11-14): PR #521, stacked on #519.** Its first CI run, 43568612961, passed all six NHETE cases. The walk took about 22 s per width and the builder spec about 20 s, so about 2 minutes in all.
+- Static stopped at `Composer audit (SCA)`, as expected until #520 merges.
+- Two failures in that run were this branch's, and it fixed both:
+  - `analytics-axe`'s suppressed-tiles read counted NHETE's labels ("70%") as zeros. It is now scoped to the tiles.
+  - The seeder test's page read needed Vite. It now reads without it.
+- Two failures were not this branch's: `NoteContentShapeTest` (`publish-gate-field-order`) and the PDF minute flake.
+- 5 of 5 mutants caught.
+
+**How the prediction fared.**
+- **Held:** the walk passes at all three widths with no sideways scroll and clean axe in both themes, and resume restores the answers. The builder block survives a reload.
+- **Wrong:**
+  - CI's cost: predicted 6 to 12 minutes, measured about 2.
+  - The one flagged as most likely wrong did not happen: the parts page at 375 px and the filler both held.
+  - Four things nobody predicted:
+    - the import's `default_language` as `<html lang>` (filed);
+    - the drawn radio and checkbox taking the pointer, so `.check()` hung for the whole test budget;
+    - a page-wide `'0%'` read in another spec;
+    - a Pest page read that needs built assets.
+  - The row's premise that the local database held no E2E seed was false.
+
+**Extended mid-build (2026-11-14), before the file was opened.** The walk's first axe scan failed `html-lang-valid` on the welcome page. The import stores the workbook's `default_language` (`English`) as the form's locale, and the guest page writes `<html lang="English">`.
+- It is filed as `xlsform-default-language-name` (`during-testing`).
+- The seeder sets the form's locale to `en`, naming that row, so the walk measures the respondent app and not the import.
+- `tests/Feature/Forms/Nhete/NheteXlsformImportTest.php` joins the files, to pin what the import stores today.
+
+---
+
+## HELD — `M238`, `composer-audit-laravel-13-40`: `laravel/framework` to v13.42.0, clearing CVE-2026-128083 and the composer audit every CI run now fails (m238-laravel-13-42) — BUILT AND HELD: PR #520 green, run 43562454871 8/8 with real step counts, waiting for a merge point, where it goes first
+
+**BUILT AND HELD (2026-11-14):** run 43562454871 has every required check green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, plus Boundary 43562453077 green (5).
+
+**How the prediction fared.**
+- **Held:** `composer audit --locked` exits 0, the lock moves two packages only, and `content-hash` does not move. Static runs to its full 33 steps for the first time since 2026-11-13.
+- **Wrong:** "every required check green" failed on the first run. PHPStan went red, through a path nobody named: Laravel 13.38 blinded Larastan to the app's console commands.
+- The one flagged as most likely wrong, a behaviour change caught by Pest or E2E, did not happen: both were green on 13.42.0.
+- Found on the way, not predicted: `NoteContentShapeTest`'s order flake (`publish-gate-field-order`).
+
+**Extended mid-build (2026-11-14), before the files were opened.** #520's run 43559666697 failed Static at PHPStan with 17 `cast.string` errors in nine console commands, each a `(string)` cast on `argument()` or `option()`.
+- Laravel 13.38 moved the commands `load()` finds off `Artisan::starting` and into the kernel's `$kernelCommands`. The console application Larastan builds to read each signature (3.10.0, and 3.15.0 alike) no longer sees them, so both methods fall back to `array|string|float|int|bool|null`.
+- Every fixed version is 13.40.0 or later, so pinning lower cannot avoid it.
+- Files added: a new `app/Console/Concerns/ReadsTextInput.php`, and the `ActivateCustomDomain`, `BuildPsgc`, `CreateTenant`, `DeployCensus`, `ExtractTenant`, `OcrBakeoff`, `OcrBakeoffLayout`, `PlatformSuperAdmin` and `SsoDomain` commands under `app/Console/Commands/`.
+- Filed with it: the same blindness takes Larastan's undefined-argument rule with it, as its own row.
+
+Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/take-composer-audit-laravel-13-40-larave-mutable-boot.md`). Branch `m238-laravel-13-42`, cut from origin/main at `712bd47b`, PR into main. **A lock change only: nothing a tester sees changes, so no `VERSION` bump** (the `M212` shape). Held green for a merge point on the user's word (`D137`), where it goes **first**, ahead of #519.
+Row: `composer-audit-laravel-13-40`, *"A Laravel advisory reported on 2026-11-13 turns `Composer audit (SCA)` red on every pull request and on the trunk, on a lock nobody changed."* Filed by `M237` on #519's branch only, so **this PR files and closes it**, and #519 dropped its open copy at `4a918ccb`.
+
+### Evidence verified
+- `composer.lock` holds `laravel/framework` `v13.30.1`: **held**.
+- `composer audit --locked` on the host reports exactly one advisory, `CVE-2026-128083` (GHSA-63hm-g96r-2m2q, *"Laravel: Task Output Injection - Concurrency Process"*, low), affecting `>=13.0.0,<13.40.0|<12.71.0`, reported 2026-11-13T18:54:31Z, and exits 1: **held**.
+- #519's run 43545115637 failed Static at step 23, *Composer audit (SCA)*, and skipped steps 24–30 (Node, npm audit, the staging headers fetch and judge, the secret scan): **held**.
+
+### Premise verified
+- The row exists only on #519's branch (`3f56e2df`), and #519 merges after this: **held**, so the row is filed and closed here.
+- Nothing in `app/`, `config/` or `routes/` uses the `Concurrency` facade (the two hits are comments): **held**. The advisory does not reach this app's code; the bump is for the gate.
+- The lock's `plugin-api-version` is `2.6.0`, which is what the host's Composer 2.8.12 writes: **held**, so writing the lock on the host leaves that line alone.
+- The host's `vendor/` is behind the lock (phpseclib 3.0.57 installed, 3.0.58 locked): **held**, and irrelevant to the diff, which is the lock alone.
+
+### Remedy verdict
+The row's `composer update laravel/framework --with-dependencies`, dry-run: **works, but moves 110 packages**, including a major `guzzlehttp/uri-template` 1 → 2. With `--minimal-changes` added, dry-run: `laravel/framework` v13.30.1 → **v13.42.0** (the newest 13.x) and `laravel/prompts` v0.3.21 → v0.3.27, **and nothing else**. Taken with `--no-install --no-scripts` (the `M235` recipe); `composer audit --locked` after the write is the measurement.
+
+Files: `composer.lock`.
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: nothing from the ADR, migration or decision namespaces.
+
+Prediction:
+- `composer audit --locked` exits 0, the diff is the two packages' lock entries, and `content-hash` does not move.
+- Every required check is green, and Static runs past the audit to its full step count for the first time since 2026-11-13.
+
+The one most likely wrong: a 13.31–13.42 behaviour change that Pest or E2E catches.
+
+---
+
+## HELD — `M237`, `nhete-stress-test`: build the NHETE pre-work module every way the app offers, and measure what passes (m237-nhete-stress-test) — BUILT AND HELD: PR #519, red at `Composer audit (SCA)` until `M238` merges, waiting for a merge point
 
 Taken 2026-11-14, from the plan the user approved in chat the same day (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Branch `m237-nhete-stress-test`, cut from origin/main at `93d85ccd`, PR into main. **Tests and records only: nothing a tester sees changes, so no `VERSION` bump.** Held green for a merge point on the user's word (`D137`).
 Row: filed by this increment, `nhete-stress-test`, *"The NHETE TWG pre-work module (about 45 screens, 35 indicator rows of five questions, about 90 conditional part rows) has never been built in the app; the biggest form ever seeded has about eight questions, and nothing has been measured at that size."* The user's three answers are recorded as `D220`–`D222` in this PR: a test case, not a live run; the repository gets a same-shape copy with placeholder wording and never the review copy's own words; every NHETE row is filed `during-testing` and taken next.

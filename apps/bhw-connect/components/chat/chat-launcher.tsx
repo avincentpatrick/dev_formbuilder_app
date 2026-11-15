@@ -7,11 +7,13 @@ export function ChatLauncher({
   geoCode,
   geoLevel,
   dataset = "bhw",
+  placement = "floating",
 }: {
   geoCode?: string;
   geoLevel?: GeoLevel;
   geoName?: string;
   dataset?: DatasetScopeId;
+  placement?: "floating" | "inline";
   starterQuestions?: string[];
   introLine?: string;
   inputPlaceholder?: string;
@@ -23,7 +25,7 @@ export function ChatLauncher({
   return (
     <Link
       href={`/ask-the-data?${query}`}
-      className="fixed bottom-24 right-4 z-30 rounded-full bg-accent px-4 py-3 text-sm font-medium text-accent-foreground shadow-lg hover:opacity-90"
+      className={`${placement === "floating" ? "fixed bottom-24 right-4 z-30" : "inline-block"} rounded-full bg-accent px-4 py-3 text-sm font-medium text-accent-foreground shadow-lg hover:opacity-90`}
     >
       Ask the Data · approved users
     </Link>

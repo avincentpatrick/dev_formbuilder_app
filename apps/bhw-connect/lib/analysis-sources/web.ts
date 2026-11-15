@@ -44,11 +44,31 @@ function proxyFor(host: string) {
 }
 export async function publicFetch(
   raw: string,
-  options: { headers?: Record<string, string>; sensitiveOrigin?: string } = {},
+  options: {
+    headers?: Record<string, string>;
+    sensitiveOrigin?: string;
+    allowedHost?: string;
+    signal?: AbortSignal;
+    maxBytes?: number;
+  } = {},
 ) {
   let next = raw;
   for (let hop = 0; hop < 4; hop++) {
-    const { url, address } = await validatePublicUrl(next);
+    options.signal?.throwIfAborted();
+    let resolutionTimer: ReturnType<typeof setTimeout> | undefined;
+    const { url, address } = await Promise.race([
+      validatePublicUrl(next),
+      new Promise<never>((_, reject) => {
+        resolutionTimer = setTimeout(() => reject(new Error("DNS resolution timed out")), 5000);
+        resolutionTimer.unref();
+      }),
+    ]).finally(() => clearTimeout(resolutionTimer));
+    if (
+      options.allowedHost &&
+      url.hostname !== options.allowedHost &&
+      !url.hostname.endsWith(`.${options.allowedHost}`)
+    )
+      throw new Error("Redirect outside selected official publisher");
     if (options.sensitiveOrigin && url.origin !== options.sensitiveOrigin)
       throw new Error("Credential-bearing redirect refused");
     const target = new URL(url);
@@ -66,6 +86,7 @@ export async function publicFetch(
         target,
         {
           servername: url.hostname,
+          signal: options.signal,
           agent: proxy ? new HttpsProxyAgent(proxy) : undefined,
           headers: {
             Host: url.host,
@@ -100,7 +121,7 @@ export async function publicFetch(
           let size = 0;
           stream.on("data", (chunk: Buffer) => {
             size += chunk.length;
-            if (size > MAX_BYTES) {
+            if (size > (options.maxBytes ?? MAX_BYTES)) {
               stream.destroy();
               req.destroy(new Error("Source exceeds retrieval size limit"));
             } else chunks.push(chunk);
@@ -138,7 +159,7 @@ export async function publicFetch(
   }
   throw new Error("Source redirected too many times");
 }
-export async function searchOnline(query: string) {
+export async function searchOnline(query: string, signal?: AbortSignal) {
   const key = process.env.BHW_WEB_SEARCH_API_KEY;
   if (!key)
     return {
@@ -149,18 +170,17 @@ export async function searchOnline(query: string) {
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query.slice(0, 500));
   url.searchParams.set("count", "5");
-  analysisUsage
-    .getStore()
-    ?.push({
-      provider: "brave-search",
-      model: "web-v1",
-      billingUnit: "request",
-      inputTokens: null,
-      outputTokens: null,
-    });
+  analysisUsage.getStore()?.push({
+    provider: "brave-search",
+    model: "web-v1",
+    billingUnit: "request",
+    inputTokens: null,
+    outputTokens: null,
+  });
   const response = await publicFetch(url.href, {
     headers: { "X-Subscription-Token": key },
     sensitiveOrigin: url.origin,
+    signal,
   });
   const data = JSON.parse(response.bytes.toString("utf8")) as {
     web?: { results?: Array<{ title: string; url: string; description: string }> };

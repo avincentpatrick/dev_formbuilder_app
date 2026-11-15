@@ -107,17 +107,19 @@ export function BarChartClient({
 /** Selectable counterpart to the Plot chart: full names and native buttons work on touch/keyboard. */
 export function SelectableBarChart({
   data,
+  maximum: suppliedMaximum,
   selected,
   onSelect,
   label,
 }: {
   data: BarDatum[];
+  maximum?: number;
   selected: string | null;
   onSelect: (code: string) => void;
   label: string;
 }) {
   const fill = usePaletteAccent();
-  const maximum = Math.max(0, ...data.map((row) => row.value));
+  const maximum = suppliedMaximum ?? Math.max(0, ...data.map((row) => row.value));
   return (
     <ul aria-label={label} className="space-y-2">
       {data.map((row) => (

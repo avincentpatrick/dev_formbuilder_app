@@ -29,6 +29,8 @@ import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import { hasValueFilter, valueFilterState, countFilterSummary } from "@/lib/maps/value-filter";
+import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { RankedMapBars } from "./ranked-map-bars";
 import { NationalMapLocator } from "./national-map-locator";
@@ -86,9 +88,14 @@ export function DatasetMapCard({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const query = mapHref({ ...choice, selected: null }).split("?")[1];
+  const query = mapHref({
+    ...choice,
+    selected: null,
+    valueMin: undefined,
+    valueMax: undefined,
+  }).split("?")[1];
   const key = `${query}&retry=${retry}`;
-  const exportVersion = `${key}:${choice.selected ?? ""}`;
+  const exportVersion = `${key}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}`;
   const currentExportVersion = useRef(exportVersion);
   useEffect(() => {
     currentExportVersion.current = exportVersion;
@@ -148,6 +155,14 @@ export function DatasetMapCard({
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const view = mapView(choice);
+  const filtering = hasValueFilter(choice);
+  const filterSummary = data && filtering ? countFilterSummary(data.rows, choice) : null;
+  const excludedCodes =
+    data && filtering
+      ? data.rows
+          .filter((row) => valueFilterState(row, choice) === "Excluded by range")
+          .map((row) => row.code)
+      : [];
   const bhw = dataset === "bhw-stepzero-2026" || dataset === "bhw-2025";
   const workspace = bhw && expanded;
   const [panel, setPanel] = useState<"map" | "areas">("map");
@@ -270,13 +285,21 @@ export function DatasetMapCard({
                 onChange={(e) => {
                   const m = metrics.find((i) => i.id === e.target.value)!;
                   // A barangay view only exists for indicators with a barangay reader.
-                  const next = clampBarangayScope({ ...choice, indicator: m.id, period: m.period });
+                  const next = clampBarangayScope({
+                    ...choice,
+                    valueMin: undefined,
+                    valueMax: undefined,
+                    indicator: m.id,
+                    period: m.period,
+                  });
                   if (next.view === "circles" && !supportsCircles(next)) next.view = "choropleth";
                   if (next.level !== choice.level) setTrail(trail.slice(0, -1));
                   setNotice(
                     next.level !== choice.level
                       ? "This indicator has no barangay map, so it is shown for the province."
-                      : null,
+                      : filtering
+                        ? "Count range reset for the new indicator."
+                        : null,
                   );
                   setChoice(next);
                 }}
@@ -434,7 +457,7 @@ export function DatasetMapCard({
                 <>
                   {workspace && legend}
                   <DatasetCanvas
-                    key={`${key}:render=${renderAttempt}`}
+                    key={`${key}:render=${renderAttempt}:range=${choice.valueMin}:${choice.valueMax}`}
                     url={data.geometryUrl}
                     rows={data.rows}
                     bins={bins}
@@ -451,8 +474,19 @@ export function DatasetMapCard({
                     expanded={expanded}
                     compact={workspace}
                     labels={bhw}
+                    excludedCodes={excludedCodes}
                     view={view}
                   />
+                  {filterSummary && (
+                    <p role="status" className="rounded border border-border p-2 text-sm">
+                      Count range: {choice.valueMin ?? "no minimum"} to{" "}
+                      {choice.valueMax ?? "no maximum"}, inclusive. {filterSummary.included}{" "}
+                      included, {filterSummary.excluded} excluded, {filterSummary.unavailable}{" "}
+                      unavailable. Published total and complete table unchanged. White shapes with
+                      dashed outlines are excluded. Scales and classification use all areas.
+                      {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
+                    </p>
+                  )}
                   {workspace && (choice.level !== "national" || selected) && (
                     <NationalMapLocator
                       geometry={geometry?.key === key ? geometry.collection : undefined}
@@ -587,6 +621,19 @@ export function DatasetMapCard({
                       {data.totalNote}
                     </p>
                   )}
+                  {workspace && supportsCircles(choice) && (
+                    <ValueFilterControls
+                      key={`${choice.indicator}:${choice.valueMin}:${choice.valueMax}`}
+                      range={choice}
+                      onApply={(range) =>
+                        setChoice((current) => ({
+                          ...current,
+                          valueMin: range.valueMin,
+                          valueMax: range.valueMax,
+                        }))
+                      }
+                    />
+                  )}
                   <label className="block text-sm">
                     Search areas by name or PSGC code
                     <input
@@ -704,6 +751,7 @@ export function DatasetMapCard({
                   )}
                   {workspace && supportsCircles(choice) && metric && (
                     <RankedMapBars
+                      range={choice}
                       rows={data.rows}
                       area={data.area}
                       label={metric.label}
@@ -738,6 +786,7 @@ export function DatasetMapCard({
                             )}
                             {(income || profiling || uucRoute || accreditation || censusMean) &&
                               !navigationOnly && <th scope="col">Source context</th>}
+                            {filtering && <th scope="col">Count range</th>}
                             <th scope="col">Geometry</th>
                           </tr>
                         </thead>
@@ -771,6 +820,7 @@ export function DatasetMapCard({
                               )}
                               {(income || profiling || uucRoute || accreditation || censusMean) &&
                                 !navigationOnly && <td>{r.note ?? "—"}</td>}
+                              {filtering && <td>{valueFilterState(r, choice)}</td>}
                               <td>
                                 {shapeCodes
                                   ? shapeCodes.includes(r.code)

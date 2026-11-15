@@ -23,6 +23,7 @@ export function DatasetCanvas({
   emphasis,
   compact = false,
   labels = false,
+  excludedCodes = [],
   view = "choropleth",
 }: {
   url: string;
@@ -40,6 +41,7 @@ export function DatasetCanvas({
   compact?: boolean;
   /** Collision-managed names from the accepted area rows; no remote font source. */
   labels?: boolean;
+  excludedCodes?: readonly string[];
   view?: "circles" | "choropleth";
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -54,6 +56,7 @@ export function DatasetCanvas({
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
+  const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
@@ -74,6 +77,7 @@ export function DatasetCanvas({
         if (disposed || !container.current) return;
         if (geometry.type !== "FeatureCollection" || !Array.isArray(geometry.features))
           throw new Error("Invalid boundary");
+        const excluded = new Set(excludedKey.split(",").filter(Boolean));
         const byCode = new Map(rows.map((r) => [r.code, r]));
         const codes: string[] = [];
         const bounds = new gl.LngLatBounds();
@@ -91,7 +95,13 @@ export function DatasetCanvas({
           codes.push(code);
           const row = byCode.get(code)!;
           const center = boundaryCenter(feature.geometry);
-          if (center && row.value !== null && Number.isFinite(row.value) && row.value >= 0)
+          if (
+            !excluded.has(code) &&
+            center &&
+            row.value !== null &&
+            Number.isFinite(row.value) &&
+            row.value >= 0
+          )
             points.push({
               type: "Feature",
               geometry: { type: "Point", coordinates: center },
@@ -101,6 +111,7 @@ export function DatasetCanvas({
                 radius: symbolRadius(row.value, maximum),
               },
             });
+          feature.properties.excluded = excluded.has(code);
           feature.properties.smallSample = row.value !== null && row.smallSample === true;
           feature.properties.color =
             row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
@@ -139,7 +150,12 @@ export function DatasetCanvas({
             type: "fill",
             source: "areas",
             paint: {
-              "fill-color": view === "circles" ? "#e5e7eb" : ["get", "color"],
+              "fill-color": [
+                "case",
+                ["==", ["get", "excluded"], true],
+                "#ffffff",
+                view === "circles" ? "#e5e7eb" : ["get", "color"],
+              ],
               "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
             },
           });
@@ -148,6 +164,13 @@ export function DatasetCanvas({
             type: "line",
             source: "areas",
             paint: { "line-color": "#fff", "line-width": 1 },
+          });
+          map.addLayer({
+            id: "excluded-range",
+            type: "line",
+            source: "areas",
+            filter: ["==", ["get", "excluded"], true],
+            paint: { "line-color": "#6b7280", "line-width": 1.5, "line-dasharray": [3, 2] },
           });
           map.addLayer({
             id: "small-sample",
@@ -209,7 +232,13 @@ export function DatasetCanvas({
               });
           }
           if (labels) {
-            map.addSource("place-names", { type: "geojson", data: mapLabelPoints(rows, geometry) });
+            map.addSource("place-names", {
+              type: "geojson",
+              data: mapLabelPoints(
+                rows.filter((row) => !excluded.has(row.code)),
+                geometry,
+              ),
+            });
             map.addLayer({
               id: "place-labels",
               type: "symbol",
@@ -279,7 +308,7 @@ export function DatasetCanvas({
       mapRef.current = null;
       resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey, view, labels]);
+  }, [url, rows, bins, emphasisKey, view, labels, excludedKey]);
   return (
     <div>
       <div

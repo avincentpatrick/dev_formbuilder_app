@@ -1,3 +1,4 @@
+import { hasValueFilter, valueFilterState, countFilterSummary } from "./value-filter";
 import { mapBinLabel } from "./legend-label";
 import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
 import { isCensusProfileRate } from "./census-accreditation";
@@ -35,6 +36,7 @@ export function datasetMapExport(
     choice.dataset === "bhw-profiling-status-2026";
   return {
     schemaVersion: 1,
+    ...(hasValueFilter(choice) ? { valueFilter: countFilterSummary(data.rows, choice) } : {}),
     dataset: { slug: definition.slug, title: definition.title },
     selection: {
       ...choice,
@@ -126,6 +128,7 @@ export function datasetMapExport(
           ? "Published parent rate; never an average of child percentages."
           : "Reported parent total, not a sum of drawable areas; no aggregate is inferred when absent."),
     rows: data.rows.map((row) => ({
+      ...(hasValueFilter(choice) ? { filterState: valueFilterState(row, choice) } : {}),
       code: row.code,
       name: row.name,
       value: navigationOnly ? null : row.value,

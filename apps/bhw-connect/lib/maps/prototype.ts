@@ -1,10 +1,13 @@
 import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { getDatasetMap } from "./definitions";
 import { isReleasePublic } from "@/lib/releases/visibility";
+import { parseCountRange, hasValueFilter } from "./value-filter";
 import { supportsCircles } from "./symbols";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
 export type MapChoice = MapScope & {
+  valueMin?: number;
+  valueMax?: number;
   dataset: string;
   indicator: string;
   period: string;
@@ -98,9 +101,17 @@ export function initialMapChoice(dataset: string): MapChoice {
 export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   // One meaning per shareable choice; never silently pick the first duplicated value.
   if (
-    ["dataset", "indicator", "period", "level", "code", "selected", "view"].some(
-      (key) => params.getAll(key).length > 1,
-    )
+    [
+      "dataset",
+      "indicator",
+      "period",
+      "level",
+      "code",
+      "selected",
+      "view",
+      "valueMin",
+      "valueMax",
+    ].some((key) => params.getAll(key).length > 1)
   )
     return null;
   const dataset = params.get("dataset");
@@ -141,7 +152,10 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const view = dataset === "ph-legislative-districts" ? null : params.get("view");
   if (view !== null && view !== "circles" && view !== "choropleth") return null;
   if (view === "circles" && !supportsCircles({ dataset, indicator })) return null;
+  const range = parseCountRange(params.get("valueMin"), params.get("valueMax"));
+  if (!range || (hasValueFilter(range) && !supportsCircles({ dataset, indicator }))) return null;
   return {
+    ...range,
     dataset,
     indicator,
     period,
@@ -161,6 +175,8 @@ export function mapHref(choice: MapChoice) {
   params.set("code", choice.code);
   if (choice.selected) params.set("selected", choice.selected);
   if (choice.view) params.set("view", choice.view);
+  if (choice.valueMin !== undefined) params.set("valueMin", String(choice.valueMin));
+  if (choice.valueMax !== undefined) params.set("valueMax", String(choice.valueMax));
   return `/map?${params}`;
 }
 /** Preserve zero and missing rows; never coerce absent, invalid or duplicate values into zero. */

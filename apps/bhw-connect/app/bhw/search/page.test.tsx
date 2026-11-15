@@ -38,7 +38,7 @@ it("distinguishes failed, empty and unsupported searches", async () => {
   search.mockResolvedValue([]);
   expect(await render("Unknown")).toContain("No matching places found");
   search.mockClear();
-  expect(await render("Compare Cebu and Bohol accreditation")).toContain("not supported here yet");
+  expect(await render("forecast headcount")).toContain("not supported");
   expect(search).not.toHaveBeenCalled();
 });
 

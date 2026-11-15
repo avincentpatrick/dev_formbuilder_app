@@ -8,6 +8,7 @@ import { BHW_MEASURES, levelLabel } from "@/lib/bhw/search";
 import { SourceDates } from "@/components/catalog/catalog-results";
 import { formatValue } from "@/components/catalog/presentation";
 import { BhwSearchForm } from "@/components/bhw/search-form";
+import { comparisonHref } from "@/lib/bhw/comparison";
 
 export const metadata = { title: "BHW measure" };
 
@@ -76,6 +77,9 @@ export default async function BhwMeasurePage({
         Copy this page’s URL to share this measure and location. Missing or withheld values are not
         zero.
       </p>
+      <Link className="block underline" href={comparisonHref(spec.id, [geo.geoCode])}>
+        Compare this measure with another place
+      </Link>
       <BhwSearchForm />
     </div>
   );

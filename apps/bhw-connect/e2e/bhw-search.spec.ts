@@ -40,7 +40,7 @@ for (const width of [390, 1440]) {
 test("unsupported comparison syntax does not silently pick places or a denominator", async ({
   page,
 }) => {
-  await page.goto("bhw/search?q=Compare+Cebu+and+Bohol+accreditation");
-  await expect(page.getByRole("status")).toContainText("not supported here yet");
+  await page.goto("bhw/search?q=Compare+Cebu+and+Bohol");
+  await expect(page.getByRole("status")).toContainText("not supported");
   await expect(page.getByRole("region", { name: "Search results" })).toHaveCount(0);
 });

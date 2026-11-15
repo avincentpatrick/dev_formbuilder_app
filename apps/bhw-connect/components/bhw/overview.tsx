@@ -119,7 +119,7 @@ export function BhwOverview({ dataset }: { dataset: CatalogDataset }) {
             <Link href="/bhw#workforce">Workforce distribution</Link>
             <Link href="/bhw#qualifications">Qualifications and training</Link>
             <Link href="/bhw#support">Support and compensation</Link>
-            <Link href="/compare">Compare places</Link>
+            <Link href="/compare?measure=bhw.total">Compare places</Link>
             <Link href={mapHref}>Map explorer</Link>
             <Link href="/bhw#methodology">Data and methodology</Link>
           </nav>

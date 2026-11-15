@@ -28,7 +28,7 @@ export function BhwSearchForm({
       <p id="bhw-search-help" className="text-sm text-muted">
         {compact
           ? "Place, PSGC code, or indicator."
-          : "Try a place name or PSGC code, “headcount”, “education”, or “Cebu accreditation”. Choose among matching places and measures before opening a figure."}
+          : "Try a place name or PSGC code, “headcount”, “Cebu accreditation”, or “Compare Cebu and Bohol accreditation”. Choose among matching places and measures before opening a figure."}
       </p>
     </form>
   );

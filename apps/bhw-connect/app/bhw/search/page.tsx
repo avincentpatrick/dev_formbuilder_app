@@ -3,6 +3,8 @@ import { BhwSearchForm } from "@/components/bhw/search-form";
 import { searchGeo, type GeoSearchResult } from "@/lib/db/search";
 import { bhwMeasureHref, levelLabel, parseBhwSearch } from "@/lib/bhw/search";
 import { catalogHref } from "@/lib/catalog/navigation";
+import { parseComparisonSearch, publicPlace, type PlaceGroup } from "@/lib/bhw/comparison";
+import { ComparisonQueryResolver } from "@/components/compare/query-resolver";
 
 export const metadata = { title: "Search BHW places and indicators" };
 
@@ -13,6 +15,36 @@ export default async function BhwSearchPage({
 }) {
   const params = await searchParams;
   const query = typeof params.q === "string" ? params.q : "";
+  const comparison = parseComparisonSearch(query);
+  if (comparison?.valid) {
+    const groups: PlaceGroup[] = await Promise.all(
+      comparison.places.map(async (place) => {
+        try {
+          return {
+            query: place,
+            state: "available" as const,
+            matches: (await searchGeo(place, 12, { throwOnError: true })).map(publicPlace),
+          };
+        } catch {
+          return { query: place, state: "failed" as const, matches: [] };
+        }
+      }),
+    );
+    return (
+      <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6">
+        <Link href="/bhw" className="underline">
+          ← BHW overview
+        </Link>
+        <h1 className="text-2xl font-semibold">Search BHW places and indicators</h1>
+        <BhwSearchForm query={query} />
+        <ComparisonQueryResolver
+          key={query}
+          groups={groups}
+          measures={comparison.measures.map(({ id, label }) => ({ id, label }))}
+        />
+      </div>
+    );
+  }
   const intent = parseBhwSearch(query);
   let places: GeoSearchResult[] = [];
   let failed = false;
@@ -42,9 +74,9 @@ export default async function BhwSearchPage({
       <BhwSearchForm query={query.slice(0, 100)} />
       {intent.state === "unsupported" && (
         <p role="status">
-          This search supports one place and one indicator phrase. Comparison requests and trends
-          are not supported here yet. Try “Cebu accreditation”, then choose the population and
-          place.
+          This query is not supported. Try a place and indicator, or “Compare Cebu and Bohol
+          accreditation”. Separate places with “and” or commas and include a supported measure.
+          Trends and predictions are not supported.
         </p>
       )}
       {failed && (

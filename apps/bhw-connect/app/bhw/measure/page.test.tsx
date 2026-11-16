@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import Page from "./page";
+import { parseHTML } from "linkedom";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import type { CatalogDataset, DataState } from "@/lib/catalog/types";
@@ -69,4 +71,65 @@ it("keeps published zero and refuses invalid geography without national fallback
   vi.mocked(getPublicDataset).mockClear();
   expect(await render("barangay:01")).toContain("Could not verify this selection");
   expect(getPublicDataset).not.toHaveBeenCalled();
+});
+
+it("keeps map return separate from measure scope and retains it on onward comparison and overview", async () => {
+  vi.mocked(getPublicDataset).mockResolvedValue(dataset("suppressed"));
+  const mapState =
+    "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306&valueMin=12.34";
+  const html = renderToStaticMarkup(
+    await Page({
+      searchParams: Promise.resolve({
+        indicator: "bhw.demographics.education",
+        location: "region:01",
+        mapState,
+      }),
+    }),
+  );
+  const { document } = parseHTML(html);
+  expect(html).not.toContain("PRIVATE_SENTINEL");
+  expect(html).toContain("map filters and color groups do not apply");
+  const links = [...document.querySelectorAll("a")];
+  expect(
+    links.find((a) => a.textContent === "Return to previous BHW map")?.getAttribute("href"),
+  ).toBe(restoredBhwMapHref(mapState));
+  for (const prefix of ["/bhw?", "/compare?"]) {
+    const href = links
+      .find((a) => a.getAttribute("href")?.startsWith(prefix))!
+      .getAttribute("href")!;
+    expect(restoredBhwMapHref(new URLSearchParams(href.split("?")[1]).get("mapState")!)).toBe(
+      restoredBhwMapHref(mapState),
+    );
+  }
+});
+it("keeps a valid map return on invalid measure selection without reading data", async () => {
+  const html = renderToStaticMarkup(
+    await Page({
+      searchParams: Promise.resolve({ indicator: "invalid", mapState: "dataset=bhw-2025" }),
+    }),
+  );
+  expect(html).toContain("Could not verify this selection");
+  expect(html).toContain("Return to previous BHW map");
+  expect(getPublicDataset).not.toHaveBeenCalled();
+});
+it("explains invalid map snapshots without propagating them", async () => {
+  vi.mocked(getPublicDataset).mockResolvedValue(dataset("unavailable"));
+  for (const mapState of [
+    "https://example.com",
+    ["dataset=bhw-2025", "dataset=bhw-2025"],
+    "dataset=bhw-profiling-status-2026",
+  ]) {
+    const html = renderToStaticMarkup(
+      await Page({
+        searchParams: Promise.resolve({
+          indicator: "bhw.demographics.education",
+          location: "region:01",
+          mapState,
+        }),
+      }),
+    );
+    expect(html).toContain("previous map settings are invalid");
+    expect(html).not.toContain("Return to previous BHW map");
+    expect(html).not.toContain("mapState=");
+  }
 });

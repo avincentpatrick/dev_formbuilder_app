@@ -1,4 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
+import { bhwOverviewHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { catalogHref, parseCatalogParams } from "@/lib/catalog/navigation";
@@ -18,21 +21,32 @@ export default async function BhwMeasurePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const returnMap = restoredBhwMapHref(params.mapState);
+  const mapState = returnMap?.split("?")[1];
+  const returnPanel =
+    params.mapState !== undefined ? (
+      <BhwMapReturnLink
+        href={returnMap}
+        scopeNote="Measure figures use the selected place and indicator; map filters and color groups do not apply."
+      />
+    ) : null;
   const spec = BHW_MEASURES.find((s) => s.id === params.indicator);
   const request = parseCatalogParams({ mode: "psgc", location: params.location, dataset: "bhw" });
   const selection = request?.selection;
-  if (!spec || selection?.mode !== "psgc") return <InvalidSelection />;
+  if (!spec || selection?.mode !== "psgc") return <InvalidSelection returnPanel={returnPanel} />;
   const geo = await getGeoByCode(selection.code);
-  if (!geo || geo.geoLevel !== selection.level) return <InvalidSelection />;
+  if (!geo || geo.geoLevel !== selection.level)
+    return <InvalidSelection returnPanel={returnPanel} />;
   const dataset = await getPublicDataset("bhw", selection);
   const indicator = dataset.indicators.find((i) => i.id === spec.id)!;
   const values = publicValues(indicator);
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6">
-      <Link href="/bhw" className="underline">
+      <Link href={bhwOverviewHref(mapState)} className="underline">
         ← BHW overview
       </Link>
       <h1 className="text-2xl font-semibold">{indicator.label}</h1>
+      {returnPanel}
       <p>
         {geo.geoName} · {levelLabel[geo.geoLevel]} · {geo.geoCode} · 2025
       </p>
@@ -77,7 +91,10 @@ export default async function BhwMeasurePage({
         Copy this page’s URL to share this measure and location. Missing or withheld values are not
         zero.
       </p>
-      <Link className="block underline" href={comparisonHref(spec.id, [geo.geoCode])}>
+      <Link
+        className="block underline"
+        href={comparisonHref(spec.id, [geo.geoCode], undefined, mapState)}
+      >
         Compare this measure with another place
       </Link>
       <BhwSearchForm />
@@ -85,10 +102,11 @@ export default async function BhwMeasurePage({
   );
 }
 
-function InvalidSelection() {
+function InvalidSelection({ returnPanel }: { returnPanel: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6">
       <h1 className="text-2xl font-semibold">Could not verify this selection</h1>
+      {returnPanel}
       <p role="status">
         Check the indicator and place code, or retry if the place service is unavailable. No
         national fallback has been applied.

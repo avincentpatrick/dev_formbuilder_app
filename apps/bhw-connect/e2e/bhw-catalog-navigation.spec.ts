@@ -22,6 +22,11 @@ for (const width of [390, 1440]) {
       .getByRole("link", { name: "Philippines", exact: true })
       .click();
     await expect(page).toHaveURL((url) => url.searchParams.get("dataset") === "bhw");
+    await expect(page).toHaveURL(/location=national%3APH/);
+    await expect(back).toHaveAttribute("href", original!);
+    // The development seed has figures for Region I, not national observations.
+    await page.goBack();
+    await expect(page).toHaveURL(/location=region%3A01/);
     await page
       .getByRole("link", { name: "← All datasets for this selection", exact: true })
       .click();

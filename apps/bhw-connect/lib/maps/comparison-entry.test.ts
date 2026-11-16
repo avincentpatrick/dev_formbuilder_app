@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { bhwMapComparisonHref } from "./comparison-entry";
-import { initialMapChoice, type MapPayload } from "./prototype";
+import { initialMapChoice, mapHref, type MapPayload } from "./prototype";
 const data: MapPayload = {
   state: "available",
   rows: [{ code: "07306", name: "Synthetic HUC", value: null }],
@@ -15,19 +15,38 @@ const data: MapPayload = {
 it("carries the same public measure and selected child without map-only settings", () => {
   const choice = {
     ...initialMapChoice("bhw-2025"),
+    level: "region" as const,
+    code: "07",
     indicator: "bhw.active-years",
     selected: "07306",
     valueMin: 12.34,
     classification: "custom" as const,
     classBreaks: [10, 20],
   };
-  expect(bhwMapComparisonHref(choice, data)).toBe("/compare?measure=bhw.active-years&geos=07306");
+  const query = new URL(bhwMapComparisonHref(choice, data)!, "https://example.test").searchParams;
+  expect(query.get("measure")).toBe("bhw.active-years");
+  expect(query.get("geos")).toBe("07306");
+  expect(query.get("mapState")).toBe(mapHref(choice).split("?")[1]);
+  expect(query.has("valueMin")).toBe(false);
   expect(
-    bhwMapComparisonHref({ ...initialMapChoice("bhw-stepzero-2026"), selected: "07306" }, data),
-  ).toBe("/compare?measure=bhw.total&geos=07306");
+    bhwMapComparisonHref(
+      {
+        ...initialMapChoice("bhw-stepzero-2026"),
+        level: "region" as const,
+        code: "07",
+        selected: "07306",
+      },
+      data,
+    ),
+  ).toContain("/compare?measure=bhw.total&geos=07306&mapState=");
 });
 it("does not invent a comparison for unloaded, unsupported or mismatched selections", () => {
-  const choice = { ...initialMapChoice("bhw-2025"), selected: "07306" };
+  const choice = {
+    ...initialMapChoice("bhw-2025"),
+    level: "region" as const,
+    code: "07",
+    selected: "07306",
+  };
   expect(bhwMapComparisonHref(choice, null)).toBeNull();
   expect(bhwMapComparisonHref({ ...choice, selected: null }, data)).toBeNull();
   expect(bhwMapComparisonHref({ ...choice, selected: "07022" }, data)).toBeNull();

@@ -64,3 +64,21 @@ it("serializes measure, all places and phone focus and excludes counts from matc
     }),
   ).not.toHaveProperty("nTotal");
 });
+
+it("preserves a validated map snapshot independently of edited comparison settings", () => {
+  const raw =
+    "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306&valueMin=12.34";
+  const href = comparisonHref("bhw.total", ["01", "02"], "02", raw);
+  const params = new URL(href, "https://example.test").searchParams;
+  expect(params.get("measure")).toBe("bhw.total");
+  expect(params.get("geos")).toBe("01,02");
+  expect(params.get("focus")).toBe("02");
+  const snapshot = new URLSearchParams(params.get("mapState")!);
+  expect(snapshot.get("indicator")).toBe("bhw.active-years");
+  expect(snapshot.get("selected")).toBe("07306");
+  expect(snapshot.get("valueMin")).toBe("12.34");
+  for (const invalid of ["https://example.com", "dataset=bhw-profiling-status-2026", [raw, raw]])
+    expect(comparisonHref("bhw.total", [], undefined, invalid)).toBe(
+      comparisonHref("bhw.total", []),
+    );
+});

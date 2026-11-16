@@ -66,7 +66,7 @@ for (const width of [390, 1440]) {
     ]) {
       await nav.getByRole("link", { name: label, exact: true }).click();
       await expect(page).toHaveURL(`${overviewUrl}#${section}`);
-      await expect(page.locator(`#${section}`)).toBeInViewport();
+      await expect(page.locator(`#${section}:visible`)).toBeInViewport();
       await expect(back).toHaveAttribute(
         "href",
         new URL(previous).pathname + new URL(previous).search,
@@ -80,7 +80,9 @@ for (const width of [390, 1440]) {
     await page.goForward();
     await expect(page).toHaveURL(`${overviewUrl}#workforce`);
     await nav.getByRole("link", { name: "Data and methodology", exact: true }).click();
-    await page.locator("#methodology summary").click();
+    // History navigation can retain a hidden copy of the previous route.
+    // Keep strict matching, but target the summary the reader can interact with.
+    await page.locator("#methodology > summary:visible").click();
     await page
       .getByRole("link", { name: "View national indicators and availability", exact: false })
       .click();

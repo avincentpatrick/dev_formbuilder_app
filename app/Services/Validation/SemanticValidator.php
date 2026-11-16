@@ -18,6 +18,7 @@ use App\Services\Expressions\Coercion;
 use App\Services\Expressions\EvaluationContext;
 use App\Services\Expressions\ExpressionEvaluator;
 use App\Services\Expressions\Marker;
+use App\Support\Forms\AnswerLimits;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\FormClock;
 use Illuminate\Support\Collection;
@@ -642,6 +643,7 @@ final class SemanticValidator
 
         $this->collectMembershipErrors($field, $answer, $errors, $sectionKey, $instanceIndex);
         $this->collectWholeNumberError($field, $answer, $errors, $sectionKey, $instanceIndex);
+        $this->collectAnswerLimitErrors($field, $answer, $errors, $sectionKey, $instanceIndex);
     }
 
     /**
@@ -1789,6 +1791,69 @@ final class SemanticValidator
 
         if (floor($number) !== $number) {
             $errors[] = new SemanticError($field->key, 'not_a_whole_number', self::WHOLE_NUMBER_MESSAGE, $sectionKey, $instanceIndex);
+        }
+    }
+
+    /**
+     * A question's answer limits (M243, `R-1da063f4`), on an answered, relevant question — an empty one is Required's
+     * business. A text answer's word count against `min_words`/`max_words`; a multi-select's number of different choices
+     * against `min_choices`/`max_choices`, and an "only answer" choice chosen beside another. A single "only answer"
+     * choice is a whole answer, so the minimum is not asked of it. Twin of `collectAnswerLimitErrors()` in
+     * `semantic-validator.ts`, pinned by `tests/golden/validation/answer_rules.json`.
+     *
+     * @param  list<SemanticError>  $errors
+     */
+    private function collectAnswerLimitErrors(FormField $field, mixed $answer, array &$errors, ?string $sectionKey, ?int $instanceIndex): void
+    {
+        $config = is_array($field->config) ? $field->config : null;
+
+        if ($field->field_type->takesWordLimits()) {
+            $min = AnswerLimits::bound($config, AnswerLimits::MIN_WORDS);
+            $max = AnswerLimits::bound($config, AnswerLimits::MAX_WORDS);
+            if (($min === null && $max === null) || is_array($answer)) {
+                return;
+            }
+
+            $words = AnswerLimits::words(Coercion::toStr($answer));
+            if ($min !== null && $words < $min) {
+                $errors[] = new SemanticError($field->key, 'words_too_few', 'Use at least '.number_format($min).' words.', $sectionKey, $instanceIndex);
+            }
+            if ($max !== null && $words > $max) {
+                $errors[] = new SemanticError($field->key, 'words_too_many', 'Use '.number_format($max).' words or fewer.', $sectionKey, $instanceIndex);
+            }
+
+            return;
+        }
+
+        if (! $field->field_type->takesChoiceLimits() || ! is_array($answer)) {
+            return;
+        }
+
+        $chosen = [];
+        foreach ($answer as $element) {
+            $chosen[Coercion::toStr($element)] = true;
+        }
+        $count = count($chosen);
+        $exclusive = AnswerLimits::exclusiveOptions($config);
+        $alone = $count === 1 && isset($exclusive[array_key_first($chosen)]);
+
+        $min = AnswerLimits::bound($config, AnswerLimits::MIN_CHOICES);
+        $max = AnswerLimits::bound($config, AnswerLimits::MAX_CHOICES);
+        if ($min !== null && ! $alone && $count < $min) {
+            $errors[] = new SemanticError($field->key, 'choices_too_few', 'Choose at least '.number_format($min).'.', $sectionKey, $instanceIndex);
+        }
+        if ($max !== null && $count > $max) {
+            $errors[] = new SemanticError($field->key, 'choices_too_many', 'Choose no more than '.number_format($max).'.', $sectionKey, $instanceIndex);
+        }
+
+        if ($count > 1) {
+            foreach (array_keys($chosen) as $value) {
+                if (isset($exclusive[(string) $value])) {
+                    $errors[] = new SemanticError($field->key, 'choice_exclusive', '“'.$exclusive[(string) $value].'” can only be chosen on its own.', $sectionKey, $instanceIndex);
+
+                    return; // one per question
+                }
+            }
         }
     }
 }

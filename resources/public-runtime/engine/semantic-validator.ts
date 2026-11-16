@@ -25,6 +25,7 @@ import { ExpressionEvaluator, makeExpressionEvaluator } from './evaluator';
 import { fieldRendersNothing } from './field-roles';
 import { StructuredRuleLowering, type FieldKeysById } from './lowering';
 import { StructuredRuleEvaluator } from './structured-rule-evaluator';
+import { wordCount } from './words';
 import type { CompositeAnswer, GeoAnswer, InstanceAnswers, MediaAnswer, SchemaField, SchemaSection, SemanticInput, ValidationRow } from './schema';
 
 /** The full effective-answers map: scalars/lists, repeat instances (G1), composite grids (G4b), geo (G5b1), media (G6). */
@@ -48,6 +49,19 @@ function isMediaType(fieldType: string | undefined): boolean {
 
 const DEFAULT_CONSTRAINT_MESSAGE = 'This value is not valid.';
 const DEFAULT_REQUIRED_MESSAGE = 'This field is required.';
+
+/**
+ * M243: an answer limit as both engines read it — a whole number of at least 1, else no limit. The mirror of PHP
+ * `AnswerLimits::bound()`, so one stored value is never read two ways.
+ */
+function wholeBound(raw: number | null | undefined): number | null {
+    return typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : null;
+}
+
+/** M243: a limit as its message prints it, `1,500` — PHP's `number_format()`. */
+function grouped(value: number): string {
+    return value.toLocaleString('en-US');
+}
 
 export interface SemanticError {
     fieldKey: string;
@@ -567,6 +581,57 @@ export class SemanticValidator {
 
         this.collectMembershipErrors(field, answer, errors, sectionKey, instanceIndex);
         this.collectWholeNumberError(field, answer, errors, sectionKey, instanceIndex);
+        this.collectAnswerLimitErrors(field, answer, errors, sectionKey, instanceIndex);
+    }
+
+    /**
+     * A question's answer limits (M243, `R-1da063f4`) on an answered, relevant question — the twin of PHP
+     * `SemanticValidator::collectAnswerLimitErrors()`, pinned by golden/validation/answer_rules.json. A text answer's
+     * word count against `words`; a multi-select's number of different choices against `choices`, and an "only answer"
+     * choice chosen beside another. A single "only answer" choice is a whole answer, so the minimum is not asked of it.
+     */
+    private collectAnswerLimitErrors(field: SchemaField, answer: MaybeAbsent, errors: SemanticError[], sectionKey: string | null, instanceIndex: number | null): void {
+        if (field.field_type === 'short_text' || field.field_type === 'long_text') {
+            const min = wholeBound(field.words?.min);
+            const max = wholeBound(field.words?.max);
+            if ((min === null && max === null) || Array.isArray(answer)) {
+                return;
+            }
+
+            const words = wordCount(toStr(answer));
+            if (min !== null && words < min) {
+                errors.push({ fieldKey: field.key, rule: 'words_too_few', message: `Use at least ${grouped(min)} words.`, sectionKey, instanceIndex });
+            }
+            if (max !== null && words > max) {
+                errors.push({ fieldKey: field.key, rule: 'words_too_many', message: `Use ${grouped(max)} words or fewer.`, sectionKey, instanceIndex });
+            }
+
+            return;
+        }
+
+        if (field.field_type !== 'multi_select' || !Array.isArray(answer)) {
+            return;
+        }
+
+        const chosen = [...new Set(answer.map((element) => toStr(element)))];
+        const exclusive = new Map((field.exclusive ?? []).map((option) => [option.value, option.label]));
+        const alone = chosen.length === 1 && exclusive.has(chosen[0]);
+
+        const min = wholeBound(field.choices?.min);
+        const max = wholeBound(field.choices?.max);
+        if (min !== null && !alone && chosen.length < min) {
+            errors.push({ fieldKey: field.key, rule: 'choices_too_few', message: `Choose at least ${grouped(min)}.`, sectionKey, instanceIndex });
+        }
+        if (max !== null && chosen.length > max) {
+            errors.push({ fieldKey: field.key, rule: 'choices_too_many', message: `Choose no more than ${grouped(max)}.`, sectionKey, instanceIndex });
+        }
+
+        if (chosen.length > 1) {
+            const first = chosen.find((value) => exclusive.has(value));
+            if (first !== undefined) {
+                errors.push({ fieldKey: field.key, rule: 'choice_exclusive', message: `“${exclusive.get(first)}” can only be chosen on its own.`, sectionKey, instanceIndex });
+            }
+        }
     }
 
     /**

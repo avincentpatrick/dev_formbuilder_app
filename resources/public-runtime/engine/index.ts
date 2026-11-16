@@ -67,7 +67,9 @@ export type {
     MatrixAnswer,
     GeoAnswer,
     MediaAnswer,
+    AnswerBounds,
 } from './schema';
+export { wordCount } from './words';
 export type { Node } from './ast';
 export type {
     ComparisonOperator,

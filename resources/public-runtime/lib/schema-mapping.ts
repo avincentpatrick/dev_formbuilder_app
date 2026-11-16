@@ -13,6 +13,7 @@
  */
 
 import type {
+    AnswerBounds,
     CascadeConfig,
     ComparisonOperator,
     GridColumnSpec,
@@ -490,6 +491,47 @@ function buildMedia(field: RawField): RenderMedia | null {
     };
 }
 
+/**
+ * M243 (`R-1da063f4`): an answer limit — a whole number of at least 1, else none. An integer, or a string of digits, is
+ * read; anything else is no limit, the mirror of PHP `AnswerLimits::bound()`, so one stored value is never read two ways.
+ */
+export function configWhole(config: Record<string, unknown> | null | undefined, key: string): number | null {
+    const raw = config?.[key];
+    const value = typeof raw === 'number' ? raw : typeof raw === 'string' && /^[0-9]+$/.test(raw) ? Number(raw) : null;
+
+    return value !== null && Number.isInteger(value) && value >= 1 ? value : null;
+}
+
+/** M243: a pair of limits, or null when neither is set. */
+function answerBounds(field: RawField, minKey: string, maxKey: string): AnswerBounds | null {
+    const min = configWhole(field.config, minKey);
+    const max = configWhole(field.config, maxKey);
+
+    return min === null && max === null ? null : { min, max };
+}
+
+/** M243: a multi-select's "only answer" choices, in option order, each with the label its message names. */
+function exclusiveOptions(field: RawField): { value: string; label: string }[] {
+    const raw = field.config?.options;
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+    const out: { value: string; label: string }[] = [];
+    for (const option of raw) {
+        if (option === null || typeof option !== 'object' || (option as { exclusive?: unknown }).exclusive !== true) {
+            continue;
+        }
+        const value = (option as { value?: unknown }).value;
+        if (typeof value !== 'string' && typeof value !== 'number') {
+            continue;
+        }
+        const label = (option as { label?: unknown }).label;
+        out.push({ value: String(value), label: typeof label === 'string' && label !== '' ? label : String(value) });
+    }
+
+    return out;
+}
+
 /** The min/max count the engine's media pass reads (Increment G6) → engine SchemaField.media. */
 function engineMediaConfig(field: RawField): { maxCount: number | null; minCount: number | null } {
     return { maxCount: configNumber(field, 'max_count'), minCount: configNumber(field, 'min_count') };
@@ -658,6 +700,10 @@ export function buildEngineSchema(schema: SchemaResponse): EngineSchema {
         media: isMediaFieldType(f.field_type) ? engineMediaConfig(f) : null,
         // M177 (`R-f44e9d00`): Show to respondents — a Never question raises no error nobody could repair.
         visibility: visibilityOf(f),
+        // M243 (`R-1da063f4`): answer limits — word limits on text, choice limits and "only answer" choices on a multi-select.
+        words: f.field_type === 'short_text' || f.field_type === 'long_text' ? answerBounds(f, 'min_words', 'max_words') : null,
+        choices: f.field_type === 'multi_select' ? answerBounds(f, 'min_choices', 'max_choices') : null,
+        exclusive: f.field_type === 'multi_select' ? exclusiveOptions(f) : null,
     }));
 
     const sections: SchemaSection[] = schema.version.schema.sections.map((s) => ({

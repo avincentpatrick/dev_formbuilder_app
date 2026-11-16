@@ -1,0 +1,191 @@
+[
+  {
+    "name": "answer_rules_words_max_at_limit_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 5}}]},
+    "answers": {"why": "one two three four five"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "one two three four five"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_max_over_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 5}}]},
+    "answers": {"why": "one two three four five six"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "one two three four five six"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_min_under_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"min": 3}}]},
+    "answers": {"why": "two words"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_few"}], "effective_answers": {"why": "two words"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_min_and_max_inside_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"min": 2, "max": 4}}]},
+    "answers": {"why": "three little words"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "three little words"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_short_text_counts_too",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "short_text", "words": {"max": 2}}]},
+    "answers": {"why": "a b c"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "a b c"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_tabs_and_newlines_separate",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 3}}]},
+    "answers": {"why": "one\ttwo\nthree\r\nfour"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "one\ttwo\nthree\r\nfour"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_no_break_space_separates",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 1}}]},
+    "answers": {"why": "one\u00a0two"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "one\u00a0two"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_next_line_separates",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 1}}]},
+    "answers": {"why": "one\u0085two"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "one\u0085two"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_zero_width_no_break_space_joins",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 1}}]},
+    "answers": {"why": "one\ufefftwo"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "one\ufefftwo"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_mongolian_vowel_separator_joins",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 1}}]},
+    "answers": {"why": "one\u180etwo"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "one\u180etwo"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_astral_and_punctuation_count",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 2}}]},
+    "answers": {"why": "😀 — 𝒳"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "words_too_many"}], "effective_answers": {"why": "😀 — 𝒳"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_leading_and_trailing_space_ignored",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 2}}]},
+    "answers": {"why": "  one two  "},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "  one two  "}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_min_on_an_empty_answer_is_not_asked",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"min": 3}}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_min_on_an_empty_required_answer_is_required_only",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"min": 3}, "is_required": "required"}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [{"field": "why", "rule": "field_required"}], "effective_answers": {}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_on_a_never_shown_question_not_asked",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "long_text", "words": {"max": 1}, "visibility": "hidden"}]},
+    "answers": {"why": "a b"},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": "a b"}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_words_on_a_whole_number_question_not_asked",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "why", "field_type": "integer", "words": {"max": 1}}]},
+    "answers": {"why": 12},
+    "expected": {"relevance": {"fields": {"why": true}, "sections": {}}, "errors": [], "effective_answers": {"why": 12}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_max_at_limit_passes",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"max": 2}}]},
+    "answers": {"pick": ["a", "b"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [], "effective_answers": {"pick": ["a", "b"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_max_over_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"max": 2}}]},
+    "answers": {"pick": ["a", "b", "c"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choices_too_many"}], "effective_answers": {"pick": ["a", "b", "c"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_min_under_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"min": 2}}]},
+    "answers": {"pick": ["a"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choices_too_few"}], "effective_answers": {"pick": ["a"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_only_answer_alone_meets_the_min",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"min": 2}, "exclusive": ["noview"]}]},
+    "answers": {"pick": ["noview"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [], "effective_answers": {"pick": ["noview"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_only_answer_with_another_fails",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "exclusive": ["noview"]}]},
+    "answers": {"pick": ["noview", "a"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choice_exclusive"}], "effective_answers": {"pick": ["noview", "a"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_only_answer_over_the_cap_fails_twice",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"max": 2}, "exclusive": ["noview"]}]},
+    "answers": {"pick": ["a", "b", "noview"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choice_exclusive"}, {"field": "pick", "rule": "choices_too_many"}], "effective_answers": {"pick": ["a", "b", "noview"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_two_only_answers_together_fail_once",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview", "none"], "exclusive": ["noview", "none"]}]},
+    "answers": {"pick": ["noview", "none"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choice_exclusive"}], "effective_answers": {"pick": ["noview", "none"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_a_duplicate_counts_once",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"max": 1}}]},
+    "answers": {"pick": ["a", "a"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [], "effective_answers": {"pick": ["a", "a"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_unknown_value_over_the_cap",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"max": 1}}]},
+    "answers": {"pick": ["a", "zz"]},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [{"field": "pick", "rule": "choice_not_in_options"}, {"field": "pick", "rule": "choices_too_many"}], "effective_answers": {"pick": ["a", "zz"]}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_min_on_an_empty_answer_is_not_asked",
+    "grammar_version": "2.0",
+    "schema": {"fields": [{"key": "pick", "field_type": "multi_select", "options": ["a", "b", "c", "noview"], "choices": {"min": 2}}]},
+    "answers": {},
+    "expected": {"relevance": {"fields": {"pick": true}, "sections": {}}, "errors": [], "effective_answers": {}, "computed": {}}
+  },
+  {
+    "name": "answer_rules_choices_in_a_repeat_instance",
+    "grammar_version": "2.0",
+    "schema": {"sections": [{"key": "hh", "repeatable": true}], "fields": [{"key": "pick", "field_type": "multi_select", "section": "hh", "options": ["a", "b", "c", "noview"], "choices": {"max": 1}}]},
+    "answers": {"hh": [{"pick": ["a"]}, {"pick": ["a", "b"]}]},
+    "expected": {"relevance": {"fields": {}, "sections": {"hh": true}}, "errors": [{"field": "hh[1].pick", "rule": "choices_too_many"}], "effective_answers": {"hh": [{"pick": ["a"]}, {"pick": ["a", "b"]}]}, "computed": {}, "repeat_relevance": {"hh": [{"pick": true}, {"pick": true}]}}
+  }
+]

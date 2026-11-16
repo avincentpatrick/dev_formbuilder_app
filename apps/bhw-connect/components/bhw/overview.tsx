@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { comparisonHref } from "@/lib/bhw/comparison";
 import { bhwNationalCatalogHref } from "@/lib/maps/catalog-return";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
@@ -107,6 +108,7 @@ export function BhwOverview({
     value: v.value,
     shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
+  const compareHref = comparisonHref("bhw.total", []);
   const mapHref = subjectMapHref("bhw", { mode: "all" })!;
   return (
     <PresentationProvider
@@ -126,7 +128,7 @@ export function BhwOverview({
             <Link href="#workforce">Workforce distribution</Link>
             <Link href="#qualifications">Qualifications and training</Link>
             <Link href="#support">Support and compensation</Link>
-            <Link href="/compare?measure=bhw.total">Compare places</Link>
+            <Link href={compareHref}>Compare places</Link>
             <Link href={mapHref}>Map explorer</Link>
             <Link href="#methodology">Data and methodology</Link>
           </nav>
@@ -298,7 +300,7 @@ export function BhwOverview({
             coverage before interpreting differences; this overview does not assign a staffing-need
             score.
           </p>
-          <Link href="/compare" className="text-sm font-semibold text-accent underline">
+          <Link href={compareHref} className="text-sm font-semibold text-accent underline">
             Compare places →
           </Link>
         </section>

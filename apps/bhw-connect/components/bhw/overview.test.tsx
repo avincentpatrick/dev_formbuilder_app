@@ -57,3 +57,10 @@ it("starts with figures and provides named purpose anchors before methodology", 
   expect(document.getElementById("methodology")?.tagName).toBe("DETAILS");
   expect(document.querySelectorAll('[href*="bhw-profiling-status-2026"]')).toHaveLength(0);
 });
+
+it("routes every overview comparison entry through the public headcount contract", () => {
+  const { document } = parseHTML(render([item("bhw.total", "available", 0)]));
+  const links = [...document.querySelectorAll('a[href^="/compare"]')];
+  expect(links).toHaveLength(2);
+  for (const link of links) expect(link.getAttribute("href")).toBe("/compare?measure=bhw.total");
+});

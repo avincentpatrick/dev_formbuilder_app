@@ -41,9 +41,7 @@ it("round-trips ranges and rejects invalid, duplicate or unsupported range links
     expect(parseMapChoice(new URLSearchParams(`dataset=bhw-stepzero-2026&${query}`))).toBeNull();
   expect(
     parseMapChoice(
-      new URLSearchParams(
-        "dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&valueMin=0",
-      ),
+      new URLSearchParams("dataset=bhw-stepzero-2026&indicator=stepzero.population&valueMin=0"),
     ),
   ).toBeNull();
   expect(parseMapChoice(new URLSearchParams("dataset=nhfr-2026-09&valueMin=0"))).toBeNull();

@@ -1,26 +1,43 @@
 "use client";
+import { classificationBreaksText } from "@/lib/maps/classification";
 import { useState } from "react";
-import { parseCountRange, type CountRange } from "@/lib/maps/value-filter";
+import { parseCountRange, parsePercentageRange, type CountRange } from "@/lib/maps/value-filter";
 export function ValueFilterControls({
   range,
+  kind = "count",
   onApply,
 }: {
   range: CountRange;
+  kind?: "count" | "percentage";
   onApply: (range: CountRange) => void;
 }) {
-  const [min, setMin] = useState(range.valueMin?.toString() ?? "");
-  const [max, setMax] = useState(range.valueMax?.toString() ?? "");
+  const percentage = kind === "percentage";
+  const [min, setMin] = useState(
+    range.valueMin === undefined ? "" : classificationBreaksText([range.valueMin]),
+  );
+  const [max, setMax] = useState(
+    range.valueMax === undefined ? "" : classificationBreaksText([range.valueMax]),
+  );
   const [error, setError] = useState<string | null>(null);
   return (
     <details className="rounded border border-border p-3">
-      <summary className="cursor-pointer font-medium text-sm">Filter workforce counts</summary>
+      <summary className="cursor-pointer font-medium text-sm">
+        {percentage ? "Filter percentages" : "Filter workforce counts"}
+      </summary>
       <form
         className="mt-2 space-y-2 text-sm"
         onSubmit={(event) => {
           event.preventDefault();
-          const parsed = parseCountRange(min || null, max || null);
+          const parsed = (percentage ? parsePercentageRange : parseCountRange)(
+            min || null,
+            max || null,
+          );
           if (!parsed) {
-            setError("Use nonnegative whole counts, with minimum no greater than maximum.");
+            setError(
+              percentage
+                ? "Use percentages from 0 to 100, with minimum no greater than maximum."
+                : "Use nonnegative whole counts, with minimum no greater than maximum.",
+            );
             return;
           }
           setError(null);
@@ -28,25 +45,26 @@ export function ValueFilterControls({
         }}
       >
         <p>
-          Include counts within these limits, including both ends. Blank means no limit. This
-          filters values, not classification. Changing measure or dataset resets the range.
+          Include {percentage ? "percentages (0–100%)" : "counts"} within these limits, including
+          both ends. Blank means no limit. This filters values, not classification. Changing measure
+          or dataset resets the range.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <label>
-            Minimum count
+            {percentage ? "Minimum percentage (%)" : "Minimum count"}
             <input
-              aria-label="Minimum count"
-              inputMode="numeric"
+              aria-label={percentage ? "Minimum percentage (%)" : "Minimum count"}
+              inputMode={percentage ? "decimal" : "numeric"}
               value={min}
               onChange={(e) => setMin(e.target.value)}
               className="mt-1 w-full min-w-0 rounded border border-border bg-background p-2"
             />
           </label>
           <label>
-            Maximum count
+            {percentage ? "Maximum percentage (%)" : "Maximum count"}
             <input
-              aria-label="Maximum count"
-              inputMode="numeric"
+              aria-label={percentage ? "Maximum percentage (%)" : "Maximum count"}
+              inputMode={percentage ? "decimal" : "numeric"}
               value={max}
               onChange={(e) => setMax(e.target.value)}
               className="mt-1 w-full min-w-0 rounded border border-border bg-background p-2"
@@ -56,7 +74,7 @@ export function ValueFilterControls({
         {error && <p role="alert">{error}</p>}
         <div className="flex flex-wrap gap-3">
           <button type="submit" className="min-h-11 underline">
-            Apply count range
+            Apply {kind} range
           </button>
           <button
             type="button"
@@ -68,7 +86,7 @@ export function ValueFilterControls({
               onApply({});
             }}
           >
-            Reset count range
+            Reset {kind} range
           </button>
         </div>
       </form>

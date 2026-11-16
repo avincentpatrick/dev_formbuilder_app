@@ -88,7 +88,7 @@ export function pngNotes(data: Context, hasScaleBar = false, hasLocator = false)
     `Current viewport. Selected: ${selected?.name ?? "none"}.`,
     ...(data.valueFilter
       ? [
-          `Count range: ${data.valueFilter.minimum ?? "no minimum"} to ${data.valueFilter.maximum ?? "no maximum"}, inclusive. ${data.valueFilter.included} included; ${data.valueFilter.excluded} excluded; ${data.valueFilter.unavailable} unavailable. ${data.valueFilter.note} Selected area: ${selected?.filterState ?? "none"}.`,
+          `${data.valueFilter.unit === "%" ? "Percentage range (%)" : "Count range"}: ${data.valueFilter.minimum ?? "no minimum"} to ${data.valueFilter.maximum ?? "no maximum"}, inclusive. ${data.valueFilter.included} included; ${data.valueFilter.excluded} excluded; ${data.valueFilter.unavailable} unavailable. ${data.valueFilter.note} Selected area: ${selected?.filterState ?? "none"}.`,
         ]
       : []),
     ...(data.dataset.slug === "bhw-stepzero-2026" || data.dataset.slug === "bhw-2025"

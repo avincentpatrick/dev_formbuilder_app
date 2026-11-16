@@ -46,3 +46,33 @@ for (const width of [390, 1440]) {
     );
   });
 }
+
+for (const width of [390, 1440]) {
+  test(`both overview comparison entries open public headcount at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    for (const entry of ["navigation", "closer examination"]) {
+      await page.goto("bhw");
+      const link =
+        entry === "navigation"
+          ? page
+              .getByRole("navigation", { name: "BHW analysis" })
+              .getByRole("link", { name: "Compare places", exact: true })
+          : page
+              .getByRole("region", { name: "Places to examine more closely" })
+              .getByRole("link", { name: "Compare places", exact: false });
+      await link.click();
+      await expect(page).toHaveURL(/compare\?measure=bhw.total$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Compare BHW places");
+      await expect(
+        page.getByRole("combobox", { name: "Comparison measure", exact: true }),
+      ).toHaveValue("bhw.total");
+      await expect(
+        page.getByText("Choose at least two places to compare.", { exact: true }),
+      ).toBeVisible();
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Compare BHW places");
+      await page.goBack();
+      await expect(page).toHaveURL(/\/bhw$/);
+    }
+  });
+}

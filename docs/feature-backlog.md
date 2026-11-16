@@ -16210,6 +16210,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   The remedy, when taken: read `count-selected` as `count`, warn on import for every function this product does not have (naming it), and decide whether `regex`/`string-length` join the grammar. The latter needs both engines and golden vectors.
 
+  ➕ **Since `M243`** a word cap, a choice cap and an only answer are settings (`answer-rules-words-choices`), carried by this product's own XLSForm as `#meridian` tokens. A Kobo author writes them as `count-selected(.) <= N`, `not(selected(., 'x') and count-selected(.) > 1)` and a word-cap `regex(…)`, so the import should also recognise those shapes and turn them into the settings rather than keep them as expressions.
+
   **Live.** Filed by `M237`. **Tier: during-testing.**
 
 - **`minor` · `xlsform-required-when` — "Required when…" cannot come in by XLSForm: a `required` formula is dropped without a warning, and a stand-in constraint never runs on a blank answer.**
@@ -16276,7 +16278,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Latent** — needs text within a few characters of the limit. Filed by `M240`. **Tier: after-launch.**
 
-- **`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
+- ✅ **CLOSED BY `M243` (2026-11-16) — ****`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
   Found by `M237` (2026-11-14). NHETE builds today with three workarounds:
   - a whole-answer pattern for "up to 1,500 words";
   - `count(.) <= 2` for "choose up to two";
@@ -16287,6 +16289,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: minimum/maximum words with a counter, a "most choices" setting, and an exclusive choice that clears and locks the rest, in both engines with golden vectors, the builder's panes, and XLSForm export and import.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+  ✅ **CLOSED BY `M243` (2026-11-16), on its branch.** Built as the remedy says, with four corrections the row did not know:
+  - **Field settings, not rule rows.** `config.min_words`/`max_words` on a Short or Long text, `min_choices`/`max_choices` and `options[].exclusive` on a multi-select, read by `FormField::answerLimits()` and both engines. A rule row can sit in an any/all group, so it is never absolute, and rule rows never reach the respondent's render model, so neither the count nor the lock could have been built on them.
+  - **Words split on the Unicode White_Space set written out**, in `AnswerLimits` and `words.ts`, never `\s`: the two engines read `\s` differently (`engine-whitespace-class`).
+  - **An "only answer" box is never locked by the cap**, so switching to "No view" never needs every other tick taken back first.
+  - **XLSForm carries the settings as `#meridian` tokens**, not ODK constraints, which this product's own import refuses at publish (`xlsform-import-odk-functions`).
+
+  On the screen: a live count under the box ("12 of 1,500 words", and how many too many once over), a multi-select that cannot take one choice too many, and an only answer that clears and locks the rest; the builder's Validation tab has Words or Choices, and the Options tab an Only answer column. Pinned by `tests/golden/validation/answer_rules.json` (27 vectors, both engines), `AnswerLimitsTest`, `XlsformAnswerLimitsTest`, the Vitest cases, and NHETE: its three workarounds are settings now, refused by their own rules, kept through export and re-import, and met in the browser by `nhete-walk.spec.ts` and `nhete-builder-block.spec.ts`. Version 0.22.0.
 
 - **`minor` · `note-details-block` — A note has no collapsible "details" block, so long optional reading is always open.**
   Found by `M237` (2026-11-14). NHETE keeps each indicator's formula, sources, watch-outs and "Research behind this" under a collapsed *More about this indicator*. Today all 35 are drawn open (`NhetePlan`'s `research-open` count is 30). `ContentBlocks` holds heading, paragraph, callout, divider and image only. Bullet lists are the table item *"Rich-text / media content block (headings, lists, …)"* at the top of this file.

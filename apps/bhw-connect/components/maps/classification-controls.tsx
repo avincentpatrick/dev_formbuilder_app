@@ -12,7 +12,7 @@ export function ClassificationControls({
   onApply,
 }: {
   settings: CountClassification;
-  kind?: "count" | "percentage";
+  kind?: "count" | "percentage" | "years";
   onApply: (settings: CountClassification) => void;
 }) {
   const defaultMethod = kind === "percentage" ? "fixed" : "quantile";
@@ -54,6 +54,8 @@ export function ClassificationControls({
         <p>
           Color groups do not filter areas or change values. Automatic groups use all child areas.
           Changing measure or dataset resets classification.
+          {kind === "years" &&
+            " Cut points are in mean active years. Published means, denominators and the unavailable contributing count are unchanged."}
         </p>
         <label className="block">
           Grouping method
@@ -68,7 +70,8 @@ export function ClassificationControls({
             )}
             <option value="quantile">Quantiles — similar numbers of areas</option>
             <option value="equal">
-              Equal-width {kind === "percentage" ? "percentage" : "count"} intervals
+              Equal-width{" "}
+              {kind === "percentage" ? "percentage" : kind === "years" ? "year" : "count"} intervals
             </option>
             <option value="custom">Custom cut points</option>
           </select>
@@ -80,7 +83,13 @@ export function ClassificationControls({
               aria-label="Custom cut points"
               value={breaks}
               onChange={(e) => setBreaks(e.target.value)}
-              placeholder={kind === "percentage" ? "25, 50, 75" : "25, 50, 100"}
+              placeholder={
+                kind === "percentage"
+                  ? "25, 50, 75"
+                  : kind === "years"
+                    ? "5, 10, 20"
+                    : "25, 50, 100"
+              }
               className="mt-1 w-full min-w-0 rounded border border-border bg-background p-2"
             />
             <span className="block text-xs text-muted">

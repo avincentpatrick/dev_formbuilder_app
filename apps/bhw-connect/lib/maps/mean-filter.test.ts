@@ -19,11 +19,7 @@ it("round-trips decimal limits and preserves count, percentage and classificatio
     const current = { ...choice, valueMin };
     expect(parseMapChoice(new URLSearchParams(mapHref(current).split("?")[1]))).toEqual(current);
   }
-  for (const suffix of [
-    "valueMin=1&valueMin=2",
-    "valueMin=1&level=citymun&code=0702234",
-    "classification=equal&classCount=3",
-  ])
+  for (const suffix of ["valueMin=1&valueMin=2", "valueMin=1&level=citymun&code=0702234"])
     expect(
       parseMapChoice(new URLSearchParams(`dataset=bhw-2025&indicator=bhw.active-years&${suffix}`)),
     ).toBeNull();

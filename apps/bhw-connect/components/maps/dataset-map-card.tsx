@@ -213,7 +213,7 @@ export function DatasetMapCard({
               ? INCOME_BINS
               : poverty
                 ? POVERTY_BINS
-                : supportsCircles({ dataset, indicator: choice.indicator })
+                : supportsCircles({ dataset, indicator: choice.indicator }) || censusMean
                   ? countClassificationBins(
                       {
                         classification: choice.classification,
@@ -230,6 +230,7 @@ export function DatasetMapCard({
       profiling,
       navigationOnly,
       accreditation,
+      censusMean,
       dataset,
       choice.indicator,
       choice.classification,
@@ -289,7 +290,7 @@ export function DatasetMapCard({
       <SizeLegend rows={data.rows} compact={workspace} />
     ) : (
       <div className="space-y-1">
-        {rangeKind && rangeKind !== "years" && (
+        {rangeKind && (
           <p className="text-xs font-medium">
             {choice.classification === "custom"
               ? "Custom cut points"
@@ -602,7 +603,7 @@ export function DatasetMapCard({
                     excludedCodes={excludedCodes}
                     view={view}
                   />
-                  {rangeKind && rangeKind !== "years" && view === "choropleth" && (
+                  {rangeKind && view === "choropleth" && (
                     <p className="text-xs text-muted" aria-label="Effective classification">
                       {classificationDescription(choice, bins, rangeKind ?? "count")}
                     </p>
@@ -661,9 +662,11 @@ export function DatasetMapCard({
                               ? `${choice.classification ? "Color groups use all reported child-area shares." : "Fixed percentage breaks across areas."} Gray means the published share or its denominator is unavailable, not zero percent.`
                               : profiling
                                 ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
-                                : supportsCircles(choice)
-                                  ? "Color classification uses all reported child-area counts. Gray means no reported value."
-                                  : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                                : censusMean
+                                  ? "Color classification uses all reported child-area means. Gray means no reported value."
+                                  : supportsCircles(choice)
+                                    ? "Color classification uses all reported child-area counts. Gray means no reported value."
+                                    : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
                     Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
                     pan.
                   </p>
@@ -762,25 +765,21 @@ export function DatasetMapCard({
                       {data.totalNote}
                     </p>
                   )}
-                  {workspace &&
-                    rangeKind &&
-                    rangeKind !== "years" &&
-                    !navigationOnly &&
-                    view === "choropleth" && (
-                      <ClassificationControls
-                        kind={rangeKind}
-                        key={`${choice.indicator}:${classificationKey}`}
-                        settings={choice}
-                        onApply={(settings) =>
-                          setChoice((current) => ({
-                            ...current,
-                            classification: settings.classification,
-                            classCount: settings.classCount,
-                            classBreaks: settings.classBreaks,
-                          }))
-                        }
-                      />
-                    )}
+                  {workspace && rangeKind && !navigationOnly && view === "choropleth" && (
+                    <ClassificationControls
+                      kind={rangeKind}
+                      key={`${choice.indicator}:${classificationKey}`}
+                      settings={choice}
+                      onApply={(settings) =>
+                        setChoice((current) => ({
+                          ...current,
+                          classification: settings.classification,
+                          classCount: settings.classCount,
+                          classBreaks: settings.classBreaks,
+                        }))
+                      }
+                    />
+                  )}
                   {workspace && rangeKind && !navigationOnly && (
                     <ValueFilterControls
                       kind={rangeKind}

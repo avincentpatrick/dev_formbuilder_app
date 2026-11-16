@@ -108,6 +108,27 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     await page.goBack();
     await expect(explorer).toBeVisible();
+    // Overview and comparison keep their own scope while retaining the same way back.
+    const overviewBeforeCompare = page.url();
+    await page
+      .getByRole("navigation", { name: "BHW analysis" })
+      .getByRole("link", { name: "Compare places", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Compare BHW places", exact: true }),
+    ).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("mapState")).toBe(
+      new URL(previous).search.slice(1),
+    );
+    expect(new URL(page.url()).searchParams.has("geos")).toBe(false);
+    await page.reload();
+    await page.getByRole("link", { name: "← BHW overview", exact: true }).click();
+    await expect(page).toHaveURL(overviewBeforeCompare);
+    await page.reload();
+    await expect(back).toHaveAttribute(
+      "href",
+      new URL(previous).pathname + new URL(previous).search,
+    );
     // Purpose sections must keep the return snapshot, including on reload/history.
     const overviewUrl = page.url();
     const nav = page.getByRole("navigation", { name: "BHW analysis" });

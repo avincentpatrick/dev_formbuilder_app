@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
-import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
+import { bhwOverviewHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { createCatalogReader } from "@/lib/catalog/reader";
@@ -81,7 +81,7 @@ export async function PublicComparison({
   }));
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6">
-      <Link href="/bhw" className="underline">
+      <Link href={bhwOverviewHref(mapState)} className="underline">
         ← BHW overview
       </Link>
       <h1 className="text-2xl font-semibold">Compare BHW places</h1>

@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   bhwNationalCatalogHref,
+  bhwOverviewHref,
   bhwCatalogReturnHref,
   restoredBhwMapHref,
   bhwOverviewReturnHref,
@@ -110,4 +111,20 @@ it("carries a local map snapshot into national methodology without changing cata
     "dataset=bhw-profiling-status-2026",
   ])
     expect(bhwNationalCatalogHref(invalid)).toBe(bhwNationalCatalogHref());
+});
+
+it("keeps only validated map settings on the comparison return to the national overview", () => {
+  const choice = initialMapChoice("bhw-2025");
+  const raw = mapHref(choice).split("?")[1];
+  expect(bhwOverviewHref(`${raw}&redirect=https://example.com`)).toBe(
+    bhwOverviewReturnHref(choice),
+  );
+  for (const invalid of [
+    undefined,
+    "https://example.com",
+    [raw, raw],
+    "dataset=bhw-profiling-status-2026",
+    "dataset=bhw-2025&valueMin=-1",
+  ])
+    expect(bhwOverviewHref(invalid)).toBe("/bhw");
 });

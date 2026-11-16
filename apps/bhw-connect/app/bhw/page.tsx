@@ -9,9 +9,9 @@ import { BhwSearchForm } from "@/components/bhw/search-form";
 
 export const metadata: Metadata = { title: "BHW 2025" };
 
-async function OverviewContent() {
+async function OverviewContent({ mapState }: { mapState: string | string[] | undefined }) {
   const dataset = await getPublicDataset("bhw", { mode: "psgc", level: "national", code: "PH" });
-  return <BhwOverview dataset={dataset} />;
+  return <BhwOverview dataset={dataset} mapState={mapState} />;
 }
 
 export default async function Home({
@@ -39,7 +39,7 @@ export default async function Home({
         />
       )}
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
-        <OverviewContent />
+        <OverviewContent mapState={params.mapState} />
       </Suspense>
       <div>
         <ChatLauncher geoCode="PH" geoLevel="national" placement="inline" />

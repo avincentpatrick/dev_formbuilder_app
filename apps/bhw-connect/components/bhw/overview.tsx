@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { bhwNationalCatalogHref } from "@/lib/maps/catalog-return";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
 import { formatCount, formatPct } from "@/lib/format";
@@ -49,7 +50,13 @@ function ShareTile({
 
 /** This component receives catalog-approved values only. It never imports legacy
  * DB readers, AI caches or export endpoints with a different disclosure contract. */
-export function BhwOverview({ dataset }: { dataset: CatalogDataset }) {
+export function BhwOverview({
+  dataset,
+  mapState,
+}: {
+  dataset: CatalogDataset;
+  mapState?: string | string[];
+}) {
   const { get, total, parts } = overviewMeasures(dataset);
   const profiles = scalar(get("bhw.validated-profiles"));
   const registrationMix = parts?.map((value, index) => ({
@@ -311,7 +318,7 @@ export function BhwOverview({ dataset }: { dataset: CatalogDataset }) {
           <SourceDates dataset={dataset} />
           <Link
             prefetch={false}
-            href="/catalog?mode=psgc&location=national%3APH&dataset=bhw"
+            href={bhwNationalCatalogHref(mapState)}
             className="mt-4 inline-block text-sm underline"
           >
             View national indicators and availability →

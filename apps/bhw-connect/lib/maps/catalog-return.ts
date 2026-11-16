@@ -27,3 +27,13 @@ export function bhwOverviewReturnHref(choice: MapChoice): string | null {
   const query = new URLSearchParams({ mapState: mapHref(choice).split("?")[1] });
   return `/bhw?${query}`;
 }
+
+/** National methodology keeps its scope while carrying only validated return settings. */
+export function bhwNationalCatalogHref(raw?: string | string[]): string {
+  const query = new URLSearchParams(
+    catalogHref({ mode: "psgc", level: "national", code: "PH" }, "bhw").split("?")[1],
+  );
+  const restored = restoredBhwMapHref(raw);
+  if (restored) query.set("mapState", restored.split("?")[1]);
+  return `/catalog?${query}`;
+}

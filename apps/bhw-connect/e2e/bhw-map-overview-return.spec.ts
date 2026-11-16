@@ -79,6 +79,22 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(`${overviewUrl}#methodology`);
     await page.goForward();
     await expect(page).toHaveURL(`${overviewUrl}#workforce`);
+    await nav.getByRole("link", { name: "Data and methodology", exact: true }).click();
+    await page.locator("#methodology summary").click();
+    await page
+      .getByRole("link", { name: "View national indicators and availability", exact: false })
+      .click();
+    await expect(page).toHaveURL(/catalog\?/);
+    const catalogQuery = new URL(page.url()).searchParams;
+    expect(catalogQuery.get("location")).toBe("national:PH");
+    expect(catalogQuery.get("dataset")).toBe("bhw");
+    expect(catalogQuery.get("mapState")).toBe(new URL(previous).search.slice(1));
+    await page.reload();
+    await expect(back).toHaveAttribute(
+      "href",
+      new URL(previous).pathname + new URL(previous).search,
+    );
+    await expect(page.getByText(/Catalog figures keep their own scope/)).toBeVisible();
     await back.click();
     await expect(page).toHaveURL(previous);
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();

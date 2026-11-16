@@ -213,7 +213,7 @@ measure table/legend response, not final GPU paint or production percentiles.
 | Phone | classification | Warm | 84, 105, 78, 163, 93 | 93 | 163 | 300 |
 
 Warm phone interactions met the target in all ten observations. Cold-page phone
-filter outliers and a desktop classification outlier still exceeded the targets;
+filter/classification outliers and a desktop classification outlier still exceeded the targets;
 the optimization is not a complete performance pass. Preserve these results,
 repeat on controlled/representative devices, and resolve budget misses before
 signoff. A smaller median does not waive the maximum or physical-device gates.

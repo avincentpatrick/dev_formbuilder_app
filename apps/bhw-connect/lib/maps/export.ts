@@ -1,5 +1,5 @@
 import { classificationDescription } from "./classification";
-import { hasValueFilter, valueFilterState, countFilterSummary } from "./value-filter";
+import { hasValueFilter, valueFilterState, valueFilterSummary } from "./value-filter";
 import { mapBinLabel } from "./legend-label";
 import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
 import { isCensusProfileRate } from "./census-accreditation";
@@ -49,7 +49,7 @@ export function datasetMapExport(
           },
         }
       : {}),
-    ...(hasValueFilter(choice) ? { valueFilter: countFilterSummary(data.rows, choice) } : {}),
+    ...(hasValueFilter(choice) ? { valueFilter: valueFilterSummary(data.rows, choice) } : {}),
     dataset: { slug: definition.slug, title: definition.title },
     selection: {
       ...choice,

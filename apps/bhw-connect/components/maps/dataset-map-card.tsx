@@ -38,7 +38,12 @@ import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
 import type { BoundaryCollection, LocatorMap } from "@/lib/geo/locator-shapes";
-import { hasValueFilter, valueFilterState, countFilterSummary } from "@/lib/maps/value-filter";
+import {
+  hasValueFilter,
+  valueFilterState,
+  valueFilterSummary,
+  valueRangeKind,
+} from "@/lib/maps/value-filter";
 import { countClassificationBins, classificationDescription } from "@/lib/maps/classification";
 import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
@@ -221,8 +226,10 @@ export function DatasetMapCard({
   );
   const metric = metrics.find((m) => m.id === choice.indicator);
   const view = mapView(choice);
+  const rangeKind = valueRangeKind(choice);
+  const rangeLabel = rangeKind === "percentage" ? "Percentage" : "Count";
   const filtering = hasValueFilter(choice);
-  const filterSummary = data && filtering ? countFilterSummary(data.rows, choice) : null;
+  const filterSummary = data && filtering ? valueFilterSummary(data.rows, choice) : null;
   const excludedCodes =
     data && filtering
       ? data.rows
@@ -396,7 +403,7 @@ export function DatasetMapCard({
                       : choice.classification
                         ? "Color classification and count range reset for the new indicator."
                         : filtering
-                          ? "Count range reset for the new indicator."
+                          ? `${rangeLabel} range reset for the new indicator.`
                           : null,
                   );
                   setChoice(next);
@@ -582,11 +589,15 @@ export function DatasetMapCard({
                   )}
                   {filterSummary && (
                     <p role="status" className="rounded border border-border p-2 text-sm">
-                      Count range: {choice.valueMin ?? "no minimum"} to{" "}
-                      {choice.valueMax ?? "no maximum"}, inclusive. {filterSummary.included}{" "}
-                      included, {filterSummary.excluded} excluded, {filterSummary.unavailable}{" "}
-                      unavailable. Published total and complete table unchanged. White shapes with
-                      dashed outlines are excluded. Scales and classification use all areas.
+                      {rangeLabel} range{rangeKind === "percentage" ? " (%)" : ""}:{" "}
+                      {choice.valueMin ?? "no minimum"} to {choice.valueMax ?? "no maximum"},
+                      inclusive. {filterSummary.included} included, {filterSummary.excluded}{" "}
+                      excluded, {filterSummary.unavailable} unavailable. Published{" "}
+                      {rangeKind === "percentage" ? "parent rate" : "total"} and complete table
+                      unchanged. White shapes with dashed outlines are excluded.{" "}
+                      {rangeKind === "percentage"
+                        ? "Fixed color breaks are unchanged."
+                        : "Scales and classification use all areas."}
                       {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
                     </p>
                   )}
@@ -741,8 +752,9 @@ export function DatasetMapCard({
                       }
                     />
                   )}
-                  {workspace && supportsCircles(choice) && (
+                  {workspace && rangeKind && !navigationOnly && (
                     <ValueFilterControls
+                      kind={rangeKind}
                       key={`${choice.indicator}:${choice.valueMin}:${choice.valueMax}`}
                       range={choice}
                       onApply={(range) =>
@@ -906,7 +918,7 @@ export function DatasetMapCard({
                             )}
                             {(income || profiling || uucRoute || accreditation || censusMean) &&
                               !navigationOnly && <th scope="col">Source context</th>}
-                            {filtering && <th scope="col">Count range</th>}
+                            {filtering && <th scope="col">{rangeLabel} range</th>}
                             <th scope="col">Geometry</th>
                           </tr>
                         </thead>

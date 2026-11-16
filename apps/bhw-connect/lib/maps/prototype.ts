@@ -6,7 +6,12 @@ import {
   classificationBreaksText,
   type CountClassification,
 } from "./classification";
-import { parseCountRange, hasValueFilter } from "./value-filter";
+import {
+  parseCountRange,
+  parsePercentageRange,
+  valueRangeKind,
+  hasValueFilter,
+} from "./value-filter";
 import { supportsCircles } from "./symbols";
 
 export type MapScope = { level: "national" | "region" | "province" | "citymun"; code: string };
@@ -168,8 +173,12 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   );
   if (!grouping || (grouping.classification && !supportsCircles({ dataset, indicator })))
     return null;
-  const range = parseCountRange(params.get("valueMin"), params.get("valueMax"));
-  if (!range || (hasValueFilter(range) && !supportsCircles({ dataset, indicator }))) return null;
+  const rangeKind = valueRangeKind({ dataset, indicator, level });
+  const range = (rangeKind === "percentage" ? parsePercentageRange : parseCountRange)(
+    params.get("valueMin"),
+    params.get("valueMax"),
+  );
+  if (!range || (hasValueFilter(range) && !rangeKind)) return null;
   return {
     ...range,
     ...grouping,
@@ -198,8 +207,10 @@ export function mapHref(choice: MapChoice) {
     else params.set("classCount", String(choice.classCount ?? 5));
   }
   if (choice.view) params.set("view", choice.view);
-  if (choice.valueMin !== undefined) params.set("valueMin", String(choice.valueMin));
-  if (choice.valueMax !== undefined) params.set("valueMax", String(choice.valueMax));
+  if (choice.valueMin !== undefined)
+    params.set("valueMin", classificationBreaksText([choice.valueMin]));
+  if (choice.valueMax !== undefined)
+    params.set("valueMax", classificationBreaksText([choice.valueMax]));
   return `/map?${params}`;
 }
 /** Preserve zero and missing rows; never coerce absent, invalid or duplicate values into zero. */

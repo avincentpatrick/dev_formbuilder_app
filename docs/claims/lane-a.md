@@ -63,6 +63,33 @@ Prediction:
 
 The one most likely wrong: the store adopting a carried row that has an unsent edit of its own, where a column-by-column merge has to keep the typed text and still take the rewrite.
 
+**BUILT AND HELD (2026-11-16): PR #545.** `VERSION` 0.21.1 with its notes.
+- **CI run 43778856251 on `857db5d8`:** every job green with real step counts — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5 — and Boundary 43778854398 green (5). Pest 7,634 passed and 1 skipped (36,704 assertions); E2E 925 passed in 35.4 min.
+- **Server.** New `KeyRenameCarrier` and its `CarriedReferences` value. `KeyReferenceRewriter`'s `field()`, `section()` and `validation()` return the expression columns they could not read, and a new `confirmation()` rewrites the thank-you message for its one writer, `FormService::setConfirmationMessage()`. `FormBuilderService::updateFieldCarrying()`/`updateSectionCarrying()` return the row and the carry; `updateField()`/`updateSection()` delegate, so their callers are unchanged. The reply carries `carried` only after a rename.
+- **Locks.** A rename takes `lockForRename()` (the `forms` row, then the draft's sections, questions and rules by ascending id) before `writeField()`'s own lock set; an edit that keeps its key takes none of it.
+- **One key space, on a change only.** `freeKey()` adds the other table's keys only when the key changes, because it runs on every save: done unconditionally, a question already sharing a section's key would be renamed by an unrelated edit.
+- **Builder.** `takeCarried()` takes each carried row in place by server id, token and all; a row typed into since its last save keeps every setting the author changed and takes the rest, and its journal entry is re-kept on the new token. The saved row's own carried text (`ownCarried`) becomes what the commit or the replay holds. `repointOtherPair()` and `resave()` are gone. The undo entry reads *"Edit Age and 3 that named its key"* (`undoLabel`, read-only, exposed for it); the panel says what followed under Field key and under Section key, which also gets the kept-key notice it lacked. A rewritten thank-you message reloads the page's `form` prop, so the settings modal never saves the old text back.
+- **Docs.** `manual.ts`'s Field key entry; five ledger citations into `useBuilderStore.ts` and `ConfigPanel.vue` that the new lines moved now cite by name (the ledger tier back at 16, its ceiling).
+- **Tests.** New `BuilderKeyRenameTest` (9), `KeyReferenceRewriterTest` (4), a rename arm in `BuilderLockOrderTest`, new `key-rename-carry.test.ts` (8), `other-specify-store.test.ts` rewritten for the carry, `key-clash.test.ts`'s notice wording, new `tests/e2e/builder-key-rename.spec.ts`. `NheteBuilderDriver::copyBlock()` retypes nothing now.
+- **Local runs.**
+  - Pest: the new files, `BuilderLockOrderTest` (8), the builder neighbours (117: `BuilderCopyTest`, `BuilderDraftGuardTest`, `BuilderRoutesTest`, `BuilderSettingsRoundTripTest`, `ConversionCensusTest`, `FieldLibraryBuilderTest`, `OtherSpecifyTest`, `CopyKeysTest`, `ExpressionKeyRewriterTest`), `NheteCopyEquivalenceTest` and `NheteBuilderRouteTest` (167 s).
+  - Vitest: the builder folder and the forms pages, 82 files and 1,176 tests; one worker failed to start under load, on `other-specify-store.test.ts`, which passes on its own.
+  - E2E, run here and named: `builder-key-rename.spec.ts` and `builder-insert-question.spec.ts` (desktop), `nhete-builder-block.spec.ts` (all three widths).
+  - `vue-tsc` and the build; Pint, the whole tree on the host; PHPStan clean but for the container's partial view of the migrations (every remaining error is an "undefined property" on a column the migrations hold, two of them in M240's lines of `KeyReferenceRewriter`); the host lints.
+- **Mutants.** **12 of 12 caught.** Seven server ones through `mutate.php`: the carry call, the owner-token touch, the one key space, the one key space made unconditional, the rename lock made unconditional, the live thank-you arm, and the unread report. Five store ones through the byte-restoring Vitest harness: a stale token on whole adoption, a stale token on the merge, the merge overwriting typed text, the carry ignored, and the own text not held. **The last one first SURVIVED**: the store had already put the carried text on screen, so nothing read the stale baseline. Its case now checks that a touch with nothing changed sends nothing, and it is caught.
+
+**How the prediction fared.**
+- **Held:**
+  - One rename re-points every reference in the draft, the draft publishes with no hand edit, and renaming back restores every text byte for byte.
+  - The NHETE copy build sends the same requests: the driver lost its retyping, not a request. The copy-built form still serialises identically.
+  - The one flagged as most likely wrong — a carried row with an unsent edit — passed first time, and its mutant (the merge overwriting typed text) is caught.
+- **Wrong:** "No existing case moves except the lock-order arm and `other-specify-store.test.ts`". `key-clash.test.ts`'s notice wording moved too, because a kept key can now be a section's. Five old ledger citations went blank when one import line moved them.
+- **Not predicted:**
+  - `freeKey()` runs on every save, so one key space applies only when the key changes. Unconditional, it would rename a question that already shares a section's key the next time anyone edits it.
+  - The settings modal seeds the thank-you message from the page's `form` prop, so a carried message needs that prop reloaded. A later save from the stale copy would put the old key back.
+  - Its sibling store case, the renamed row's own text, had a mutant survive until the case checked a no-change touch.
+  - `mutate.php` aborts on a dirty target (seven of seven, until I committed); the Vitest harness died on the Windows console's encoding; local e2e needed a pending trunk migration on the dev database first.
+
 ---
 
 ## RELEASED — `M240`, `builder-copy-section`: copy a section, or ticked questions, with every condition, rule, formula and piped answer inside the copy pointing at the copies (merged as PR #526, `eaa3a39b`, fifth and last at the merge point of 2026-11-15, after merging the trunk into its branch at `6536ce35`; every required check green with real step counts on its run 43744913438 — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 43744910857 green (5); the trunk's run 43749147828 on `eaa3a39b` 8/8, with BHW Connect at 23)

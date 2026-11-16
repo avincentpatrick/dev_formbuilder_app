@@ -20,3 +20,10 @@ export function restoredBhwMapHref(raw: string | string[] | undefined): string |
   const choice = parseMapChoice(new URLSearchParams(raw));
   return choice && isBhw(choice) ? mapHref(choice) : null;
 }
+
+/** The overview keeps its national figures; the snapshot is only a way back to the map. */
+export function bhwOverviewReturnHref(choice: MapChoice): string | null {
+  if (!isBhw(choice)) return null;
+  const query = new URLSearchParams({ mapState: mapHref(choice).split("?")[1] });
+  return `/bhw?${query}`;
+}

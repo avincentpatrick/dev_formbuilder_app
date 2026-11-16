@@ -184,7 +184,7 @@ export async function PublicComparison({
                 />
                 <Link
                   className="underline"
-                  href={bhwMeasureHref(spec.id, geo.geoLevel, geo.geoCode)}
+                  href={bhwMeasureHref(spec.id, geo.geoLevel, geo.geoCode, mapState)}
                 >
                   Open this measure for {geo.geoName}
                 </Link>

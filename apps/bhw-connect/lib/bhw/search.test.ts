@@ -45,3 +45,21 @@ it("retains place names/codes and distinguishes unsupported actions from empty i
     "/bhw/measure?indicator=bhw.total&location=barangay%3A0102801001",
   );
 });
+
+it("carries only validated map snapshots into measure details", () => {
+  const raw =
+    "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306&valueMin=12.34";
+  const query = new URLSearchParams(bhwMeasureHref("bhw.total", "region", "01", raw).split("?")[1]);
+  expect(query.get("location")).toBe("region:01");
+  expect(query.get("indicator")).toBe("bhw.total");
+  expect(query.get("mapState")).toContain("selected=07306");
+  for (const invalid of [
+    "https://example.com",
+    [raw, raw],
+    "dataset=bhw-profiling-status-2026",
+    "dataset=bhw-2025&valueMin=-1",
+  ])
+    expect(bhwMeasureHref("bhw.total", "region", "01", invalid)).toBe(
+      bhwMeasureHref("bhw.total", "region", "01"),
+    );
+});

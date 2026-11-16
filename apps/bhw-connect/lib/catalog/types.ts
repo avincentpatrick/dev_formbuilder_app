@@ -11,6 +11,7 @@ export type PublicSource = {
   slug: string;
   name: string;
   sourceName: string | null;
+  license?: string | null;
   asOfDate: string | null;
   lastUpdatedAt: string | null;
 };

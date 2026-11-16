@@ -1,40 +1,14 @@
 import { InnovationEndorsement } from "@/components/branding/innovation-endorsement";
 import Link from "next/link";
-import { getActiveDataset } from "@/lib/db/dataset";
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
-
-export async function Footer() {
-  const dataset = await getActiveDataset();
-
+export function Footer() {
   return (
     <footer className="mt-auto border-t border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted sm:px-6">
         <p>
-          Source:{" "}
-          {dataset?.sourceName ??
-            "Official DOH Barangay Health Worker registration/accreditation dataset (2025 snapshot)"}
-          .
-        </p>
-        <p>
-          Data licensed under{" "}
-          <a
-            href="https://creativecommons.org/licenses/by/4.0/"
-            className="underline underline-offset-2 hover:text-accent"
-            rel="license noopener noreferrer"
-            target="_blank"
-          >
-            {dataset?.license ?? "CC BY 4.0"}
-          </a>
-          .{" "}
-          {dataset?.lastUpdatedAt && <span>Last updated {formatDate(dataset.lastUpdatedAt)}.</span>}
+          Sources, reference dates and licenses vary by dataset. Check the source notes beside each
+          figure before reusing data. Missing license information does not establish permission to
+          reuse it.
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <Link href="/" className="underline underline-offset-2 hover:text-accent">

@@ -589,3 +589,25 @@ it.each(["suppressed", "failed"] as const)(
     expect(JSON.stringify(result)).not.toContain("987654");
   },
 );
+
+it("preserves supplied license metadata with its own accepted source", async () => {
+  const sourceReader = reader();
+  vi.mocked(sourceReader.source).mockImplementation(async (slug) => ({
+    state: "available",
+    value: {
+      datasetId: 42,
+      slug,
+      name: slug,
+      sourceName: "Synthetic source",
+      license: slug === ACCEPTED_RELEASES.bhw ? "Synthetic profile terms" : null,
+      asOfDate: "2025-12-31",
+      lastUpdatedAt: "2026-01-01",
+    },
+  }));
+  const catalog = await getPublicCatalog({ mode: "all" }, sourceReader);
+  const sources = catalog.datasets.find((d) => d.id === "bhw")!.sources;
+  expect(sources.find((s) => s.slug === ACCEPTED_RELEASES.bhw)?.license).toBe(
+    "Synthetic profile terms",
+  );
+  expect(sources.find((s) => s.slug === ACCEPTED_RELEASES.stepzero)?.license).toBeNull();
+});

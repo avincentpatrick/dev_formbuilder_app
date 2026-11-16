@@ -204,6 +204,7 @@ export async function getPublicCatalog(
               slug: info.slug,
               name: info.name,
               sourceName: info.sourceName,
+              license: info.license,
               asOfDate: date(info.asOfDate),
               lastUpdatedAt: date(info.lastUpdatedAt),
             });

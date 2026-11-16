@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { CatalogDetails, CatalogResults } from "./catalog-results";
+import { CatalogDetails, CatalogResults, SourceDates } from "./catalog-results";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
 import { summarizeCatalog } from "@/lib/catalog/summary";
 
@@ -192,7 +192,7 @@ it("gives each card and the dataset view its own full map, at the chosen place",
   ]) {
     const { document } = parseHTML(markup);
     const link = document.querySelector('a[aria-label="Open full NHFR map"]');
-    expect(link?.textContent).toBe("Open full map →");
+    expect(link?.textContent).toBe(`Open full ${dataset.title} map →`);
     expect(link?.getAttribute("href")).toMatch(
       /^\/map\?dataset=nhfr-2026-09&.*level=region&code=01/,
     );
@@ -217,4 +217,21 @@ it("opens BHW visuals from the all-location card while retaining scoped indicato
   expect(scoped.querySelector("article h2 a")?.getAttribute("href")).toContain(
     "location=region%3A01&dataset=bhw",
   );
+});
+
+it("reports each source license without inferring permission from missing metadata", () => {
+  const html = renderToStaticMarkup(
+    <SourceDates
+      dataset={{
+        ...dataset,
+        sources: [
+          { ...dataset.sources[0], slug: "licensed", license: "Example supplied terms" },
+          { ...dataset.sources[0], slug: "unknown", license: null },
+        ],
+      }}
+    />,
+  );
+  expect(html).toContain("License: Example supplied terms");
+  expect(html).toContain("Not supplied by source metadata");
+  expect(html).not.toContain("CC BY 4.0");
 });

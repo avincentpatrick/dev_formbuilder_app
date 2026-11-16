@@ -5,6 +5,15 @@ import { initialMapChoice, mapHref } from "@/lib/maps/prototype";
 import { BhwOverview } from "./overview";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 
+vi.mock("@/components/maps/dataset-map-card", () => ({
+  DatasetMapCard: ({
+    dataset,
+    overviewPreview,
+  }: {
+    dataset: string;
+    overviewPreview?: boolean;
+  }) => <div data-map-preview={overviewPreview} data-dataset={dataset} />,
+}));
 // Inspect the exact props crossing into interactive charts/presentations.
 vi.mock("@/components/charts/figure-view", () => ({
   FigureView: ({ data }: { data: unknown }) => <pre data-chart>{JSON.stringify(data)}</pre>,
@@ -83,8 +92,8 @@ it("resumes the validated map from navigation while retaining a fresh national h
   );
   expect(explorer?.getAttribute("href")).toBe(previous);
   expect(explorer?.textContent).toContain("previous settings");
-  const comparisons = [...document.querySelectorAll("a")].filter(
-    (a) => a.textContent?.trim().startsWith("Compare places"),
+  const comparisons = [...document.querySelectorAll("a")].filter((a) =>
+    a.textContent?.trim().startsWith("Compare places"),
   );
   expect(comparisons).toHaveLength(2);
   for (const link of comparisons) {
@@ -112,4 +121,12 @@ it("keeps the fresh map default when a snapshot is absent, invalid, hidden or du
     expect(explorer?.getAttribute("href")).toBe(mapHref(initialMapChoice("bhw-stepzero-2026")));
     expect(explorer?.textContent).not.toContain("previous settings");
   }
+});
+
+it("opens a fresh headcount distribution preview independently of a saved map return", () => {
+  const { document } = parseHTML(render([], "dataset=bhw-2025&indicator=bhw.active-years"));
+  expect(document.querySelector('[aria-label="Workforce distribution preview"]')).not.toBeNull();
+  expect(document.querySelector('[data-map-preview="true"]')?.getAttribute("data-dataset")).toBe(
+    "bhw-stepzero-2026",
+  );
 });

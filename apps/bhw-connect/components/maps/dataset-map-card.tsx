@@ -74,11 +74,13 @@ export function DatasetMapCard({
   dataset,
   initial,
   expanded = false,
+  overviewPreview = false,
   onChoiceChange,
 }: {
   dataset: string;
   initial?: MapChoice;
   expanded?: boolean;
+  overviewPreview?: boolean;
   onChoiceChange?: (choice: MapChoice) => void;
 }) {
   const definition = getDatasetMap(dataset)!;
@@ -258,7 +260,7 @@ export function DatasetMapCard({
           .map((row) => row.code)
       : [];
   const bhw = dataset === "bhw-stepzero-2026" || dataset === "bhw-2025";
-  const workspace = bhw && expanded;
+  const workspace = bhw && (expanded || overviewPreview);
   const [panel, setPanel] = useState<"map" | "areas">("map");
   const panelId = useId();
   const censusUncertainty = censusRate && !!metric?.catalogSpec?.attributes?.ciLow;
@@ -912,7 +914,7 @@ export function DatasetMapCard({
                               : data.childLevel === "barangay"
                                 ? "Barangays are the smallest area on this map."
                                 : "Barangay polygons are not yet validated."}{" "}
-                          {dashboard && (
+                          {dashboard && !overviewPreview && (
                             <Link
                               className="underline"
                               href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${data.childLevel === "barangay" ? choice.code : selected.code}`}
@@ -1031,7 +1033,7 @@ export function DatasetMapCard({
         <Link prefetch={false} href={mapHref(bhw ? { ...choice, view } : choice)}>
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
-        {dashboard && (
+        {dashboard && !overviewPreview && (
           <Link
             href={dashboard === "/bhw" ? (bhwOverviewReturnHref(choice) ?? dashboard) : dashboard}
           >

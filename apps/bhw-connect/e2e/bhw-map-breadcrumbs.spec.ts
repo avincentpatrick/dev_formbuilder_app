@@ -118,7 +118,7 @@ for (const width of [390, 1440]) {
     const back = page.getByRole("link", { name: "← BHW dataset", exact: true });
     await expect(back).toHaveAttribute(
       "href",
-      "/bhw-connect/catalog?mode=psgc&location=region%3A07&dataset=bhw",
+      /^\/bhw-connect\/catalog\?mode=psgc&location=region%3A07&dataset=bhw&mapState=/,
     );
     if (width < 1024)
       await page.getByRole("button", { name: "Areas and data", exact: true }).click();
@@ -128,7 +128,7 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "Show areas within Cebu", exact: true }).click();
     await expect(back).toHaveAttribute(
       "href",
-      "/bhw-connect/catalog?mode=psgc&location=province%3A07022&dataset=bhw",
+      /^\/bhw-connect\/catalog\?mode=psgc&location=province%3A07022&dataset=bhw&mapState=/,
     );
     await page.goBack();
     await expect(back).toHaveAttribute("href", /location=region%3A07/);

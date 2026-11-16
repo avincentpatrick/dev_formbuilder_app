@@ -37,10 +37,11 @@ export default async function BhwMeasurePage({
   const spec = BHW_MEASURES.find((s) => s.id === params.indicator);
   const request = parseCatalogParams({ mode: "psgc", location: params.location, dataset: "bhw" });
   const selection = request?.selection;
-  if (!spec || selection?.mode !== "psgc") return <InvalidSelection returnPanel={returnPanel} />;
+  if (!spec || selection?.mode !== "psgc")
+    return <InvalidSelection returnPanel={returnPanel} mapState={mapState} />;
   const geo = await getGeoByCode(selection.code);
   if (!geo || geo.geoLevel !== selection.level)
-    return <InvalidSelection returnPanel={returnPanel} />;
+    return <InvalidSelection returnPanel={returnPanel} mapState={mapState} />;
   const dataset = await getPublicDataset("bhw", selection);
   const indicator = dataset.indicators.find((i) => i.id === spec.id)!;
   const values = publicValues(indicator);
@@ -101,12 +102,18 @@ export default async function BhwMeasurePage({
       >
         Compare this measure with another place
       </Link>
-      <BhwSearchForm />
+      <BhwSearchForm mapState={mapState} />
     </div>
   );
 }
 
-function InvalidSelection({ returnPanel }: { returnPanel: ReactNode }) {
+function InvalidSelection({
+  returnPanel,
+  mapState,
+}: {
+  returnPanel: ReactNode;
+  mapState?: string;
+}) {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6">
       <h1 className="text-2xl font-semibold">Could not verify this selection</h1>
@@ -115,7 +122,7 @@ function InvalidSelection({ returnPanel }: { returnPanel: ReactNode }) {
         Check the indicator and place code, or retry if the place service is unavailable. No
         national fallback has been applied.
       </p>
-      <BhwSearchForm />
+      <BhwSearchForm mapState={mapState} />
     </div>
   );
 }

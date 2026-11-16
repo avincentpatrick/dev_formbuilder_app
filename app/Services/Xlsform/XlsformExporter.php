@@ -99,7 +99,7 @@ final class XlsformExporter
 
         return [
             'survey' => ['headers' => $this->surveyHeaders($langs), 'rows' => $survey],
-            'choices' => ['headers' => $this->choicesHeaders($langs, $hasCascade), 'rows' => $choices],
+            'choices' => ['headers' => [...$this->choicesHeaders($langs, $hasCascade), ...(self::anyExclusive($choices) ? ['#meridian'] : [])], 'rows' => $choices],
             'settings' => $this->settingsSheet($form, $version, $locale),
         ];
     }
@@ -143,7 +143,7 @@ final class XlsformExporter
 
         $row = $this->commonColumns($field, $locale, $langs);
         $row['appearance'] = $this->appearance($field, $mapping->appearance);
-        $row['#meridian'] = $mapping->marker ?? '';
+        $row['#meridian'] = implode(' ', [...($mapping->marker !== null ? [$mapping->marker] : []), ...$this->types->answerLimitTokens($type, $config)]);
 
         $typeToken = $mapping->type;
 
@@ -157,7 +157,7 @@ final class XlsformExporter
         } elseif ($type->hasOptions()) {
             // single_select / multi_select / dropdown / likert_scale
             $typeToken = $mapping->type.' '.$key;
-            $this->pushOptionList($key, $config, $locale, $langs, $choices, $listsSeen);
+            $this->pushOptionList($key, $type->takesChoiceLimits() ? $config : self::withoutExclusive($config), $locale, $langs, $choices, $listsSeen);
         }
 
         $row['type'] = $typeToken;
@@ -461,7 +461,7 @@ final class XlsformExporter
         $listsSeen[$listName] = true;
 
         foreach ($pairs as $pair) {
-            $row = ['list_name' => $listName, 'name' => $pair['value']];
+            $row = ['list_name' => $listName, 'name' => $pair['value']] + (($pair['exclusive'] ?? false) === true ? ['#meridian' => XlsformTypeMap::MARKER_EXCLUSIVE] : []);
             $this->fillText($row, 'label', $pair['label'], $pair['translations'] ?? null, $langs);
             $choices[] = $row;
         }
@@ -612,6 +612,7 @@ final class XlsformExporter
                 'value' => $value,
                 'label' => (string) ($entry['label'] ?? $value),
                 'translations' => $entry['label_translations'] ?? null,
+                'exclusive' => ($entry['exclusive'] ?? null) === true,
             ];
         }
 
@@ -703,5 +704,37 @@ final class XlsformExporter
     private function bySectionSequence(array $a, array $b): int
     {
         return ((int) ($a['section_sequence'] ?? $a['sequence'] ?? 0)) <=> ((int) ($b['section_sequence'] ?? $b['sequence'] ?? 0));
+    }
+
+    /**
+     * M243 (`R-1da063f4`): an "only answer" flag is a multi-select's alone. A choice list of any other type is exported
+     * without it, so a flag a type conversion left behind (`FieldTypeConversion::answerLimitsFor()`) never travels.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private static function withoutExclusive(array $config): array
+    {
+        if (is_array($config['options'] ?? null)) {
+            $config['options'] = array_map(static fn (mixed $option): mixed => is_array($option) ? array_diff_key($option, ['exclusive' => true]) : $option, $config['options']);
+        }
+
+        return $config;
+    }
+
+    /**
+     * M243: whether any choice row carries an "only answer" marker. The choices sheet gets its `#meridian` column only then.
+     *
+     * @param  list<array<string, scalar|null>>  $choices
+     */
+    private static function anyExclusive(array $choices): bool
+    {
+        foreach ($choices as $row) {
+            if (($row['#meridian'] ?? null) === XlsformTypeMap::MARKER_EXCLUSIVE) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

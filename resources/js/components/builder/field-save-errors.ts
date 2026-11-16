@@ -134,6 +134,12 @@ const TAB_BY_PATH: Record<string, string> = {
     is_sensitive: 'advanced',
     is_queryable: 'advanced',
     appearance: 'options',
+    // M243 (`R-1da063f4`): the answer limits sit at the top of the Validation tab; an option's "Only answer" is an option
+    // path, so the Options tab already takes it.
+    'config.min_words': 'validation',
+    'config.max_words': 'validation',
+    'config.min_choices': 'validation',
+    'config.max_choices': 'validation',
 };
 
 /**

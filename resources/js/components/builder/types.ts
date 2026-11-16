@@ -273,6 +273,9 @@ export interface BuilderEnums {
     // M177 (`R-71509975`) — the types whose Options tab offers "Other, please specify" (`OtherSpecify::types()`). Optional so
     // a hand-built enums payload in a test may carry none; absent reads as no type offering it.
     other_specify_types?: string[];
+    /** M243 (`R-1da063f4`): the types whose Validation tab offers a word limit, and a choice limit with "only answer" choices. */
+    word_limit_types?: string[];
+    choice_limit_types?: string[];
     // M134 (`R-910d2286`) — one row per `OperandKind`, what the condition editor may offer. Optional: a hand-built
     // enum block in a test offers none, and the editor then filters nothing.
     operand_kinds?: OperandKindOption[];

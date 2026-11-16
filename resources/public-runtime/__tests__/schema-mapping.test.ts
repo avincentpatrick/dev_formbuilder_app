@@ -213,3 +213,47 @@ describe('translation resolver', () => {
         expect(resolveOptional(null, null, 'es')).toBeNull();
     });
 });
+
+/**
+ * M243 (`R-1da063f4`): the answer limits reach the engine and the screen from one projection, by the engines' whole-number
+ * rule — an integer or a string of digits of at least 1, and nothing else — and only on the types that take them.
+ */
+describe('answer limits (M243)', () => {
+    const schema = schemaResponse({
+        fields: [
+            field({ key: 'why', field_type: 'long_text', config: { max_words: 1500, min_words: '10' } }),
+            field({
+                key: 'pick',
+                field_type: 'multi_select',
+                config: {
+                    max_choices: 2,
+                    options: [
+                        { value: 'a', label: 'A' },
+                        { value: 'noview', label: 'No view', exclusive: true },
+                    ],
+                },
+            }),
+            field({ key: 'odd', field_type: 'short_text', config: { max_words: 2.5, min_words: 0 } }),
+            field({ key: 'email', field_type: 'email', config: { max_words: 3 } }),
+            field({ key: 'one', field_type: 'single_select', config: { max_choices: 1, options: [{ value: 'x', label: 'X', exclusive: true }] } }),
+        ],
+    });
+
+    it('projects them into the engine schema', () => {
+        const fields = Object.fromEntries(buildEngineSchema(schema).fields.map((f) => [f.key, f]));
+
+        expect(fields.why.words).toEqual({ min: 10, max: 1500 });
+        expect(fields.pick.choices).toEqual({ min: null, max: 2 });
+        expect(fields.pick.exclusive).toEqual([{ value: 'noview', label: 'No view' }]);
+        expect(fields.odd.words).toBeNull();
+        expect([fields.email.words, fields.one.choices, fields.one.exclusive]).toEqual([null, null, null]);
+    });
+
+    it('hands the screen the same limits, and none where the question has none', () => {
+        const limits = Object.fromEntries(buildRenderModel(schema).fields.map((f) => [f.key, f.limits]));
+
+        expect(limits.why).toEqual({ words: { min: 10, max: 1500 }, choices: null, exclusive: [] });
+        expect(limits.pick).toEqual({ words: null, choices: { min: null, max: 2 }, exclusive: ['noview'] });
+        expect([limits.odd, limits.email, limits.one]).toEqual([null, null, null]);
+    });
+});

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { captureMapFrame, composeMapPng, type MapFrame } from "./png";
+import { captureMapFrame, captureMetricScale, composeMapPng, pngNotes, type MapFrame } from "./png";
 import { datasetMapExport } from "./export";
 import { initialMapChoice, type MapPayload } from "./prototype";
 
@@ -103,9 +103,49 @@ it("captures CSS scaling independently of the WebGL device pixel ratio", async (
     off: vi.fn(),
     loaded: () => true,
     getCanvas: () => ({ width: 800, height: 600, clientWidth: 400 }),
+    getContainer: () => ({
+      querySelector: () => ({
+        textContent: "20\u00a0km",
+        getBoundingClientRect: () => ({ width: 100 }),
+      }),
+    }),
     triggerRepaint: () => listeners.get("render")?.(),
   };
   const frame = await captureMapFrame(map as unknown as Parameters<typeof captureMapFrame>[0]);
   expect(frame.cssPixelScale).toBe(3);
+  expect(frame.scaleBar).toEqual({ label: "20 km", pixels: 300 });
   expect(frame.height).toBe(900);
+});
+
+it("rejects missing or invalid live scales instead of inventing a distance", () => {
+  for (const [label, width] of [
+    ["", 100],
+    ["0 km", 100],
+    ["20 mi", 100],
+    ["10 km", 0],
+    ["10 km", Infinity],
+    ["10 km", 2000],
+  ] as const) {
+    const container = {
+      querySelector: () => ({ textContent: label, getBoundingClientRect: () => ({ width }) }),
+    };
+    expect(captureMetricScale(container as unknown as HTMLElement, 1)).toBeUndefined();
+  }
+  expect(
+    captureMetricScale({ querySelector: () => null } as unknown as HTMLElement, 1),
+  ).toBeUndefined();
+});
+it("draws the captured ruler and labels its geographic approximation", async () => {
+  const { ctx } = canvasFixture();
+  const payload = datasetMapExport(initialMapChoice("bhw-stepzero-2026"), data, [], []);
+  await composeMapPng(
+    { width: 1200, height: 500, scaleBar: { label: "20 km", pixels: 300 } } as MapFrame,
+    payload,
+  );
+  expect(ctx.fillRect.mock.calls.some((args) => args[2] === 300 && args[3] === 2)).toBe(true);
+  expect(ctx.fillText.mock.calls.some((args) => args[0] === "Scale near map center: 20 km")).toBe(
+    true,
+  );
+  expect(pngNotes(payload, true).join(" ")).toContain("scale varies with location");
+  expect(pngNotes(payload).join(" ")).toContain("no distance bar is inferred");
 });

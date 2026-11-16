@@ -4,7 +4,22 @@ import type { datasetMapExport } from "./export";
 import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
 
 type Context = ReturnType<typeof datasetMapExport>;
-export type MapFrame = HTMLCanvasElement & { cssPixelScale?: number };
+export type MapFrame = HTMLCanvasElement & {
+  cssPixelScale?: number;
+  scaleBar?: { label: string; pixels: number };
+};
+
+/** Reuse the metric MapLibre control; do not introduce a second distance formula. */
+export function captureMetricScale(container: HTMLElement, cssPixelScale: number) {
+  const control = container.querySelector<HTMLElement>(".maplibregl-ctrl-scale");
+  const label = control?.textContent?.trim().replace(/\s+/g, " ");
+  const width = control?.getBoundingClientRect().width ?? 0;
+  const match = label?.match(/^(\d+(?:\.\d+)?) (m|km)$/);
+  const pixels = width * cssPixelScale;
+  if (!match || Number(match[1]) <= 0 || !Number.isFinite(pixels) || pixels <= 0 || pixels > 1152)
+    return undefined;
+  return { label: label!, pixels };
+}
 
 /** Copy synchronously during MapLibre's render event, before WebGL discards its drawing buffer. */
 export function captureMapFrame(map: LibreMap): Promise<MapFrame> {
@@ -29,6 +44,7 @@ export function captureMapFrame(map: LibreMap): Promise<MapFrame> {
         copy.width = 1200;
         // MapLibre radii are CSS pixels, while the WebGL buffer may be high-DPI.
         copy.cssPixelScale = copy.width / (source.clientWidth || source.width);
+        copy.scaleBar = captureMetricScale(map.getContainer(), copy.cssPixelScale);
         copy.height = Math.max(1, Math.round((1200 * source.height) / source.width));
         if (copy.height > 4096) throw new Error("Map viewport is too tall to export");
         const context = copy.getContext("2d");
@@ -52,7 +68,7 @@ export function captureMapFrame(map: LibreMap): Promise<MapFrame> {
   });
 }
 
-export function pngNotes(data: Context): string[] {
+export function pngNotes(data: Context, hasScaleBar = false): string[] {
   const selected = data.rows.find((row) => row.code === data.selection.selected);
   const missing = data.rows.filter((row) => row.geometry === "missing").length;
   const unchecked = data.rows.filter((row) => row.geometry === "not-checked").length;
@@ -74,7 +90,10 @@ export function pngNotes(data: Context): string[] {
       : []),
     ...(data.dataset.slug === "bhw-stepzero-2026" || data.dataset.slug === "bhw-2025"
       ? [
-          "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom. The national locator and live scale bar are not included in this image.",
+          "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom. The national locator is not included in this image.",
+          hasScaleBar
+            ? "Metric scale is approximate near the map center at capture time; map scale varies with location."
+            : "Metric scale is unavailable for this capture; no distance bar is inferred.",
         ]
       : []),
     `Legend: ${data.legend.method}. ${data.legend.symbols ? "Neutral shapes provide geographic context; counts use circles." : "Gray: unavailable value or navigation-only geography; not zero."}`,
@@ -145,7 +164,7 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     if (line) lines.push(line);
     return lines;
   };
-  const notes = pngNotes(data);
+  const notes = pngNotes(data, Boolean(frame.scaleBar));
   const heading = notes.slice(0, 2).flatMap(wrap);
   const footer = notes.slice(2).flatMap(wrap);
   const legend = data.legend.bins.map((bin) => ({
@@ -180,6 +199,7 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     headerHeight +
     frame.height +
     symbolHeight +
+    (frame.scaleBar ? 75 : 0) +
     margin * 2 +
     (footer.length + legend.length + 1) * lineHeight;
   if (canvas.height > 16384)
@@ -192,6 +212,13 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
   heading.forEach((line, i) => context.fillText(line, margin, margin + i * lineHeight));
   context.drawImage(frame, 0, headerHeight);
   let y = headerHeight + frame.height + margin;
+  if (frame.scaleBar) {
+    context.fillText(`Scale near map center: ${frame.scaleBar.label}`, margin, y);
+    context.fillRect(margin, y + 35, frame.scaleBar.pixels, 2);
+    context.fillRect(margin, y + 29, 2, 8);
+    context.fillRect(margin + frame.scaleBar.pixels - 2, y + 29, 2, 8);
+    y += 75;
+  }
   if (symbols) {
     context.fillText("Circle area represents BHW count", margin, y);
     y += lineHeight;

@@ -25,13 +25,16 @@ async function fixture(page: Page, empty = false) {
 }
 test.use({ deviceScaleFactor: 2 });
 for (const width of [390, 1440]) {
-  test(`circle PNG exports a size legend at ${width}px and high DPI`, async ({
+  test(`circle PNG exports size and metric legends at ${width}px and high DPI`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await fixture(page);
     await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07&valueMin=25");
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    const scale = page.locator(".maplibregl-ctrl-scale");
+    await expect(scale).toHaveText(/\d+(?:\.\d+)?\s+(?:km|m)/);
+    const initialScale = await scale.innerText();
     const pending = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download map image (PNG)", exact: true }).click();
     const download = await pending;
@@ -43,6 +46,11 @@ for (const width of [390, 1440]) {
     expect(png.subarray(1, 4).toString()).toBe("PNG");
     expect(png.readUInt32BE(16)).toBe(1200);
     expect(png.readUInt32BE(20)).toBeGreaterThan(500);
+    await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await expect(scale).not.toHaveText(initialScale);
+    const zoomed = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download map image (PNG)", exact: true }).click();
+    await (await zoomed).saveAs(testInfo.outputPath(`metric-zoom-${width}.png`));
     await expect(
       page.getByRole("button", { name: "Download map image (PNG)", exact: true }),
     ).toBeEnabled();

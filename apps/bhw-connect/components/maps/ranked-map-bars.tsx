@@ -42,8 +42,9 @@ export function RankedMapBars({
       </p>
       <p className="text-xs text-muted">
         Bars start at zero and use a common scale within this view. Zero has no filled bar. Select a
-        bar to update the map and area details. A low count alone does not show a shortage. Bars are
-        not included in the map PNG; JSON contains the complete area values.
+        bar to update the map and area details. A low count alone does not show a shortage. The map
+        PNG includes up to 20 included areas, largest count first, with omissions stated; JSON
+        contains all area values.
       </p>
       {ranked.length ? (
         <div

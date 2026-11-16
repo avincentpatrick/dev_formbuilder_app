@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { createCatalogReader } from "@/lib/catalog/reader";
@@ -16,16 +18,26 @@ export async function PublicComparison({
 }: {
   params: Record<string, string | string[] | undefined>;
 }) {
+  const returnMap = restoredBhwMapHref(params.mapState);
+  const mapState = returnMap?.split("?")[1];
+  const returnPanel =
+    params.mapState !== undefined ? (
+      <BhwMapReturnLink
+        href={returnMap}
+        scopeNote="Comparison figures use their own selected places and measure; map filters and color groups do not apply."
+      />
+    ) : null;
   const selection = parsePublicComparison(params);
   if (!selection)
     return (
       <div className="mx-auto max-w-4xl space-y-4 p-4">
         <h1 className="text-2xl font-semibold">Invalid comparison settings</h1>
+        {returnPanel}
         <p role="alert">
           Use a supported BHW measure and distinct PSGC codes. Districts, repeated settings and an
           unselected focus cannot be mixed into this comparison. No fallback was applied.
         </p>
-        <Link href={comparisonHref("bhw.total", [])} className="underline">
+        <Link href={comparisonHref("bhw.total", [], undefined, mapState)} className="underline">
           Choose comparison settings
         </Link>
       </div>
@@ -73,6 +85,7 @@ export async function PublicComparison({
         ← BHW overview
       </Link>
       <h1 className="text-2xl font-semibold">Compare BHW places</h1>
+      {returnPanel}
       <p>
         {spec.label} · 2025 · {spec.unit}
       </p>
@@ -90,6 +103,7 @@ export async function PublicComparison({
         places={places}
         measure={spec.id}
         focus={focus}
+        mapState={mapState}
         measures={BHW_MEASURES.map(({ id, label }) => ({ id, label }))}
       />
       {rows.length > 0 && (
@@ -116,7 +130,7 @@ export async function PublicComparison({
             {rows.map(({ geo }) => (
               <Link
                 key={geo.geoCode}
-                href={comparisonHref(spec.id, codes, geo.geoCode)}
+                href={comparisonHref(spec.id, codes, geo.geoCode, mapState)}
                 scroll={false}
                 aria-current={geo.geoCode === focus ? "page" : undefined}
                 className="rounded border border-border p-3 underline"
@@ -179,7 +193,10 @@ export async function PublicComparison({
           </div>
         </>
       )}
-      <Link href={comparisonHref(spec.id, codes, focus)} className="inline-block underline">
+      <Link
+        href={comparisonHref(spec.id, codes, focus, mapState)}
+        className="inline-block underline"
+      >
         Shareable comparison link
       </Link>
       <p className="text-sm text-muted">

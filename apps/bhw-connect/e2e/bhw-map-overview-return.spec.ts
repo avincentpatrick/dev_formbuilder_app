@@ -42,14 +42,34 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(/selected=07306/);
     const beforeComparison = page.url();
     await page.getByRole("link", { name: "Compare selected place", exact: true }).click();
-    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306$/);
+    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306&mapState=/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Compare BHW places");
     await expect(
       page.getByRole("combobox", { name: "Comparison measure", exact: true }),
     ).toHaveValue("bhw.active-years");
     await page.reload();
-    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306$/);
-    await page.goBack();
+    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306&mapState=/);
+    const returnFromComparison = page.getByRole("link", {
+      name: "Return to previous BHW map",
+      exact: true,
+    });
+    await expect(returnFromComparison).toHaveAttribute(
+      "href",
+      new URL(beforeComparison).pathname + new URL(beforeComparison).search,
+    );
+    await page
+      .getByRole("combobox", { name: "Comparison measure", exact: true })
+      .selectOption("bhw.total");
+    await expect(page).toHaveURL(/measure=bhw.total/);
+    await expect(
+      page.getByRole("link", { name: "Shareable comparison link", exact: true }),
+    ).toHaveAttribute("href", /mapState=/);
+    await page.reload();
+    await expect(returnFromComparison).toHaveAttribute(
+      "href",
+      new URL(beforeComparison).pathname + new URL(beforeComparison).search,
+    );
+    await returnFromComparison.click();
     await expect(page).toHaveURL(beforeComparison);
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     const previous = page.url();

@@ -1,3 +1,4 @@
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { BHW_MEASURES, parseBhwSearch } from "./search";
 import type { GeoSearchResult } from "@/lib/db/search";
 
@@ -46,10 +47,17 @@ export function parseComparisonSearch(query: string) {
   };
 }
 
-export function comparisonHref(measure: string, codes: readonly string[], focus?: string) {
+export function comparisonHref(
+  measure: string,
+  codes: readonly string[],
+  focus?: string,
+  mapState?: string | string[],
+) {
   const query = new URLSearchParams({ measure });
   if (codes.length) query.set("geos", codes.join(","));
   if (focus && codes.includes(focus)) query.set("focus", focus);
+  const restored = restoredBhwMapHref(mapState);
+  if (restored) query.set("mapState", restored.split("?")[1]);
   return `/compare?${query}`;
 }
 

@@ -94,3 +94,34 @@ it("invalid public modes cannot read data", async () => {
   expect(getPublicDataset).not.toHaveBeenCalled();
   expect(getGeoByCode).not.toHaveBeenCalled();
 });
+
+it("keeps a valid map return available even when comparison settings are invalid", async () => {
+  const html = renderToStaticMarkup(
+    await PublicComparison({
+      params: {
+        measure: "invalid",
+        mapState: "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306",
+      },
+    }),
+  );
+  expect(html).toContain("Invalid comparison settings");
+  expect(html).toContain("Return to previous BHW map");
+  expect(html).toContain("mapState=");
+  expect(getGeoByCode).not.toHaveBeenCalled();
+  expect(getPublicDataset).not.toHaveBeenCalled();
+});
+it("explains invalid snapshots without rendering a return link or propagating them", async () => {
+  for (const mapState of [
+    "https://example.com",
+    "dataset=bhw-profiling-status-2026",
+    ["dataset=bhw-2025", "dataset=bhw-2025"],
+  ]) {
+    const html = renderToStaticMarkup(
+      await PublicComparison({ params: { measure: "bhw.total", mapState } }),
+    );
+    expect(html).toContain("previous map settings are invalid or unsupported");
+    expect(html).not.toContain("Return to previous BHW map");
+    expect(html).not.toContain("mapState=");
+  }
+  expect(getPublicDataset).not.toHaveBeenCalled();
+});

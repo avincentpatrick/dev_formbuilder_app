@@ -2,7 +2,12 @@ import Link from "next/link";
 import { BhwSearchForm } from "@/components/bhw/search-form";
 import { searchGeo, type GeoSearchResult } from "@/lib/db/search";
 import { bhwMeasureHref, levelLabel, parseBhwSearch } from "@/lib/bhw/search";
-import { catalogHref } from "@/lib/catalog/navigation";
+import {
+  bhwOverviewHref,
+  bhwScopedCatalogHref,
+  restoredBhwMapHref,
+} from "@/lib/maps/catalog-return";
+import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import { parseComparisonSearch, publicPlace, type PlaceGroup } from "@/lib/bhw/comparison";
 import { ComparisonQueryResolver } from "@/components/compare/query-resolver";
 
@@ -14,6 +19,15 @@ export default async function BhwSearchPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const returnMap = restoredBhwMapHref(params.mapState);
+  const mapState = returnMap?.split("?")[1];
+  const returnPanel =
+    params.mapState !== undefined ? (
+      <BhwMapReturnLink
+        href={returnMap}
+        scopeNote="Search results follow your query; map filters and color groups do not limit the matches."
+      />
+    ) : null;
   const query = typeof params.q === "string" ? params.q : "";
   const comparison = parseComparisonSearch(query);
   if (comparison?.valid) {
@@ -32,13 +46,15 @@ export default async function BhwSearchPage({
     );
     return (
       <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6">
-        <Link href="/bhw" className="underline">
+        <Link href={bhwOverviewHref(mapState)} className="underline">
           ← BHW overview
         </Link>
         <h1 className="text-2xl font-semibold">Search BHW places and indicators</h1>
-        <BhwSearchForm query={query} />
+        {returnPanel}
+        <BhwSearchForm query={query} mapState={mapState} />
         <ComparisonQueryResolver
           key={query}
+          mapState={mapState}
           groups={groups}
           measures={comparison.measures.map(({ id, label }) => ({ id, label }))}
         />
@@ -67,11 +83,12 @@ export default async function BhwSearchPage({
   }
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6">
-      <Link href="/bhw" className="underline">
+      <Link href={bhwOverviewHref(mapState)} className="underline">
         ← BHW overview
       </Link>
       <h1 className="text-2xl font-semibold">Search BHW places and indicators</h1>
-      <BhwSearchForm query={query.slice(0, 100)} />
+      {returnPanel}
+      <BhwSearchForm query={query.slice(0, 100)} mapState={mapState} />
       {intent.state === "unsupported" && (
         <p role="status">
           This query is not supported. Try a place and indicator, or “Compare Cebu and Bohol
@@ -121,7 +138,7 @@ export default async function BhwSearchPage({
                       <Link
                         prefetch={false}
                         className="underline"
-                        href={bhwMeasureHref(measure.id, place.geoLevel, place.geoCode)}
+                        href={bhwMeasureHref(measure.id, place.geoLevel, place.geoCode, mapState)}
                       >
                         {measure.label}
                       </Link>
@@ -138,9 +155,9 @@ export default async function BhwSearchPage({
                 <Link
                   prefetch={false}
                   className="underline"
-                  href={catalogHref(
+                  href={bhwScopedCatalogHref(
                     { mode: "psgc", level: place.geoLevel, code: place.geoCode },
-                    "bhw",
+                    mapState,
                   )}
                 >
                   View BHW indicators for {place.geoName}

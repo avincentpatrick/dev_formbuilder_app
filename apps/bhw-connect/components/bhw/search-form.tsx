@@ -1,14 +1,19 @@
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { withBasePath } from "@/lib/base-path";
 
 export function BhwSearchForm({
   query = "",
   compact = false,
+  mapState,
 }: {
   query?: string;
   compact?: boolean;
+  mapState?: string | string[];
 }) {
+  const snapshot = restoredBhwMapHref(mapState)?.split("?")[1];
   return (
     <form action={withBasePath("/bhw/search")} method="get" role="search" className="space-y-2">
+      {snapshot && <input type="hidden" name="mapState" value={snapshot} />}
       <label htmlFor="bhw-search" className="block font-medium">
         Search BHW places and indicators
       </label>

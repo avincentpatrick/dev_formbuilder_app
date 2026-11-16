@@ -30,7 +30,7 @@ export default async function Home({
         <p className="max-w-3xl text-muted">
           Workforce, qualifications and support. Philippines · 2025.
         </p>
-        <BhwSearchForm compact />
+        <BhwSearchForm compact mapState={params.mapState} />
       </header>
       {params.mapState !== undefined && (
         <BhwMapReturnLink

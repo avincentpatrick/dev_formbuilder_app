@@ -7,8 +7,10 @@ import { comparisonHref, placeLabel, type PlaceGroup } from "@/lib/bhw/compariso
 export function ComparisonQueryResolver({
   groups,
   measures,
+  mapState,
 }: {
   groups: PlaceGroup[];
+  mapState?: string;
   measures: { id: string; label: string }[];
 }) {
   const router = useRouter();
@@ -27,7 +29,7 @@ export function ComparisonQueryResolver({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (valid) router.push(comparisonHref(measure, codes));
+        if (valid) router.push(comparisonHref(measure, codes, undefined, mapState));
       }}
     >
       <h2 className="text-xl font-semibold">Resolve comparison</h2>

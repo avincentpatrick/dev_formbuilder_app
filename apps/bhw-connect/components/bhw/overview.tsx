@@ -109,7 +109,7 @@ export function BhwOverview({
     shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
   const previousMapHref = restoredBhwMapHref(mapState);
-  const compareHref = comparisonHref("bhw.total", []);
+  const compareHref = comparisonHref("bhw.total", [], undefined, mapState);
   const mapHref = subjectMapHref("bhw", { mode: "all" })!;
   return (
     <PresentationProvider

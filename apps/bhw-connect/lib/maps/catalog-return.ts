@@ -28,6 +28,13 @@ export function bhwOverviewReturnHref(choice: MapChoice): string | null {
   return `/bhw?${query}`;
 }
 
+/** Keep a validated map return snapshot when navigating back from comparison. */
+export function bhwOverviewHref(raw?: string | string[]): string {
+  const restored = restoredBhwMapHref(raw);
+  if (!restored) return "/bhw";
+  return `/bhw?${new URLSearchParams({ mapState: restored.split("?")[1] })}`;
+}
+
 /** National methodology keeps its scope while carrying only validated return settings. */
 export function bhwNationalCatalogHref(raw?: string | string[]): string {
   const query = new URLSearchParams(

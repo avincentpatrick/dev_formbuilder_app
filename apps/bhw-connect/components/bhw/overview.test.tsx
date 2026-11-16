@@ -83,6 +83,16 @@ it("resumes the validated map from navigation while retaining a fresh national h
   );
   expect(explorer?.getAttribute("href")).toBe(previous);
   expect(explorer?.textContent).toContain("previous settings");
+  const comparisons = [...document.querySelectorAll("a")].filter(
+    (a) => a.textContent?.trim().startsWith("Compare places"),
+  );
+  expect(comparisons).toHaveLength(2);
+  for (const link of comparisons) {
+    const params = new URLSearchParams(link.getAttribute("href")!.split("?")[1]);
+    expect(params.get("mapState")).toBe(previous.split("?")[1]);
+    expect(params.get("measure")).toBe("bhw.total");
+    expect(params.has("geos")).toBe(false);
+  }
   const fresh = [...document.querySelectorAll("a")].find((a) =>
     a.textContent?.includes("Explore national headcount"),
   );

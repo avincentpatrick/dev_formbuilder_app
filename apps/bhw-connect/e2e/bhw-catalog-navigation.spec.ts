@@ -32,7 +32,11 @@ for (const width of [390, 1440]) {
       .click();
     await expect(page).toHaveURL((url) => !url.searchParams.has("dataset"));
     await expect(back).toHaveAttribute("href", original!);
-    await page.getByRole("link", { name: "View BHW indicators →", exact: true }).click();
+    // The committed development seed is withheld by the public catalog contract.
+    // Returning through history must restore BHW even when no available-card link exists.
+    await expect(page.getByRole("heading", { name: "Datasets not shown", exact: true })).toBeVisible();
+    await expect(page.getByText("BHW: Measures are withheld under the catalog’s privacy rules.", { exact: true })).toBeVisible();
+    await page.goBack();
     await expect(page).toHaveURL((url) => url.searchParams.get("dataset") === "bhw");
     await expect(back).toHaveAttribute("href", original!);
     await page.getByRole("link", { name: "All locations", exact: true }).click();

@@ -18,3 +18,9 @@ Unit checks cover serializer scope independence, invalid snapshots, unrelated
 sources and real form/ancestor markup. Phone/desktop browser checks cover BHW
 national → region → reload → ancestor → all datasets → BHW → all locations → Back.
 This is bounded navigation evidence, not exhaustive geography or reader acceptance.
+
+CI reproduction used the committed development copy in isolated PostgreSQL 15 /
+PostgREST 16.4. Its catalog-wide privacy contract withholds BHW, so the browser
+journey checks that explanation and returns to BHW through history. An explicit
+available-card unit fixture checks the BHW link preserves the map snapshot and
+an unrelated dataset drops it. Both browser widths passed against the seeded database.

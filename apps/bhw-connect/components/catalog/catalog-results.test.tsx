@@ -235,3 +235,21 @@ it("reports each source license without inferring permission from missing metada
   expect(html).toContain("Not supplied by source metadata");
   expect(html).not.toContain("CC BY 4.0");
 });
+
+
+it("carries the original BHW map only through BHW available-card links", () => {
+  const bhw = { ...dataset, id: "bhw" as const, title: "BHW" };
+  const mapState = "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306";
+  const document = parseHTML(renderToStaticMarkup(
+    <CatalogResults catalog={catalog([bhw, dataset])} locationName="Region I" mapState={mapState} />,
+  )).document;
+  for (const link of document.querySelectorAll('article a[href^="/catalog?"]')) {
+    const url = new URL(link.getAttribute("href")!, "https://example.test");
+    expect(url.searchParams.get("location")).toBe("region:01");
+    if (url.searchParams.get("dataset") === "bhw") {
+      expect(url.searchParams.get("mapState")).toContain("selected=07306");
+    } else {
+      expect(url.searchParams.has("mapState")).toBe(false);
+    }
+  }
+});

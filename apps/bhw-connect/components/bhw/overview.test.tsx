@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
+import { initialMapChoice, mapHref } from "@/lib/maps/prototype";
 import { BhwOverview } from "./overview";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 
@@ -18,7 +19,7 @@ const item = (id: string, state: CatalogIndicator["state"], value: number): Cata
   reason: null,
   reportedAreaRecords: 1,
 });
-function render(indicators: CatalogIndicator[]) {
+function render(indicators: CatalogIndicator[], mapState?: string | string[]) {
   const dataset: CatalogDataset = {
     id: "bhw",
     title: "BHW",
@@ -31,7 +32,7 @@ function render(indicators: CatalogIndicator[]) {
     detailHref: "/bhw",
     sources: [],
   };
-  return renderToStaticMarkup(<BhwOverview dataset={dataset} />);
+  return renderToStaticMarkup(<BhwOverview dataset={dataset} mapState={mapState} />);
 }
 it("does not serialize withheld categories or payer values into charts, labels or presentation content", () => {
   const html = render([
@@ -63,4 +64,42 @@ it("routes every overview comparison entry through the public headcount contract
   const links = [...document.querySelectorAll('a[href^="/compare"]')];
   expect(links).toHaveLength(2);
   for (const link of links) expect(link.getAttribute("href")).toBe("/compare?measure=bhw.total");
+});
+
+it("resumes the validated map from navigation while retaining a fresh national headcount link", () => {
+  const previous = mapHref({
+    ...initialMapChoice("bhw-2025"),
+    level: "region",
+    code: "07",
+    indicator: "bhw.active-years",
+    selected: "07306",
+    valueMin: 12.34,
+    classification: "custom",
+    classBreaks: [10, 20],
+  });
+  const { document } = parseHTML(render([], previous.split("?")[1]));
+  const explorer = [...document.querySelectorAll("nav a")].find((a) =>
+    a.textContent?.includes("Map explorer"),
+  );
+  expect(explorer?.getAttribute("href")).toBe(previous);
+  expect(explorer?.textContent).toContain("previous settings");
+  const fresh = [...document.querySelectorAll("a")].find((a) =>
+    a.textContent?.includes("Explore national headcount"),
+  );
+  expect(fresh?.getAttribute("href")).toBe(mapHref(initialMapChoice("bhw-stepzero-2026")));
+});
+it("keeps the fresh map default when a snapshot is absent, invalid, hidden or duplicated", () => {
+  for (const raw of [
+    undefined,
+    "https://example.com",
+    "dataset=bhw-profiling-status-2026",
+    ["dataset=bhw-2025", "dataset=bhw-2025"],
+  ]) {
+    const { document } = parseHTML(render([], raw));
+    const explorer = [...document.querySelectorAll("nav a")].find((a) =>
+      a.textContent?.includes("Map explorer"),
+    );
+    expect(explorer?.getAttribute("href")).toBe(mapHref(initialMapChoice("bhw-stepzero-2026")));
+    expect(explorer?.textContent).not.toContain("previous settings");
+  }
 });

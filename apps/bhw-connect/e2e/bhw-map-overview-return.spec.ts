@@ -55,6 +55,27 @@ for (const width of [390, 1440]) {
       "href",
       new URL(previous).pathname + new URL(previous).search,
     );
+    const explorer = page.getByRole("link", {
+      name: "Map explorer · previous settings",
+      exact: true,
+    });
+    await expect(explorer).toHaveAttribute(
+      "href",
+      new URL(previous).pathname + new URL(previous).search,
+    );
+    const fresh = page.getByRole("link", {
+      name: "Explore national headcount on the BHW map",
+      exact: false,
+    });
+    const freshParams = new URL((await fresh.getAttribute("href"))!, page.url()).searchParams;
+    expect(freshParams.get("dataset")).toBe("bhw-stepzero-2026");
+    expect(freshParams.get("code")).toBe("PH");
+    expect(freshParams.has("valueMin")).toBe(false);
+    await explorer.click();
+    await expect(page).toHaveURL(previous);
+    await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    await page.goBack();
+    await expect(explorer).toBeVisible();
     // Purpose sections must keep the return snapshot, including on reload/history.
     const overviewUrl = page.url();
     const nav = page.getByRole("navigation", { name: "BHW analysis" });

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { comparisonHref } from "@/lib/bhw/comparison";
-import { bhwNationalCatalogHref } from "@/lib/maps/catalog-return";
+import { bhwNationalCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
 import { formatCount, formatPct } from "@/lib/format";
@@ -108,6 +108,7 @@ export function BhwOverview({
     value: v.value,
     shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
+  const previousMapHref = restoredBhwMapHref(mapState);
   const compareHref = comparisonHref("bhw.total", []);
   const mapHref = subjectMapHref("bhw", { mode: "all" })!;
   return (
@@ -129,7 +130,9 @@ export function BhwOverview({
             <Link href="#qualifications">Qualifications and training</Link>
             <Link href="#support">Support and compensation</Link>
             <Link href={compareHref}>Compare places</Link>
-            <Link href={mapHref}>Map explorer</Link>
+            <Link href={previousMapHref ?? mapHref}>
+              Map explorer{previousMapHref ? " · previous settings" : ""}
+            </Link>
             <Link href="#methodology">Data and methodology</Link>
           </nav>
         </div>
@@ -190,7 +193,7 @@ export function BhwOverview({
               href={mapHref}
               className="inline-block text-sm font-semibold text-accent underline"
             >
-              Explore geographic distribution on the BHW map →
+              Explore national headcount on the BHW map →
             </Link>
             <PresentButton variant="secondary" />
           </div>

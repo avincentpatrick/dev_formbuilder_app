@@ -16,7 +16,62 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M242`, `R-ade0b598`: a renamed key carries every condition, formula and piped answer that names it (m242-key-rename-carries-references)
+## Status: ACTIVE CLAIM — `M243`, `R-1da063f4`: word limits with a live count, "choose at most N" that stops a further tick, and an "only answer" choice that clears and locks the rest (m243-answer-rules-words-choices)
+
+Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-2-streamed-book.md`). NHETE recommendation 2, answer rules, the NHETE plan's next item after `M242` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m243-answer-rules-words-choices`, cut from origin/main at `af2ad500`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.22.0 (a feature) with its release notes.** `M242` (#545, 0.21.1) is held too, so at the merge point it goes first and this branch takes the trunk and keeps 0.22.0 on top. Held green for a merge point on the user's word (`D137`).
+Row: `answer-rules-words-choices` (`R-1da063f4`), *"No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact."*
+
+### Evidence verified
+- *"NHETE builds today with three workarounds"* (a whole-answer pattern, `count(.) <= 2`, `not(selected(., 'noview')) or count(.) = 1`): **held**, all three in `NheteBuilderDriver::rules()`, and the word cap's pattern in `wordCapPattern()`.
+- *"All three refuse correctly (`NheteBuilderRouteTest`)"*: **held**, its refusal table holds one row for each and asserts the refusal lands on that question alone.
+- *"None shows a live count, stops a third tick, or clears the other boxes"*: **held.** `FieldInput.vue` draws text through `MdsTextInput`/`MdsTextarea` with no counter, and `toggleOption()` only appends or filters.
+- *"None is reachable without writing a pattern or formula"*: **held.** `ValueShape::allows()` gives `multiple_choice` only the four conditional rules, so a multi-select can take no structured constraint at all.
+
+### Premise verified
+- *"No word limit, no 'choose at most N' … exist as settings"*: **held.** `config.min_count`/`max_count` exist, but only for media (`SemanticValidator::mediaCountBounds()`, `UpdateFieldRequest::configRules()`'s media arm).
+- *"In both engines with golden vectors"* assumes the two engines agree on what a word break is: **false.** Measured with PHP 8.4.14 (PCRE 10.44) and Node 24: `\s` under `/u` matches U+0085 and U+180E in PHP and not in JS, and U+FEFF the other way round. A word count on `\s` would inherit that, so both engines split on the Unicode White_Space set written out as a list. The existing `pattern` rule already carries the split; filed as its own row, not fixed here.
+- *"Golden vectors"* check the rule ids, not the messages: **held, and a limit.** Both runners compare sorted `{field, rule}` pairs. The PHP runner rebuilds `config` per fragment and merges only `visibility`, so a new fragment would wipe `options`; the runner merges instead.
+- *"XLSForm export and import"* assumes a place to carry the settings: **false.**
+  - The exporter drops `pattern` and length rules (`renderStructured()`), and its only extra survey column is `#meridian`, one marker per row.
+  - The choices sheet has no extra column.
+  - The importer turns any constraint into an expression row, and publish refuses `count-selected` and `regex`: that is rec 3, `xlsform-import-odk-functions`.
+  - So the settings ride as `#meridian` tokens, and no ODK constraint is written, or our own round trip would not publish.
+- An "Other" choice is an ordinary option (`OtherSpecify::withOther()`), so it counts like any other: **held**.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held**.
+
+### Remedy verdict
+**Works, with four corrections:**
+1. **Field settings in `config`, not new rule rows**, following media's "How many". A rule row can sit in an any/all group, so it is not absolute and could not safely stop a tick. Rule rows also never reach the respondent's render model (`RenderField` carries no validations), so they could not drive a counter.
+2. **Words split on an explicit whitespace list** in both engines, never `\s` (the premise above).
+3. **An "only answer" box is never disabled by the "at most" cap.** Otherwise switching to "No view" would first need every other tick removed.
+4. **XLSForm carries the settings as `#meridian` tokens** (the premise above).
+
+Files:
+- **Server:** `app/Enums/FieldType.php`, a new `app/Support/Forms/WordCount.php`, `app/Services/Validation/SemanticValidator.php`, `app/Http/Requests/Forms/UpdateFieldRequest.php`, `app/Services/Forms/StructuralValidationGate.php`, `app/Exceptions/Forms/PublishValidationException.php`, `app/Support/Forms/FieldTypeConversion.php`, `app/Services/Forms/BuilderPresenter.php`, `app/Services/Submissions/EncodeFormPresenter.php`, `app/Services/Submissions/SchemaValueFormatter.php`, and `app/Services/Xlsform/` (`XlsformExporter.php`, `XlsformTypeMap.php`, `XlsformImportParser.php`, and the importer and DTOs they need).
+- **Engine and respondent screen:** `resources/public-runtime/engine/` (`semantic-validator.ts`, `schema.ts`, a new `words.ts`), `resources/public-runtime/lib/` (`schema-mapping.ts`, `types.ts`), `resources/public-runtime/components/` (`FieldControl.vue`, `InstanceField.vue`), and `resources/js/components/submissions/FieldInput.vue` with the staff page's adapter.
+- **Builder:** `resources/js/components/builder/` (`ConfigPanel.vue`, a new `AnswerLimitsEditor.vue`, `ChoicesEditor.vue`, `types.ts`, `field-save-errors.ts`) and `resources/js/components/help/manual.ts`.
+- **Tests:**
+  - `tests/golden/validation/` (a new `answer_rules.json`, `manifest.json`), both golden runners, and a new `tests/Feature/Forms/AnswerLimitsTest.php`;
+  - the payload, attribute, adapter and XLSForm tests;
+  - `tests/Support/Nhete/` and `tests/Feature/Forms/Nhete/`;
+  - Vitest beside each file above;
+  - `tests/e2e/nhete-walk.spec.ts` and `tests/e2e/nhete-builder-block.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/xlsform-interop-spec.md`, `docs/architecture/technical-architecture.md` (the vector count), `docs/feature-backlog.md`, `docs/pipeline.md`.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/xlsform-interop-spec.md`, `docs/architecture/technical-architecture.md`, `PROGRESS.md` (own block only), and the top-level `tests/e2e/nhete-walk.spec.ts` and `tests/e2e/nhete-builder-block.spec.ts`.
+Paired files taken: none of the 7(b-bis) entries. The PHP and TS engines are held together by the golden runners, and both halves change in this PR.
+Namespaces spent: nothing from the ADR, migration or decision namespaces (no migration: the settings are `config` keys).
+
+Prediction:
+- The NHETE build keeps its 1,560 builder requests, since the settings ride the same PATCH as the rules they replace.
+- `NheteCopyEquivalenceTest` does not move.
+- The golden total grows by exactly the new file's count.
+- `NheteXlsformImportTest`'s "LOST: the 1,500-word cap" turns into kept.
+
+The one most likely wrong: `nhete-walk.spec.ts` ticks each multi-select's first box, and if that box is an "only answer" choice, or a cap disables what it ticks next, the walk changes.
+
+## HELD — `M242`, `R-ade0b598`: a renamed key carries every condition, formula and piped answer that names it (m242-key-rename-carries-references) — BUILT AND HELD: PR #545, CI 43778856251 every job green with real step counts
 
 Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/record-the-census-after-cosmic-hare.md`), taken straight after `M240` by `D226` **A**, on `M240`'s `KeyReferenceRewriter`.
 Branch `m242-key-rename-carries-references`, cut from origin/main at `dd275c3b`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.21.1 (a fix) with its release notes.** Held green for a merge point on the user's word (`D137`).

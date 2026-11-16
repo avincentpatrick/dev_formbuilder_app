@@ -99,7 +99,7 @@ it("round-trips settings and rejects duplicate or incompatible share parameters"
   expect(
     parseMapChoice(
       new URLSearchParams(
-        "dataset=bhw-stepzero-2026&indicator=bhw.declared-accreditation&classification=equal",
+        "dataset=bhw-stepzero-2026&indicator=stepzero.population&classification=equal",
       ),
     ),
   ).toBeNull();

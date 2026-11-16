@@ -2,17 +2,21 @@
 import { useState } from "react";
 import {
   parseCountClassification,
+  parsePercentageClassification,
   classificationBreaksText,
   type CountClassification,
 } from "@/lib/maps/classification";
 export function ClassificationControls({
   settings,
+  kind = "count",
   onApply,
 }: {
   settings: CountClassification;
+  kind?: "count" | "percentage";
   onApply: (settings: CountClassification) => void;
 }) {
-  const [method, setMethod] = useState(settings.classification ?? "quantile");
+  const defaultMethod = kind === "percentage" ? "fixed" : "quantile";
+  const [method, setMethod] = useState<string>(settings.classification ?? defaultMethod);
   const [count, setCount] = useState(String(settings.classCount ?? 5));
   const [breaks, setBreaks] = useState(classificationBreaksText(settings.classBreaks ?? []));
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +27,11 @@ export function ClassificationControls({
         className="mt-2 space-y-2 text-sm"
         onSubmit={(event) => {
           event.preventDefault();
-          const parsed = parseCountClassification(
-            method,
-            method === "custom" ? null : count,
+          const parsed = (
+            kind === "percentage" ? parsePercentageClassification : parseCountClassification
+          )(
+            method === "fixed" ? null : method,
+            method === "custom" || method === "fixed" ? null : count,
             method === "custom"
               ? breaks
                   .split(",")
@@ -35,7 +41,9 @@ export function ClassificationControls({
           );
           if (!parsed) {
             setError(
-              "Choose 2–7 groups, or 1–6 positive, finite, increasing cut points separated by commas.",
+              kind === "percentage"
+                ? "Choose 2–7 groups, or 1–6 increasing cut points strictly between 0 and 100, separated by commas."
+                : "Choose 2–7 groups, or 1–6 positive, finite, increasing cut points separated by commas.",
             );
             return;
           }
@@ -55,8 +63,13 @@ export function ClassificationControls({
             onChange={(e) => setMethod(e.target.value as typeof method)}
             className="mt-1 w-full rounded border border-border bg-background p-2"
           >
+            {kind === "percentage" && (
+              <option value="fixed">Fixed percentage breaks (default)</option>
+            )}
             <option value="quantile">Quantiles — similar numbers of areas</option>
-            <option value="equal">Equal-width count intervals</option>
+            <option value="equal">
+              Equal-width {kind === "percentage" ? "percentage" : "count"} intervals
+            </option>
             <option value="custom">Custom cut points</option>
           </select>
         </label>
@@ -67,15 +80,17 @@ export function ClassificationControls({
               aria-label="Custom cut points"
               value={breaks}
               onChange={(e) => setBreaks(e.target.value)}
-              placeholder="25, 50, 100"
+              placeholder={kind === "percentage" ? "25, 50, 75" : "25, 50, 100"}
               className="mt-1 w-full min-w-0 rounded border border-border bg-background p-2"
             />
             <span className="block text-xs text-muted">
-              1–6 increasing positive numbers. First group starts at 0; last group has no upper
-              limit. Exploratory, not official standards.
+              {kind === "percentage"
+                ? "1–6 increasing numbers strictly between 0 and 100. Groups cover 0–100%."
+                : "1–6 increasing positive numbers. First group starts at 0; last group has no upper limit."}{" "}
+              Exploratory, not official standards.
             </span>
           </label>
-        ) : (
+        ) : method !== "fixed" ? (
           <label className="block">
             Requested groups
             <select
@@ -91,7 +106,7 @@ export function ClassificationControls({
               ))}
             </select>
           </label>
-        )}
+        ) : null}
         {error && <p role="alert">{error}</p>}
         <div className="flex flex-wrap gap-3">
           <button type="submit" className="min-h-11 underline">
@@ -101,7 +116,7 @@ export function ClassificationControls({
             type="button"
             className="min-h-11 underline"
             onClick={() => {
-              setMethod("quantile");
+              setMethod(defaultMethod);
               setCount("5");
               setBreaks("");
               setError(null);

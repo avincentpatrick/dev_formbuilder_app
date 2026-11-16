@@ -218,3 +218,21 @@ it("opens BHW visuals from the all-location card while retaining scoped indicato
     "location=region%3A01&dataset=bhw",
   );
 });
+
+
+it("carries the original BHW map only through BHW available-card links", () => {
+  const bhw = { ...dataset, id: "bhw" as const, title: "BHW" };
+  const mapState = "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306";
+  const document = parseHTML(renderToStaticMarkup(
+    <CatalogResults catalog={catalog([bhw, dataset])} locationName="Region I" mapState={mapState} />,
+  )).document;
+  for (const link of document.querySelectorAll('article a[href^="/catalog?"]')) {
+    const url = new URL(link.getAttribute("href")!, "https://example.test");
+    expect(url.searchParams.get("location")).toBe("region:01");
+    if (url.searchParams.get("dataset") === "bhw") {
+      expect(url.searchParams.get("mapState")).toContain("selected=07306");
+    } else {
+      expect(url.searchParams.has("mapState")).toBe(false);
+    }
+  }
+});

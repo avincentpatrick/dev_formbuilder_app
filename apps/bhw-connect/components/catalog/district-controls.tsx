@@ -1,14 +1,28 @@
 import Link from "next/link";
 import { withBasePath } from "@/lib/base-path";
-import { catalogHref } from "@/lib/catalog/navigation";
+import { catalogJourneyHref } from "@/lib/catalog/journey";
+import type { CatalogId, CatalogSelection } from "@/lib/catalog/types";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import type { DistrictGeography } from "@/lib/catalog/district-geography";
 
 export function DistrictControls({
   geography,
+  dataset,
+  mapState,
 }: {
   geography: Extract<DistrictGeography, { state: "available" }>;
+  dataset?: CatalogId | null;
+  mapState?: string;
 }) {
   const { selection, current, scope } = geography;
+  const snapshot =
+    !dataset || dataset === "bhw" ? restoredBhwMapHref(mapState)?.split("?")[1] : undefined;
+  const href = (scope: CatalogSelection) =>
+    catalogJourneyHref(
+      scope,
+      scope.mode === "district" && !scope.districtCode ? null : dataset,
+      snapshot,
+    );
   const city = scope.cities.find((c) => c.code === selection.citymunCode);
   const barangay = city?.barangays.find((b) => b.code === selection.barangayCode);
   return (
@@ -19,14 +33,14 @@ export function DistrictControls({
       <nav aria-label="Geographic mode" className="flex flex-wrap gap-3 text-sm">
         <Link
           prefetch={false}
-          href={catalogHref({ mode: "all" })}
+          href={href({ mode: "all" })}
           className="rounded-md border border-border px-3 py-2 underline"
         >
           PSGC / All locations
         </Link>
         <Link
           prefetch={false}
-          href={catalogHref({ mode: "district", districtCode: "" })}
+          href={href({ mode: "district", districtCode: "" })}
           aria-current="page"
           className="rounded-md border border-border px-3 py-2 underline"
         >
@@ -39,6 +53,8 @@ export function DistrictControls({
         className="flex flex-wrap items-end gap-3"
       >
         <input type="hidden" name="mode" value="district" />
+        {dataset && <input type="hidden" name="dataset" value={dataset} />}
+        {snapshot && <input type="hidden" name="mapState" value={snapshot} />}
         <div className="min-w-0 flex-1 basis-64">
           <label htmlFor="catalog-district" className="mb-1 block text-sm font-medium">
             Congressional district
@@ -70,7 +86,7 @@ export function DistrictControls({
             <Link
               prefetch={false}
               className="underline"
-              href={catalogHref({ mode: "district", districtCode: current.code })}
+              href={href({ mode: "district", districtCode: current.code })}
             >
               {current.name}
             </Link>
@@ -78,7 +94,7 @@ export function DistrictControls({
               <Link
                 prefetch={false}
                 className="underline"
-                href={catalogHref({
+                href={href({
                   mode: "district",
                   districtCode: current.code,
                   citymunCode: city.code,
@@ -97,6 +113,8 @@ export function DistrictControls({
               className="flex flex-wrap items-end gap-3"
             >
               <input type="hidden" name="mode" value="district" />
+              {dataset && <input type="hidden" name="dataset" value={dataset} />}
+              {snapshot && <input type="hidden" name="mapState" value={snapshot} />}
               <input type="hidden" name="district" value={current.code} />
               {city && <input type="hidden" name="citymun" value={city.code} />}
               <div className="min-w-0 flex-1 basis-64">

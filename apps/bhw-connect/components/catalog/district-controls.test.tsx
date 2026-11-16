@@ -45,4 +45,20 @@ it("offers only constituent barangays and retains district/city fields in the le
   ]);
   expect(document.documentElement.textContent).toContain("district barangays only");
   expect(document.querySelector('a[href="/catalog?mode=all"]')).not.toBeNull();
+  const contextual = parseHTML(
+    renderToStaticMarkup(
+      <DistrictControls geography={geography} dataset="bhw" mapState="dataset=bhw-2025" />,
+    ),
+  ).document;
+  for (const form of contextual.querySelectorAll("form")) {
+    expect(form.querySelector('input[name="dataset"]')?.getAttribute("value")).toBe("bhw");
+    expect(form.querySelector('input[name="mapState"]')?.getAttribute("value")).toContain(
+      "dataset=bhw-2025",
+    );
+  }
+  const memberLink = [...contextual.querySelectorAll("a")].find((a) =>
+    a.textContent?.includes("Split city"),
+  )!;
+  expect(memberLink.getAttribute("href")).toContain("dataset=bhw");
+  expect(memberLink.getAttribute("href")).toContain("mapState=");
 });

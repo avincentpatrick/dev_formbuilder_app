@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { getPublicCatalog } from "@/lib/catalog/catalog";
 import { getCatalogGeography } from "@/lib/catalog/geography";
 import { type CatalogRequest } from "@/lib/catalog/navigation";
@@ -8,7 +9,13 @@ import { DistrictControls } from "@/components/catalog/district-controls";
 import { getDistrictGeography } from "@/lib/catalog/district-geography";
 import { getDistrictCatalog } from "@/lib/catalog/district-catalog";
 
-export async function CatalogContent({ request }: { request: CatalogRequest }) {
+export async function CatalogContent({
+  request,
+  mapState,
+}: {
+  request: CatalogRequest;
+  mapState?: string;
+}) {
   if (request.selection.mode === "district") {
     const geography = await getDistrictGeography(request.selection);
     if (geography.state !== "available")
@@ -20,7 +27,10 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
               : "District member not found"}
           </h2>
           <p className="mt-2">No figures from a different area are shown.</p>
-          <Link href="/catalog?mode=district" className="mt-3 inline-block underline">
+          <Link
+            href={catalogJourneyHref({ mode: "district", districtCode: "" }, null, mapState)}
+            className="mt-3 inline-block underline"
+          >
             Choose a district
           </Link>
         </section>
@@ -28,7 +38,7 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
     if (!geography.current)
       return (
         <>
-          <DistrictControls geography={geography} />
+          <DistrictControls geography={geography} dataset={request.dataset} mapState={mapState} />
           <p role="status">
             {geography.choices.length
               ? "Choose a congressional district to view its mapped members and available datasets."
@@ -49,14 +59,14 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
     const dataset = catalog.datasets.find((d) => d.id === request.dataset);
     return (
       <div className="space-y-6">
-        <DistrictControls geography={geography} />
+        <DistrictControls geography={geography} dataset={request.dataset} mapState={mapState} />
         <h2 className="text-2xl font-semibold" data-testid="catalog-scope">
           {locationName}
         </h2>
         {dataset ? (
-          <CatalogDetails catalog={catalog} dataset={dataset} />
+          <CatalogDetails catalog={catalog} dataset={dataset} mapState={mapState} />
         ) : (
-          <CatalogResults catalog={catalog} locationName={locationName} />
+          <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
         )}
       </div>
     );
@@ -73,7 +83,10 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
             ? "Please try again. No figures are being shown for a different place."
             : "This code and geographic level do not identify a supported location."}
         </p>
-        <Link href="/catalog" className="mt-3 inline-block underline">
+        <Link
+          href={catalogJourneyHref({ mode: "all" }, request.dataset, mapState)}
+          className="mt-3 inline-block underline"
+        >
           Return to All locations
         </Link>
       </section>
@@ -83,7 +96,12 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
   const dataset = request.dataset ? catalog.datasets.find((d) => d.id === request.dataset) : null;
   return (
     <div className="space-y-6">
-      <LocationControls geography={geography} selection={request.selection} />
+      <LocationControls
+        geography={geography}
+        selection={request.selection}
+        dataset={request.dataset}
+        mapState={mapState}
+      />
       <div>
         <h2 className="text-2xl font-semibold" data-testid="catalog-scope">
           {locationName}
@@ -95,9 +113,9 @@ export async function CatalogContent({ request }: { request: CatalogRequest }) {
         </p>
       </div>
       {dataset ? (
-        <CatalogDetails catalog={catalog} dataset={dataset} />
+        <CatalogDetails catalog={catalog} dataset={dataset} mapState={mapState} />
       ) : (
-        <CatalogResults catalog={catalog} locationName={locationName} />
+        <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
       )}
     </div>
   );

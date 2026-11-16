@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
-import { catalogHref } from "@/lib/catalog/navigation";
+import { catalogJourneyHref } from "@/lib/catalog/journey";
+import { bhwOverviewHref } from "@/lib/maps/catalog-return";
 import { subjectMapHref } from "@/lib/maps/subjects";
 import type { CatalogSelection } from "@/lib/catalog/types";
 import { hasAvailableValue } from "@/lib/catalog/summary";
@@ -33,9 +34,11 @@ export function SourceDates({ dataset }: { dataset: CatalogDataset }) {
 export function CatalogResults({
   catalog,
   locationName,
+  mapState,
 }: {
   catalog: PublicCatalog;
   locationName: string;
+  mapState?: string;
 }) {
   const visible = catalog.datasets.filter((d) => d.availableIndicators > 0);
   const omitted = catalog.datasets.filter((d) => d.availableIndicators === 0);
@@ -81,7 +84,11 @@ export function CatalogResults({
         <p role="status" className="rounded-lg border border-border bg-surface p-4 text-sm">
           Some figures could not be loaded. Available results are shown; a failed read does not mean
           the source reported no data.{" "}
-          <Link prefetch={false} href={catalogHref(catalog.selection)} className="underline">
+          <Link
+            prefetch={false}
+            href={catalogJourneyHref(catalog.selection, null, mapState)}
+            className="underline"
+          >
             Try again
           </Link>
           .
@@ -125,8 +132,8 @@ export function CatalogResults({
                 prefetch={false}
                 href={
                   dataset.id === "bhw" && catalog.selection.mode === "all"
-                    ? "/bhw"
-                    : catalogHref(catalog.selection, dataset.id)
+                    ? bhwOverviewHref(mapState)
+                    : catalogJourneyHref(catalog.selection, dataset.id, mapState)
                 }
                 className="underline decoration-transparent underline-offset-4 hover:decoration-current"
               >
@@ -183,7 +190,7 @@ export function CatalogResults({
             <div className="mt-auto pt-4">
               <Link
                 prefetch={false}
-                href={catalogHref(catalog.selection, dataset.id)}
+                href={catalogJourneyHref(catalog.selection, dataset.id, mapState)}
                 className="text-sm font-semibold text-accent underline underline-offset-4"
               >
                 View {dataset.title} indicators →
@@ -254,9 +261,11 @@ function Overview({ label, value, note }: { label: string; value: string; note: 
 export function CatalogDetails({
   catalog,
   dataset,
+  mapState,
 }: {
   catalog: PublicCatalog;
   dataset: CatalogDataset;
+  mapState?: string;
 }) {
   const available = dataset.indicators.filter((i) => hasAvailableValue(i.state));
   const missing = dataset.indicators.filter((i) => !hasAvailableValue(i.state));
@@ -264,7 +273,7 @@ export function CatalogDetails({
     <section aria-label={`${dataset.title} indicators`} className="space-y-5">
       <Link
         prefetch={false}
-        href={catalogHref(catalog.selection)}
+        href={catalogJourneyHref(catalog.selection, null, mapState)}
         className="text-sm underline underline-offset-4"
       >
         ← All datasets for this selection
@@ -278,7 +287,7 @@ export function CatalogDetails({
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {dataset.detailHref && (
         <Link
-          href={dataset.detailHref}
+          href={dataset.id === "bhw" ? bhwOverviewHref(mapState) : dataset.detailHref}
           className="inline-block text-sm text-accent underline underline-offset-4"
         >
           Open existing {dataset.title} dashboard →

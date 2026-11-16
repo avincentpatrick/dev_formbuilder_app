@@ -21,7 +21,10 @@ export default async function CatalogPage({
 }) {
   const params = await searchParams;
   const request = parseCatalogParams(params);
-  const returnMap = request?.dataset === "bhw" ? restoredBhwMapHref(params.mapState) : null;
+  const returnMap =
+    request && (!request.dataset || request.dataset === "bhw")
+      ? restoredBhwMapHref(params.mapState)
+      : null;
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <header className="space-y-4">
@@ -39,7 +42,7 @@ export default async function CatalogPage({
       )}
       {request ? (
         <Suspense key={JSON.stringify(request)} fallback={<CatalogLoading />}>
-          <CatalogContent request={request} />
+          <CatalogContent request={request} mapState={returnMap?.split("?")[1]} />
         </Suspense>
       ) : (
         <section role="alert" className="rounded-xl border border-border bg-surface p-6">

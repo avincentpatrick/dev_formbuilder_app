@@ -49,6 +49,7 @@ import {
   percentageClassificationBins,
   classificationDescription,
 } from "@/lib/maps/classification";
+import { bhwMapComparisonHref } from "@/lib/maps/comparison-entry";
 import { bhwOverviewReturnHref } from "@/lib/maps/catalog-return";
 import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
@@ -262,6 +263,7 @@ export function DatasetMapCard({
   const panelId = useId();
   const censusUncertainty = censusRate && !!metric?.catalogSpec?.attributes?.ciLow;
   const selected = data?.rows.find((r) => r.code === choice.selected);
+  const comparisonHref = bhwMapComparisonHref(choice, data);
   const locatorKey = `${key}:${selected?.code ?? ""}`;
   const trackLocator = useCallback(
     (locator: LocatorMap | null) => {
@@ -859,6 +861,18 @@ export function DatasetMapCard({
                             : (selected.value ?? "Not reported")}{" "}
                         {selected.value !== null && !income ? metric?.unit : ""}
                       </p>
+                      {comparisonHref && (
+                        <div>
+                          <Link href={comparisonHref} className="underline">
+                            Compare selected place
+                          </Link>
+                          <p className="text-xs text-muted">
+                            Opens this indicator and place. Choose another place at the same level.
+                            Comparison uses published values; map filters and color groups do not
+                            apply.
+                          </p>
+                        </div>
+                      )}
                       {(income || profiling || uucRoute || accreditation || censusMean) && (
                         <p>{selected.note}</p>
                       )}

@@ -13,8 +13,9 @@ use RuntimeException;
  *             one cell however long, a `media::image` for each diagram, `count-selected()` for "up to two", `regex()`
  *             for a word cap, a `required` FORMULA for "required when", and the placeholder as a hint.
  *   MERIDIAN  the same module in what this product's importer is documented to take (`docs/xlsform-interop-spec.md`):
- *             plain-text notes split under the 500-character label column, `count(.)`, and no word cap or "required
- *             when", which XLSForm cannot express here — so a constraint stands in for "required when".
+ *             plain-text notes split under the 500-character label column, the word caps, "up to two" and the only
+ *             answer as `#meridian` tokens (M243), and no "required when", which XLSForm cannot express here — so a
+ *             constraint stands in for it.
  *
  * Both come from the one {@see NhetePlan}, so a difference between their outcomes is the importer's, never the data's.
  */
@@ -54,8 +55,8 @@ final class NheteWorkbook
         }
 
         return [
-            'survey' => ['headers' => self::SURVEY_HEADERS, 'rows' => $survey],
-            'choices' => ['headers' => ['list_name', 'name', 'label'], 'rows' => $this->choices],
+            'survey' => ['headers' => [...self::SURVEY_HEADERS, ...($this->dialect === self::MERIDIAN ? ['#meridian'] : [])], 'rows' => $survey],
+            'choices' => ['headers' => ['list_name', 'name', 'label', ...($this->dialect === self::MERIDIAN ? ['#meridian'] : [])], 'rows' => $this->choices],
             'settings' => ['headers' => ['form_title', 'form_id', 'default_language'], 'rows' => [['form_title' => $this->plan->title(), 'form_id' => 'nhete', 'default_language' => 'English']]],
         ];
     }
@@ -106,6 +107,14 @@ final class NheteWorkbook
             },
         ];
 
+        if ($this->dialect === self::MERIDIAN) {
+            // M243: the answer limits as this product's own export writes them.
+            $tokens = array_filter([
+                $e['max_words'] !== null ? "meridian:max_words={$e['max_words']}" : null,
+                $e['max_choices'] !== null ? "meridian:max_choices={$e['max_choices']}" : null,
+            ]);
+            $row['#meridian'] = $tokens === [] ? null : implode(' ', $tokens);
+        }
         if ($e['required'] === 'conditional' && $this->dialect === self::KOBO) {
             // Kobo authors write "required when" as a formula in the required column.
             $row['required'] = implode(' or ', array_map(static fn (array $w): string => "\${{$w[0]}} = '{$w[1]}'", $e['required_when']));
@@ -131,14 +140,12 @@ final class NheteWorkbook
             $parts[] = "regex(., '^".NheteBuilderDriver::wordCapPattern((int) $e['max_words'])."$')";
             $messages[] = 'Please keep this to '.number_format((int) $e['max_words']).' words or fewer.';
         }
-        if ($e['max_choices'] !== null) {
-            $parts[] = $kobo ? "count-selected(.) <= {$e['max_choices']}" : "count(.) <= {$e['max_choices']}";
+        if ($e['max_choices'] !== null && $kobo) {
+            $parts[] = "count-selected(.) <= {$e['max_choices']}";
             $messages[] = "You can choose up to {$e['max_choices']}.";
         }
-        if ($e['exclusive'] !== null) {
-            $parts[] = $kobo
-                ? "not(selected(., '{$e['exclusive']}') and count-selected(.) > 1)"
-                : "not(selected(., '{$e['exclusive']}')) or count(.) = 1";
+        if ($e['exclusive'] !== null && $kobo) {
+            $parts[] = "not(selected(., '{$e['exclusive']}') and count-selected(.) > 1)";
             $messages[] = 'No view or opinion cannot be combined with another answer.';
         }
         if ($e['required'] === 'conditional' && ! $kobo) {
@@ -225,12 +232,14 @@ final class NheteWorkbook
     /** @param  array<string, mixed>  $e */
     private function listFor(array $e): string
     {
-        $signature = json_encode($e['options']);
+        // M243: a list is shared only by questions that agree on which choice stands alone, since the marker is on the row.
+        $signature = json_encode([$e['options'], $this->dialect === self::MERIDIAN ? $e['exclusive'] : null]);
         if (! isset($this->lists[$signature])) {
             $name = 'l_'.$e['key'];
             $this->lists[$signature] = $name;
             foreach ($e['options'] as [$value, $label]) {
-                $this->choices[] = ['list_name' => $name, 'name' => $value, 'label' => $label];
+                $this->choices[] = ['list_name' => $name, 'name' => $value, 'label' => $label]
+                    + ($this->dialect === self::MERIDIAN && $value === $e['exclusive'] ? ['#meridian' => 'meridian:exclusive'] : []);
             }
         }
 

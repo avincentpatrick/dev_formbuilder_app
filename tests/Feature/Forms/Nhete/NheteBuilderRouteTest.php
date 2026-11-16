@@ -134,6 +134,8 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         'a disagreement row whose own question was skipped' => [['tor_t03' => null], 'tor_t03'],
         'the consent box left unticked' => [['q0_0' => []], 'q0_0'],
     ];
+    // M243: the three answer rules are settings now, each refused by its own rule.
+    $ruleOf = ['q1_1' => 'words_too_many', 'q3_1' => 'choices_too_many', 'q3_2' => 'choice_exclusive'];
     foreach ($refusals as $what => [$change, $key]) {
         $answers = array_filter([...$base, ...$change], static fn (mixed $v): bool => $v !== null);
         $response = $submit($answers);
@@ -141,7 +143,8 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         $failed = $response->json('error.details.fields') ?? [];
         expect($response->status())->toBe(422, "{$what}: expected a refusal, got {$response->status()}")
             ->and(array_column($failed, 'field'))->toContain($key)
-            ->and(count($failed))->toBe(1, "{$what}: refused on more than {$key}: ".json_encode($failed));
+            ->and(count($failed))->toBe(1, "{$what}: refused on more than {$key}: ".json_encode($failed))
+            ->and(isset($ruleOf[$key]) ? $failed[0]['rule'] : null)->toBe($ruleOf[$key] ?? null);
         $report['refusals'][$what] = $failed[0];
     }
 
@@ -297,6 +300,11 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         array_filter($plan->elements(), static fn (array $e): bool => $e['required'] === 'conditional'),
     ));
     $answeredComments = array_keys(array_intersect_key($base, array_flip($conditional)));
+    // M243: the answer limits come back as settings through the `#meridian` column.
+    enterTenant($tenant->id, $admin->id);
+    $reimported = FormField::query()->where('form_version_id', $reimport->current_published_version_id)->get()->keyBy('key');
+    expect($reimported['q1_1']->answerLimits()['words'] ?? null)->toBe(['min' => null, 'max' => 1500])
+        ->and($reimported['q3_1']->answerLimits())->toBe(['words' => null, 'choices' => ['min' => null, 'max' => 2], 'exclusive' => ['noview']]);
     expect($report['export_reimport']['import_status'])->toBe(302)
         ->and($report['export_reimport']['fields'])->toBe($report['fields'])
         ->and($report['export_reimport']['notes_with_content'])->toBe(0)

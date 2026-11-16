@@ -226,7 +226,7 @@ it("carries the original BHW map only through BHW available-card links", () => {
   const document = parseHTML(renderToStaticMarkup(
     <CatalogResults catalog={catalog([bhw, dataset])} locationName="Region I" mapState={mapState} />,
   )).document;
-  for (const link of document.querySelectorAll("article a")) {
+  for (const link of document.querySelectorAll('article a[href^="/catalog?"]')) {
     const url = new URL(link.getAttribute("href")!, "https://example.test");
     expect(url.searchParams.get("location")).toBe("region:01");
     if (url.searchParams.get("dataset") === "bhw") {

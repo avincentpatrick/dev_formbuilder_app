@@ -11,11 +11,13 @@ export function PublicCompareControls({
   measure,
   measures,
   focus,
+  mapState,
 }: {
   places: SelectedGeo[];
   measure: string;
   measures: { id: string; label: string }[];
   focus?: string;
+  mapState?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -26,7 +28,7 @@ export function PublicCompareControls({
   const requestId = useRef(0);
   const codes = places.map((p) => p.geoCode);
   const navigate = (next: string[], nextMeasure = measure) =>
-    startTransition(() => router.push(comparisonHref(nextMeasure, next, focus)));
+    startTransition(() => router.push(comparisonHref(nextMeasure, next, focus, mapState)));
   return (
     <section aria-label="Comparison controls" className="space-y-4">
       <label className="block">

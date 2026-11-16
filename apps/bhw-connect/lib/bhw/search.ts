@@ -1,4 +1,5 @@
 import { CATALOG, type IndicatorSpec } from "@/lib/catalog/definitions";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import type { GeoLevel } from "@/lib/filters/schema";
 
 export const BHW_MEASURES = CATALOG.find((dataset) => dataset.id === "bhw")!.indicators;
@@ -54,8 +55,16 @@ export function parseBhwSearch(query: string): BhwSearchIntent {
   return { state: "ready", placeQuery: query.trim(), measures: [] };
 }
 
-export function bhwMeasureHref(indicator: string, level: GeoLevel, code: string) {
-  return `/bhw/measure?${new URLSearchParams({ indicator, location: `${level}:${code}` })}`;
+export function bhwMeasureHref(
+  indicator: string,
+  level: GeoLevel,
+  code: string,
+  mapState?: string | string[],
+) {
+  const query = new URLSearchParams({ indicator, location: `${level}:${code}` });
+  const restored = restoredBhwMapHref(mapState);
+  if (restored) query.set("mapState", restored.split("?")[1]);
+  return `/bhw/measure?${query}`;
 }
 
 export const levelLabel: Record<GeoLevel, string> = {

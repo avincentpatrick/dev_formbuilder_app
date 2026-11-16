@@ -42,14 +42,34 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(/selected=07306/);
     const beforeComparison = page.url();
     await page.getByRole("link", { name: "Compare selected place", exact: true }).click();
-    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306$/);
+    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306&mapState=/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Compare BHW places");
     await expect(
       page.getByRole("combobox", { name: "Comparison measure", exact: true }),
     ).toHaveValue("bhw.active-years");
     await page.reload();
-    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306$/);
-    await page.goBack();
+    await expect(page).toHaveURL(/compare\?measure=bhw.active-years&geos=07306&mapState=/);
+    const returnFromComparison = page.getByRole("link", {
+      name: "Return to previous BHW map",
+      exact: true,
+    });
+    await expect(returnFromComparison).toHaveAttribute(
+      "href",
+      new URL(beforeComparison).pathname + new URL(beforeComparison).search,
+    );
+    await page
+      .getByRole("combobox", { name: "Comparison measure", exact: true })
+      .selectOption("bhw.total");
+    await expect(page).toHaveURL(/measure=bhw.total/);
+    await expect(
+      page.getByRole("link", { name: "Shareable comparison link", exact: true }),
+    ).toHaveAttribute("href", /mapState=/);
+    await page.reload();
+    await expect(returnFromComparison).toHaveAttribute(
+      "href",
+      new URL(beforeComparison).pathname + new URL(beforeComparison).search,
+    );
+    await returnFromComparison.click();
     await expect(page).toHaveURL(beforeComparison);
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     const previous = page.url();
@@ -88,6 +108,27 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     await page.goBack();
     await expect(explorer).toBeVisible();
+    // Overview and comparison keep their own scope while retaining the same way back.
+    const overviewBeforeCompare = page.url();
+    await page
+      .getByRole("navigation", { name: "BHW analysis" })
+      .getByRole("link", { name: "Compare places", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Compare BHW places", exact: true }),
+    ).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("mapState")).toBe(
+      new URL(previous).search.slice(1),
+    );
+    expect(new URL(page.url()).searchParams.has("geos")).toBe(false);
+    await page.reload();
+    await page.getByRole("link", { name: "← BHW overview", exact: true }).click();
+    await expect(page).toHaveURL(overviewBeforeCompare);
+    await page.reload();
+    await expect(back).toHaveAttribute(
+      "href",
+      new URL(previous).pathname + new URL(previous).search,
+    );
     // Purpose sections must keep the return snapshot, including on reload/history.
     const overviewUrl = page.url();
     const nav = page.getByRole("navigation", { name: "BHW analysis" });

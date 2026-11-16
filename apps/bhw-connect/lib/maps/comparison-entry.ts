@@ -1,7 +1,7 @@
 import { barangayIndicatorSupported } from "./barangay-support";
 import { comparisonHref } from "@/lib/bhw/comparison";
 import { BHW_MEASURES } from "@/lib/bhw/search";
-import type { MapChoice, MapPayload } from "./prototype";
+import { mapHref, type MapChoice, type MapPayload } from "./prototype";
 
 /** Compare only a loaded child with the same public measure/source/period contract. */
 export function bhwMapComparisonHref(
@@ -29,5 +29,5 @@ export function bhwMapComparisonHref(
     !spec.levels.includes(data.childLevel)
   )
     return null;
-  return comparisonHref(spec.id, [choice.selected]);
+  return comparisonHref(spec.id, [choice.selected], undefined, mapHref(choice).split("?")[1]);
 }

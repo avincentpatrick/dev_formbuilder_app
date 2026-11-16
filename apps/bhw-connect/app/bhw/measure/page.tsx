@@ -1,10 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
-import { bhwOverviewHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
+import {
+  bhwOverviewHref,
+  bhwScopedCatalogHref,
+  restoredBhwMapHref,
+} from "@/lib/maps/catalog-return";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getPublicDataset } from "@/lib/catalog/catalog";
-import { catalogHref, parseCatalogParams } from "@/lib/catalog/navigation";
+import { parseCatalogParams } from "@/lib/catalog/navigation";
 import { measureDefinition } from "@/lib/catalog/measure-notes";
 import { publicValues, measureStatus } from "@/lib/bhw/overview";
 import { BHW_MEASURES, levelLabel } from "@/lib/bhw/search";
@@ -84,7 +88,7 @@ export default async function BhwMeasurePage({
           sources: dataset.sources.filter((s) => s.slug === indicator.sourceSlug),
         }}
       />
-      <Link className="inline-block underline" href={catalogHref(selection, "bhw")}>
+      <Link className="inline-block underline" href={bhwScopedCatalogHref(selection, mapState)}>
         All BHW indicators for {geo.geoName}
       </Link>
       <p className="text-sm text-muted">

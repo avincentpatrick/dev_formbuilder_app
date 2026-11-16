@@ -93,7 +93,7 @@ it("keeps map return separate from measure scope and retains it on onward compar
   expect(
     links.find((a) => a.textContent === "Return to previous BHW map")?.getAttribute("href"),
   ).toBe(restoredBhwMapHref(mapState));
-  for (const prefix of ["/bhw?", "/compare?"]) {
+  for (const prefix of ["/bhw?", "/compare?", "/catalog?"]) {
     const href = links
       .find((a) => a.getAttribute("href")?.startsWith(prefix))!
       .getAttribute("href")!;

@@ -1,3 +1,4 @@
+import type { CatalogSelection } from "@/lib/catalog/types";
 import { catalogHref } from "@/lib/catalog/navigation";
 import { mapHref, parseMapChoice, type MapChoice } from "./prototype";
 
@@ -35,12 +36,18 @@ export function bhwOverviewHref(raw?: string | string[]): string {
   return `/bhw?${new URLSearchParams({ mapState: restored.split("?")[1] })}`;
 }
 
-/** National methodology keeps its scope while carrying only validated return settings. */
-export function bhwNationalCatalogHref(raw?: string | string[]): string {
-  const query = new URLSearchParams(
-    catalogHref({ mode: "psgc", level: "national", code: "PH" }, "bhw").split("?")[1],
-  );
+/** Catalog scope stays independent of the validated map return snapshot. */
+export function bhwScopedCatalogHref(
+  selection: Extract<CatalogSelection, { mode: "psgc" }>,
+  raw?: string | string[],
+): string {
+  const query = new URLSearchParams(catalogHref(selection, "bhw").split("?")[1]);
   const restored = restoredBhwMapHref(raw);
   if (restored) query.set("mapState", restored.split("?")[1]);
   return `/catalog?${query}`;
+}
+
+/** National methodology keeps its scope while carrying only validated return settings. */
+export function bhwNationalCatalogHref(raw?: string | string[]): string {
+  return bhwScopedCatalogHref({ mode: "psgc", level: "national", code: "PH" }, raw);
 }

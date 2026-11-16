@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   bhwNationalCatalogHref,
+  bhwScopedCatalogHref,
   bhwOverviewHref,
   bhwCatalogReturnHref,
   restoredBhwMapHref,
@@ -127,4 +128,27 @@ it("keeps only validated map settings on the comparison return to the national o
     "dataset=bhw-2025&valueMin=-1",
   ])
     expect(bhwOverviewHref(invalid)).toBe("/bhw");
+});
+
+it("keeps the measure catalog location independent of the saved map area", () => {
+  const raw =
+    "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306&valueMin=12.34";
+  const selection = { mode: "psgc", level: "region", code: "01" } as const;
+  const params = new URLSearchParams(
+    bhwScopedCatalogHref(selection, `${raw}&redirect=https://example.com`).split("?")[1],
+  );
+  expect(params.get("location")).toBe("region:01");
+  expect(params.get("dataset")).toBe("bhw");
+  expect(restoredBhwMapHref(params.get("mapState")!)).toBe(restoredBhwMapHref(raw));
+  expect(params.get("mapState")).not.toContain("redirect");
+  for (const invalid of [
+    undefined,
+    "https://example.com",
+    [raw, raw],
+    "dataset=bhw-profiling-status-2026",
+    "dataset=bhw-2025&valueMin=-1",
+  ])
+    expect(bhwScopedCatalogHref(selection, invalid)).toBe(
+      "/catalog?mode=psgc&location=region%3A01&dataset=bhw",
+    );
 });

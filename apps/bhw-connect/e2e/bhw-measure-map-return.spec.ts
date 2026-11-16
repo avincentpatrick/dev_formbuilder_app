@@ -26,6 +26,18 @@ for (const width of [390, 1440]) {
       ),
     ).toBeVisible();
     const measureUrl = page.url();
+    await page.getByRole("link", { name: /^All BHW indicators for / }).click();
+    await expect(page.getByRole("heading", { name: "Dataset catalog", exact: true })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("location")).toBe("region:01");
+    expect(new URL(page.url()).searchParams.get("dataset")).toBe("bhw");
+    await page.reload();
+    await expect(returnLink).toHaveAttribute("href", original!);
+    await expect(
+      page.getByText("Catalog figures keep their own scope.", { exact: false }),
+    ).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(measureUrl);
+    await expect(returnLink).toHaveAttribute("href", original!);
     await page
       .getByRole("link", { name: "Compare this measure with another place", exact: true })
       .click();

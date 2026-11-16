@@ -25,6 +25,9 @@ export function SourceDates({ dataset }: { dataset: CatalogDataset }) {
             Accepted release: {source.name} ({source.slug})
           </span>
           Source date: {sourceDate(source.asOfDate)} · Updated: {sourceDate(source.lastUpdatedAt)}
+          <span className="block">
+            License: {source.license?.trim() || "Not supplied by source metadata"}
+          </span>
         </li>
       ))}
     </ul>
@@ -243,7 +246,7 @@ function FullMapLink({
       aria-label={`Open full ${dataset.title} map`}
       className="mt-2 block text-sm font-semibold text-accent underline underline-offset-4"
     >
-      Open full map →
+      Open full {dataset.title} map →
     </Link>
   );
 }

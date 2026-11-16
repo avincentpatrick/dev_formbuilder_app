@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { bhwCatalogReturnHref, restoredBhwMapHref, bhwOverviewReturnHref } from "./catalog-return";
+import {
+  bhwNationalCatalogHref,
+  bhwCatalogReturnHref,
+  restoredBhwMapHref,
+  bhwOverviewReturnHref,
+} from "./catalog-return";
 import { initialMapChoice, mapHref, type MapChoice } from "./prototype";
 it("restores complete public BHW settings independently of catalog scope", () => {
   const choices: MapChoice[] = [
@@ -80,4 +85,29 @@ it("preserves the complete BHW map snapshot through the national overview withou
   expect([...params.keys()]).toEqual(["mapState"]);
   expect(restoredBhwMapHref(params.get("mapState")!)).toBe(mapHref(choice));
   expect(bhwOverviewReturnHref(initialMapChoice("psa-popcen-2024"))).toBeNull();
+});
+
+it("carries a local map snapshot into national methodology without changing catalog scope", () => {
+  const choice: MapChoice = {
+    ...initialMapChoice("bhw-2025"),
+    level: "region",
+    code: "07",
+    indicator: "bhw.active-years",
+    selected: "07306",
+    valueMin: 12.34,
+    classification: "custom",
+    classBreaks: [10, 20],
+  };
+  const raw = mapHref(choice).split("?")[1];
+  const query = new URLSearchParams(bhwNationalCatalogHref(raw).split("?")[1]);
+  expect(query.get("location")).toBe("national:PH");
+  expect(query.get("dataset")).toBe("bhw");
+  expect(restoredBhwMapHref(query.get("mapState")!)).toBe(mapHref(choice));
+  for (const invalid of [
+    undefined,
+    "https://example.com",
+    [raw, raw],
+    "dataset=bhw-profiling-status-2026",
+  ])
+    expect(bhwNationalCatalogHref(invalid)).toBe(bhwNationalCatalogHref());
 });

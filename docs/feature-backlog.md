@@ -16362,3 +16362,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+
+- **`nit` · `engine-whitespace-class` — The two validation engines disagree on what `\s` matches, so a `pattern` rule can pass in the browser and be refused on submit, or the reverse.**
+  Found by `M243` (2026-11-16), measured with PHP 8.4.14 (PCRE 10.44) and Node 24 while planning the word count. Under the `u` flag, `\s` matches U+0085 (next line) and U+180E (Mongolian vowel separator) in PHP and not in JavaScript, and U+FEFF (zero-width no-break space) in JavaScript and not in PHP. `StructuredRuleEvaluator::compilePattern()` and its TypeScript twin compile an author's pattern as written, so any pattern using `\s` or `\S` inherits the split. No golden vector holds one of the three characters. `M243`'s word count avoids it by splitting on the Unicode White_Space set written out as a list.
+
+  The remedy, when taken: rewrite `\s`/`\S` in an author's pattern to one explicit class in both engines (or refuse the three characters at the save door), with a golden vector for each character.
+
+  **Latent** — needs one of three rare characters inside an answer checked by a pattern that uses `\s`. Filed by `M243`. **Tier: before-launch.**
+
+- **`nit` · `length-rule-value-cast` — A length rule's value is read differently by the two engines, and publish never checks it.**
+  Found by `M243` (2026-11-16). `min_length`/`max_length` read `rule_value` as an integer: PHP's `(int)` reads `"1e3"` as 1000, while the TypeScript twin's `phpIntCast` (`structured-rule-evaluator.ts`) reads it as 1. `ExpressionValidationGate::assertRuleValue()` checks that a pattern compiles and that a minimum or maximum value is numeric, but checks no length value at all, so `"1e3"`, `"-5"` or `"ten"` publishes.
+
+  The remedy, when taken: refuse a length value that is not a plain whole number at the save door and the publish gate, with a golden vector pinning both engines on a refused shape.
+
+  **Latent** — needs an author to type an exponent or a word into a length rule's value. Filed by `M243`. **Tier: before-launch.**
+
+- **`minor` · `print-answer-rule-hints` — A printed blank form shows no word limit, no "choose up to N" and no "only answer" mark, so a paper respondent cannot follow the rules the keyer is later held to.**
+  Found by `M243` (2026-11-16). `BlankFormPrintPresenter::fieldRows()` prints the label, the required mark, "(if applicable)", the author's hint and a box per option. It prints no rule at all; the only one it reads is `max_length`, to size a long answer's ruled lines (`authoredMaxLength()`). `M243` adds word limits, choice limits and "only answer" choices, and the keyer's screen enforces them, so a paper answer that breaks one cannot be keyed as written.
+
+  The remedy, when taken: print a short line under the label ("Up to 1,500 words", "Tick up to 2"), mark an "only answer" option, and size a long answer's lines from its word limit too.
+
+  **Not live** — a request, and it needs a printed form using one of `M243`'s settings. Filed by `M243`. **Tier: before-launch.**

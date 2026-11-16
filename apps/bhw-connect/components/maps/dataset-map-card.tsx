@@ -7,7 +7,7 @@ import {
   STEPZERO_ACCREDITATION_DENOMINATOR,
 } from "@/lib/maps/stepzero-accreditation";
 import { searchMapAreas } from "@/lib/maps/area-search";
-import { composeMapPng } from "@/lib/maps/png";
+import { composeMapPng, type MapFrame } from "@/lib/maps/png";
 import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
@@ -37,7 +37,7 @@ import { loadMaplibre } from "./load-maplibre";
 import { INCOME_BINS, INCOME_CLASSES, incomeClassLabel } from "@/lib/maps/income-class";
 import { POVERTY_BINS } from "@/lib/maps/poverty";
 import { MapLegend } from "./map-legend";
-import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import type { BoundaryCollection, LocatorMap } from "@/lib/geo/locator-shapes";
 import { hasValueFilter, valueFilterState, countFilterSummary } from "@/lib/maps/value-filter";
 import { countClassificationBins, classificationDescription } from "@/lib/maps/classification";
 import { ClassificationControls } from "./classification-controls";
@@ -128,6 +128,7 @@ export function DatasetMapCard({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const locatorExport = useRef<{ key: string; locator: LocatorMap | null } | null>(null);
   const query = mapHref({
     ...choice,
     selected: null,
@@ -234,6 +235,13 @@ export function DatasetMapCard({
   const panelId = useId();
   const censusUncertainty = censusRate && !!metric?.catalogSpec?.attributes?.ciLow;
   const selected = data?.rows.find((r) => r.code === choice.selected);
+  const locatorKey = `${key}:${selected?.code ?? ""}`;
+  const trackLocator = useCallback(
+    (locator: LocatorMap | null) => {
+      locatorExport.current = { key: locatorKey, locator };
+    },
+    [locatorKey],
+  );
   const shapeCodes = geometry?.key === key ? geometry.codes : null;
   const matchingAreas = useMemo(
     () => searchMapAreas(data?.rows ?? [], searchText),
@@ -305,7 +313,15 @@ export function DatasetMapCard({
     setExportError(null);
     try {
       const metadata = datasetMapExport(choice, data, bins, shapeCodes);
-      const frame = await capture.run();
+      const locator =
+        locatorExport.current?.key === locatorKey ? locatorExport.current.locator : null;
+      const frame: MapFrame = await capture.run();
+      if (locator)
+        frame.locator = {
+          map: locator,
+          name: selected?.name ?? data.area,
+          selected: Boolean(selected),
+        };
       if (currentExportVersion.current !== exportVersion) throw new Error("Selection changed");
       const blob = await composeMapPng(frame, metadata);
       if (currentExportVersion.current !== exportVersion) throw new Error("Selection changed");
@@ -576,6 +592,7 @@ export function DatasetMapCard({
                   )}
                   {workspace && (choice.level !== "national" || selected) && (
                     <NationalMapLocator
+                      onLocator={trackLocator}
                       geometry={geometry?.key === key ? geometry.collection : undefined}
                       selected={selected?.code ?? null}
                       name={selected?.name ?? data.area}

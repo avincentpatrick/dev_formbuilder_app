@@ -32,6 +32,7 @@ for (const width of [390, 1440]) {
     await fixture(page);
     await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07&valueMin=25");
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    await expect(page.locator('[data-locator-state="ready"]')).toBeVisible();
     const scale = page.locator(".maplibregl-ctrl-scale");
     await expect(scale).toHaveText(/\d+(?:\.\d+)?\s+(?:km|m)/);
     const initialScale = await scale.innerText();
@@ -56,3 +57,17 @@ for (const width of [390, 1440]) {
     ).toBeEnabled();
   });
 }
+
+test("missing selected shape exports without an invented locator", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 844 });
+  await fixture(page);
+  await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
+  await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+  await expect(page.locator('[data-locator-state="ready"]')).toBeVisible();
+  await page.getByLabel("BHW Headcount 2025 area", { exact: true }).selectOption("07306");
+  await expect(page.locator('[data-locator-state="unavailable"]')).toBeVisible();
+  await expect(page.locator("[data-locator-state] svg")).toHaveCount(0);
+  const pending = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map image (PNG)", exact: true }).click();
+  await (await pending).saveAs(testInfo.outputPath("missing-shape-locator.png"));
+});

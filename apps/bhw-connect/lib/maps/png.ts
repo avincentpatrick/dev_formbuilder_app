@@ -1,3 +1,4 @@
+import { drawPngLocator, type PngLocator } from "./png-locator";
 import { pngRanking } from "./png-ranking";
 import { MIN_LEADER_N } from "@/lib/analysis/thresholds";
 import type { Map as LibreMap } from "maplibre-gl";
@@ -7,6 +8,7 @@ import { NO_DATA_COLOR } from "@/lib/charts/color-scale";
 type Context = ReturnType<typeof datasetMapExport>;
 export type MapFrame = HTMLCanvasElement & {
   cssPixelScale?: number;
+  locator?: PngLocator;
   scaleBar?: { label: string; pixels: number };
 };
 
@@ -69,7 +71,7 @@ export function captureMapFrame(map: LibreMap): Promise<MapFrame> {
   });
 }
 
-export function pngNotes(data: Context, hasScaleBar = false): string[] {
+export function pngNotes(data: Context, hasScaleBar = false, hasLocator = false): string[] {
   const selected = data.rows.find((row) => row.code === data.selection.selected);
   const missing = data.rows.filter((row) => row.geometry === "missing").length;
   const unchecked = data.rows.filter((row) => row.geometry === "not-checked").length;
@@ -91,7 +93,10 @@ export function pngNotes(data: Context, hasScaleBar = false): string[] {
       : []),
     ...(data.dataset.slug === "bhw-stepzero-2026" || data.dataset.slug === "bhw-2025"
       ? [
-          "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom. The national locator is not included in this image.",
+          "Place labels use approximate boundary centers and avoid overlaps; some names may be omitted at this zoom.",
+          hasLocator
+            ? "The national locator shows supplied boundaries, not worker addresses or another measure. Historical boundary compatibility remains unverified."
+            : "National locator not included: unavailable at capture time or not applicable to this view. No position is inferred.",
           hasScaleBar
             ? "Metric scale is approximate near the map center at capture time; map scale varies with location."
             : "Metric scale is unavailable for this capture; no distance bar is inferred.",
@@ -165,7 +170,7 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     if (line) lines.push(line);
     return lines;
   };
-  const notes = pngNotes(data, Boolean(frame.scaleBar));
+  const notes = pngNotes(data, Boolean(frame.scaleBar), Boolean(frame.locator));
   const heading = notes.slice(0, 2).flatMap(wrap);
   const footer = notes.slice(2).flatMap(wrap);
   const legend = data.legend.bins.map((bin) => ({
@@ -218,6 +223,19 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
       rankRows.reduce((sum, row) => sum + row.lines.length * lineHeight + 24, 0) +
       margin
     : 0;
+  const locatorHeading = frame.locator
+    ? wrap(`Location in Philippines — ${frame.locator.name}`)
+    : [];
+  const locatorNote = frame.locator
+    ? wrap(
+        frame.locator.selected
+          ? "Highlighted supplied boundary. A ring marks shapes too small to see. Location only, not worker addresses."
+          : "Highlighted available child boundaries, not a complete parent outline. A ring marks small shapes. Location only, not worker addresses.",
+      )
+    : [];
+  const locatorHeight = frame.locator
+    ? (locatorHeading.length + locatorNote.length) * lineHeight + 240 + margin
+    : 0;
   const headerHeight = margin * 2 + heading.length * lineHeight;
   canvas.width = width;
   canvas.height =
@@ -225,6 +243,7 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     frame.height +
     symbolHeight +
     rankHeight +
+    locatorHeight +
     (frame.scaleBar ? 75 : 0) +
     margin * 2 +
     (footer.length + legend.length + 1) * lineHeight;
@@ -244,6 +263,19 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     context.fillRect(margin, y + 29, 2, 8);
     context.fillRect(margin + frame.scaleBar.pixels - 2, y + 29, 2, 8);
     y += 75;
+  }
+  if (frame.locator) {
+    for (const line of locatorHeading) {
+      context.fillText(line, margin, y);
+      y += lineHeight;
+    }
+    drawPngLocator(context, frame.locator.map, margin, y);
+    y += 240;
+    for (const line of locatorNote) {
+      context.fillText(line, margin, y);
+      y += lineHeight;
+    }
+    y += margin;
   }
   if (symbols) {
     context.fillText("Circle area represents BHW count", margin, y);

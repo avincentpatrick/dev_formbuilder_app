@@ -34,10 +34,17 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     if (width < 1024)
       await page.getByRole("button", { name: "Areas and data", exact: true }).click();
+    await page
+      .locator(".maplibregl-canvas")
+      .evaluate((canvas) => canvas.setAttribute("data-canvas-instance", "original"));
     await page.getByText("Filter workforce counts", { exact: true }).click();
     await page.getByLabel("Minimum count", { exact: true }).fill("25");
     await page.getByLabel("Maximum count", { exact: true }).fill("50");
     await page.getByRole("button", { name: "Apply count range", exact: true }).click();
+    await expect(page.locator(".maplibregl-canvas")).toHaveAttribute(
+      "data-canvas-instance",
+      "original",
+    );
     const bars = page.getByRole("region", { name: "Ranked area counts", exact: true });
     await expect(bars.getByRole("button")).toHaveCount(2);
     await expect(bars.getByRole("button").first()).toContainText("Cebu City");
@@ -130,4 +137,40 @@ test("a shared choropleth restores the range and changing dataset resets it", as
   await expect(
     page.getByRole("region", { name: "Ranked area counts", exact: true }).getByRole("button"),
   ).toHaveCount(4);
+});
+
+test("a replacement canvas shows loading and failure instead of stale ready status", async ({
+  page,
+}) => {
+  await fixture(page);
+  let requests = 0;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let observed!: () => void;
+  const requested = new Promise<void>((resolve) => {
+    observed = resolve;
+  });
+  await page.route("**/geo/provinces/07.json", async (route) => {
+    requests += 1;
+    if (requests === 1) return route.continue();
+    if (requests === 2) {
+      observed();
+      await held;
+      return route.fulfill({ status: 503, body: "Synthetic boundary failure" });
+    }
+    return route.continue();
+  });
+  await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
+  await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+  await page.getByLabel("BHW map view", { exact: true }).selectOption("choropleth");
+  await requested;
+  await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "loading");
+  await expect(page.getByRole("button", { name: "Zoom in", exact: true })).toBeDisabled();
+  release();
+  await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "failed");
+  await page.getByLabel("BHW map view", { exact: true }).selectOption("circles");
+  await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "ready");
+  await expect(page.getByRole("button", { name: "Zoom in", exact: true })).toBeEnabled();
 });

@@ -35,10 +35,17 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     if (width < 1024)
       await page.getByRole("button", { name: "Areas and data", exact: true }).click();
+    await page
+      .locator(".maplibregl-canvas")
+      .evaluate((canvas) => canvas.setAttribute("data-canvas-instance", "original"));
     await page.getByText("Color classification", { exact: true }).click();
     await page.getByLabel("Grouping method", { exact: true }).selectOption("equal");
     await page.getByLabel("Requested groups", { exact: true }).selectOption("4");
     await page.getByRole("button", { name: "Apply classification", exact: true }).click();
+    await expect(page.locator(".maplibregl-canvas")).toHaveAttribute(
+      "data-canvas-instance",
+      "original",
+    );
     const bars = page.getByRole("region", { name: "Ranked area counts", exact: true });
     await expect(bars.getByRole("button")).toHaveCount(3);
     await page.getByText("Color classification", { exact: true }).click();

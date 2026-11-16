@@ -185,6 +185,11 @@ describe('a renamed key (R-ade0b598)', () => {
         expect(patches(mock)).toHaveLength(1);
         expect(store.saveState.value).toBe('saved');
 
+        // The carried text is the row's baseline: a commit with nothing changed has nothing to send.
+        store.touch(age.uid, 'field');
+        await settle(store);
+        expect(patches(mock)).toHaveLength(1);
+
         // Nothing is owed: an unrelated commit of the row sends exactly what the server holds, the carried text with it.
         age.label = 'Age in years';
         store.touch(age.uid, 'field');

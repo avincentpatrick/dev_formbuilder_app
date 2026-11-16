@@ -14777,7 +14777,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   notice or scheduled task compares it with the quarter. A dated note in Settings → About ("Philippine places: 3Q 2026") and a
   reminder a few weeks after each quarter end would close it. **Live.** Filed by `M172`. **Tier: after-launch.**
 
-- **`minor` · A key edited in the builder leaves conditions, formulas and piping that name the old key pointing at nothing until publish refuses them.**
+- ✅ **CLOSED BY `M242` (2026-11-16) — ****`minor` · A key edited in the builder leaves conditions, formulas and piping that name the old key pointing at nothing until publish refuses them.**
   Found by `M172` while building the auto-adjusted key (`D132`): a comparison rule follows a key change — it is stored by id, and
   the store now carries the new key into the copy it re-sends — but expression TEXT does not. `relevant_expression`,
   `config.calculated_formula`, a validation's `expression`, the `${key}` holes in labels, hints and placeholders, and the form's
@@ -14789,6 +14789,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   old ⇒ new map. A rename is a one-entry map, and `ExpressionKeyRewriter::rewriteReporting()` says which text it could not read,
   so a reference is never left behind silently. Until it lands, a copied block's renamed keys leave its text references to be
   retyped (`NheteBuilderDriver::copyBlock()` does so).
+  ✅ **CLOSED BY `M242` (2026-11-16), on its branch.** Built as the remedy says, on `M240`'s engine, with three corrections the row did not know:
+  - **Every row, one engine.** `KeyRenameCarrier` runs `KeyReferenceRewriter` with a one-entry map over every section, question and rule of the draft, the renamed question included (a rule may name its own key, `${age} < 130`). It covers what `referencesTo()` lists and two columns it does not: a formula default and the Other pair's `config.other_specify_key`. A text it cannot read is left as written and reported (`rewriteReporting()`, passed up by `KeyReferenceRewriter` now).
+  - **Section keys too.** `count(${roster})` names a section, and `updateSection()` renames one the same way, so a section's rename carries as well.
+  - **The thank-you message is form-level** (`D227` **A**). The live version reads it, so it follows a rename only while no version is live; on a live form the builder says to change it just before publishing.
+  - **A changed rule moves its question's token**, because the builder re-sends a question's whole rule list under that token. The reply carries every rewritten row under `carried`, each with its new token, and the builder takes them in place (a row the author has typed into keeps what they typed and takes the rest), so no next save is refused as a conflict. M177's `repointOtherPair()`, which re-saved the Other partner from the browser, is gone: that request would now meet the token the carry moved.
+  - **One key space on a rename.** A key that changes is free only when no question and no section holds it; a key kept as it is is checked within its own table only, as before. A rename takes the `forms` row and then the draft's sections, questions and rules in publish's order (`BuilderLockOrderTest`); an edit that keeps its key takes no `forms` lock.
+  - **Said in the undo entry and under the key.** *"Edit Age and 3 that named its key"*, and *"3 other questions that named “age” now name “age_years”."* Undo re-sends the old key, and the server carries everything back.
+  - **NHETE.** `NheteBuilderDriver::copyBlock()` no longer retypes anything: each save sends the copy's text as the server last returned it, so a reference the carry missed would reach the equivalence case still naming a counted-up key.
+  Not fixed here, each filed below: a rename may take a key a published version held, the live form's thank-you message does not follow a rename, and the as-you-type key warning names questions only.
 
 - **`nit` · The builder's Undo and Redo never say what they will undo or redo.**
   Found by `M172`: every history entry carries a label (`resources/js/components/builder/useBuilderStore.ts`, `pushHistory()` — "Edit
@@ -16362,3 +16371,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+
+- **`minor` · A key renamed in the builder can take a key some published version held for another question, though a copy never may.**
+  Found by `M242` (2026-11-16) while carrying a rename into the draft's references (`R-ade0b598`). `FormBuilderService::freeKey()` checks the draft's questions and, when the key changes, its sections; it never asks `RetiredFieldKeys::everHeld()`, the set `DraftCopier` keeps every copy off.
+  - `D225`'s reason for that set is that old answers must not attach to a new question under an old name. Version 1 asked `age`, the draft deleted it, and a rename of another question to `age` is saved as typed.
+  - Taking a retired key may be deliberate, to pick a question up again, so the remedy is a decision first: keep such a key free to take, or keep it as a copy does (`age_2`) and say why under Field key.
+
+  **Latent** until an author renames a question onto a key a published version held. Filed by `M242`. **Tier: during-testing.**
+
+- **`nit` · On a live form, renaming a key leaves the thank-you message naming the old key, for the author to change just before publishing.**
+  Found by `M242` (2026-11-16). `D227` **A**: `forms.confirmation_message` is form-level and the live version reads it (`PublicFormPresenter`), so `KeyRenameCarrier` rewrites it only while no version is live and otherwise reports `left`. The builder then says *"The thank-you message is shared with the live form, so it still names “age”. Change it just before you publish."*, and publish refuses the message until it is changed (`TemplateValidationGate`).
+
+  The remedy, when taken: carry the rename at publish instead, rewriting the message inside the publish transaction from the keys that changed between the live version and the draft (`form_fields.lineage_id` pairs a question across them).
+
+  **Live** on every published form whose thank-you message shows an answer. Filed by `M242`. **Tier: after-launch.**
+
+- **`nit` · The Field key's as-you-type warning names only questions, so a key a section holds is announced only after the save keeps it with a number.**
+  Found by `M242` (2026-11-16). Since `M242` a key that changes is free only when no question and no section holds it (`FormBuilderService::freeKey()`). `ConfigPanel.vue`'s `keyClash` still looks only at the store's questions, and `sectionKeyClash` only at its sections, so typing a section's key into Field key warns of nothing, and the kept-key notice after the save is the first the author hears of it.
+
+  Folding the other table into the warning needs the panel to know the row's saved key: a question that already shares a section's key keeps it when it is saved unchanged, and must not be warned.
+
+  **Live.** Filed by `M242`. **Tier: during-testing.**

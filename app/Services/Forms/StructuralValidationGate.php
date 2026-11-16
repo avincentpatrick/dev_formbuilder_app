@@ -676,7 +676,7 @@ final class StructuralValidationGate
         }
 
         $min = $limits['choices']['min'] ?? null;
-        $config = is_array($field->config) ? $field->config : [];
+        $config = $field->config;
         $typed = ($config['options_source'] ?? null) === null && ($config['options_list'] ?? null) === null;
         if ($min === null || ! $typed || ! is_array($config['options'] ?? null)) {
             return;

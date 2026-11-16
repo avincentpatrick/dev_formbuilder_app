@@ -448,7 +448,7 @@ final class XlsformExporter
     }
 
     /**
-     * @param  list<array{value: string, label: string, translations?: mixed}>  $pairs
+     * @param  list<array{value: string, label: string, translations?: mixed, exclusive?: bool}>  $pairs
      * @param  list<string>  $langs
      * @param  list<array<string, scalar|null>>  $choices
      * @param  array<string, true>  $listsSeen
@@ -597,7 +597,7 @@ final class XlsformExporter
      * A `{value,label,translations}` list from a config option-array key (`options`/`rows`/`columns`/`cells`).
      *
      * @param  array<string, mixed>  $config
-     * @return list<array{value: string, label: string, translations: mixed}>
+     * @return list<array{value: string, label: string, translations: mixed, exclusive: bool}>
      */
     private function pairs(array $config, string $key): array
     {

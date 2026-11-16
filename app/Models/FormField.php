@@ -147,7 +147,7 @@ class FormField extends Model implements TenantScoped
      */
     public function answerLimits(): ?array
     {
-        $config = is_array($this->config) ? $this->config : [];
+        $config = $this->config;
         $type = $this->field_type;
 
         $words = $type->takesWordLimits() ? AnswerLimits::pair($config, AnswerLimits::MIN_WORDS, AnswerLimits::MAX_WORDS) : null;

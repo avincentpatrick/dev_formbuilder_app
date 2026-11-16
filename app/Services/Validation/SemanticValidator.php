@@ -1805,7 +1805,7 @@ final class SemanticValidator
      */
     private function collectAnswerLimitErrors(FormField $field, mixed $answer, array &$errors, ?string $sectionKey, ?int $instanceIndex): void
     {
-        $config = is_array($field->config) ? $field->config : null;
+        $config = $field->config;
 
         if ($field->field_type->takesWordLimits()) {
             $min = AnswerLimits::bound($config, AnswerLimits::MIN_WORDS);

@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils';
 import { computed, reactive, ref } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ConfigPanel from './ConfigPanel.vue';
-import AnswerLimitsEditor from './AnswerLimitsEditor.vue';
 import type { BuilderStore } from './useBuilderStore';
 import type { BuilderEnums, LocalField, LocalSection, PaletteGroup } from './types';
 
@@ -903,7 +902,7 @@ describe('ConfigPanel — answer limits on the Validation tab (M243)', () => {
 
         expect(wrapper.get('[data-answer-limits]').attributes('data-answer-limits')).toBe('words');
 
-        wrapper.getComponent(AnswerLimitsEditor).vm.$emit('update:max', 1500);
+        wrapper.getComponent({ name: 'AnswerLimitsEditor' }).vm.$emit('update:max', 1500);
         expect(target.config.max_words).toBe(1500);
     });
 

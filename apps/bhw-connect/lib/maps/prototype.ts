@@ -10,6 +10,7 @@ import {
 import {
   parseCountRange,
   parsePercentageRange,
+  parseYearsRange,
   valueRangeKind,
   hasValueFilter,
 } from "./value-filter";
@@ -171,11 +172,14 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const grouping = (
     rangeKind === "percentage" ? parsePercentageClassification : parseCountClassification
   )(params.get("classification"), params.get("classCount"), params.get("classBreaks"));
-  if (!grouping || (grouping.classification && !rangeKind)) return null;
-  const range = (rangeKind === "percentage" ? parsePercentageRange : parseCountRange)(
-    params.get("valueMin"),
-    params.get("valueMax"),
-  );
+  if (!grouping || (grouping.classification && (!rangeKind || rangeKind === "years"))) return null;
+  const range = (
+    rangeKind === "percentage"
+      ? parsePercentageRange
+      : rangeKind === "years"
+        ? parseYearsRange
+        : parseCountRange
+  )(params.get("valueMin"), params.get("valueMax"));
   if (!range || (hasValueFilter(range) && !rangeKind)) return null;
   return {
     ...range,

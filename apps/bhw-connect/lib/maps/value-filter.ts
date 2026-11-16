@@ -48,6 +48,12 @@ export function valueRangeKind(
 ) {
   if (supportsCircles(choice)) return "count" as const;
   if (
+    choice.dataset === "bhw-2025" &&
+    choice.indicator === "bhw.active-years" &&
+    choice.level !== "citymun"
+  )
+    return "years" as const;
+  if (
     choice.level !== "citymun" &&
     ((choice.dataset === "bhw-stepzero-2026" &&
       choice.indicator === "bhw.declared-accreditation") ||
@@ -57,10 +63,21 @@ export function valueRangeKind(
   return null;
 }
 export function parsePercentageRange(min: string | null, max: string | null): CountRange | null {
+  return parseDecimalRange(min, max, 100);
+}
+/** Published active years have a nonnegative decimal domain, not a percentage cap. */
+export function parseYearsRange(min: string | null, max: string | null): CountRange | null {
+  return parseDecimalRange(min, max, Infinity);
+}
+function parseDecimalRange(
+  min: string | null,
+  max: string | null,
+  maximum: number,
+): CountRange | null {
   const parse = (value: string | null) =>
     value === null
       ? undefined
-      : /^(0|[1-9]\d*)(\.\d+)?$/.test(value) && Number(value) >= 0 && Number(value) <= 100
+      : /^(0|[1-9]\d*)(\.\d+)?$/.test(value) && Number(value) >= 0 && Number(value) <= maximum
         ? Number(value)
         : NaN;
   const valueMin = parse(min),
@@ -78,6 +95,12 @@ export function parsePercentageRange(min: string | null, max: string | null): Co
 }
 export function valueFilterSummary(rows: readonly MapRow[], choice: MapChoice) {
   const summary = countFilterSummary(rows, choice);
+  if (valueRangeKind(choice) === "years")
+    return {
+      ...summary,
+      unit: "years",
+      note: "Inclusive mean active-years range. Published parent mean, denominator and complete rows are unchanged; child means are never averaged. Contributing count and confidence interval are not supplied. Classification uses all reported child-area means, including areas without shapes. Excluded shapes are white with dashed outlines; unavailable values are distinct from excluded values.",
+    };
   return valueRangeKind(choice) === "percentage"
     ? {
         ...summary,

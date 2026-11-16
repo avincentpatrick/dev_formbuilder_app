@@ -240,7 +240,12 @@ export function DatasetMapCard({
   const metric = metrics.find((m) => m.id === choice.indicator);
   const view = mapView(choice);
   const rangeKind = valueRangeKind(choice);
-  const rangeLabel = rangeKind === "percentage" ? "Percentage" : "Count";
+  const rangeLabel =
+    rangeKind === "percentage"
+      ? "Percentage"
+      : rangeKind === "years"
+        ? "Mean active years"
+        : "Count";
   const filtering = hasValueFilter(choice);
   const filterSummary = data && filtering ? valueFilterSummary(data.rows, choice) : null;
   const excludedCodes =
@@ -284,7 +289,7 @@ export function DatasetMapCard({
       <SizeLegend rows={data.rows} compact={workspace} />
     ) : (
       <div className="space-y-1">
-        {rangeKind && (
+        {rangeKind && rangeKind !== "years" && (
           <p className="text-xs font-medium">
             {choice.classification === "custom"
               ? "Custom cut points"
@@ -597,7 +602,7 @@ export function DatasetMapCard({
                     excludedCodes={excludedCodes}
                     view={view}
                   />
-                  {rangeKind && view === "choropleth" && (
+                  {rangeKind && rangeKind !== "years" && view === "choropleth" && (
                     <p className="text-xs text-muted" aria-label="Effective classification">
                       {classificationDescription(choice, bins, rangeKind ?? "count")}
                     </p>
@@ -608,9 +613,13 @@ export function DatasetMapCard({
                       {choice.valueMin ?? "no minimum"} to {choice.valueMax ?? "no maximum"},
                       inclusive. {filterSummary.included} included, {filterSummary.excluded}{" "}
                       excluded, {filterSummary.unavailable} unavailable. Published{" "}
-                      {rangeKind === "percentage" ? "parent rate" : "total"} and complete table
-                      unchanged. White shapes with dashed outlines are excluded.{" "}
                       {rangeKind === "percentage"
+                        ? "parent rate"
+                        : rangeKind === "years"
+                          ? "parent mean"
+                          : "total"}{" "}
+                      and complete table unchanged. White shapes with dashed outlines are excluded.{" "}
+                      {rangeKind !== "count"
                         ? "Value filtering does not change the color breaks."
                         : "Scales and classification use all areas."}
                       {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
@@ -753,21 +762,25 @@ export function DatasetMapCard({
                       {data.totalNote}
                     </p>
                   )}
-                  {workspace && rangeKind && !navigationOnly && view === "choropleth" && (
-                    <ClassificationControls
-                      kind={rangeKind}
-                      key={`${choice.indicator}:${classificationKey}`}
-                      settings={choice}
-                      onApply={(settings) =>
-                        setChoice((current) => ({
-                          ...current,
-                          classification: settings.classification,
-                          classCount: settings.classCount,
-                          classBreaks: settings.classBreaks,
-                        }))
-                      }
-                    />
-                  )}
+                  {workspace &&
+                    rangeKind &&
+                    rangeKind !== "years" &&
+                    !navigationOnly &&
+                    view === "choropleth" && (
+                      <ClassificationControls
+                        kind={rangeKind}
+                        key={`${choice.indicator}:${classificationKey}`}
+                        settings={choice}
+                        onApply={(settings) =>
+                          setChoice((current) => ({
+                            ...current,
+                            classification: settings.classification,
+                            classCount: settings.classCount,
+                            classBreaks: settings.classBreaks,
+                          }))
+                        }
+                      />
+                    )}
                   {workspace && rangeKind && !navigationOnly && (
                     <ValueFilterControls
                       kind={rangeKind}

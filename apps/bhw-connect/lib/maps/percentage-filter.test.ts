@@ -46,7 +46,6 @@ it("limits percentage filters to published BHW shares, preserving separate mean/
   for (const indicator of prototypeIndicators("bhw-2025").filter((m) => m.unit === "%"))
     expect(valueRangeKind({ dataset: "bhw-2025", indicator: indicator.id })).toBe("percentage");
   for (const current of [
-    { dataset: "bhw-2025", indicator: "bhw.active-years" },
     { dataset: "bhw-stepzero-2026", indicator: "stepzero.population" },
     { dataset: "psa-sae-poverty-2023", indicator: "poverty.incidence" },
   ])

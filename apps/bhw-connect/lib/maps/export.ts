@@ -49,12 +49,12 @@ export function datasetMapExport(
             requestedGroups: choice.classCount ?? null,
             cutPoints: choice.classBreaks ?? null,
             actualGroups: bins.length,
-            appliesTo: accreditation ? "percentage-choropleth" : "count-choropleth",
-            note: classificationDescription(
-              choice,
-              bins,
-              valueRangeKind(choice) === "percentage" ? "percentage" : "count",
-            ),
+            appliesTo: accreditation
+              ? "percentage-choropleth"
+              : censusMean
+                ? "mean-years-choropleth"
+                : "count-choropleth",
+            note: classificationDescription(choice, bins, valueRangeKind(choice) ?? "count"),
           },
         }
       : {}),
@@ -102,11 +102,15 @@ export function datasetMapExport(
             : choice.classification === "custom"
               ? accreditation
                 ? "custom-percentage-cut-points"
-                : "custom-count-cut-points"
+                : censusMean
+                  ? "custom-mean-year-cut-points"
+                  : "custom-count-cut-points"
               : choice.classification === "equal"
                 ? accreditation
                   ? "equal-width-percentage-intervals"
-                  : "equal-width-count-intervals"
+                  : censusMean
+                    ? "equal-width-mean-year-intervals"
+                    : "equal-width-count-intervals"
                 : "quantiles-relative-to-displayed-areas",
       ...(circles
         ? {

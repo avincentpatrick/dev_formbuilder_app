@@ -67,7 +67,7 @@ for (const width of [390, 1440]) {
     expect(data.legend.bins.at(-1).max).toBe(101.25);
     expect(data.indicator.denominator).toContain("contributing count not supplied");
     expect(data.indicator.confidenceLevel).toBeNull();
-    await expect(page.getByText("Color classification", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Effective classification")).toContainText("child-area means");
     await page.goBack();
     await expect(page).not.toHaveURL(/valueMin=/);
     await page.goForward();

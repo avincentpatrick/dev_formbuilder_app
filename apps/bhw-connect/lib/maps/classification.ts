@@ -80,7 +80,7 @@ export function countClassificationBins(
 export function classificationDescription(
   settings: CountClassification,
   bins: ColorBin[],
-  kind: "count" | "percentage" = "count",
+  kind: "count" | "percentage" | "years" = "count",
 ) {
   if (kind === "percentage") {
     if (!settings.classification)
@@ -96,7 +96,9 @@ export function classificationDescription(
   const mode = settings.classification ?? "quantile";
   const method =
     mode === "equal" ? "Equal-width groups" : mode === "custom" ? "Custom cut points" : "Quantiles";
-  return `${method}: ${bins.length} actual groups${mode !== "custom" ? ` (${settings.classCount ?? 5} requested)` : ""}. ${mode === "custom" ? "Exploratory cut points, not official standards; retained across areas. Counts start at zero and the last group is open-ended." : "Recalculated from all reported child-area counts when geography changes; not common breaks for comparisons. Ties may reduce the group count."} Value filtering does not change the breaks. Shared edges belong to the higher group; the final finite maximum is included.`;
+  const unit = kind === "years" ? "Mean active years" : "Counts";
+  const observations = kind === "years" ? "means" : "counts";
+  return `${method}: ${bins.length} actual groups${mode !== "custom" ? ` (${settings.classCount ?? 5} requested)` : ""}. ${mode === "custom" ? `Exploratory cut points, not official standards; retained across areas. ${unit} start at zero and the last group is open-ended.` : `Recalculated from all reported child-area ${observations} when geography changes; not common breaks for comparisons. Ties may reduce the group count.`} Value filtering does not change the breaks. Shared edges belong to the higher group; the final finite maximum is included.${kind === "years" ? " Published parent means and denominators are unchanged; child means are never averaged. Contributing count and confidence interval are not supplied." : ""}`;
 }
 
 /** Only validated BHW shares use this bounded domain; other ratios are not assumed bounded. */

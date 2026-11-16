@@ -172,7 +172,7 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const grouping = (
     rangeKind === "percentage" ? parsePercentageClassification : parseCountClassification
   )(params.get("classification"), params.get("classCount"), params.get("classBreaks"));
-  if (!grouping || (grouping.classification && (!rangeKind || rangeKind === "years"))) return null;
+  if (!grouping || (grouping.classification && !rangeKind)) return null;
   const range = (
     rangeKind === "percentage"
       ? parsePercentageRange

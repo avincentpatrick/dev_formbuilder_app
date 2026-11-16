@@ -4,6 +4,7 @@ import { bhwNationalCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-r
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
 import { formatCount, formatPct } from "@/lib/format";
+import { DatasetMapCard } from "@/components/maps/dataset-map-card";
 import { subjectMapHref } from "@/lib/maps/subjects";
 import { StatHero } from "@/components/home/stat-hero";
 import { StatTile } from "@/components/home/stat-tile";
@@ -188,6 +189,15 @@ export function BhwOverview({
               />
             </div>
           </PresentationSlide>
+          <section aria-label="Workforce distribution preview" className="space-y-3">
+            <h3 className="text-xl font-semibold">Where are BHWs reported?</h3>
+            <p className="text-sm text-muted">
+              Start with regional LGU-reported headcount. Circles show area totals, not worker
+              locations. Use Areas and data for ranked counts and exact values. Preview choices do
+              not change the national headline figures; enlarge the map to continue exploring.
+            </p>
+            <DatasetMapCard dataset="bhw-stepzero-2026" overviewPreview />
+          </section>
           <div className="flex flex-wrap items-center gap-4">
             <Link
               href={mapHref}

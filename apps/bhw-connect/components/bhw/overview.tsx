@@ -116,12 +116,12 @@ export function BhwOverview({ dataset }: { dataset: CatalogDataset }) {
             aria-label="BHW analysis"
             className="flex flex-wrap gap-3 text-sm underline underline-offset-4"
           >
-            <Link href="/bhw#workforce">Workforce distribution</Link>
-            <Link href="/bhw#qualifications">Qualifications and training</Link>
-            <Link href="/bhw#support">Support and compensation</Link>
+            <Link href="#workforce">Workforce distribution</Link>
+            <Link href="#qualifications">Qualifications and training</Link>
+            <Link href="#support">Support and compensation</Link>
             <Link href="/compare?measure=bhw.total">Compare places</Link>
             <Link href={mapHref}>Map explorer</Link>
-            <Link href="/bhw#methodology">Data and methodology</Link>
+            <Link href="#methodology">Data and methodology</Link>
           </nav>
         </div>
         <section

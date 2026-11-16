@@ -55,6 +55,30 @@ for (const width of [390, 1440]) {
       "href",
       new URL(previous).pathname + new URL(previous).search,
     );
+    // Purpose sections must keep the return snapshot, including on reload/history.
+    const overviewUrl = page.url();
+    const nav = page.getByRole("navigation", { name: "BHW analysis" });
+    for (const [label, section] of [
+      ["Qualifications and training", "qualifications"],
+      ["Support and compensation", "support"],
+      ["Data and methodology", "methodology"],
+      ["Workforce distribution", "workforce"],
+    ]) {
+      await nav.getByRole("link", { name: label, exact: true }).click();
+      await expect(page).toHaveURL(`${overviewUrl}#${section}`);
+      await expect(page.locator(`#${section}`)).toBeInViewport();
+      await expect(back).toHaveAttribute(
+        "href",
+        new URL(previous).pathname + new URL(previous).search,
+      );
+    }
+    await page.reload();
+    await expect(page).toHaveURL(`${overviewUrl}#workforce`);
+    await expect(back).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(`${overviewUrl}#methodology`);
+    await page.goForward();
+    await expect(page).toHaveURL(`${overviewUrl}#workforce`);
     await back.click();
     await expect(page).toHaveURL(previous);
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();

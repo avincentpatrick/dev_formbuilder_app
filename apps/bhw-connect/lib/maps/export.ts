@@ -50,7 +50,11 @@ export function datasetMapExport(
             cutPoints: choice.classBreaks ?? null,
             actualGroups: bins.length,
             appliesTo: accreditation ? "percentage-choropleth" : "count-choropleth",
-            note: classificationDescription(choice, bins, valueRangeKind(choice) ?? "count"),
+            note: classificationDescription(
+              choice,
+              bins,
+              valueRangeKind(choice) === "percentage" ? "percentage" : "count",
+            ),
           },
         }
       : {}),

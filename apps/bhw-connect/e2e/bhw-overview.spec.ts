@@ -36,7 +36,7 @@ for (const width of [390, 1440]) {
       ).toBeVisible();
     }
     await nav.getByRole("link", { name: "Data and methodology" }).click();
-    await page.locator("#methodology summary").focus();
+    await page.locator("#methodology > summary:visible").focus();
     await page.keyboard.press("Enter");
     await expect(
       page.getByRole("link", { name: "View national indicators and availability", exact: false }),

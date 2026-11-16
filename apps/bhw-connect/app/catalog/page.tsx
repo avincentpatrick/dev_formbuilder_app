@@ -5,6 +5,7 @@ import { IconnectLogo } from "@/components/branding/iconnect-logo";
 import { parseCatalogParams, type CatalogParams } from "@/lib/catalog/navigation";
 import { CatalogContent } from "@/components/catalog/catalog-content";
 import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
+import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import CatalogLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -33,23 +34,9 @@ export default async function CatalogPage({
           poverty. Figures keep their own sources, dates and geographic limits.
         </p>
       </header>
-      {params.mapState !== undefined &&
-        (returnMap ? (
-          <aside className="rounded border border-border p-3 text-sm">
-            <Link href={returnMap} className="underline">
-              Return to previous BHW map
-            </Link>
-            <p className="mt-1 text-muted">
-              Restores the map you came from, including its indicator, area, selected place, view,
-              filter and color groups. Catalog figures keep their own scope.
-            </p>
-          </aside>
-        ) : (
-          <p role="status">
-            The previous map settings are invalid or unsupported. Open a new map from the dataset
-            details.
-          </p>
-        ))}
+      {params.mapState !== undefined && (
+        <BhwMapReturnLink href={returnMap} scopeNote="Catalog figures keep their own scope." />
+      )}
       {request ? (
         <Suspense key={JSON.stringify(request)} fallback={<CatalogLoading />}>
           <CatalogContent request={request} />

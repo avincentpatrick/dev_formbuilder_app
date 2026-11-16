@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bhwCatalogReturnHref, restoredBhwMapHref } from "./catalog-return";
+import { bhwCatalogReturnHref, restoredBhwMapHref, bhwOverviewReturnHref } from "./catalog-return";
 import { initialMapChoice, mapHref, type MapChoice } from "./prototype";
 it("restores complete public BHW settings independently of catalog scope", () => {
   const choices: MapChoice[] = [
@@ -60,4 +60,24 @@ it("canonicalizes known settings rather than forwarding arbitrary parameters", (
     "dataset=bhw-2025&redirect=https%3A%2F%2Fexample.com&mapState=recursive",
   );
   expect(href).toBe(mapHref(initialMapChoice("bhw-2025")));
+});
+
+it("preserves the complete BHW map snapshot through the national overview without changing its scope", () => {
+  const choice: MapChoice = {
+    ...initialMapChoice("bhw-2025"),
+    indicator: "bhw.active-years",
+    level: "region",
+    code: "07",
+    selected: "07306",
+    view: "choropleth",
+    valueMin: 12.34,
+    classification: "custom",
+    classBreaks: [10, 20],
+  };
+  const href = bhwOverviewReturnHref(choice)!;
+  expect(href.startsWith("/bhw?")).toBe(true);
+  const params = new URLSearchParams(href.split("?")[1]);
+  expect([...params.keys()]).toEqual(["mapState"]);
+  expect(restoredBhwMapHref(params.get("mapState")!)).toBe(mapHref(choice));
+  expect(bhwOverviewReturnHref(initialMapChoice("psa-popcen-2024"))).toBeNull();
 });

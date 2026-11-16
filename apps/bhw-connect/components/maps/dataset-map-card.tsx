@@ -49,6 +49,7 @@ import {
   percentageClassificationBins,
   classificationDescription,
 } from "@/lib/maps/classification";
+import { bhwOverviewReturnHref } from "@/lib/maps/catalog-return";
 import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -1016,7 +1017,13 @@ export function DatasetMapCard({
         <Link prefetch={false} href={mapHref(bhw ? { ...choice, view } : choice)}>
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
-        {dashboard && <Link href={dashboard}>Open dashboard</Link>}
+        {dashboard && (
+          <Link
+            href={dashboard === "/bhw" ? (bhwOverviewReturnHref(choice) ?? dashboard) : dashboard}
+          >
+            Open dashboard
+          </Link>
+        )}
         {expanded && data && (
           <button
             type="button"

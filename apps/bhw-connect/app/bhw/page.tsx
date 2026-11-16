@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { getPublicDataset } from "@/lib/catalog/catalog";
 import { BhwOverview } from "@/components/bhw/overview";
 import { ChatLauncher } from "@/components/chat/chat-launcher";
+import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { BhwSearchForm } from "@/components/bhw/search-form";
 
 export const metadata: Metadata = { title: "BHW 2025" };
@@ -12,7 +14,13 @@ async function OverviewContent() {
   return <BhwOverview dataset={dataset} />;
 }
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const returnMap = restoredBhwMapHref(params.mapState);
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
       <header className="space-y-4">
@@ -24,6 +32,12 @@ export default function Home() {
         </p>
         <BhwSearchForm compact />
       </header>
+      {params.mapState !== undefined && (
+        <BhwMapReturnLink
+          href={returnMap}
+          scopeNote="Overview figures remain national and are not filtered by the map settings."
+        />
+      )}
       <Suspense fallback={<p role="status">Loading public BHW figures…</p>}>
         <OverviewContent />
       </Suspense>

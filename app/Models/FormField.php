@@ -10,6 +10,7 @@ use App\Enums\RequiredMode;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Support\Forms\AnswerLimits;
 use Database\Factories\FormFieldFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -135,5 +136,26 @@ class FormField extends Model implements TenantScoped
     public function validations(): HasMany
     {
         return $this->hasMany(FormFieldValidation::class, 'form_field_id');
+    }
+
+    /**
+     * M243 (`R-1da063f4`): this question's answer limits, as the respondent's screen and the publish gate read them — the
+     * word limits on a type that takes them, the choice limits and "only answer" values on one that takes those — or null
+     * when it has none. Each limit is read by {@see AnswerLimits::bound()}, the engines' own rule.
+     *
+     * @return array{words: array{min: ?int, max: ?int}|null, choices: array{min: ?int, max: ?int}|null, exclusive: list<string>}|null
+     */
+    public function answerLimits(): ?array
+    {
+        $config = is_array($this->config) ? $this->config : [];
+        $type = $this->field_type;
+
+        $words = $type->takesWordLimits() ? AnswerLimits::pair($config, AnswerLimits::MIN_WORDS, AnswerLimits::MAX_WORDS) : null;
+        $choices = $type->takesChoiceLimits() ? AnswerLimits::pair($config, AnswerLimits::MIN_CHOICES, AnswerLimits::MAX_CHOICES) : null;
+        $exclusive = $type->takesChoiceLimits() ? array_map(strval(...), array_keys(AnswerLimits::exclusiveOptions($config))) : [];
+
+        return $words === null && $choices === null && $exclusive === []
+            ? null
+            : ['words' => $words, 'choices' => $choices, 'exclusive' => $exclusive];
     }
 }

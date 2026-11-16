@@ -54,6 +54,8 @@ const encodeField = computed<EncodeField>(() => ({
     suggestions: props.field.suggestions,
     // M186 (`R-ed7f3127`) — what narrows the choices shown by what another form recorded.
     choice_filter: props.field.choiceFilter ?? null,
+    // M243 (`R-1da063f4`) — the word count and the choice locks, as the encode page's presenter sends them.
+    limits: props.field.limits ?? null,
     supported: props.field.supported,
 }));
 

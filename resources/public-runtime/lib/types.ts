@@ -353,6 +353,11 @@ export interface RenderField {
      * field built by hand in a test needs none. Display only: no engine reads it.
      */
     choiceFilter?: RenderChoiceFilter[] | null;
+    /**
+     * M243 (`R-1da063f4`): the answer limits — words on a text question, choices and "only answer" values on a multi-select —
+     * or null. Optional, so a render field built by hand in a test needs none. The engine reads its own projection.
+     */
+    limits?: { words: { min: number | null; max: number | null } | null; choices: { min: number | null; max: number | null } | null; exclusive: string[] } | null;
     /** M177 (`R-f44e9d00`): Show to respondents — `hidden` (Never) or `shown` (Always); null keeps the type's own rule. */
     visibility: 'hidden' | 'shown' | null;
     sequence: number;

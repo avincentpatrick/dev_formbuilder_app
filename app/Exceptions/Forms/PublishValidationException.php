@@ -635,4 +635,13 @@ final class PublishValidationException extends RuntimeException
     {
         return new self($message, [['field' => $field, 'code' => $code, 'message' => $message]]);
     }
+
+    /**
+     * M243 (`R-1da063f4`): a question whose answer limits no answer can meet — a minimum above its maximum, or a
+     * multi-select asking for more choices than it has that can be chosen together. `$detail` names the numbers.
+     */
+    public static function answerLimitsInvalid(string $fieldKey, string $detail): self
+    {
+        return self::one($fieldKey, 'answer_limits_invalid', "The question “{$fieldKey}” has answer limits no answer can meet ({$detail}).");
+    }
 }

@@ -29,6 +29,7 @@ import LikertLine from './LikertLine.vue';
 import MatrixGrid from './MatrixGrid.vue';
 import NoteContent from './NoteContent.vue';
 import { choiceLayoutFor } from './choice-layout';
+import { choiceLocked, choiceNote, nextChoices, wordCount, wordCounterText, type AnswerLimitsView } from './answer-limits';
 import { renderableBlocks } from './note-content';
 
 // Geospatial capture (Increment G5b2) is lazy-loaded so its Leaflet dependency + CSS only ship in the chunk a
@@ -166,6 +167,10 @@ export interface EncodeField {
     // cascade level it narrows (null for a question's own list), `values` the other form's answers — null when they could
     // not be read (`D163`: every choice is shown, and the question says so). Display only: no engine reads it.
     choice_filter?: ChoiceFilter[] | null;
+    // M243 (`R-1da063f4`) — the answer limits: word limits on a text question (a live count under the box), choice limits and
+    // "only answer" values on a multi-select (a box that cannot take one more; an only answer clears and locks the rest).
+    // Null when the question has none. The engines hold the answer to the same limits on submit.
+    limits?: AnswerLimitsView | null;
     supported: boolean;
 }
 
@@ -392,11 +397,11 @@ const narrowingNote = computed<string | null>(() => {
     return null;
 });
 /** The hint as shown: the author's, then what narrowing has to say. */
-const shownHint = computed<string | null>(() => [props.field.hint, narrowingNote.value].filter((part): part is string => !!part).join(' ') || null);
+const shownHint = computed<string | null>(() => [props.field.hint, narrowingNote.value, choiceLimitNote.value].filter((part): part is string => !!part).join(' ') || null);
 
 function toggleOption(value: string, checked: boolean): void {
     const current = listValue.value;
-    emit('update:modelValue', checked ? [...current, value] : current.filter((v) => v !== value));
+    emit('update:modelValue', nextChoices(current, value, checked, exclusiveValues.value));
 }
 
 // ── The group controls' wiring (M130) ───────────────────────────────────────────────────────────────
@@ -558,6 +563,28 @@ function setCascadeLevel(index: number, value: string): void {
     next.push(value);
     emit('update:modelValue', withImpliedLevels(next));
 }
+
+// ── M243 (`R-1da063f4`): answer limits ──────────────────────────────────────────────────────────────────────────
+// Read only for the control that shows them, so a stray limit on another type does nothing here, as in the engines.
+const wordLimits = computed(() => (control.value === 'text' || control.value === 'textarea' ? (props.field.limits?.words ?? null) : null));
+const wordsTyped = computed<number>(() => wordCount(stringValue.value));
+const wordsOver = computed<boolean>(() => wordLimits.value?.max != null && wordsTyped.value > wordLimits.value.max);
+/** The line under a text box with a word limit. Tied to the box by `aria-describedby`, not a live region (as `MdsTextarea`'s
+ *  own counter is): announced on every keystroke, it would talk over the person's typing. */
+const wordCounter = computed<string | null>(() => (wordLimits.value === null ? null : wordCounterText(wordsTyped.value, wordLimits.value)));
+const counterId = useId();
+function withCounter(describedby: string | undefined): string | undefined {
+    return [describedby, wordCounter.value !== null ? counterId : null].filter((id): id is string => !!id).join(' ') || undefined;
+}
+
+const choiceLimits = computed(() => (control.value === 'checkboxes' ? (props.field.limits?.choices ?? null) : null));
+const exclusiveValues = computed<ReadonlySet<string>>(() => new Set(control.value === 'checkboxes' ? (props.field.limits?.exclusive ?? []) : []));
+const choiceLimitNote = computed<string | null>(() =>
+    control.value === 'checkboxes'
+        ? choiceNote(listValue.value, choiceLimits.value, exclusiveValues.value, (value) => props.field.options.find((option) => option.value === value)?.label ?? value)
+        : null,
+);
+
 </script>
 
 <template>
@@ -576,7 +603,7 @@ function setCascadeLevel(index: number, value: string): void {
                 :type="textType"
                 :model-value="stringValue"
                 :placeholder="field.placeholder ?? undefined"
-                :describedby="describedby"
+                :describedby="withCounter(describedby)"
                 :invalid="invalid"
                 :list="hasSuggestions ? `${id}-suggestions` : undefined"
                 :autocomplete="hasSuggestions ? 'off' : undefined"
@@ -585,16 +612,23 @@ function setCascadeLevel(index: number, value: string): void {
             <datalist v-if="hasSuggestions" :id="`${id}-suggestions`" data-suggestions>
                 <option v-for="suggestion in shownSuggestions" :key="suggestion" :value="suggestion" />
             </datalist>
+            <p v-if="wordCounter" :id="counterId" class="encode-field__count" :class="{ 'encode-field__count--over': wordsOver }" data-word-count>
+                {{ wordCounter }}
+            </p>
         </template>
-        <MdsTextarea
-            v-else-if="control === 'textarea'"
-            :id="id"
-            :model-value="stringValue"
-            :placeholder="field.placeholder ?? undefined"
-            :describedby="describedby"
-            :invalid="invalid"
-            @update:model-value="emit('update:modelValue', $event)"
-        />
+        <template v-else-if="control === 'textarea'">
+            <MdsTextarea
+                :id="id"
+                :model-value="stringValue"
+                :placeholder="field.placeholder ?? undefined"
+                :describedby="withCounter(describedby)"
+                :invalid="invalid"
+                @update:model-value="emit('update:modelValue', $event)"
+            />
+            <p v-if="wordCounter" :id="counterId" class="encode-field__count" :class="{ 'encode-field__count--over': wordsOver }" data-word-count>
+                {{ wordCounter }}
+            </p>
+        </template>
         <MdsNumberInput
             v-else-if="control === 'number'"
             :id="id"
@@ -637,6 +671,7 @@ function setCascadeLevel(index: number, value: string): void {
                 :key="opt.value"
                 :label="opt.label"
                 :model-value="listValue.includes(opt.value)"
+                :disabled="choiceLocked(opt.value, listValue, choiceLimits?.max ?? null, exclusiveValues)"
                 :invalid="Boolean(error)"
                 :describedby="error ? errorId : undefined"
                 @update:model-value="toggleOption(opt.value, $event)"
@@ -1065,4 +1100,20 @@ function setCascadeLevel(index: number, value: string): void {
 .encode-choices__clear {
     align-self: flex-start;
 }
+
+/* M243 (`R-1da063f4`): the word count under a text box with a word limit — the design system's counter (`MdsTextarea`),
+   in the danger tone once over, with the overage said in words so the tone is never the only signal. */
+.encode-field__count {
+    margin: var(--mds-space-1) 0 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    color: var(--mds-color-text-secondary);
+    text-align: end;
+}
+
+.encode-field__count--over {
+    color: var(--mds-color-danger-text);
+}
+
 </style>

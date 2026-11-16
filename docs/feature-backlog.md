@@ -11898,7 +11898,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   PHP counterpart at all.** Found by `M112` (2026-09-26) while verifying `R-54a19217`; the row it was verified
   for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:50-63` `SUPPORTED`, `:73`
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
-  `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
+  `:55` `MEDIA_TYPES`; `semantic-validator.ts`'s `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
   and `ConfigPanel.vue:193` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
@@ -15181,7 +15181,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
-  (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
+  (the M180 comment in `SemanticValidator::evaluate()` and in its twin `evaluate()` in `resources/public-runtime/engine/semantic-validator.ts`), yet the condition
   editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:367`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a

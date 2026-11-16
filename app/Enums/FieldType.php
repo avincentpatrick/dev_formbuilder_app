@@ -208,26 +208,6 @@ enum FieldType: string
     }
 
     /**
-     * Whether a question of this type takes a word limit, `config.min_words`/`max_words` (M243, `R-1da063f4`). The one
-     * list: both engines check only these types, the publish gate refuses the keys elsewhere, a type conversion drops
-     * them, and the builder is sent the list (`word_limit_types`) rather than keeping a copy.
-     */
-    public function takesWordLimits(): bool
-    {
-        return $this === self::ShortText || $this === self::LongText;
-    }
-
-    /**
-     * Whether a question of this type takes a choice limit, `config.min_choices`/`max_choices`, and "only answer"
-     * choices, `config.options[].exclusive` (M243, `R-1da063f4`). Only a multi-select holds more than one choice. Sent to
-     * the builder as `choice_limit_types`.
-     */
-    public function takesChoiceLimits(): bool
-    {
-        return $this === self::MultiSelect;
-    }
-
-    /**
      * Whether an author may no longer PICK this type — from the palette, the "Add a question here" list, or as a
      * conversion target (M177, `R-0b7db001`, `R-22011569`, `D140`). Yes/No is a Single choice with the choices Yes and
      * No; a Duration has no control anyone can answer, and a duration is worked out by a calculation. Every existing
@@ -274,5 +254,32 @@ enum FieldType: string
             self::FileUpload, self::ImageCapture, self::AudioCapture, self::VideoCapture, self::Signature,
             self::Note, self::PageBreak, self::Hidden, self::Matrix => null,
         };
+    }
+
+    /**
+     * M243 (`R-1da063f4`): the largest word or choice limit an author may set. The save door holds it; a larger stored
+     * value is still read as written. It sits here, beside the two questions below, so the save request reads it with no
+     * new import (a `use` line would move every line the backlog cites in that file).
+     */
+    public const ANSWER_LIMIT_CEILING = 100000;
+
+    /**
+     * Whether a question of this type takes a word limit, `config.min_words`/`max_words` (M243, `R-1da063f4`). The one
+     * list: both engines check only these types, the publish gate refuses the keys elsewhere, a type conversion drops
+     * them, and the builder is sent the list (`word_limit_types`) rather than keeping a copy.
+     */
+    public function takesWordLimits(): bool
+    {
+        return $this === self::ShortText || $this === self::LongText;
+    }
+
+    /**
+     * Whether a question of this type takes a choice limit, `config.min_choices`/`max_choices`, and "only answer"
+     * choices, `config.options[].exclusive` (M243, `R-1da063f4`). Only a multi-select holds more than one choice. Sent to
+     * the builder as `choice_limit_types`.
+     */
+    public function takesChoiceLimits(): bool
+    {
+        return $this === self::MultiSelect;
     }
 }

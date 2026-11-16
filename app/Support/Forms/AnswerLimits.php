@@ -27,9 +27,6 @@ final class AnswerLimits
 
     public const EXCLUSIVE = 'exclusive';
 
-    /** The largest limit an author may set. The save door holds it; a larger stored value is still read as written. */
-    public const CEILING = 100000;
-
     /**
      * What separates two words: the Unicode White_Space set, written out.
      *
@@ -69,6 +66,20 @@ final class AnswerLimits
         };
 
         return $value !== null && $value >= 1 ? $value : null;
+    }
+
+    /**
+     * A lower and upper limit read by {@see bound()}, or null when neither is set.
+     *
+     * @param  array<string, mixed>|null  $config
+     * @return array{min: ?int, max: ?int}|null
+     */
+    public static function pair(?array $config, string $minKey, string $maxKey): ?array
+    {
+        $min = self::bound($config, $minKey);
+        $max = self::bound($config, $maxKey);
+
+        return $min === null && $max === null ? null : ['min' => $min, 'max' => $max];
     }
 
     /**

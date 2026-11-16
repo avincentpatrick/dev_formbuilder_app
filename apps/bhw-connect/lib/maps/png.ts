@@ -1,3 +1,4 @@
+import { pngRanking } from "./png-ranking";
 import { MIN_LEADER_N } from "@/lib/analysis/thresholds";
 import type { Map as LibreMap } from "maplibre-gl";
 import type { datasetMapExport } from "./export";
@@ -193,12 +194,37 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
       symbolRows.reduce((sum, row) => sum + Math.max(lineHeight, Math.ceil(row.radius * 2 + 16)), 0)
     : 0;
   const maxRadius = Math.max(0, ...symbolRows.map((row) => row.radius));
+  const ranking = pngRanking(data);
+  const rankHeading = ranking
+    ? [
+        ...wrap(`Largest included area counts — ${data.geography.area}`),
+        ...wrap(`${data.indicator.label} | ${data.indicator.period} | ${data.indicator.unit}`),
+        ...wrap(ranking.note),
+        ...(!ranking.rows.length
+          ? wrap("No included counts to rank. This does not mean zero.")
+          : []),
+      ]
+    : [];
+  const rankRows =
+    ranking?.rows.map((row) => ({
+      ...row,
+      lines: wrap(
+        `${row.name} (${row.code}) — ${row.value.toLocaleString("en-PH")} ${data.indicator.unit}${row.missingGeometry ? " · no map shape" : ""}${row.code === data.selection.selected ? " · selected" : ""}`,
+      ),
+    })) ?? [];
+  const rankHeight = ranking
+    ? margin +
+      rankHeading.length * lineHeight +
+      rankRows.reduce((sum, row) => sum + row.lines.length * lineHeight + 24, 0) +
+      margin
+    : 0;
   const headerHeight = margin * 2 + heading.length * lineHeight;
   canvas.width = width;
   canvas.height =
     headerHeight +
     frame.height +
     symbolHeight +
+    rankHeight +
     (frame.scaleBar ? 75 : 0) +
     margin * 2 +
     (footer.length + legend.length + 1) * lineHeight;
@@ -257,6 +283,30 @@ export async function composeMapPng(frame: MapFrame, data: Context): Promise<Blo
     context.fillText(item.text, margin + 28, y);
     y += lineHeight;
   }
+  if (ranking) {
+    y += margin;
+    for (const line of rankHeading) {
+      context.fillStyle = "#111827";
+      context.fillText(line, margin, y);
+      y += lineHeight;
+    }
+    for (const row of rankRows) {
+      context.fillStyle = "#111827";
+      for (const line of row.lines) {
+        context.fillText(line, margin, y);
+        y += lineHeight;
+      }
+      context.fillStyle = "#f3f4f6";
+      context.fillRect(margin, y, width - 2 * margin, 12);
+      if (row.value > 0 && ranking.maximum > 0) {
+        context.fillStyle = "#0c747b";
+        context.fillRect(margin, y, ((width - 2 * margin) * row.value) / ranking.maximum, 12);
+      }
+      y += 24;
+    }
+    y += margin;
+  }
+  context.fillStyle = "#111827";
   footer.forEach((line) => {
     context.fillText(line, margin, y);
     y += lineHeight;

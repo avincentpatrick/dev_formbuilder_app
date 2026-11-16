@@ -20,6 +20,7 @@ const data: MapPayload = {
 };
 function canvasFixture() {
   const ctx = {
+    fillStyle: "",
     measureText: (s: string) => ({ width: s.length * 8 }),
     fillText: vi.fn(),
     fillRect: vi.fn(),
@@ -148,4 +149,22 @@ it("draws the captured ruler and labels its geographic approximation", async () 
   );
   expect(pngNotes(payload, true).join(" ")).toContain("scale varies with location");
   expect(pngNotes(payload).join(" ")).toContain("no distance bar is inferred");
+});
+
+it("draws filtered ranked bars against the full-set maximum and keeps zero unfilled", async () => {
+  const { ctx } = canvasFixture();
+  const payload = datasetMapExport(
+    { ...initialMapChoice("bhw-stepzero-2026"), valueMax: 25 },
+    data,
+    [],
+    ["01"],
+  );
+  await composeMapPng({ width: 1200, height: 500 } as MapFrame, payload);
+  const bars = ctx.fillRect.mock.calls.filter((args) => args[3] === 12);
+  expect(bars.map((args) => args[2])).toEqual([1152, 288, 1152]);
+  const text = ctx.fillText.mock.calls.map((args) => args[0]).join("\n");
+  expect(text).toContain("Small (02) — 25 people · no map shape");
+  expect(text).toContain("Zero (03) — 0 people · no map shape");
+  expect(text).toContain("Largest included area counts");
+  expect(ctx.fillStyle).toBe("#111827"); // Footer must not inherit the last bar color.
 });

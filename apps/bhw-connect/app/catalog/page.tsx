@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { IconnectLogo } from "@/components/branding/iconnect-logo";
 import { parseCatalogParams, type CatalogParams } from "@/lib/catalog/navigation";
 import { CatalogContent } from "@/components/catalog/catalog-content";
+import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import CatalogLoading from "./loading";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default async function CatalogPage({
 }) {
   const params = await searchParams;
   const request = parseCatalogParams(params);
+  const returnMap = request?.dataset === "bhw" ? restoredBhwMapHref(params.mapState) : null;
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <header className="space-y-4">
@@ -31,6 +33,23 @@ export default async function CatalogPage({
           poverty. Figures keep their own sources, dates and geographic limits.
         </p>
       </header>
+      {params.mapState !== undefined &&
+        (returnMap ? (
+          <aside className="rounded border border-border p-3 text-sm">
+            <Link href={returnMap} className="underline">
+              Return to previous BHW map
+            </Link>
+            <p className="mt-1 text-muted">
+              Restores the map you came from, including its indicator, area, selected place, view,
+              filter and color groups. Catalog figures keep their own scope.
+            </p>
+          </aside>
+        ) : (
+          <p role="status">
+            The previous map settings are invalid or unsupported. Open a new map from the dataset
+            details.
+          </p>
+        ))}
       {request ? (
         <Suspense key={JSON.stringify(request)} fallback={<CatalogLoading />}>
           <CatalogContent request={request} />

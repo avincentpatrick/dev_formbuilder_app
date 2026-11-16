@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { parseMapChoice } from "@/lib/maps/prototype";
 import { subjectOfRelease } from "@/lib/maps/subjects";
 import { catalogHref } from "@/lib/catalog/navigation";
+import { bhwCatalogReturnHref } from "@/lib/maps/catalog-return";
 import type { CatalogId } from "@/lib/catalog/types";
 
 /** Native workspace history can change geography without rerendering the server page. */
@@ -17,12 +18,14 @@ export function DatasetMapBackLink() {
     : subject.id === "districts"
       ? { href: "/districts", label: "Legislative districts" }
       : {
-          href: catalogHref(
-            choice && subject.id === "bhw"
-              ? { mode: "psgc", level: choice.level, code: choice.code }
-              : { mode: "all" },
-            subject.id as CatalogId,
-          ),
+          href:
+            (choice && bhwCatalogReturnHref(choice)) ??
+            catalogHref(
+              choice && subject.id === "bhw"
+                ? { mode: "psgc", level: choice.level, code: choice.code }
+                : { mode: "all" },
+              subject.id as CatalogId,
+            ),
           label: `${subject.title} dataset`,
         };
   return (

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\FormVersionStatus;
+use App\Models\Form;
 use App\Models\FormField;
 use App\Models\User;
 use App\Services\Forms\PublishService;
@@ -14,6 +15,7 @@ use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Spatie\Permission\PermissionRegistrar;
 
 uses(RefreshDatabase::class);
@@ -58,7 +60,7 @@ function xlsLimitsUpload(array $sheets): UploadedFile
  * Import sheets into a fresh form, and return its draft's questions by key and the import's warnings.
  *
  * @param  array<string, array{headers: list<string>, rows: list<array<string, mixed>>}>  $sheets
- * @return array{0: \Illuminate\Support\Collection<string, FormField>, 1: list<string>, 2: \App\Models\Form}
+ * @return array{0: Collection<string, FormField>, 1: list<string>, 2: Form}
  */
 function xlsLimitsImport(User $owner, array $sheets): array
 {

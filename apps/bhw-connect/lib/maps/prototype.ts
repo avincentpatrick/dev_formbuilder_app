@@ -3,6 +3,7 @@ import { getDatasetMap } from "./definitions";
 import { isReleasePublic } from "@/lib/releases/visibility";
 import {
   parseCountClassification,
+  parsePercentageClassification,
   classificationBreaksText,
   type CountClassification,
 } from "./classification";
@@ -166,14 +167,11 @@ export function parseMapChoice(params: URLSearchParams): MapChoice | null {
   const view = dataset === "ph-legislative-districts" ? null : params.get("view");
   if (view !== null && view !== "circles" && view !== "choropleth") return null;
   if (view === "circles" && !supportsCircles({ dataset, indicator })) return null;
-  const grouping = parseCountClassification(
-    params.get("classification"),
-    params.get("classCount"),
-    params.get("classBreaks"),
-  );
-  if (!grouping || (grouping.classification && !supportsCircles({ dataset, indicator })))
-    return null;
   const rangeKind = valueRangeKind({ dataset, indicator, level });
+  const grouping = (
+    rangeKind === "percentage" ? parsePercentageClassification : parseCountClassification
+  )(params.get("classification"), params.get("classCount"), params.get("classBreaks"));
+  if (!grouping || (grouping.classification && !rangeKind)) return null;
   const range = (rangeKind === "percentage" ? parsePercentageRange : parseCountRange)(
     params.get("valueMin"),
     params.get("valueMax"),

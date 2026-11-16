@@ -44,7 +44,11 @@ import {
   valueFilterSummary,
   valueRangeKind,
 } from "@/lib/maps/value-filter";
-import { countClassificationBins, classificationDescription } from "@/lib/maps/classification";
+import {
+  countClassificationBins,
+  percentageClassificationBins,
+  classificationDescription,
+} from "@/lib/maps/classification";
 import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -193,7 +197,16 @@ export function DatasetMapCard({
       navigationOnly
         ? []
         : accreditation
-          ? STEPZERO_ACCREDITATION_BINS
+          ? choice.classification
+            ? percentageClassificationBins(
+                {
+                  classification: choice.classification,
+                  classCount: choice.classCount,
+                  classBreaks: choice.classBreaks,
+                },
+                data?.rows.map((r) => r.value) ?? [],
+              )
+            : STEPZERO_ACCREDITATION_BINS
           : profiling
             ? PROFILING_BINS
             : income
@@ -271,20 +284,22 @@ export function DatasetMapCard({
       <SizeLegend rows={data.rows} compact={workspace} />
     ) : (
       <div className="space-y-1">
-        {supportsCircles(choice) && (
+        {rangeKind && (
           <p className="text-xs font-medium">
             {choice.classification === "custom"
               ? "Custom cut points"
               : choice.classification === "equal"
                 ? "Equal-width groups"
-                : "Quantiles"}{" "}
+                : rangeKind === "percentage" && !choice.classification
+                  ? "Fixed percentage breaks"
+                  : "Quantiles"}{" "}
             · {bins.length} groups · all child areas
           </p>
         )}
         <MapLegend
           bins={bins}
           categoryLabels={
-            profiling || accreditation
+            profiling || (accreditation && !choice.classification)
               ? {
                   0: "0–<25%",
                   25: "25–<50%",
@@ -401,7 +416,7 @@ export function DatasetMapCard({
                     next.level !== choice.level
                       ? "This indicator has no barangay map, so it is shown for the province."
                       : choice.classification
-                        ? "Color classification and count range reset for the new indicator."
+                        ? `Color classification and ${rangeLabel.toLowerCase()} range reset for the new indicator.`
                         : filtering
                           ? `${rangeLabel} range reset for the new indicator.`
                           : null,
@@ -582,9 +597,9 @@ export function DatasetMapCard({
                     excludedCodes={excludedCodes}
                     view={view}
                   />
-                  {supportsCircles(choice) && view === "choropleth" && (
+                  {rangeKind && view === "choropleth" && (
                     <p className="text-xs text-muted" aria-label="Effective classification">
-                      {classificationDescription(choice, bins)}
+                      {classificationDescription(choice, bins, rangeKind ?? "count")}
                     </p>
                   )}
                   {filterSummary && (
@@ -596,7 +611,7 @@ export function DatasetMapCard({
                       {rangeKind === "percentage" ? "parent rate" : "total"} and complete table
                       unchanged. White shapes with dashed outlines are excluded.{" "}
                       {rangeKind === "percentage"
-                        ? "Fixed color breaks are unchanged."
+                        ? "Value filtering does not change the color breaks."
                         : "Scales and classification use all areas."}
                       {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
                     </p>
@@ -634,7 +649,7 @@ export function DatasetMapCard({
                           : poverty
                             ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
                             : accreditation
-                              ? "Fixed percentage breaks across areas. Gray means the published share or its denominator is unavailable, not zero percent."
+                              ? `${choice.classification ? "Color groups use all reported child-area shares." : "Fixed percentage breaks across areas."} Gray means the published share or its denominator is unavailable, not zero percent.`
                               : profiling
                                 ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
                                 : supportsCircles(choice)
@@ -738,8 +753,9 @@ export function DatasetMapCard({
                       {data.totalNote}
                     </p>
                   )}
-                  {workspace && supportsCircles(choice) && view === "choropleth" && (
+                  {workspace && rangeKind && !navigationOnly && view === "choropleth" && (
                     <ClassificationControls
+                      kind={rangeKind}
                       key={`${choice.indicator}:${classificationKey}`}
                       settings={choice}
                       onApply={(settings) =>

@@ -1,5 +1,10 @@
 import { classificationDescription } from "./classification";
-import { hasValueFilter, valueFilterState, valueFilterSummary } from "./value-filter";
+import {
+  hasValueFilter,
+  valueFilterState,
+  valueFilterSummary,
+  valueRangeKind,
+} from "./value-filter";
 import { mapBinLabel } from "./legend-label";
 import { CENSUS_ACTIVE_YEARS_ID } from "./census-active-years";
 import { isCensusProfileRate } from "./census-accreditation";
@@ -31,7 +36,7 @@ export function datasetMapExport(
   const censusRate = choice.dataset === "bhw-2025" && isCensusProfileRate(choice.indicator);
   const accreditation = declaredAccreditation || censusRate;
   const fixed =
-    accreditation ||
+    (accreditation && !choice.classification) ||
     income ||
     choice.dataset === "psa-sae-poverty-2023" ||
     choice.dataset === "bhw-profiling-status-2026";
@@ -44,8 +49,8 @@ export function datasetMapExport(
             requestedGroups: choice.classCount ?? null,
             cutPoints: choice.classBreaks ?? null,
             actualGroups: bins.length,
-            appliesTo: "count-choropleth",
-            note: classificationDescription(choice, bins),
+            appliesTo: accreditation ? "percentage-choropleth" : "count-choropleth",
+            note: classificationDescription(choice, bins, valueRangeKind(choice) ?? "count"),
           },
         }
       : {}),
@@ -91,9 +96,13 @@ export function datasetMapExport(
           : fixed
             ? "fixed"
             : choice.classification === "custom"
-              ? "custom-count-cut-points"
+              ? accreditation
+                ? "custom-percentage-cut-points"
+                : "custom-count-cut-points"
               : choice.classification === "equal"
-                ? "equal-width-count-intervals"
+                ? accreditation
+                  ? "equal-width-percentage-intervals"
+                  : "equal-width-count-intervals"
                 : "quantiles-relative-to-displayed-areas",
       ...(circles
         ? {

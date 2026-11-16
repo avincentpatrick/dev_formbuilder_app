@@ -82,7 +82,7 @@ export function valueFilterSummary(rows: readonly MapRow[], choice: MapChoice) {
     ? {
         ...summary,
         unit: "%",
-        note: "Inclusive percentage range (0–100%). Published parent rate, denominator and complete rows are unchanged; child percentages are never averaged. Fixed classification is unchanged. Excluded shapes are white with dashed outlines; unavailable values are distinct from excluded values.",
+        note: "Inclusive percentage range (0–100%). Published parent rate, denominator and complete rows are unchanged; child percentages are never averaged. Value filtering does not change the classification. Excluded shapes are white with dashed outlines; unavailable values are distinct from excluded values.",
       }
     : { ...summary, unit: "count" };
 }

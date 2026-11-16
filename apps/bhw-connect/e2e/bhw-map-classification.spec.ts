@@ -101,7 +101,9 @@ test("classification resets on indicator change and unsupported links are reject
   await expect(
     page.getByText("Color classification and count range reset for the new indicator."),
   ).toBeVisible();
-  await expect(page.getByText("Color classification", { exact: true })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/classification=/);
+  await page.getByText("Color classification", { exact: true }).click();
+  await expect(page.getByLabel("Grouping method", { exact: true })).toHaveValue("fixed");
   await page.goto("map?dataset=bhw-stepzero-2026&classification=custom&classBreaks=50,25");
   await expect(page.getByText(/If a shared link has an unsupported indicator/)).toBeVisible();
   await expect(page.locator('[data-map-state="ready"]')).toHaveCount(0);

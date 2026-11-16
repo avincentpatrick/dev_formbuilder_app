@@ -77,9 +77,47 @@ export function countClassificationBins(
   );
   return binsFromEdges([...new Set(edges)]);
 }
-export function classificationDescription(settings: CountClassification, bins: ColorBin[]) {
+export function classificationDescription(
+  settings: CountClassification,
+  bins: ColorBin[],
+  kind: "count" | "percentage" = "count",
+) {
+  if (kind === "percentage") {
+    if (!settings.classification)
+      return "Fixed percentage breaks across areas. Value filtering does not change the breaks.";
+    const method =
+      settings.classification === "custom"
+        ? "Custom cut points"
+        : settings.classification === "equal"
+          ? "Equal-width groups"
+          : "Quantiles";
+    return `${method}: ${bins.length} actual groups${settings.classification !== "custom" ? ` (${settings.classCount ?? 5} requested)` : ""}. ${settings.classification === "custom" ? "Exploratory cut points, not official standards; retained across areas. Groups cover 0–100%." : "Recalculated from all reported child-area percentages when geography changes; not common breaks for comparisons. Ties may reduce the group count."} Value filtering does not change the breaks. Shared edges belong to the higher group; the final finite maximum is included. Published parent rates and denominators are unchanged.`;
+  }
   const mode = settings.classification ?? "quantile";
   const method =
     mode === "equal" ? "Equal-width groups" : mode === "custom" ? "Custom cut points" : "Quantiles";
   return `${method}: ${bins.length} actual groups${mode !== "custom" ? ` (${settings.classCount ?? 5} requested)` : ""}. ${mode === "custom" ? "Exploratory cut points, not official standards; retained across areas. Counts start at zero and the last group is open-ended." : "Recalculated from all reported child-area counts when geography changes; not common breaks for comparisons. Ties may reduce the group count."} Value filtering does not change the breaks. Shared edges belong to the higher group; the final finite maximum is included.`;
+}
+
+/** Only validated BHW shares use this bounded domain; other ratios are not assumed bounded. */
+export function parsePercentageClassification(
+  method: string | null,
+  count: string | null,
+  breaks: string | null,
+): CountClassification | null {
+  const parsed = parseCountClassification(method, count, breaks);
+  return parsed?.classBreaks?.some((edge) => edge >= 100) ? null : parsed;
+}
+export function percentageClassificationBins(
+  settings: CountClassification,
+  values: readonly (number | null)[],
+): ColorBin[] {
+  const valid = values.filter(
+    (value): value is number =>
+      value !== null && Number.isFinite(value) && value >= 0 && value <= 100,
+  );
+  if (!valid.length) return [];
+  return settings.classification === "custom"
+    ? binsFromEdges([0, ...(settings.classBreaks ?? []), 100])
+    : countClassificationBins(settings, valid);
 }

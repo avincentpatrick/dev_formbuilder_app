@@ -229,3 +229,23 @@ signoff. A smaller median does not waive the maximum or physical-device gates.
 4. Complete the reader checklist above on physical phone/desktop and record the
    results alongside controlled performance observations. Keep data licensing,
    historical boundaries and missing HUC supply follow-ups explicit.
+
+## Deployed smoke check through #567
+
+Later in this continuation, [deploy 43907375147](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/43907375147)
+succeeded for `86accec940b353fba04ae7d0347e37ee3f19e04c` (through #567).
+A read-only live check of `https://iconnect.com.de/bhw-connect` at 390×844 and
+1440×844 verified:
+
+- Overview: HTTP 200, first non-AI figure/status, ready distribution preview and
+  source-specific footer wording.
+- Catalog: HTTP 200, Region VII → All locations retains BHW and the original
+  validated map snapshot.
+- Regional map: HTTP 200, ready canvas and default headcount circles restored
+  from that snapshot.
+
+All six page/width checks had zero ordinary horizontal overflow; neither journey
+captured a page error. No record values or screenshots from these live pages were
+committed. These samples establish the deployed behavior above, not nationwide
+coverage, physical-device acceptance or verification of the still-unmerged #569
+and renderer changes. Those releases still need their own deployed check.

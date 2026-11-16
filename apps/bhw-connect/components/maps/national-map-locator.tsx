@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useMemo, useState } from "react";
 import { withBasePath } from "@/lib/base-path";
-import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
+import type { BoundaryCollection, LocatorMap } from "@/lib/geo/locator-shapes";
 import { nationalLocator } from "@/lib/maps/orientation";
 import { LocatorMapGraphic } from "@/components/place/locator-map";
 
@@ -9,10 +9,12 @@ export function NationalMapLocator({
   geometry,
   selected,
   name,
+  onLocator,
 }: {
   geometry?: BoundaryCollection;
   selected: string | null;
   name: string;
+  onLocator?: (locator: LocatorMap | null) => void;
 }) {
   const id = useId();
   const [country, setCountry] = useState<BoundaryCollection | null>(null);
@@ -53,6 +55,9 @@ export function NationalMapLocator({
         : locator
           ? "ready"
           : "unavailable";
+  useEffect(() => {
+    onLocator?.(status === "ready" ? locator : null);
+  }, [locator, status, onLocator]);
   return (
     <figure
       aria-labelledby={id}
@@ -96,8 +101,8 @@ export function NationalMapLocator({
           </button>
         )}
         <p className="text-muted">
-          Historical boundary compatibility remains unverified. This locator is not included in the
-          map PNG.
+          Historical boundary compatibility remains unverified. Available locators are included in
+          the map PNG; unavailable locations are explicitly noted.
         </p>
       </figcaption>
     </figure>

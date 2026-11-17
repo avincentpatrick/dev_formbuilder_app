@@ -98,3 +98,12 @@ other checks were running. That was a separate readiness miss, not a reproduced
 export timeout, and is not erased by later passes. Tests are functional evidence,
 not performance-budget acceptance. Final checks and deployed follow-up are recorded
 with the PR and in the acceptance record.
+
+Local final validation: npm ci; lint (one existing warning in the deliberate
+base-path defect fixture); typecheck; 2,029 unit tests passed, 55 database-dependent
+skips; migration lint; prefixed no-data production build and standalone extractor
+verification passed. All seven PNG / Map only / automatic-zoom browser cases
+passed against that build with synthetic map fixtures, one worker, no retries.
+The full seeded-database browser run remains CI's gate. Test-only final edits
+were checked again with ESLint, Prettier and typecheck; application build inputs
+were unchanged.

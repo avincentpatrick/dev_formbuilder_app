@@ -1,27 +1,34 @@
 import { expect, test, type Page } from "@playwright/test";
 async function fixture(page: Page, empty = false) {
-  await page.route("**/api/dataset-map?**", (route) =>
-    route.fulfill({
+  await page.route("**/api/dataset-map?**", (route) => {
+    const url = new URL(route.request().url());
+    const province = url.searchParams.get("level") === "province";
+    return route.fulfill({
       json: {
         state: "available",
-        rows: [
-          { code: "07012", name: "Bohol", value: empty ? null : 0 },
-          { code: "07022", name: "Cebu", value: empty ? null : 100 },
-          { code: "07306", name: "Cebu City", value: empty ? null : 50 },
-          { code: "07311", name: "Lapu-Lapu", value: null },
-          { code: "07313", name: "Mandaue", value: empty ? null : 25 },
-        ],
+        rows: province
+          ? [
+              { code: "0702201", name: "Alcantara", value: empty ? null : 0 },
+              { code: "0702202", name: "Alcoy", value: empty ? null : 100 },
+            ]
+          : [
+              { code: "07012", name: "Bohol", value: empty ? null : 0 },
+              { code: "07022", name: "Cebu", value: empty ? null : 100 },
+              { code: "07306", name: "Cebu City", value: empty ? null : 50 },
+              { code: "07311", name: "Lapu-Lapu", value: null },
+              { code: "07313", name: "Mandaue", value: empty ? null : 25 },
+            ],
         total: 999,
-        area: "Region VII",
-        childLevel: "province",
+        area: province ? "Cebu" : "Region VII",
+        childLevel: province ? "citymun" : "province",
         navigation: { parents: [], complete: true },
         source: "Synthetic fixture",
         date: "2025-12-31",
         license: "Test only",
-        geometryUrl: `${new URL(route.request().url()).origin}/bhw-connect/geo/provinces/07.json`,
+        geometryUrl: `${url.origin}/bhw-connect/geo/${province ? "citymun/07022" : "provinces/07"}.json`,
       },
-    }),
-  );
+    });
+  });
 }
 test.use({ deviceScaleFactor: 2 });
 for (const width of [390, 1440]) {
@@ -48,6 +55,11 @@ for (const width of [390, 1440]) {
     expect(png.readUInt32BE(16)).toBe(1200);
     expect(png.readUInt32BE(20)).toBeGreaterThan(500);
     await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+    // Zoom now changes geographic detail. Wait for that transition before
+    // exporting: a changed scale alone can still belong to the outgoing map.
+    // An export started there is correctly cancelled when its scope changes.
+    await expect(page).toHaveURL(/level=province&code=07022/);
+    await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     await expect(scale).not.toHaveText(initialScale);
     const zoomed = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download map image (PNG)", exact: true }).click();

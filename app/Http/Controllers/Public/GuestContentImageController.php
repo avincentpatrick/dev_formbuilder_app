@@ -37,20 +37,26 @@ final class GuestContentImageController extends Controller
 
     /**
      * The one query that answers "does this version show this image": a note's content, in the frozen snapshot,
-     * holding an image block with this id. Versions are immutable, so the answer never changes for a version.
+     * holding an image block with this id — at the top level, or (M245, `R-93e22765`) inside a details block, which
+     * holds blocks of its own one level down. Versions are immutable, so the answer never changes for a version.
      */
     private const SHOWN_BY_VERSION = <<<'SQL'
         EXISTS (
             SELECT 1
-            FROM jsonb_array_elements(schema_snapshot -> 'fields') AS field,
-                 jsonb_array_elements(
-                     CASE WHEN jsonb_typeof(field -> 'config' -> 'content') = 'array'
-                          THEN field -> 'config' -> 'content'
-                          ELSE '[]'::jsonb END
-                 ) AS block
+            FROM jsonb_array_elements(schema_snapshot -> 'fields') AS field
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(field -> 'config' -> 'content') = 'array'
+                     THEN field -> 'config' -> 'content'
+                     ELSE '[]'::jsonb END
+            ) AS block
+            LEFT JOIN LATERAL jsonb_array_elements(
+                CASE WHEN block ->> 'type' = 'details' AND jsonb_typeof(block -> 'blocks') = 'array'
+                     THEN block -> 'blocks'
+                     ELSE '[]'::jsonb END
+            ) AS inner_block ON true
             WHERE field ->> 'field_type' = 'note'
-              AND block ->> 'type' = 'image'
-              AND block ->> 'attachment_id' = ?
+              AND ((block ->> 'type' = 'image' AND block ->> 'attachment_id' = ?)
+                OR (inner_block ->> 'type' = 'image' AND inner_block ->> 'attachment_id' = ?))
         )
         SQL;
 
@@ -81,7 +87,7 @@ final class GuestContentImageController extends Controller
 
         $shown = FormVersion::query()
             ->whereKey($token->formVersionId)
-            ->whereRaw(self::SHOWN_BY_VERSION, [$attachment->id])
+            ->whereRaw(self::SHOWN_BY_VERSION, [$attachment->id, $attachment->id])
             ->exists();
 
         if (! $shown) {

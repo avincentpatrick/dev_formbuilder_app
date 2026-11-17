@@ -22,7 +22,7 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | saveAsTemplate() reads its tree inside ONE transaction (M90, docs/feature-backlog.md:8943).
 |--------------------------------------------------------------------------
-| SchemaSnapshotSerializer::snapshot() issues exactly three reads. Outside a transaction they are three
+| SchemaSnapshotSerializer::snapshot() issues exactly four reads (M245 added the glossary). Outside a transaction they are four
 | separately autocommitted statements, so a builder edit landing between them yields a blueprint
 | describing a tree that existed at no instant — a field whose `section_key` names a section the first
 | read did not return.
@@ -89,10 +89,11 @@ it('reads the whole tree and writes the row inside one transaction', function ()
 
     app(TemplateService::class)->saveAsTemplate($draft, $admin, ['name' => 'Reusable']);
 
-    // The four statements the method is made of — three child reads plus the INSERT.
+    // The five statements the method is made of — four child reads (M245 added the glossary) plus the INSERT.
     $sections = array_values(array_filter($seen, static fn (array $q): bool => str_contains($q['sql'], 'from "form_sections"')));
     $fields = array_values(array_filter($seen, static fn (array $q): bool => str_contains($q['sql'], 'from "form_fields"')));
     $validations = array_values(array_filter($seen, static fn (array $q): bool => str_contains($q['sql'], 'from "form_field_validations"')));
+    $glossary = array_values(array_filter($seen, static fn (array $q): bool => str_contains($q['sql'], 'from "form_version_glossary_entries"')));
     $insert = array_values(array_filter($seen, static fn (array $q): bool => str_contains($q['sql'], 'insert into "form_templates"')));
 
     // Non-vacuity first: an empty harvest would make every assertion below trivially true, and this
@@ -100,9 +101,10 @@ it('reads the whole tree and writes the row inside one transaction', function ()
     expect($sections)->not->toBeEmpty()
         ->and($fields)->not->toBeEmpty()
         ->and($validations)->not->toBeEmpty()
+        ->and($glossary)->not->toBeEmpty()
         ->and($insert)->not->toBeEmpty();
 
-    foreach ([...$sections, ...$fields, ...$validations, ...$insert] as $query) {
+    foreach ([...$sections, ...$fields, ...$validations, ...$glossary, ...$insert] as $query) {
         expect($query['level'])->toBeGreaterThan($ambient, "ran at level {$query['level']} against an ambient {$ambient} — it is outside the service's transaction: {$query['sql']}");
     }
 });

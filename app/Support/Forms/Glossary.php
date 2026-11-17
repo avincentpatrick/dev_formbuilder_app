@@ -90,7 +90,8 @@ final class Glossary
         $seen = [];
         foreach ($value as $index => $entry) {
             $name = 'term '.($index + 1);
-            if (! is_array($entry) || array_is_list($entry) || array_keys($entry) !== ['term', 'definition']) {
+            // A snapshot's keys are sorted (`definition`, `term`), so the pair is compared as a set.
+            if (! is_array($entry) || array_is_list($entry) || count($entry) !== 2 || ! array_key_exists('term', $entry) || ! array_key_exists('definition', $entry)) {
                 return "{$name} is not a term and its definition";
             }
             if (! is_string($entry['term']) || ! is_string($entry['definition'])) {

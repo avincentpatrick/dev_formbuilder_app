@@ -201,6 +201,14 @@ it('refuses at publish every image that is not this form’s own usable upload, 
             ['type' => 'image', 'attachment_id' => $notes[$name][0], 'alt' => $notes[$name][1]],
         ]]]);
     }
+    // M245: an image one level down, inside a details block, is asked the same question and named by its path.
+    addFormField($version, $user, 'nested_other_form', FieldType::Note, count($notes), ['config' => ['content' => [
+        ['type' => 'paragraph', 'spans' => [['text' => 'See below.']]],
+        ['type' => 'details', 'summary' => 'Where to go', 'blocks' => [
+            ['type' => 'divider'],
+            ['type' => 'image', 'attachment_id' => $image(['attachable_id' => $other->id]), 'alt' => 'A map'],
+        ]],
+    ]]]);
 
     try {
         (new StructuralValidationGate)->assertPublishable($version->refresh());
@@ -210,10 +218,11 @@ it('refuses at publish every image that is not this form’s own usable upload, 
     }
 
     $byField = array_column($violations, 'message', 'field');
-    expect(array_keys($byField))->toBe(['other_form', 'wrong_kind', 'wrong_owner', 'infected', 'missing', 'deleted', 'undescribed'])
+    expect(array_keys($byField))->toBe(['other_form', 'wrong_kind', 'wrong_owner', 'infected', 'missing', 'deleted', 'undescribed', 'nested_other_form'])
         ->and(array_values(array_unique(array_column($violations, 'code'))))->toBe(['note_content_invalid'])
         ->and($byField['other_form'])->toContain('block 2’s image is missing, belongs to another form, or failed its virus check')
-        ->and($byField['undescribed'])->toContain('block 2 is an image with no description');
+        ->and($byField['undescribed'])->toContain('block 2 is an image with no description')
+        ->and($byField['nested_other_form'])->toContain('block 2.2’s image is missing, belongs to another form, or failed its virus check');
 });
 
 it('refuses a blank heading at publish, naming the note — and passes good content and a plain note', function (): void {

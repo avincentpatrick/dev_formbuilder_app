@@ -80,6 +80,9 @@ final class TenantScopedTables
         // M141. Nothing withheld: a list of codes and labels the author uploaded, frozen per version. Its SELECT is
         // plain tenant equality; its writes carry the draft-child guard, as `form_version_reference_files` does.
         'form_version_choice_lists',
+        // M245. Nothing withheld: terms and definitions the author typed, frozen per version. Its SELECT is plain
+        // tenant equality; its writes carry the draft-child guard, as `form_version_choice_lists` does.
+        'form_version_glossary_entries',
         // M132. Nothing withheld: a label the author typed and two ids. Its SELECT is plain tenant equality; its
         // writes carry the draft-child guard, as `form_sections` and `form_fields` do.
         'form_version_reference_files',

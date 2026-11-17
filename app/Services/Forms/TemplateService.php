@@ -53,8 +53,8 @@ final class TemplateService
      * Capture a version's live rows as a template blueprint.
      *
      * ── M90: ONE SNAPSHOT, NOT THREE (docs/feature-backlog.md:8943) ─────────────────────────────────
-     * {@see SchemaSnapshotSerializer::snapshot()} issues exactly three reads — sections, fields,
-     * validations. Outside a transaction those are three separately autocommitted statements, so a
+     * {@see SchemaSnapshotSerializer::snapshot()} issues exactly four reads — sections, fields,
+     * validations, and since M245 the glossary. Outside a transaction those are four separately autocommitted statements, so a
      * builder edit landing between them produces a blueprint describing a tree that never existed at any
      * instant: a field whose `section_key` names a section the first read did not return.
      *

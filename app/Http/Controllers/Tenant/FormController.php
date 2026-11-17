@@ -11,8 +11,10 @@ use App\Http\Controllers\Concerns\ResolvesTenant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Forms\FormMetadataRequest;
 use App\Http\Requests\Forms\StoreFormAutomationRequest;
+use App\Http\Requests\Forms\StoreGlossaryEntryRequest;
 use App\Http\Requests\Forms\UpdateDataSharingRequest;
 use App\Http\Requests\Forms\UpdateFormAutomationRequest;
+use App\Http\Requests\Forms\UpdateGlossaryEntryRequest;
 use App\Http\Requests\Forms\UpdateOcrScanningRequest;
 use App\Models\Form;
 use App\Models\FormAutomation;
@@ -21,6 +23,7 @@ use App\Models\User;
 use App\Services\Automations\FormAutomationPresenter;
 use App\Services\Automations\FormAutomationService;
 use App\Services\Entitlements\EntitlementService;
+use App\Services\Forms\FormGlossaryService;
 use App\Services\Forms\FormPresenter;
 use App\Services\Forms\FormService;
 use App\Services\Scoping\ScopeNodePresenter;
@@ -235,5 +238,34 @@ final class FormController extends Controller
     public function testAutomation(Form $form, FormAutomation $automation, FormAutomationService $automations): JsonResponse
     {
         return response()->json(['data' => $automations->test($automation)]);
+    }
+
+    /**
+     * The draft's glossary (M245, `R-d0bbb7bb`), for Form settings → Glossary. On this already-imported controller,
+     * beside the automations, for the routes file's `use`-line reason.
+     */
+    public function indexGlossary(Form $form, FormGlossaryService $glossary): JsonResponse
+    {
+        return response()->json(['data' => $glossary->forAuthor($form)]);
+    }
+
+    /** Add a term to the draft glossary: 201 with the entry. */
+    public function storeGlossaryEntry(StoreGlossaryEntryRequest $request, Form $form, FormGlossaryService $glossary): JsonResponse
+    {
+        return response()->json(['data' => $glossary->add($form, $request->term(), $request->definition())], 201);
+    }
+
+    /** Change a term or its definition on the draft. */
+    public function updateGlossaryEntry(UpdateGlossaryEntryRequest $request, Form $form, string $entry, FormGlossaryService $glossary): JsonResponse
+    {
+        return response()->json(['data' => $glossary->update($form, $entry, $request->term(), $request->definition())]);
+    }
+
+    /** Remove a term from the draft. A published version keeps its own glossary. */
+    public function destroyGlossaryEntry(Form $form, string $entry, FormGlossaryService $glossary): HttpResponse
+    {
+        $glossary->remove($form, $entry);
+
+        return response()->noContent();
     }
 }

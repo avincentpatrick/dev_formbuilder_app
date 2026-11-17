@@ -13,6 +13,7 @@ use App\Models\FormVersion;
 use App\Models\User;
 use App\Services\Forms\Dto\MaterializeResult;
 use App\Services\Xlsform\XlsformImporter;
+use App\Support\Forms\Glossary;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -79,6 +80,10 @@ final class SchemaBlueprintMaterializer
                 $fieldIdByKey,
             );
         }
+
+        // M245 (`R-d0bbb7bb`): the template's glossary, already checked by the validator above. The notes' marked words
+        // name their terms by text, so they find these entries without any re-pointing.
+        FormGlossaryService::writeAll($target, Glossary::fromSnapshot($blueprint));
 
         return new MaterializeResult(
             sectionCount: count($sections),

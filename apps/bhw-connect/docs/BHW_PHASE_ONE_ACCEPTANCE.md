@@ -249,3 +249,39 @@ captured a page error. No record values or screenshots from these live pages wer
 committed. These samples establish the deployed behavior above, not nationwide
 coverage, physical-device acceptance or verification of the still-unmerged #569
 and renderer changes. Those releases still need their own deployed check.
+
+## Reconciliation with the original acceptance — 2026-11-17
+
+Phase 1 remains **not signed off**. The earlier deployment/check-window notes above
+are historical, not current blockers. See
+[BHW_LOCALITY_LIVE_VERIFICATION.md](BHW_LOCALITY_LIVE_VERIFICATION.md) for the exact
+#577 deployment ancestry, current samples, reproduction limits and PNG-test race.
+The original assessment was re-read from `docs/bhw-card-analytics-assessment`.
+
+| Original Phase 1 acceptance | Current evidence and remaining boundary |
+| --- | --- |
+| Meaningful national visuals / honest unavailable states | Live national plus four geographic levels retain the dashboard. Headcount and profiles agree with exact public locality rows; unsupported Alfaco figures and invalid scope do not fall back nationally. Sampled pass; not complete source validation. |
+| Global municipality/barangay, duplicate names, indicator and mixed search | Existing resolver/fixture coverage remains. Current live Cebu province suggestion and indicator autocomplete pass at both widths. Cross-region municipality/barangay, duplicate-name and mixed-query live coverage is not newly established by this sample. |
+| Explicit comparison intent and ambiguity handling | Existing automated evidence remains; no new live comparison/ambiguity acceptance or reader result in this session. |
+| Add/replace/remove to four, phone switching and share restoration | Existing automated evidence remains; not re-certified by the locality checks. |
+| Indicator/drill/reset/filter/classification with touch and keyboard alternatives | Current live circle tap, selected-value dismissal/reopen, viewport exit/focus/Escape and automatic detail pass in the named samples. Existing synthetic suites cover broader controls. Physical gestures and keyboard/screen-reader task completion remain open. |
+| Fresh headcount circles, explicit shared views, zero vs missing | Live sampled map uses circles and exact values. Synthetic zero/missing/share contracts remain essential; one positive live tap cannot certify all states. |
+| Usable phone/desktop layout, legend and controls | Sampled responsive layout and viewport bounds pass. Expanded workspace retains legend/controls; the separately requested Map only mode intentionally hides these until exit. Reader comprehension and physical-device behavior remain open. |
+| Map/bars/table agreement, share/export legend and provenance | Locality headlines agree with public map rows. Existing cross-view/export tests remain; PNG test now waits for zoom's geographic transition. Full live export/round-trip matrix was not repeated. |
+| Readable legends/breadcrumbs and missing geometry | Sampled names/captions are scoped. Region VII still has three missing HUC shapes; #581 repaired NCR only. Synthetic missing-shape regression is retained. Historical boundaries/source permissions remain unresolved. |
+| No new disclosure just because a visual/search supports it | Evaluate against the superseding explicit aggregate-publication decision, not the obsolete global small-cell gate. No raw records or inferred source-null values were added. |
+
+**Next unfinished acceptance work:** complete the physical-phone/desktop reader
+exercise (general reader, BHW/LGU, analytical reader, including screen-reader
+navigation) and record task completion/misinterpretations alongside controlled
+performance measurements. Existing phone cold-map and cold filter/classification
+budget misses remain open; this session's unthrottled functional checks and
+occasional test-readiness timeout do not replace or waive them. No new physical
+reader results or representative budget pass were found.
+
+In parallel, obtain accepted historical boundary/crosswalk evidence and licensed
+missing-HUC geometry, plus explicit Headcount source-license metadata. Rebuild
+historical source-null aggregates only from authorized privately supplied inputs
+if that work is requested. These are named data/operator prerequisites, not UI
+fixes or evidence that Phase 1 can be signed off. Phase 2 features already added
+on main do not waive these Phase 1 gates.

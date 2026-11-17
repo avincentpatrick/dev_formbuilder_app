@@ -156,7 +156,7 @@ export function BhwOverview({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <nav
             aria-label="BHW analysis"
-            className="flex flex-wrap gap-3 text-sm underline underline-offset-4"
+            className="flex max-w-full gap-3 overflow-x-auto whitespace-nowrap pb-2 text-sm underline underline-offset-4 md:flex-wrap md:whitespace-normal"
           >
             <Link href="#workforce">Workforce distribution</Link>
             <Link href="#qualifications">Qualifications and training</Link>

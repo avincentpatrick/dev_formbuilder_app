@@ -208,7 +208,7 @@ it("opens BHW visuals from the all-location card while retaining scoped indicato
   expect(national.querySelector("article h2 a")?.getAttribute("href")).toBe("/bhw");
   expect(
     [...national.querySelectorAll("article a")].some(
-      (a) => a.getAttribute("href") === "/catalog?mode=all&dataset=bhw",
+      (a) => a.textContent === "Open BHW overview →" && a.getAttribute("href") === "/bhw",
     ),
   ).toBe(true);
   const scoped = parseHTML(
@@ -236,13 +236,19 @@ it("reports each source license without inferring permission from missing metada
   expect(html).not.toContain("CC BY 4.0");
 });
 
-
 it("carries the original BHW map only through BHW available-card links", () => {
   const bhw = { ...dataset, id: "bhw" as const, title: "BHW" };
-  const mapState = "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306";
-  const document = parseHTML(renderToStaticMarkup(
-    <CatalogResults catalog={catalog([bhw, dataset])} locationName="Region I" mapState={mapState} />,
-  )).document;
+  const mapState =
+    "dataset=bhw-2025&indicator=bhw.active-years&level=region&code=07&selected=07306";
+  const document = parseHTML(
+    renderToStaticMarkup(
+      <CatalogResults
+        catalog={catalog([bhw, dataset])}
+        locationName="Region I"
+        mapState={mapState}
+      />,
+    ),
+  ).document;
   for (const link of document.querySelectorAll('article a[href^="/catalog?"]')) {
     const url = new URL(link.getAttribute("href")!, "https://example.test");
     expect(url.searchParams.get("location")).toBe("region:01");

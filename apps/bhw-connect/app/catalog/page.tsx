@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconnectLogo } from "@/components/branding/iconnect-logo";
 import { parseCatalogParams, type CatalogParams } from "@/lib/catalog/navigation";
 import { CatalogContent } from "@/components/catalog/catalog-content";
-import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
+import { bhwOverviewHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import CatalogLoading from "./loading";
 
@@ -21,6 +22,14 @@ export default async function CatalogPage({
 }) {
   const params = await searchParams;
   const request = parseCatalogParams(params);
+  if (request?.selection.mode === "all" && request.dataset === "bhw") {
+    // Preserve an invalid-context notice without forwarding arbitrary input.
+    redirect(
+      params.mapState !== undefined && !restoredBhwMapHref(params.mapState)
+        ? "/bhw?mapState="
+        : bhwOverviewHref(params.mapState),
+    );
+  }
   const returnMap =
     request && (!request.dataset || request.dataset === "bhw")
       ? restoredBhwMapHref(params.mapState)

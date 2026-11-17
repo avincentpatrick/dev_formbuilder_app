@@ -20,9 +20,17 @@ it("drops invalid snapshots and leaves unrelated dataset links unchanged", () =>
     ["dataset=bhw-2025", "dataset=bhw-2025"],
     "dataset=bhw-profiling-status-2026",
   ]) {
-    expect(catalogJourneyHref({ mode: "all" }, "bhw", raw)).toBe("/catalog?mode=all&dataset=bhw");
+    expect(catalogJourneyHref({ mode: "all" }, "bhw", raw)).toBe("/bhw");
   }
   expect(catalogJourneyHref({ mode: "all" }, "population", raw)).toBe(
     "/catalog?mode=all&dataset=population",
   );
+});
+
+it("opens the BHW overview with validated return context from all-location entries", () => {
+  const href = catalogJourneyHref({ mode: "all" }, "bhw", raw);
+  expect(href.split("?")[0]).toBe("/bhw");
+  expect(
+    restoredBhwMapHref(new URL(href, "https://example.test").searchParams.get("mapState")!),
+  ).toBe(restoredBhwMapHref(raw));
 });

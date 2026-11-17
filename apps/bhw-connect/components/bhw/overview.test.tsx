@@ -205,3 +205,27 @@ it("shows the derived honorarium count with its percentage and explains the appr
     "≈947 (95%)",
   );
 });
+
+it("makes extended analyses discoverable from overview categories with exact-value and comparison links", () => {
+  const html = render([
+    { ...item("bhw.honorarium-amount.barangay.median", "available", 1000), unit: "PHP/month" },
+    item("bhw.cohorts.registered", "available", 25),
+    item("bhw.workload.median", "available", 50),
+    item("bhw.training-recency.basic_life_support", "available", 2023),
+    item("bhw.demographics.civil_status", "available", 80),
+    item("bhw.combined-honorarium.median", "suppressed", 987654),
+  ]);
+  const { document } = parseHTML(html);
+  for (const id of [
+    "demographics",
+    "service-history",
+    "training-topics",
+    "honorarium-amounts",
+    "combined-honorarium",
+  ])
+    expect(document.getElementById(id)).not.toBeNull();
+  expect(html).toContain("₱1,000/month");
+  expect(html).toContain("indicator=bhw.honorarium-amount.barangay.median");
+  expect(html).toContain("measure=bhw.honorarium-amount.barangay.median");
+  expect(html).not.toContain("987654");
+});

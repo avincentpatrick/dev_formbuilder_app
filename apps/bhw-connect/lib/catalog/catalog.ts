@@ -72,15 +72,44 @@ function selectedValues(
   if (spec.suppression && matched.some((row) => typeof row[spec.suppression!] !== "boolean")) {
     return { ...item, state: "failed", reason: "The source returned an invalid privacy flag." };
   }
+  // Keep the standalone zero-payment share consistent with complementary masking
+  // of its payment-band breakdown; a separate measure must not reveal that cell.
+  if (spec.id === "bhw.combined-honorarium.none") {
+    const protectedBands = applyComplementarySuppression(
+      rows.map((row) => ({
+        dimension: "payment-bands",
+        category: String(row.band_order),
+        n: number(row.pct),
+        pct: null,
+        isSuppressed: row.is_suppressed === true,
+      })),
+    );
+    if (
+      protectedBands.unprotectable.length ||
+      protectedBands.rows.some((row) => row.category === "0" && row.isSuppressed)
+    )
+      return {
+        ...item,
+        state: "suppressed",
+        reason: "Withheld consistently with the payment-band breakdown.",
+        values: [],
+      };
+  }
   let suppressed = false;
   if (spec.categoryColumn) {
-    if (matched.some((r) => typeof r[spec.categoryColumn!] !== "string")) {
+    if (
+      matched.some(
+        (r) =>
+          typeof r[spec.categoryColumn!] !== "string" &&
+          !(spec.table === "agg_cohorts" && Number.isInteger(r[spec.categoryColumn!])),
+      )
+    ) {
       return { ...item, state: "failed", reason: "The source returned an invalid category." };
     }
     const result = applyComplementarySuppression(
       matched.map((row) => ({
         dimension: spec.id,
-        category: text(row[spec.categoryColumn!]),
+        category: String(row[spec.categoryColumn!]),
         n: number(row[spec.column]),
         pct: null,
         isSuppressed: spec.suppression ? row[spec.suppression] === true : false,
@@ -241,7 +270,7 @@ export async function getPublicCatalog(
                 };
               }
             }
-            if (definitionReady && spec.suppression) {
+            if (definitionReady && spec.suppression && !spec.locationPrivacy) {
               const privacy = await reader.privacy(spec, info.datasetId);
               if (privacy !== "clear") {
                 definitionReady = false;

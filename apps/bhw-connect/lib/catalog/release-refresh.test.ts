@@ -57,7 +57,7 @@ it("switches an accepted release and refreshes its metadata without duplicate id
   for (const result of [first, next]) {
     expect(result.datasets).toHaveLength(6);
     expect(result.datasets.filter((d) => d.id === "nhfr")).toHaveLength(1);
-    expect(result.overview.totalIndicators).toBe(110);
+    expect(result.overview.totalIndicators).toBe(196);
   }
   const before = first.datasets.find((d) => d.id === "nhfr")!;
   const after = next.datasets.find((d) => d.id === "nhfr")!;

@@ -16,7 +16,60 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M244`, `xlsform-import-long-label` and seven more: a Kobo or ODK workbook imports its long and formatted notes, its formulas, "required when", its language and its pictures' names, and our own export keeps note content and "Required when…" (m244-kobo-import-hardening)
+## Status: ACTIVE CLAIM — `M245`, `note-details-block`, `form-glossary`, the lists half of the rich-text table item, and `R-c083b711`: a note gains bullet and numbered lists, a "details" section collapsed by default, and glossary words that open their meaning; a form gains a glossary; paper and PDF print a note's content and end with the glossary (m245-note-lists-details-glossary)
+
+Taken 2026-11-18, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-4-rustling-ocean.md`). NHETE recommendation 4, note content and glossary, the NHETE plan's next item after `M244` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m245-note-lists-details-glossary`, cut from origin/main at `e3e1a4a7`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.24.0 (a feature) with its release notes.** `M242` (#545, 0.21.1), `M243` (#568, 0.22.0) and `M244` (#580, 0.23.0) are held too; at the merge point they go first, and this branch takes the trunk and keeps 0.24.0 on top. Held green for a merge point on the user's word (`D137`).
+Rows (four):
+- `note-details-block` (`R-93e22765`), *"A note has no collapsible "details" block, so long optional reading is always open."*
+- `form-glossary` (`R-d0bbb7bb`), *"A form has no glossary, so a term cannot open its definition where it is used."*
+- The lists half of the `docs/feature-backlog.md` §1 table item *"Rich-text / media content block (headings, lists, inline image/video, dividers)"*. Inline video stays open on it.
+- `R-c083b711`, *"The printed blank form shows a note's label, while every screen now shows its content blocks."* Added by the user in planning.
+
+The user's answers in planning (2026-11-17), recorded on this branch as `D229` (`D227` is #545's, `D228` is #580's):
+- **Paper: yes.** Paper and PDF print a note's content, details printed open, and a Glossary page at the end; the scan reader learns the new printed text.
+- **Glossary words: the author marks them** with `[[word]]` in note text, and only marked words open their definition. Every page of a form with a glossary gets a Glossary button listing every term. Question titles and help text stay plain text.
+
+### Evidence verified
+- `R-93e22765`, *"`ContentBlocks` holds heading, paragraph, callout, divider and image only"*: **held** (`BLOCK_KEYS`). *"`NhetePlan`'s `research-open` count is 30"*: **held**, measured by running the plan (9 screen research blocks and 21 indicators with research).
+- `R-d0bbb7bb`, *"115 uses in all (`NhetePlan`'s `glossary-plain` count)"*: **held**, 77 in note blocks and 38 in indicator text. *"Nothing in `app/` or the respondent app holds a glossary, and the design system's `Tooltip` is used by neither"*: **held**; `MdsTooltip` is mounted only by `shell/Sidebar.vue`.
+- `R-c083b711`, *"the printed blank form and the response PDF still print the label, pinned by `NoteContentSurfacesTest`"*: **held** (`blank-form.blade.php`'s `q__note` paragraph, `submission.blade.php`'s `prose` paragraph, and the test's print and PDF cases).
+- The table item's *"lists"*: **held**; no list block exists, and the NHETE plan writes its 3 lists as "• " paragraphs (`bullets`).
+
+### Premise verified
+- `R-d0bbb7bb` says *"NHETE marks 27 terms and all 35 indicator codes"*: **false in the same-shape fixture.** It has 27 glossary entries, but 42 distinct marked words: the 35 codes, which have no entry, and 7 others, of which only `B07` matches an entry. The placeholder scramble broke six links. Four are recovered by their letter shape; the other two are checked against the real text in session `3df65fc6`'s scratchpad, read-only, and no real wording is committed (`D221`). 20 entries are never marked.
+- `R-d0bbb7bb`'s remedy marks terms *"in note content and labels"*: **labels cannot hold one.** A single question's label is a string prop that `MdsFormField` renders inside `<label for>`, and a button inside a label is invalid HTML. The user chose the Glossary button for titles (above). 12 of the fixture's 127 markers sit in grid row labels and stay plain by design.
+- `R-93e22765`'s remedy prints details *"open on paper and PDF"*: **impossible without `R-c083b711`**, because paper and PDF print no content at all. Hence the fourth row.
+- Every reader of note content walks the **top level only**: `ContentBlocks::imageIds()`, the guest image route's `jsonb_array_elements`, `content-images.ts`, `note-content.ts`, and the editor's index-keyed drafts. A nested details block needs each of them to recurse, or a picture inside it 404s for guests.
+- The editor syntax already uses `[` and `]` for links. A `[` that does not make a link falls through as literal text, so `[[word]]` can be read first without changing what any stored text means.
+- The scan reader (`PrintedFormMatcher`) blanks only text it knows was printed. New printed content and a glossary page would otherwise be read as the nearest question's answer.
+- `form_versions` UPDATE is open to every status so publish can flip it, so a glossary column there would be published content frozen by application code alone. A child table under `draft_child` RLS freezes it in the database, as choice lists are.
+- The XLSForm exporter on this branch's base writes a note's label only (`#580` adds content as markdown). Nothing XLSForm is built here; it is filed as its own row for once #580 is on the trunk.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections:**
+1. A glossary word is marked by its text, not an entry id: content is copied verbatim by the cloner, `DraftCopier`, the library, templates and restore, and an id would break on every copy. A renamed or missing term is refused at publish, naming the word.
+2. Labels get no marks; the Glossary button covers them (the user's choice).
+3. Details nest one level, and every content reader recurses.
+4. Paper prints content in place of the label, as the screen does (`D69`), and the scan reader treats each note's printed lines as static only inside the question region they fall in.
+
+Files:
+- **Server:** `app/Rules/ContentBlocks.php`; new `app/Support/Forms/Glossary.php`, `app/Support/Forms/PrintedContent.php`, `app/Models/FormVersionGlossaryEntry.php`, `app/Services/Forms/FormGlossaryService.php`, `app/Http/Controllers/Tenant/FormGlossaryController.php`, `app/Http/Requests/Forms/StoreGlossaryEntryRequest.php`, `UpdateGlossaryEntryRequest.php`; new migration `2026_08_17_000150_create_form_version_glossary_entries_table.php`; `app/Models/FormVersion.php`, `routes/tenant.php`, the tenant-table registry; `app/Services/Forms/` `SchemaSnapshotSerializer.php`, `SchemaTreeCloner.php`, `RestoreService.php`, `BlueprintValidator.php`, `SchemaBlueprintMaterializer.php`, `StructuralValidationGate.php`, `TemplateService.php`, `BuilderPresenter.php`, `BlankFormPrintPresenter.php`; `app/Services/Submissions/SubmissionPdfPresenter.php`; `app/Services/Ocr/PrintedFormMatcher.php`; `app/Http/Controllers/Public/GuestContentImageController.php`; `resources/views/pdf/` (`blank-form.blade.php`, `submission.blade.php`, the blank-form styles, new partials); `database/seeders/E2eSeeder.php`.
+- **Front end:** `packages/design-system/src/components/Disclosure/` (new) and `src/index.ts`; `resources/js/components/builder/` `content-blocks.ts`, `content-markup.ts`, `ContentBlocksEditor.vue`, new `glossary.ts`, `FormSettingsModal.vue`, `PreviewRuntime.vue`, `PreviewPane.vue`, `draft-snapshot.ts`, `types.ts`; `resources/js/components/submissions/` `NoteContent.vue`, `note-content.ts`, new `GlossaryButton.vue`; `resources/js/components/forms/` `FormSettingsSections.vue`, new `GlossaryPanel.vue`, new `glossary.ts`; `resources/js/Pages/forms/Builder.vue`, `Pages/forms/Settings.vue`, `Pages/submissions/Encode.vue`; `resources/public-runtime/` `App.vue`, `components/FormHeader.vue`, `lib/types.ts`, `lib/schema-mapping.ts`, `lib/content-images.ts`; `resources/js/components/help/manual.ts`.
+- **Tests:** the unit, feature and Vitest files beside each of the above; `tests/fixtures/` (new `glossary-term-keys.json`, `nhete/nhete-shape.json`); `tests/Support/Nhete/` (`NhetePlan.php`, `NheteBuilderDriver.php`, `NheteWorkbook.php`); `tests/Feature/Forms/Nhete/NheteBuilderRouteTest.php`; `tests/Feature/Forms/NoteContentSurfacesTest.php`; `tests/Feature/Ocr/`; `tests/e2e/` `public-runtime-axe.spec.ts`, `nhete-builder-block.spec.ts`, `builder-content-axe.spec.ts`, `form-settings-axe.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/data-dictionary.md`, `docs/piping-output-encoding-design.md`, `docs/ocr-pipeline-design.md`, `docs/ux/design-system-reference.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D229`), `PROGRESS.md` (own block only), `docs/gate-baselines.md` at close-out.
+
+Shared artefacts taken: `docs/**` above, the four `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only). `openapi.json` is not expected to move (`version.schema` is an open object); if it does, it is taken here.
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every new `.vue` file and are run before push.
+Namespaces spent: migration prefix `2026_08_17_000150`, `D229`. No ADR.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in the settings tests that pin the rail's section list.
+- The builder-built NHETE publishes with 3 lists, 44 details blocks, a 62-entry glossary and 115 marked words, all resolving; the Meridian and Kobo workbooks stay byte-identical.
+- The one most likely wrong: that matching a word to its term ignoring case and spacing is enough for the real NHETE. The two markers with no matching shape may be inflected forms (plurals), which would need `[[shown|term]]`.
+
+## HELD — `M244`, `xlsform-import-long-label` and seven more: a Kobo or ODK workbook imports its long and formatted notes, its formulas, "required when", its language and its pictures' names, and our own export keeps note content and "Required when…" (m244-kobo-import-hardening) — BUILT AND HELD: PR #580, CI 44039244826 every job green with real step counts
 
 Taken 2026-11-17, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-3-nifty-parrot.md`). NHETE recommendation 3, harden Kobo import, the NHETE plan's next item after `M243` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m244-kobo-import-hardening`, cut from origin/main at `e98039ea`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.23.0 (a feature) with its release notes.** `M242` (#545, 0.21.1) and `M243` (#568, 0.22.0) are held too; at the merge point they go first, and this branch takes the trunk and keeps 0.23.0 on top. Held green for a merge point on the user's word (`D137`).

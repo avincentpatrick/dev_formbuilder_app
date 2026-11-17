@@ -1,6 +1,7 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MapCamera } from "@/lib/maps/zoom-geography";
 import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
@@ -20,6 +21,9 @@ export function DatasetCanvas({
   onGeometry,
   onCapture,
   onRetry,
+  onZoomGeography,
+  initialCamera,
+  geographyLabel,
   expanded,
   emphasis,
   compact = false,
@@ -27,6 +31,9 @@ export function DatasetCanvas({
   excludedCodes = [],
   view = "choropleth",
 }: {
+  geographyLabel?: string;
+  initialCamera?: MapCamera;
+  onZoomGeography?: (camera: MapCamera, direction: "in" | "out", focus: string | null) => void;
   url: string;
   rows: MapRow[];
   bins: ColorBin[];
@@ -45,8 +52,29 @@ export function DatasetCanvas({
   excludedCodes?: readonly string[];
   view?: "circles" | "choropleth";
 }) {
+  const cameraOnMount = useRef(initialCamera);
+  const zoomIntent = useRef(false);
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return;
+    const wheel = () => {
+      zoomIntent.current = true;
+    };
+    const touch = (event: TouchEvent) => {
+      if (event.touches.length >= 2) zoomIntent.current = true;
+    };
+    element.addEventListener("wheel", wheel, { passive: true });
+    element.addEventListener("touchstart", touch, { passive: true });
+    element.addEventListener("dblclick", wheel);
+    return () => {
+      element.removeEventListener("wheel", wheel);
+      element.removeEventListener("touchstart", touch);
+      element.removeEventListener("dblclick", wheel);
+    };
+  }, []);
+
   const resetView = useRef<(() => void) | null>(null);
   const selectedRef = useRef(selected);
   useEffect(() => {
@@ -55,7 +83,7 @@ export function DatasetCanvas({
       mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
   }, [selected]);
 
-  const callbacks = useRef({ onSelect, onGeometry, onCapture });
+  const callbacks = useRef({ onSelect, onGeometry, onCapture, onZoomGeography });
   const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
   // A new renderer must not inherit the previous canvas's ready/error status.
@@ -70,7 +98,7 @@ export function DatasetCanvas({
   const ready = renderResult?.version === renderVersion && renderResult.state === "ready";
   const failed = renderResult?.version === renderVersion && renderResult.state === "failed";
   useEffect(() => {
-    callbacks.current = { onSelect, onGeometry, onCapture };
+    callbacks.current = { onSelect, onGeometry, onCapture, onZoomGeography };
   });
   const display = useRef({ rows, bins, excludedKey, view });
   useEffect(() => {
@@ -276,8 +304,57 @@ export function DatasetCanvas({
             currentDisplay.view,
           );
           map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
-          if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
+          if (cameraOnMount.current) map.jumpTo(cameraOnMount.current);
+          else if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
+          let zoomStart = map.getZoom();
+          map.on("zoomstart", (event) => {
+            if ("originalEvent" in event && event.originalEvent) zoomIntent.current = true;
+          });
+          map.on("zoomend", () => {
+            const intended = zoomIntent.current;
+            zoomIntent.current = false;
+            const previousZoom = zoomStart;
+            if (map) zoomStart = map.getZoom();
+            if (
+              !intended ||
+              !map ||
+              disposed ||
+              renderFailed ||
+              !callbacks.current.onZoomGeography ||
+              map.getZoom() === previousZoom
+            )
+              return;
+            const center = map.getCenter();
+            const point = map.project(center);
+            const underCenter = map.queryRenderedFeatures(point, { layers: ["fill"] })[0]
+              ?.properties?.geo_code;
+            // Over water, use the closest visible area's boundary center, never an invented shape.
+            const visible = new Set(
+              map.queryRenderedFeatures({ layers: ["fill"] }).map((f) => f.properties?.geo_code),
+            );
+            let focus = typeof underCenter === "string" ? underCenter : null;
+            if (!focus) {
+              let distance = Infinity;
+              for (const feature of geometry.features) {
+                if (!visible.has(feature.properties.geo_code)) continue;
+                const midpoint = boundaryCenter(feature.geometry);
+                if (!midpoint) continue;
+                const projected = map.project(midpoint);
+                const d = Math.hypot(projected.x - point.x, projected.y - point.y);
+                if (d < distance) {
+                  distance = d;
+                  focus = feature.properties.geo_code;
+                }
+              }
+            }
+            callbacks.current.onZoomGeography?.(
+              { center: [center.lng, center.lat], zoom: map.getZoom() },
+              map.getZoom() > previousZoom ? "in" : "out",
+              focus,
+            );
+          });
           resetView.current = () => {
+            zoomIntent.current = false;
             if (!bounds.isEmpty()) map?.fitBounds(bounds, { padding: 20, animate: false });
           };
           map.getCanvas().tabIndex = -1;
@@ -336,7 +413,10 @@ export function DatasetCanvas({
           type="button"
           className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
-          onClick={() => mapRef.current?.zoomIn()}
+          onClick={() => {
+            zoomIntent.current = true;
+            mapRef.current?.zoomIn();
+          }}
           aria-label="Zoom in"
         >
           {compact ? "+" : "Zoom in"}
@@ -345,7 +425,10 @@ export function DatasetCanvas({
           type="button"
           className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
-          onClick={() => mapRef.current?.zoomOut()}
+          onClick={() => {
+            zoomIntent.current = true;
+            mapRef.current?.zoomOut();
+          }}
           aria-label="Zoom out"
         >
           {compact ? "−" : "Zoom out"}
@@ -372,6 +455,14 @@ export function DatasetCanvas({
               : "h-64 w-full rounded-lg border border-border"
         }
       />
+      {geographyLabel && ready && (
+        <p
+          className="pointer-events-none absolute bottom-2 right-2 rounded bg-background px-2 py-1 text-xs"
+          aria-live="polite"
+        >
+          {geographyLabel}
+        </p>
+      )}
       {!ready && !failed && (
         <p role="status" className="text-sm">
           Loading map rendering…

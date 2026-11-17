@@ -588,7 +588,7 @@ export function DatasetMapCard({
                 <>
                   {workspace && legend}
                   <DatasetCanvas
-                    key={`${key}:render=${renderAttempt}:range=${choice.valueMin}:${choice.valueMax}:classification=${classificationKey}`}
+                    key={`${key}:render=${renderAttempt}`}
                     url={data.geometryUrl}
                     rows={data.rows}
                     bins={bins}

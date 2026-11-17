@@ -73,7 +73,14 @@ for (const width of [390, 1440]) {
       await page.getByRole("button", { name: "Download map image (PNG)", exact: true }).click();
       await (await png).saveAs(testInfo.outputPath("percentage-classification.png"));
     }
-    await page.getByRole("link", { name: "Share this map selection" }).click();
+    // Open the share URL as a fresh navigation. A same-URL client refresh can
+    // otherwise replace controls after the test has already opened them.
+    const sharedUrl = await page
+      .getByRole("link", { name: "Share this map selection" })
+      .getAttribute("href");
+    expect(sharedUrl).not.toBeNull();
+    await page.goto(sharedUrl!);
+    await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     if (width < 1024)
       await page.getByRole("button", { name: "Areas and data", exact: true }).click();
     await page.getByText("Color classification", { exact: true }).click();

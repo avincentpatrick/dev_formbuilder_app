@@ -12677,7 +12677,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   word rather than a guess, applied to Stage 2 and to both engines' Stage 3 reading alike. **Latent** — no
   first-party client sends such a value. Filed by `M124`. **Tier: during-testing.**
 
-- **`minor` · An XLSForm export makes a conditionally-required question always required.** Measured by `M124` while
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · An XLSForm export makes a conditionally-required question always required.** Measured by `M124` while
   verifying `R-9f296f7e`. `XlsformExporter` writes `required = yes` for `conditional` exactly as for `required`, and
   exports none of the `required_if`/`required_with` rows behind it, so in ODK Collect the question must always be
   answered. `docs/xlsform-interop-spec.md` says the condition is "folded into the field's own `relevant`", which the
@@ -12686,6 +12686,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   **Measured again by `M237` (2026-11-14) on the NHETE module:** exported, re-imported and published, the copy refuses a full
   response the original takes, on all 30 of its unanswered "Required when…" comment boxes (`NheteBuilderRouteTest`, step 6c).
   **Live.** Filed by `M124`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch, with `R-ea0cc482`.** The export writes the rules as the `required` formula ODK reads and this product's import reads back, with the first rule's message as `required_message`; `yes` only when a rule cannot be written so. NHETE's re-imported copy now takes the full response the original takes and refuses a missing comment (`NheteBuilderRouteTest`, step 6c).
 
 - **`minor` · No seeded form contains a page break, so no end-to-end spec can see pagination.** Measured by `M124`.
   Pagination is covered by Vitest through the real store and components and by the blank-form presenter's Pest cases,
@@ -16191,7 +16192,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
     - `xlsform-default-language-name`: the walk's first axe scan failed `html-lang-valid`. The seeder sets `en`, naming the row, and `NheteXlsformImportTest` pins what the import stores.
     - The row's premise that the local database held no E2E seed was false; it holds `acme` from earlier runs. The walk ran against a scratch database anyway, and `docs/TESTING-GUIDE.md` now gives the recipe, and corrects its claim that the suite seeds itself.
 
-- **`minor` · `xlsform-import-long-label` — An XLSForm whose note or question label is longer than 500 characters fails the import with a server error instead of a message.**
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · `xlsform-import-long-label` — An XLSForm whose note or question label is longer than 500 characters fails the import with a server error instead of a message.**
   Found by `M237` (2026-11-14). `form_fields.label` is `string('label', 500)`, and `XlsformImportParser` checks the length of `appearance` only, never a label. So the INSERT fails with `22001` (value too long). `docs/xlsform-interop-spec.md` §6 promises the opposite: validation fully upfront, with an actionable error.
   - The draft is untouched, so nothing is lost.
   - The author sees a 500 page and no reason. In the debug error renderer, that page takes about two minutes on the dev host.
@@ -16200,8 +16201,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: check every label and hint against its column upfront and refuse the file naming the row. Or, for a note, carry the overflow into note content blocks.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** Both remedies, and the row was a floor:
+  - Every cell the import would store is measured upfront against the narrower of its column and the builder's own save rule (`XlsformColumnLimits`), and the file is refused once, naming each cell by sheet, row, column, length and limit (`xlsform_cell_too_long`, both surfaces, nothing written). A note too long for its label becomes note content instead (`xlsform-import-markdown`).
+  - Also overflowing, and now measured or fixed: `form_title` over 255; a taken 120-character slug plus `-2` (`FormSlug::suggest()` now fits the suffix); keys over 150 (shortened, the rename warned); and choice labels over 500, which imported and then made their question unsaveable in the builder.
+  - **The row number was wrong.** OpenSpout skips empty rows and the reader dropped them again, so a row named after any blank spacer row was the wrong one. The reader keeps each row's number in the sheet.
 
-- **`minor` · `xlsform-import-odk-functions` — Kobo and ODK formula spellings import, then publish refuses them with a parser code, not their name.**
+  Pinned by `XlsformImportHardeningTest` (the limits read from the database's column widths, both surfaces, a real file's spacer rows) and `XlsformImportParserTest`.
+
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · `xlsform-import-odk-functions` — Kobo and ODK formula spellings import, then publish refuses them with a parser code, not their name.**
   Found by `M237` (2026-11-14). `FunctionRegistry` holds thirteen functions, with none of `count-selected`, `regex` or `string-length`.
   - `count-selected(.) <= 2` imports, then publish says *"The expression on “pick” is invalid (unexpected_token)"*. The hyphen is read as a minus.
   - `regex(…)` says `unknown_function`.
@@ -16211,8 +16218,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `count-selected` as `count`, warn on import for every function this product does not have (naming it), and decide whether `regex`/`string-length` join the grammar. The latter needs both engines and golden vectors.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch,** with `D228` **A**:
+  - `count-selected` reads as `count` (`XlsformExpressionTranslator::translate()`, a splice that never touches a quoted string or a reference);
+  - every function, operator or word the grammar lacks is named in an import warning, and publish names it too ("uses “regex”, which this app does not have"), ODK's hyphenated names included, which the parser reads as a subtraction (`ExpressionParser::hyphenatedCall()`);
+  - a whole `regex(., …)` or `string-length(.) op N` constraint part becomes a Pattern or length rule where the question takes it and the pattern compiles in both engines, and the export writes those rules back as `regex()`/`string-length()`.
 
-- **`minor` · `xlsform-required-when` — "Required when…" cannot come in by XLSForm: a `required` formula is dropped without a warning, and a stand-in constraint never runs on a blank answer.**
+  The ➕ (Kobo's shapes onto `M243`'s settings) needs #568 on the trunk, so it is its own row, `xlsform-import-answer-limit-shapes`. The grammar itself is `xlsform-expression-text-functions`.
+
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · `xlsform-required-when` — "Required when…" cannot come in by XLSForm: a `required` formula is dropped without a warning, and a stand-in constraint never runs on a blank answer.**
   Found by `M237` (2026-11-14).
   - `XlsformImportParser` reads `required` as yes or blank. A formula such as `${cut} = 'change'` imports as **optional**, with an empty warnings list.
   - The stand-in an author would reach for next, `not(<when>) or . != ''` as a constraint, is never run on a blank answer. So a missing comment is accepted (`NheteXlsformImportTest`).
@@ -16222,23 +16235,48 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: import a `required` formula as `conditional` with its `required_if` rows when it is a plain or-of-equalities, and warn naming the question when it is not.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** `XlsformRequiredFormula` reads a `required` formula as "Required when…": checks joined by `or`, `and` and brackets, each held to what the compared question takes (`ValueShape::allowsOperator()`), every either-of branch a rule and every all-of branch one group. A formula it cannot read imports the question as optional, with a warning naming it; `required_message` comes in too. The export half is `R-0ceefbb4`, closed with it. The premise behind both, `docs/xlsform-interop-spec.md` §2's "XLSForm has no such column", was false. NHETE's 35 comment boxes import as "Required when…" from either dialect, and a missing one is refused (`NheteXlsformImportTest`).
 
-- **`minor` · `xlsform-export-note-content` — XLSForm export drops every note's content blocks, so headings, paragraphs, callouts, images and links do not survive a round trip.**
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · `xlsform-export-note-content` — XLSForm export drops every note's content blocks, so headings, paragraphs, callouts, images and links do not survive a round trip.**
   Found by `M237` (2026-11-14). `docs/xlsform-interop-spec.md` §3 lists `note → note` as **Full** fidelity, written before note content existed (`M125`). The exporter writes a note's label only. Re-imported, NHETE's 136 notes come back with no content at all (`NheteBuilderRouteTest`, step 6c).
 
   The remedy, when taken: export content as markdown in the label, which ODK renders, and teach the importer to read it back. The pair with `xlsform-import-markdown`. Otherwise mark the row in §3 lossy.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** As the remedy says: the export writes a note's content as markdown in its label, escaping only what would otherwise read as markup, and the import reads it back. Lossy on purpose: a callout's tone (`xlsform-export-callout-tone`) and a picture (`R-b6e9eac2`). NHETE's notes come back with the same blocks and words (`NheteBuilderRouteTest`, step 6c), and a seeded round trip of 300 random paragraphs keeps every mark (`XlsformMarkdownTest`).
 
-- **`nit` · `xlsform-import-markdown` — Markdown in an imported label is shown to respondents as literal `#` and `**` characters.**
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`nit` · `xlsform-import-markdown` — Markdown in an imported label is shown to respondents as literal `#` and `**` characters.**
   Found by `M237` (2026-11-14). ODK and Kobo render `# Heading`, `**bold**` and `[text](url)` in labels. This product stores the label as plain text, so `# Heading\n\nSome **bold** words` is exactly what a respondent reads. The remedy, when taken: turn a note's markdown into content blocks on import (heading, paragraph spans with bold and links), and strip it from question labels with a warning.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** `XlsformMarkdown` walks league/commonmark's syntax tree (now a declared dependency, the version already locked): a note's markdown becomes headings, paragraphs with bold, italic, code and links, callouts and dividers, within every `ContentBlocks` limit and checked strictly before it is written. A question's label, hint and choices lose their inline formatting, with a warning, keeping a heading's or a list's marker. Corrections the row did not know:
+  - a note that pipes `${…}` stays a label, because content is not piped, and so does a translated note that fits a label, because content shows in one language (`D70`); each loses its formatting, with a warning;
+  - `**Note: **text`, which CommonMark leaves as literal stars and ODK renders bold, is read as ODK does. The NHETE Kobo workbook writes its "Watch out:" labels so.
 
-- **`nit` · `xlsform-import-media` — An XLSForm `media::image` on a note is dropped without a warning.**
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`nit` · `xlsform-import-media` — An XLSForm `media::image` on a note is dropped without a warning.**
   Found by `M237` (2026-11-14). The workbook names a file the import does not receive, so it cannot be attached, but the author is not told. NHETE's three diagrams would vanish silently. The export side, the missing media column, is `R-b6e9eac2`. The remedy, when taken: a warning naming each row whose media was not carried, so the author knows to upload it into the note.
 
   **Live.** Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** Every `media::…`, `image`, `audio`, `video` or `big-image` cell, on the survey and the choices sheet, gets a warning naming its row and file; a picture inside a note's markdown is named too. NHETE's Kobo dialect imports with exactly its three diagram warnings.
+
+- **`minor` · `xlsform-expression-text-functions` — The formula language has no `regex()` or `string-length()`, so a Kobo text check anywhere but a whole constraint imports and then cannot publish.**
+  Found by `M244` (2026-11-17), with `D228` **A**. A whole `regex(., …)` or `string-length(.) op N` constraint part now becomes a Pattern or length rule, but the same functions in a `relevant`, a `calculation`, or inside `or`/`not(…)` stay as written, named in a warning and refused at publish. So does a pattern a browser's `RegExp` would read differently (an inline flag, a possessive quantifier: `XlsformExpressionTranslator`'s `PCRE_ONLY` list).
+
+  The remedy, when taken: the two functions in both engines under names the lexer reads, with golden vectors for counting in code points and for the pattern differences (`engine-whitespace-class`), and the import renaming ODK's spelling.
+
+  **Not live** — a request. Filed by `M244`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-import-answer-limit-shapes` — Kobo's "choose up to N", "only answer" and word-cap formulas import as constraints, not as `M243`'s settings, so they refuse after the fact instead of stopping a tick or counting words.**
+  Found by `M244` (2026-11-17). `M243` (#568, held) made word limits, a choice cap and an only answer field settings, carried by this product's own XLSForm as `#meridian` tokens. A Kobo author writes them as `count-selected(.) <= N`, `not(selected(., 'x') and count-selected(.) > 1)` and a word-cap `regex(…)`; `M244` imports the first two as `count(.)` expressions and the third as a Pattern rule, which refuse correctly, but only on Next or Submit. The settings are not on `M244`'s base, so the shapes could not land on them there.
+
+  The remedy, when taken (once #568 is on the trunk): recognise the three shapes in `XlsformExpressionTranslator::constraint()` and turn each into its setting, keeping the expression for anything else.
+
+  **Not live** — a request. Filed by `M244`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-export-callout-tone` — XLSForm export writes a note's callout as a markdown quote, so its tone (info, success, warning, danger) does not survive a round trip.**
+  Found by `M244` (2026-11-17). ODK's markdown has no tone, and a quote re-imports as an info callout. A `#meridian` marker on the note could carry each callout's tone, as it carries the other round-trip breadcrumbs.
+
+  **Not live** — a lossy round trip of this product's own export, documented in `docs/xlsform-interop-spec.md` §3. Filed by `M244`. **Tier: after-launch.**
 
 - ✅ **CLOSED BY `M240` (2026-11-15) — ****`minor` · `builder-copy-section` — The builder copies one question at a time, so a repeated structure like NHETE's 35 indicator blocks takes about 1,700 saves by hand.**
   Found by `M237` (2026-11-14). `FormBuilderService::duplicateField()` copies one question, and there is no section copy. Building NHETE took 1,725 builder requests (`NheteBuilderRouteTest`), each indicator a note, four dropdowns, a calculation and a comment whose conditions name its siblings.
@@ -16352,7 +16390,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
+- ✅ **CLOSED BY `M244` (2026-11-17) — ****`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
   Found by `M239` (2026-11-14), on the NHETE walk's first axe scan: `html-lang-valid` on the welcome page, *"<html> element must have a valid value for the lang attribute"*.
   - The NHETE workbook's settings say `default_language: English`. `XlsformImporter::applySettings()` copies it into `forms.default_locale` as it stands, and `public-runtime.blade.php` writes `<html lang="English">`.
   - `docs/xlsform-interop-spec.md` §4 maps `default_language` to `forms.default_locale` and says nothing about its form. This product's own export writes a code (`en`), so its own round trip never shows it; a workbook from ODK or Kobo does.
@@ -16362,3 +16400,4 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M244` (2026-11-17), on its branch.** `XlsformLanguages` reads `Name (code)`, an unambiguous name (Bikol and Bisaya are left out) or a bare code; anything else leaves the form's locale, with a warning. **The row understated itself:** a workbook with only `label::English` columns stored every label as `''` and displayed only because the locale was also `English`, so mapping the locale alone would have blanked every label. The import now takes the default language's column as the base and keys every translation by code. `NheteE2eSeeder` no longer sets `en` itself.

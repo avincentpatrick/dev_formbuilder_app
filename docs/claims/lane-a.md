@@ -16,7 +16,70 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M243`, `R-1da063f4`: word limits with a live count, "choose at most N" that stops a further tick, and an "only answer" choice that clears and locks the rest (m243-answer-rules-words-choices)
+## Status: ACTIVE CLAIM — `M244`, `xlsform-import-long-label` and seven more: a Kobo or ODK workbook imports its long and formatted notes, its formulas, "required when", its language and its pictures' names, and our own export keeps note content and "Required when…" (m244-kobo-import-hardening)
+
+Taken 2026-11-17, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-3-nifty-parrot.md`). NHETE recommendation 3, harden Kobo import, the NHETE plan's next item after `M243` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m244-kobo-import-hardening`, cut from origin/main at `e98039ea`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.23.0 (a feature) with its release notes.** `M242` (#545, 0.21.1) and `M243` (#568, 0.22.0) are held too; at the merge point they go first, and this branch takes the trunk and keeps 0.23.0 on top. Held green for a merge point on the user's word (`D137`).
+Rows (eight):
+- `xlsform-import-long-label` (`R-24ec82a6`), *"An XLSForm whose note or question label is longer than 500 characters fails the import with a server error instead of a message."*
+- `xlsform-import-odk-functions` (`R-bb470c3a`), *"Kobo and ODK formula spellings import, then publish refuses them with a parser code, not their name."*
+- `xlsform-required-when` (`R-ea0cc482`), *""Required when…" cannot come in by XLSForm …"*
+- `xlsform-import-markdown` (`R-5957b273`), *"Markdown in an imported label is shown to respondents as literal `#` and `**` characters."*
+- `xlsform-export-note-content` (`R-7e134c37`), *"XLSForm export drops every note's content blocks …"*
+- `xlsform-import-media` (`R-915e5d0c`), *"An XLSForm `media::image` on a note is dropped without a warning."*
+- `xlsform-default-language-name` (`R-49262cca`), *"An XLSForm whose `default_language` is a language name … sets the form's locale to that name …"*
+- `R-0ceefbb4`, *"An XLSForm export makes a conditionally-required question always required."*, closed by the same exporter change as `R-ea0cc482`.
+
+The user's answers in planning (2026-11-17), recorded on this branch:
+- All seven XLSForm rows in one increment (the four the NHETE plan names and the three in the same files).
+- `D228` **A** (reserved here; `D227` is #545's): a Kobo `regex(., '…')` or `string-length(.) op N` that is a whole constraint, or one `and`-part of it, becomes this product's Pattern or length rule; any other use is kept as written with a warning naming it. Adding `regex`/`string-length` to the formula grammar is filed as its own row, not built.
+
+### Evidence verified
+- `R-24ec82a6`, *"`form_fields.label` is `string('label', 500)`, and `XlsformImportParser` checks the length of `appearance` only"*: **held** (`APPEARANCE_MAX_LENGTH`; the label is the raw cell in `buildField()`). `NheteXlsformImportTest` pins the `22001`.
+- `R-bb470c3a`, *"`FunctionRegistry` holds thirteen functions … `count-selected(.) <= 2` … `unexpected_token` … `regex(…)` says `unknown_function`"*: **held.** The lexer's words are `[a-z_][a-z0-9_]*`, so `count-selected` lexes as `count` minus `selected`.
+- `R-ea0cc482`, *"`XlsformImportParser` reads `required` as yes or blank … a stand-in constraint is never run on a blank answer"*: **held** (`resolveRequired()`; `SemanticValidator`'s empty-answer return before constraints, and its TS twin).
+- `R-5957b273`, *"This product stores the label as plain text"*: **held**; `FieldInput.vue` and the guest `FieldControl.vue` interpolate it.
+- `R-7e134c37`, *"The exporter writes a note's label only"*: **held** (`commonColumns()`), and `NoteContentSurfacesTest` asserts it.
+- `R-915e5d0c`, *"`media::image` … dropped without a warning"*: **held**; no column but the named ones is ever read.
+- `R-49262cca`, *"`XlsformImporter::applySettings()` copies it into `forms.default_locale` as it stands"*: **held.**
+- `R-0ceefbb4`: **held.** `commonColumns()` writes `conditional` as `yes`, and `renderStructured()` omits `required_if`.
+
+### Premise verified
+- *"Naming the row"* (the long-label remedy) assumes the parser's row numbers are the sheet's: **false.** OpenSpout skips empty rows by default and `XlsformWorkbookReader` drops blank rows too, so `$index + 2` names the wrong row after any spacer row. The reader keeps real row numbers.
+- `R-49262cca` assumes the locale is the only thing a language name breaks: **false.** A workbook with only `label::English` columns stores `''` as every label and keys the text `"English"`; it reads correctly today only because the locale is also `"English"`. Mapping the locale to `en` alone would blank every label, so the import also picks the default language's column and keys translations by code.
+- `R-ea0cc482` and `R-0ceefbb4` rest on `docs/xlsform-interop-spec.md` §2, which says XLSForm has no conditional required and that export folds the condition into `relevant`: **both false.** ODK's `required` column takes a formula, and the exporter writes `yes`.
+- `R-24ec82a6` names labels: **a floor.** Also overflowing: `form_title` over 255 (`forms.title`, `form_versions.title`), a taken 120-character slug plus `FormSlug::suggest()`'s `-2`, keys `sanitizeKey()` never caps (150), and choice labels the builder caps at 500, which import stores and the builder then cannot save.
+- `R-5957b273`'s note remedy assumes imported content is checked: **false.** The importer never runs `ContentBlocks`, so whatever it builds must be checked before it is written. Paper and PDF print only a note's label (`R-c083b711`), so the label kept beside content stays readable.
+- Content is neither piped nor translated (`D69`, `D70`), so a note that pipes `${…}` stays a label.
+- `R-bb470c3a`'s ➕ (Kobo shapes → `M243`'s settings) needs `config.max_choices` and friends, which exist only on #568: **not on this branch's base**, so it is filed as its own row.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections:**
+1. Every remedy that names a row needs the reader to keep empty rows (the premise above).
+2. The language fix also chooses the default label column and keys translations by code.
+3. A `regex`/`string-length` constraint becomes a structured rule only where `ValueShape::allows()` takes it and the pattern compiles; anywhere else it stays an expression with a warning (`D228`).
+4. "Required when" holds its related question as the parsed field, not a key, so a key renamed on import still resolves.
+5. Export writes "Required when…" as an ODK `required` formula, which the import reads back, and the Pattern and length rules as `regex()` and `string-length()`.
+
+Files:
+- **Server:** new `app/Services/Xlsform/` `XlsformLanguages.php`, `XlsformExpressionTranslator.php`, `XlsformRequiredFormula.php`, `XlsformMarkdown.php`, `XlsformColumnLimits.php`; edited `XlsformWorkbookReader.php`, `XlsformImportParser.php`, `XlsformImporter.php`, `XlsformExporter.php`, `Dto/` (`RawWorkbook.php`, `FieldSpec.php`, `SectionSpec.php`, `ValidationSpec.php`, `SettingsSpec.php`, `ImportPlan.php`); `app/Exceptions/Xlsform/XlsformImportException.php`, `app/Exceptions/Expressions/ExpressionSyntaxException.php`, `app/Exceptions/Forms/PublishValidationException.php`, `app/Services/Forms/ExpressionValidationGate.php`, `app/Support/Forms/FormSlug.php`; `composer.json`, `composer.lock` (`league/commonmark`, already locked); `database/seeders/NheteE2eSeeder.php`.
+- **Tests:** `tests/Unit/Xlsform/` (a test per new class, `XlsformImportParserTest.php`), `tests/Feature/Xlsform/` (`XlsformImportTest.php`, `XlsformExportTest.php`, a new `XlsformImportHardeningTest.php`), `tests/Feature/Forms/Nhete/` (`NheteXlsformImportTest.php`, `NheteBuilderRouteTest.php`), `tests/Support/Nhete/`, `tests/Feature/Forms/NoteContentSurfacesTest.php`, `tests/Feature/Forms/ExpressionValidationGateTest.php`, `tests/Feature/Seeders/NheteE2eSeederTest.php`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/xlsform-interop-spec.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D228`), `PROGRESS.md` (own block only), `docs/gate-baselines.md` at close-out.
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/xlsform-interop-spec.md`, `docs/claims/decisions.md`, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries. No TypeScript engine file changes: import and export are server-only.
+Namespaces spent: `D228`. No migration, no ADR.
+
+Prediction:
+- The Kobo-dialect NHETE workbook imports with only its picture warnings, publishes, and takes and refuses the same responses as the builder-built form.
+- The Meridian round trip keeps every note's content (minus images) and every "Required when…".
+- `NheteBuilderRouteTest`'s 1,560 builder requests do not move.
+- No Vitest file changes.
+
+The one most likely wrong: the whole Kobo module's import and publish fit the existing test time. Markdown parsing 136 notes and checking every block strictly is new work on the largest form we have.
+
+## HELD — `M243`, `R-1da063f4`: word limits with a live count, "choose at most N" that stops a further tick, and an "only answer" choice that clears and locks the rest (m243-answer-rules-words-choices) — BUILT AND HELD: PR #568, CI 43902209107 every job green with real step counts
 
 Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-2-streamed-book.md`). NHETE recommendation 2, answer rules, the NHETE plan's next item after `M242` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m243-answer-rules-words-choices`, cut from origin/main at `af2ad500`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.22.0 (a feature) with its release notes.** `M242` (#545, 0.21.1) is held too, so at the merge point it goes first and this branch takes the trunk and keeps 0.22.0 on top. Held green for a merge point on the user's word (`D137`).

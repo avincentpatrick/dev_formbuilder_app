@@ -18,3 +18,13 @@ for (const width of [390, 1440]) {
     await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
   });
 }
+
+test("portal BHW card action and bottom link share the overview destination", async ({ page }) => {
+  await page.goto("./");
+  const action = page.getByRole("link", { name: "Open BHW overview", exact: false });
+  const footer = page.getByRole("link", { name: "BHW dashboard", exact: true });
+  await expect(action).toHaveAttribute("href", "/bhw-connect/bhw");
+  await expect(footer).toHaveAttribute("href", "/bhw-connect/bhw");
+  await action.click();
+  await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
+});

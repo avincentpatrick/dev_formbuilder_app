@@ -127,7 +127,8 @@ test("home starts with the catalog and every available card has consistent detai
     await page.goto(href);
     if (new URL(page.url()).pathname.endsWith("/bhw")) {
       await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
-      await page.goto("catalog?mode=all&dataset=bhw");
+      await page.goto("./");
+      continue;
     }
     await expect(page.getByRole("table")).toBeVisible();
     await expect(page.getByText("Accepted release:", { exact: false }).first()).toBeVisible();

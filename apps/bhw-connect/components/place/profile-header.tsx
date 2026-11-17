@@ -1,3 +1,4 @@
+import { countAndShare } from "@/lib/format";
 import type { ReactNode } from "react";
 import type { GeoLevel } from "@/lib/filters/schema";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
@@ -102,11 +103,7 @@ export function ProfileHeader({
             {validatedProfiles !== null && (
               <StatChip
                 label={<GlossaryTerm slug="validated_profile">Validated profiles</GlossaryTerm>}
-                value={
-                  coveragePct !== null
-                    ? `${validatedProfiles.toLocaleString()} (${coveragePct}%)`
-                    : validatedProfiles.toLocaleString()
-                }
+                value={countAndShare(validatedProfiles, coveragePct)}
               />
             )}
             {householdsPerBhw !== null && (

@@ -85,3 +85,20 @@ it("keeps full names in chart data while using optional compact tick labels on p
   expect(horizontalBarSpec(data, { width: 800 }).y?.tickFormat).toBeUndefined();
   expect(data[0].label).toBe("BHW Reference Manual training");
 });
+
+it("pairs counts and percentages without hiding zero or capping cross-source ratios", async () => {
+  const { countAndShare, shareOf, shareCount } = await import("./overview");
+  expect(countAndShare(270917, shareOf(270917, 306835))).toBe("270,917 (88.29%)");
+  expect(countAndShare(0, 0)).toBe("0 (0%)");
+  expect(shareOf(120, 100)).toBe(120);
+  expect(shareOf(0, 0)).toBeNull();
+  expect(countAndShare(null, 65.72)).toBe("Count unavailable (65.72%)");
+  expect(countAndShare(20, null)).toBe("20 (percentage unavailable)");
+  const row = {
+    ...indicator("share", 65.72),
+    values: [{ value: 65.72, numerator: 201654, denominator: 306835 }],
+  };
+  expect(shareCount(row)).toBe(201654);
+  expect(shareCount({ ...row, state: "suppressed" })).toBeNull();
+  expect(shareCount(indicator("share", 65.72))).toBeNull();
+});

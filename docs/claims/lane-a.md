@@ -84,6 +84,50 @@ The one most likely wrong: the whole Kobo module's import and publish fit the ex
 - `docs/PRD.md`: the XLSForm criterion was queued on `R-0ceefbb4`, which this branch closes; `pipeline-lint` P2e refused it.
 - `docs/piping-output-encoding-design.md`: the sentence saying the export carries a note's label only and the import writes no content.
 
+**BUILT AND HELD (2026-11-17): PR #580.** `VERSION` 0.23.0 with its notes. Held after #545 (`M242`, 0.21.1) and #568 (`M243`, 0.22.0), which go first at the merge point; this branch then takes the trunk.
+- **CI run 44039244826 on `213ad529`:** every job green with real step counts — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5 — and Boundary 44039236798 green (5).
+  - Pest: 7,726 passed and 1 skipped. Its 3 warnings are bad-regex cases: M242's two, and this branch's "a pattern that does not compile".
+  - E2E: 924 passed in 36.0 min. `nhete-walk.spec.ts` and `nhete-builder-block.spec.ts` ran at all three widths, 23 to 27 s each.
+  - The first run, 44039129821 on `3ab23d8c`, was cancelled by the status-bullet push. A `pull_request` run's path filter reads the whole pull request, not the commit, so a `PROGRESS.md`-only push still starts a run, and the concurrency group cancels the one before.
+- **Server.**
+  - Five new classes in `app/Services/Xlsform/`:
+    - `XlsformColumnLimits`: every cell measured; one `xlsform_cell_too_long` refusal naming each cell.
+    - `XlsformLanguages`: names read as codes; the default language's column is the base.
+    - `XlsformMarkdown`: league/commonmark's tree into content blocks and back; ODK's `**Note: **` read as bold.
+    - `XlsformExpressionTranslator`: `count-selected` → `count`, unsupported names, `D228`'s conversions.
+    - `XlsformRequiredFormula`: read and render.
+  - The reader keeps real row numbers.
+  - `ValidationSpec` carries structured rows.
+  - The exporter writes `required` formulas, `required_message`, note markdown, and `regex()`/`string-length()`.
+  - Publish names a missing function (`ExpressionSyntaxException::subject()`, `ExpressionParser::hyphenatedCall()`).
+  - `FormSlug::suggest()` fits its suffix, and keys are capped at 150.
+- **Docs.**
+  - `docs/xlsform-interop-spec.md` §2, §3, §4, §6 and §8.
+  - The PRD's XLSForm criterion, and the piping design doc's sentence on note content.
+  - Eight rows closed, three filed, `D228` recorded, the pipeline regenerated.
+- **Tests.**
+  - New: `XlsformMarkdownTest`, `XlsformExpressionTranslatorTest`, `XlsformRequiredFormulaTest`, `XlsformLanguagesTest`, `XlsformImportHardeningTest` (10), and nine new `XlsformImportParserTest` cases.
+  - Flipped: `NheteXlsformImportTest` (the Kobo module in full, and each habit), `NheteBuilderRouteTest` step 6c, and `NoteContentSurfacesTest`'s export case.
+  - `NheteWorkbook`'s Meridian dialect writes the `required` formula, not the stand-in.
+- **Local runs.**
+  - Pest at `memory_limit=3G` in the container: the Xlsform and Expressions unit folders (674), and the NHETE, seeder, Xlsform, note-surfaces and expression-gate features (179). `NheteBuilderRouteTest` took 138 s; its report puts 4 notes (`cp_a_national` … `cp_d_national`) back as labels, because they are one plain paragraph once the picture is out.
+  - Host: PHPStan 0, Pint, and every lint gate.
+  - E2E was left to CI.
+- **Mutants: 14 of 14 caught** through `mutate.php`, each against a green baseline. The first batch aborted untouched: the targets were uncommitted, and the tool refuses a dirty target.
+
+**How the prediction fared.**
+- The Kobo module imports with only its picture warnings, publishes, and takes and refuses what the original does: **right**, after two defects the prediction did not see. `and (…)` was read as a call to a function named `and`, and the module's `**Watch out: **` labels stayed literal stars under CommonMark.
+- The Meridian round trip keeps note content and "Required when…": **right, with a refinement.** 128 of 132 notes come back as content, and the 4 plain one-paragraph notes come back as the same words in their label.
+- 1,560 builder requests unchanged, and no Vitest file: **right.**
+- The one named as most likely wrong, the time: **wrong, it was fast.** Parsing the whole Kobo module takes 1.6 s, and the Kobo case runs in about 4 s.
+- What it did not see:
+  - the container's 128 MB Pest limit, which ended the first NHETE run;
+  - Git Bash turning `/tmp/…` in a `-e` variable into a Windows path;
+  - the `cmd` layer eating the caret in `composer require`;
+  - the cancelled run above.
+
+**What the claim did not cover, said rather than smoothed.** The three files the extension above names were edited before it was pushed, and the trunk records the extension in that order.
+
 ## HELD — `M243`, `R-1da063f4`: word limits with a live count, "choose at most N" that stops a further tick, and an "only answer" choice that clears and locks the rest (m243-answer-rules-words-choices) — BUILT AND HELD: PR #568, CI 43902209107 every job green with real step counts
 
 Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-2-streamed-book.md`). NHETE recommendation 2, answer rules, the NHETE plan's next item after `M242` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).

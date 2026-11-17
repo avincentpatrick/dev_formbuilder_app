@@ -1,4 +1,5 @@
 "use client";
+import { zoomGeography, type MapCamera } from "@/lib/maps/zoom-geography";
 import { CENSUS_ACTIVE_YEARS_ID } from "@/lib/maps/census-active-years";
 import { isCensusProfileRate } from "@/lib/maps/census-accreditation";
 import {
@@ -105,6 +106,7 @@ export function DatasetMapCard({
   useEffect(() => {
     onChoiceChange?.(choice);
   }, [choice, onChoiceChange]);
+  const [zoomCamera, setZoomCamera] = useState<{ scope: string; camera: MapCamera } | null>(null);
   const [trail, setTrail] = useState<MapChoice[]>([]);
   useEffect(() => {
     if (!historyEnabled) return;
@@ -115,6 +117,7 @@ export function DatasetMapCard({
       latestChoice.current = next;
       updateChoice(next);
       setTrail([]);
+      setZoomCamera(null);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
@@ -382,6 +385,7 @@ export function DatasetMapCard({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   function reset() {
+    setZoomCamera(null);
     setTrail([]);
     setChoice(initialMapChoice(dataset));
   }
@@ -589,6 +593,27 @@ export function DatasetMapCard({
                 <>
                   <DatasetCanvas
                     key={`${key}:render=${renderAttempt}`}
+                    geographyLabel={
+                      workspace
+                        ? `${data.childLevel === "citymun" ? "City/municipality" : data.childLevel.charAt(0).toUpperCase() + data.childLevel.slice(1)} figures`
+                        : undefined
+                    }
+                    initialCamera={
+                      zoomCamera?.scope === `${choice.level}:${choice.code}`
+                        ? zoomCamera.camera
+                        : undefined
+                    }
+                    onZoomGeography={
+                      workspace
+                        ? (camera, direction, focus) => {
+                            const next = zoomGeography(choice, data, camera.zoom, direction, focus);
+                            if (!next) return;
+                            setZoomCamera({ scope: `${next.level}:${next.code}`, camera });
+                            setNotice(null);
+                            setChoice(next);
+                          }
+                        : undefined
+                    }
                     url={data.geometryUrl}
                     rows={data.rows}
                     bins={bins}
@@ -913,6 +938,7 @@ export function DatasetMapCard({
                           className="underline"
                           type="button"
                           onClick={() => {
+                            setZoomCamera(null);
                             setTrail([...trail, choice]);
                             setChoice({
                               ...choice,

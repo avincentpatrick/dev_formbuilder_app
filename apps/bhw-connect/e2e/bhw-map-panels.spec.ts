@@ -92,7 +92,7 @@ for (const width of [320, 390, 1440]) {
         Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
       );
     }
-    await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await page.getByRole("button", { name: "Zoom out", exact: true }).click();
     if (width < 1024) await page.getByRole("button", { name: "Areas and data", exact: true }).tap();
     await expect(page.getByLabel("BHW Headcount 2025 search areas")).toHaveValue("zero");
     await expect(page.getByLabel("BHW Headcount 2025 area", { exact: true })).toHaveValue("99");

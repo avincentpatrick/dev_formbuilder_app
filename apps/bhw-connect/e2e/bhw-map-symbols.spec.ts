@@ -67,7 +67,7 @@ for (const width of [390, 1440]) {
     await expect(
       page.getByText("1 of 4 areas have no drawable shape.", { exact: false }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await page.getByRole("button", { name: "Zoom out", exact: true }).click();
     await page.getByRole("button", { name: "Reset map view", exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(page.locator(".maplibregl-ctrl-scale")).toBeVisible();

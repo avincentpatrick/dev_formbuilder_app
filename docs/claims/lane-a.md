@@ -79,6 +79,11 @@ Prediction:
 
 The one most likely wrong: the whole Kobo module's import and publish fit the existing test time. Markdown parsing 136 notes and checking every block strictly is new work on the largest form we have.
 
+**Claim extended (2026-11-17), after the files were opened — the order breached, said rather than smoothed.** Three files outside the list above were edited before this extension was pushed:
+- `app/Services/Expressions/ExpressionParser.php`: a new `hyphenatedCall()` at the end of the class, so publish can name an ODK call such as `string-length(…)` that lexes as a subtraction. The gate calls it rather than importing the import's translator, which would have moved every line `ExpressionValidationGate.php` is cited by.
+- `docs/PRD.md`: the XLSForm criterion was queued on `R-0ceefbb4`, which this branch closes; `pipeline-lint` P2e refused it.
+- `docs/piping-output-encoding-design.md`: the sentence saying the export carries a note's label only and the import writes no content.
+
 ## HELD — `M243`, `R-1da063f4`: word limits with a live count, "choose at most N" that stops a further tick, and an "only answer" choice that clears and locks the rest (m243-answer-rules-words-choices) — BUILT AND HELD: PR #568, CI 43902209107 every job green with real step counts
 
 Taken 2026-11-16, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-2-streamed-book.md`). NHETE recommendation 2, answer rules, the NHETE plan's next item after `M242` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
+use App\Support\Forms\Glossary;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Str;
@@ -28,7 +29,7 @@ use Illuminate\Translation\PotentiallyTranslatedString;
  * `term` is the glossary term the span's text opens, and it must BE that text. Content is copied verbatim by publish's
  * clone, a draft copy, the question library, a template and a restore, while a glossary entry's row id changes on every
  * one of them; a word marked by text survives them all and is matched against whichever glossary its form has
- * ({@see \App\Support\Forms\Glossary::key()}). A word whose term the form's glossary lacks is refused at publish,
+ * ({@see Glossary::key()}). A word whose term the form's glossary lacks is refused at publish,
  * never at save, so an author may mark a word before defining it. A `|` is refused in a term so `[[shown|term]]` can
  * be added later without changing what any stored mark means.
  *

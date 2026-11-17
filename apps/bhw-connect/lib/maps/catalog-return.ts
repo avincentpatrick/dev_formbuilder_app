@@ -22,13 +22,21 @@ export function restoredBhwMapHref(raw: string | string[] | undefined): string |
   return choice && isBhw(choice) ? mapHref(choice) : null;
 }
 
-/** Open the shared dashboard at the map area and preserve the full map snapshot. */
+/** A selected map feature is the dashboard locality; otherwise use the visible scope. */
+export function bhwMapLocality(choice: MapChoice): Extract<CatalogSelection, { mode: "psgc" }> {
+  const code = choice.selected ?? choice.code;
+  const level = choice.selected
+    ? ({ 2: "region", 5: "province", 7: "citymun", 10: "barangay" } as const)[
+        code.length as 2 | 5 | 7 | 10
+      ]
+    : choice.level;
+  return { mode: "psgc", level: level ?? choice.level, code };
+}
+
+/** Open the shared dashboard at the selected map locality and preserve the full snapshot. */
 export function bhwOverviewReturnHref(choice: MapChoice): string | null {
   if (!isBhw(choice)) return null;
-  return bhwLocalityHref(
-    { mode: "psgc", level: choice.level, code: choice.code },
-    mapHref(choice).split("?")[1],
-  );
+  return bhwLocalityHref(bhwMapLocality(choice), mapHref(choice).split("?")[1]);
 }
 
 /** Keep a validated map return snapshot when navigating back from comparison. */

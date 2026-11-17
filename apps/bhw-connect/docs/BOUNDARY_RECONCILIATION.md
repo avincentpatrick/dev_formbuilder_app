@@ -126,3 +126,15 @@ The source predates NIR's 2015/2023 re-affirmation as region 18 and still files 
 - [source_province_features_unmatched] `13075` — NCR, Third District (Not a Province)
 - [source_province_features_unmatched] `13076` — NCR, Fourth District (Not a Province)
 - [source_province_features_unmatched] `19099` — None
+
+
+## NCR city boundary repair (2026-11-17)
+
+`public/geo/provinces/13.json` now contains all 17 NCR cities/municipalities,
+keyed to the app's `13801`–`13817` city-as-province rows. The original four
+source district polygons had no matching data rows. Rebuild this file with
+`python ingestion/reconcile_ncr_boundaries.py` after running the general
+boundary importer. The repair uses public PSA-derived city geometry from
+`faeldon/philippines-json-maps`, pinned to commit
+`680e32e62baeccbcd8845d3b1387bc67c1baf78a`; it does not copy district values
+onto cities. Lower-level boundary gaps remain separately tracked.

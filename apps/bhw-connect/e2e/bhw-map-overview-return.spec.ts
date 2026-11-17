@@ -74,12 +74,10 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     const previous = page.url();
     await page.getByRole("link", { name: "Open dashboard", exact: true }).click();
-    await expect(page).toHaveURL(/bhw\?location=region%3A07&mapState=/);
+    await expect(page).toHaveURL(/bhw\?location=province%3A07306&mapState=/);
     await page.reload();
-    await expect(
-      page.getByText(/Workforce, qualifications and support\..*REGION VII/i),
-    ).toBeVisible();
-    await expect(page.getByText(/Dashboard figures describe.*REGION VII/i)).toBeVisible();
+    await expect(page.getByText(/Workforce, qualifications and support\..*CEBU/i)).toBeVisible();
+    await expect(page.getByText(/Dashboard figures describe.*CEBU/i)).toBeVisible();
     const back = page.getByRole("link", { name: "Return to previous BHW map", exact: true });
     await expect(back).toHaveAttribute(
       "href",
@@ -99,7 +97,7 @@ for (const width of [390, 1440]) {
     });
     const freshParams = new URL((await fresh.getAttribute("href"))!, page.url()).searchParams;
     expect(freshParams.get("dataset")).toBe("bhw-stepzero-2026");
-    expect(freshParams.get("code")).toBe("07");
+    expect(freshParams.get("code")).toBe("07306");
     expect(freshParams.has("valueMin")).toBe(false);
     await explorer.click();
     await expect(page).toHaveURL(previous);
@@ -118,7 +116,7 @@ for (const width of [390, 1440]) {
     expect(new URL(page.url()).searchParams.get("mapState")).toBe(
       new URL(previous).search.slice(1),
     );
-    expect(new URL(page.url()).searchParams.get("geos")).toBe("07");
+    expect(new URL(page.url()).searchParams.get("geos")).toBe("07306");
     await page.reload();
     await page.goBack();
     await expect(page).toHaveURL(overviewBeforeCompare);
@@ -160,7 +158,7 @@ for (const width of [390, 1440]) {
       .click();
     await expect(page).toHaveURL(/catalog\?/);
     const catalogQuery = new URL(page.url()).searchParams;
-    expect(catalogQuery.get("location")).toBe("region:07");
+    expect(catalogQuery.get("location")).toBe("province:07306");
     expect(catalogQuery.get("dataset")).toBe("bhw");
     expect(catalogQuery.get("mapState")).toBe(new URL(previous).search.slice(1));
     await page.reload();

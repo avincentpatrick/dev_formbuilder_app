@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 for (const width of [390, 1440]) {
-  test(`overview offers an independent headcount map and linked ranks at ${width}px`, async ({
+  test(`overview synchronizes the locality with its headcount map at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
@@ -25,7 +25,6 @@ for (const width of [390, 1440]) {
       }),
     );
     await page.goto("bhw?mapState=dataset%3Dbhw-2025%26indicator%3Dbhw.active-years");
-    const overviewUrl = page.url();
     await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
     const preview = page.getByRole("region", {
       name: "Workforce distribution preview",
@@ -44,14 +43,12 @@ for (const width of [390, 1440]) {
       preview.getByRole("region", { name: "Ranked area counts", exact: true }),
     ).toBeVisible();
     await preview.getByLabel("BHW Headcount 2025 area", { exact: true }).selectOption("02");
-    await expect(page).toHaveURL(overviewUrl);
-    const enlarge = preview.getByRole("link", { name: /^Enlarge .* map$/ });
+    await expect(page).toHaveURL(/bhw\?location=region%3A02/);
+    await expect(page.getByTestId("bhw-first-visual")).toContainText(/REGION II/i);
+    const enlarge = page.getByRole("link", { name: /^Enlarge .* map$/ });
     const destination = new URL((await enlarge.getAttribute("href"))!, page.url());
-    expect(destination.searchParams.get("dataset")).toBe("bhw-stepzero-2026");
-    expect(destination.searchParams.get("selected")).toBe("02");
-    expect(destination.searchParams.get("view")).toBe("circles");
-    await enlarge.click();
-    await expect(page).toHaveURL(destination.href);
+    expect(destination.searchParams.get("level")).toBe("region");
+    expect(destination.searchParams.get("code")).toBe("02");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

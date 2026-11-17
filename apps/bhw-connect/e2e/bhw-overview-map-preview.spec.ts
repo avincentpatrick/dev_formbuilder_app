@@ -33,7 +33,11 @@ for (const width of [390, 1440]) {
     });
     await preview.scrollIntoViewIfNeeded();
     await expect(preview.locator('[data-map-state="ready"]')).toBeVisible();
-    await expect(preview.getByText("Circle area represents BHW count", { exact: false })).toBeVisible();
+    if (width < 1024)
+      await preview.getByRole("button", { name: /map legend and reading guide/ }).click();
+    await expect(
+      preview.getByText("Circle area represents BHW count", { exact: false }),
+    ).toBeVisible();
     if (width < 1024)
       await preview.getByRole("button", { name: "Areas and data", exact: true }).click();
     await expect(

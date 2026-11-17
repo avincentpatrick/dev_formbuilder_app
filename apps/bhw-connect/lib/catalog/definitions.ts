@@ -240,6 +240,9 @@ const bhw: IndicatorSpec[] = [
     levels: BARANGAY_LEVELS,
     attributes: { numerator: "n" },
   })),
+  // Owner decision 2026-11-17: publish all stored aggregate counts/receipt shares.
+  // Legacy amount/cell flags must not suppress these measures or geographic peers.
+  // Source nulls remain unavailable; no raw records are queried or reconstructed.
   ...["sex", "civil_status", "bloodtype", "education", "ip_status", "age_band"].map(
     (key): IndicatorSpec => ({
       id: `bhw.demographics.${key}`,
@@ -250,7 +253,6 @@ const bhw: IndicatorSpec[] = [
       column: "n",
       filters: { dimension: key },
       categoryColumn: "category",
-      suppression: "is_suppressed",
       levels: BARANGAY_LEVELS,
     }),
   ),
@@ -262,7 +264,6 @@ const bhw: IndicatorSpec[] = [
     table: "agg_honorarium",
     column: "pct_receiving",
     filters: { payer_level: key },
-    suppression: "is_suppressed",
     levels: BARANGAY_LEVELS,
     attributes: { numerator: "n_receiving" },
   })),

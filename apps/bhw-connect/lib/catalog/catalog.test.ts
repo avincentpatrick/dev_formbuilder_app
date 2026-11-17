@@ -306,7 +306,7 @@ describe("public catalog contract", () => {
     expect(find(result, "nhfr.barangay-presence").values).toEqual([{ value: 8, denominator: 12 }]);
   });
 
-  it("applies complementary suppression before composing public values with totals", async () => {
+  it("publishes stored aggregates without suppressing peers or inferring nulled cells", async () => {
     const result = await getPublicCatalog(
       area,
       reader({
@@ -322,16 +322,19 @@ describe("public catalog contract", () => {
         ],
       }),
     );
-    expect(find(result, "bhw.demographics.sex")).toMatchObject({ state: "suppressed", values: [] });
+    expect(find(result, "bhw.demographics.sex")).toMatchObject({
+      state: "partial",
+      values: [{ value: 40, label: "A" }],
+    });
     expect(find(result, "bhw.demographics.education")).toMatchObject({
-      state: "suppressed",
-      values: [],
+      state: "partial",
+      values: [{ value: 0, label: "A" }],
     });
     expect(find(result, "bhw.honorarium.province")).toMatchObject({
-      state: "suppressed",
-      values: [],
+      state: "available",
+      values: [{ value: 3, numerator: 3 }],
     });
-    expect(result.overview.suppressedIndicators).toBe(3);
+    expect(result.overview.suppressedIndicators).toBe(0);
   });
 
   it("whitelists public output instead of spreading rows or dataset metadata", async () => {
@@ -377,7 +380,7 @@ describe("public catalog contract", () => {
     });
   });
 
-  it("keeps suppressed-only availability out of counts and freshness", async () => {
+  it("keeps absent values out of availability counts and freshness", async () => {
     const db = reader();
     db.probe = vi.fn<CatalogReader["probe"]>(async (spec) => ({
       state: "available",
@@ -385,12 +388,12 @@ describe("public catalog contract", () => {
       hasSuppressed: !!spec.suppression,
     }));
     const result = await getPublicCatalog({ mode: "all" }, db);
-    expect(find(result, "bhw.demographics.sex").state).toBe("suppressed");
+    expect(find(result, "bhw.demographics.sex").state).toBe("unavailable");
     expect(result.overview.availableDatasets).toBe(0);
     expect(result.overview.freshness.latestUpdate).toBeNull();
   });
 
-  it("fails closed on malformed values and absent privacy flags", async () => {
+  it("rejects malformed values but requires no obsolete amount-suppression flag for receipt shares", async () => {
     const result = await getPublicCatalog(
       area,
       reader({
@@ -399,7 +402,10 @@ describe("public catalog contract", () => {
       }),
     );
     expect(find(result, "population.residents").state).toBe("failed");
-    expect(find(result, "bhw.honorarium.province")).toMatchObject({ state: "failed", values: [] });
+    expect(find(result, "bhw.honorarium.province")).toMatchObject({
+      state: "available",
+      values: [{ value: 1, numerator: 1 }],
+    });
   });
 
   it("keeps a published Manila province census value at that node only", async () => {
@@ -483,29 +489,27 @@ it("supports only verified barangay measures, with derived coverage and no munic
   ).toBe(true);
 });
 
-it("withholds protected measure groups across parent and child scopes to prevent subtraction", async () => {
+it("publishes aggregate values at parent and child scopes without global suppression probes", async () => {
   const db = reader({
-    agg_demographics: [{ dimension: "sex", category: "A", n: 40, is_suppressed: false }],
-    agg_honorarium: [{ payer_level: "province", pct_receiving: 50, is_suppressed: false }],
+    agg_demographics: [{ dimension: "sex", category: "A", n: 40, is_suppressed: true }],
+    agg_honorarium: [{ payer_level: "province", pct_receiving: 50, is_suppressed: true }],
   });
-  db.privacy = async () => "suppressed";
-  for (const selection of [
-    { mode: "all" } as const,
-    { mode: "psgc", level: "citymun", code: "0102801" } as const,
-    { mode: "psgc", level: "barangay", code: "0102801001" } as const,
-  ]) {
-    const result = await getPublicCatalog(selection, db);
-    expect(find(result, "bhw.demographics.sex")).toMatchObject({ state: "suppressed", values: [] });
+  db.privacy = vi.fn(async () => "failed" as const);
+  for (const level of ["national", "region", "province", "citymun", "barangay"] as const) {
+    const result = await getPublicCatalog(
+      { mode: "psgc", level, code: level === "national" ? "PH" : "0102801001" },
+      db,
+    );
+    expect(find(result, "bhw.demographics.sex")).toMatchObject({
+      state: "available",
+      values: [{ value: 40, label: "A" }],
+    });
     expect(find(result, "bhw.honorarium.province")).toMatchObject({
-      state: "suppressed",
-      values: [],
+      state: "available",
+      values: [{ value: 50 }],
     });
   }
-  db.privacy = async () => "failed";
-  expect(find(await getPublicCatalog(area, db), "bhw.demographics.sex")).toMatchObject({
-    state: "failed",
-    values: [],
-  });
+  expect(db.privacy).not.toHaveBeenCalled();
 });
 
 it("preserves exact FHSIS source inputs while retaining legacy fallback and published rate", async () => {
@@ -541,7 +545,7 @@ it("preserves exact FHSIS source inputs while retaining legacy fallback and publ
 });
 
 it.each(["suppressed", "failed"] as const)(
-  "the BHW-only overview does not read protected values when privacy is %s",
+  "the BHW-only overview publishes aggregates regardless of the old global privacy result %s",
   async (state) => {
     const { getPublicDataset } = await import("./catalog");
     const db = reader({
@@ -562,17 +566,13 @@ it.each(["suppressed", "failed"] as const)(
     );
     expect(result.indicators).toHaveLength(66);
     expect(result.indicators.find((i) => i.id === "bhw.total")?.values).toEqual([{ value: 100 }]);
-    for (const indicator of result.indicators.filter((i) =>
-      /demographics|honorarium\./.test(i.id),
-    )) {
-      expect(indicator.state).toBe(state);
-      expect(indicator.values).toEqual([]);
-    }
-    expect(db.rows).not.toHaveBeenCalledWith(
-      expect.objectContaining({ suppression: "is_suppressed" }),
-      expect.anything(),
-      expect.anything(),
-    );
+    expect(result.indicators.find((i) => i.id === "bhw.demographics.education")?.values).toEqual([
+      { value: 987654, label: "Protected example" },
+    ]);
+    expect(result.indicators.find((i) => i.id === "bhw.honorarium.region")?.values).toEqual([
+      { value: 98.7654, numerator: null },
+    ]);
+    expect(db.privacy).not.toHaveBeenCalled();
     expect(db.source).toHaveBeenCalledWith("bhw-stepzero-2026");
     expect(db.source).toHaveBeenCalledWith("bhw-2025");
     expect(
@@ -586,7 +586,7 @@ it.each(["suppressed", "failed"] as const)(
       level: "national",
       code: "PH",
     });
-    expect(JSON.stringify(result)).not.toContain("987654");
+    expect(JSON.stringify(result)).toContain("987654");
   },
 );
 

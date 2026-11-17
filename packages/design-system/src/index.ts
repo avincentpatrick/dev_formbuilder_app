@@ -99,6 +99,8 @@ export { default as MdsCheckbox } from './components/Checkbox/Checkbox.vue';
 export { default as MdsRadio } from './components/Radio/Radio.vue';
 // M130 — a static, toned note in page content (a form's content blocks); unlike MdsAlert, never a live region.
 export { default as MdsCallout } from './components/Callout/Callout.vue';
+// M245 — a summary line that opens the content below it (DSR §5's disclosure), for a note's "details" block.
+export { default as MdsDisclosure } from './components/Disclosure/Disclosure.vue';
 export { default as MdsSwitch } from './components/Switch/Switch.vue';
 export { default as MdsSkeleton } from './components/Skeleton/Skeleton.vue';
 export { default as MdsModal } from './components/Modal/Modal.vue';

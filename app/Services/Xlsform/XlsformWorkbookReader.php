@@ -6,6 +6,7 @@ namespace App\Services\Xlsform;
 
 use App\Services\Xlsform\Dto\RawWorkbook;
 use App\Support\Spreadsheet\CellText;
+use OpenSpout\Reader\XLSX\Options as XlsxOptions;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
 /**
@@ -15,12 +16,19 @@ use OpenSpout\Reader\XLSX\Reader as XlsxReader;
  * carry many columns this product ignores: the first row of each sheet is the header (trimmed, BOM stripped
  * on the first cell); every later row becomes a header-keyed map; fully-empty rows are dropped. All domain
  * validation (a missing `survey` sheet, an unmapped `type`) is the parser's job, not the reader's.
+ *
+ * M244 (`R-24ec82a6`): EACH KEPT ROW REMEMBERS ITS ROW NUMBER IN THE SHEET, so a message that names a row names the
+ * one the author sees. OpenSpout skips empty rows by default and this reader dropped them again, so the parser's
+ * `$index + 2` named the wrong row after any blank spacer row. Empty rows are now read, counted and then dropped;
+ * the first non-empty row is the header, wherever it sits.
  */
 final class XlsformWorkbookReader
 {
     public function read(string $path): RawWorkbook
     {
-        $reader = new XlsxReader;
+        $options = new XlsxOptions;
+        $options->SHOULD_PRESERVE_EMPTY_ROWS = true;
+        $reader = new XlsxReader($options);
         $reader->open($path);
 
         $sheets = [];
@@ -31,12 +39,18 @@ final class XlsformWorkbookReader
 
                 $headers = [];
                 $rows = [];
+                $rowNumbers = [];
                 $isHeaderRow = true;
+                $physical = 0;
 
                 foreach ($sheet->getRowIterator() as $row) {
+                    $physical++;
                     $cells = $row->toArray();
 
                     if ($isHeaderRow) {
+                        if (! $this->hasAnyValue($cells)) {
+                            continue; // a blank row above the header
+                        }
                         $headers = $this->headerRow($cells);
                         $isHeaderRow = false;
 
@@ -46,11 +60,12 @@ final class XlsformWorkbookReader
                     $assoc = $this->associate($headers, $cells);
                     if ($assoc !== null) {
                         $rows[] = $assoc;
+                        $rowNumbers[] = $physical;
                     }
                 }
 
                 // A later sheet of the same (case-folded) name never clobbers an earlier one.
-                $sheets[$name] ??= ['headers' => $headers, 'rows' => $rows];
+                $sheets[$name] ??= ['headers' => $headers, 'rows' => $rows, 'row_numbers' => $rowNumbers];
             }
         } finally {
             $reader->close();
@@ -108,6 +123,20 @@ final class XlsformWorkbookReader
         }
 
         return $hasValue ? $assoc : null;
+    }
+
+    /**
+     * @param  array<int, mixed>  $cells
+     */
+    private function hasAnyValue(array $cells): bool
+    {
+        foreach ($cells as $cell) {
+            if ($cell !== null && trim($this->stringify($cell)) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Coerce a spreadsheet cell value to a string (form definitions are text; numbers/dates are rare but tolerated). */

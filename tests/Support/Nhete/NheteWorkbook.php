@@ -11,10 +11,11 @@ use RuntimeException;
  *
  *   KOBO      what a Kobo or ODK author writes for this module: notes in markdown (headings, bold, links, bullets) in
  *             one cell however long, a `media::image` for each diagram, `count-selected()` for "up to two", `regex()`
- *             for a word cap, a `required` FORMULA for "required when", and the placeholder as a hint.
- *   MERIDIAN  the same module in what this product's importer is documented to take (`docs/xlsform-interop-spec.md`):
- *             plain-text notes split under the 500-character label column, `count(.)`, and no word cap or "required
- *             when", which XLSForm cannot express here — so a constraint stands in for "required when".
+ *             for a word cap, a `required` FORMULA for "required when", and the placeholder as a hint. Since M244 the
+ *             import takes every one of these (the diagrams with a warning each).
+ *   MERIDIAN  the same module as `M237` measured what this product's importer was documented to take: plain-text notes
+ *             split under the 500-character label column, `count(.)`, no word cap, and (since M244) "required when" as
+ *             the same `required` formula, which the import now reads.
  *
  * Both come from the one {@see NhetePlan}, so a difference between their outcomes is the importer's, never the data's.
  */
@@ -106,8 +107,9 @@ final class NheteWorkbook
             },
         ];
 
-        if ($e['required'] === 'conditional' && $this->dialect === self::KOBO) {
-            // Kobo authors write "required when" as a formula in the required column.
+        if ($e['required'] === 'conditional') {
+            // Kobo authors write "required when" as a formula in the required column, and since M244 this product's
+            // import reads it as "Required when…" (`R-ea0cc482`), so both dialects write it.
             $row['required'] = implode(' or ', array_map(static fn (array $w): string => "\${{$w[0]}} = '{$w[1]}'", $e['required_when']));
         }
         if ($e['placeholder'] !== null && $this->dialect === self::KOBO) {
@@ -140,12 +142,6 @@ final class NheteWorkbook
                 ? "not(selected(., '{$e['exclusive']}') and count-selected(.) > 1)"
                 : "not(selected(., '{$e['exclusive']}')) or count(.) = 1";
             $messages[] = 'No view or opinion cannot be combined with another answer.';
-        }
-        if ($e['required'] === 'conditional' && ! $kobo) {
-            // XLSForm has no "required when" this product reads; a constraint is the stand-in to measure.
-            $when = implode(' or ', array_map(static fn (array $w): string => "\${{$w[0]}} = '{$w[1]}'", $e['required_when']));
-            $parts[] = "not({$when}) or . != ''";
-            $messages[] = 'Please tell us more here.';
         }
 
         return $parts === [] ? [null, null] : ['('.implode(') and (', $parts).')', implode(' ', $messages)];

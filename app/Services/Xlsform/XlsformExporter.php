@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Xlsform;
 
 use App\Enums\FieldType;
+use App\Enums\ValidationRuleType;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Forms\SchemaSnapshotSerializer;
@@ -24,14 +25,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * The four documented lossy types (§3) are expanded here: `page_break` → a zero-width group boundary,
  * `likert_matrix` → one `select_one` per row, `matrix` → one `select_one` per cell, `duration` → `decimal`.
  * A `#meridian` column carries round-trip breadcrumbs XLSForm cannot natively express.
+ *
+ * M244 writes what the import now reads back: "Required when…" as a `required` formula with its `required_message`
+ * ({@see XlsformRequiredFormula}, `R-0ceefbb4`), a note's content as markdown in its label ({@see XlsformMarkdown},
+ * `R-7e134c37`), and a Pattern or length rule as `regex()` / `string-length()` (`D228`).
  */
 final class XlsformExporter
 {
+    /** @var array<string, FieldType> every question's type by key, for the `required` formula's checks */
+    private array $typesByKey = [];
+
     public function __construct(
         private readonly SchemaSnapshotSerializer $serializer,
         private readonly XlsformTypeMap $types,
         private readonly GeoWireConverter $geo,
         private readonly XlsformWorkbookWriter $writer,
+        private readonly XlsformRequiredFormula $requiredFormula = new XlsformRequiredFormula,
+        private readonly XlsformMarkdown $markdown = new XlsformMarkdown,
     ) {}
 
     /** Stream the workbook as a download. The workbook is fully built up front (no DB in the closure). */
@@ -63,6 +73,14 @@ final class XlsformExporter
 
         $locale = $form->default_locale ?: 'en';
         $langs = $this->extraLanguages($sections, $fields, $locale);
+
+        $this->typesByKey = [];
+        foreach ($fields as $field) {
+            $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
+            if ($type !== null) {
+                $this->typesByKey[(string) $field['key']] = $type;
+            }
+        }
         $hasCascade = $this->anyOfType($fields, FieldType::CascadingSelect);
 
         // Partition fields: top-level (no section) render first, then each section as a group/repeat.
@@ -304,10 +322,12 @@ final class XlsformExporter
     {
         $row = ['name' => (string) $field['key']];
 
-        $this->fillText($row, 'label', $field['label'] ?? null, $field['label_translations'] ?? null, $langs);
+        $this->fillText($row, 'label', $this->labelFor($field), $field['label_translations'] ?? null, $langs);
         $this->fillText($row, 'hint', $field['hint'] ?? null, $field['hint_translations'] ?? null, $langs);
 
-        $row['required'] = in_array($field['is_required'] ?? 'optional', ['required', 'conditional'], true) ? 'yes' : '';
+        [$required, $requiredMessage, $requiredMessageTranslations] = $this->required($field);
+        $row['required'] = $required;
+        $this->fillText($row, 'required_message', $requiredMessage, $requiredMessageTranslations, $langs);
         $row['relevant'] = (string) ($field['relevant_expression'] ?? '');
 
         [$constraint, $message, $messageTranslations] = $this->constraint($field);
@@ -315,6 +335,60 @@ final class XlsformExporter
         $this->fillText($row, 'constraint_message', $message, $messageTranslations, $langs);
 
         return $row;
+    }
+
+    /**
+     * A note with content (M244, `R-7e134c37`) exports its content as markdown, which ODK renders and the import reads
+     * back into blocks; any other field its label. A picture block is left out, since the workbook carries no file.
+     *
+     * @param  array<string, mixed>  $field
+     */
+    private function labelFor(array $field): mixed
+    {
+        $config = is_array($field['config'] ?? null) ? $field['config'] : [];
+        $content = $config['content'] ?? null;
+        if (($field['field_type'] ?? null) === FieldType::Note->value && is_array($content) && $content !== []) {
+            $markdown = $this->markdown->toMarkdown(array_values(array_filter($content, 'is_array')));
+            if ($markdown !== '') {
+                return $markdown;
+            }
+        }
+
+        return $field['label'] ?? null;
+    }
+
+    /**
+     * The `required` cell and its message (M244, `R-0ceefbb4`): `yes` for a question always required; for one required
+     * when, the formula its rules stand for, with the first rule's message — falling back to `yes` only when a rule
+     * cannot be written as a check the import reads back.
+     *
+     * @param  array<string, mixed>  $field
+     * @return array{0: string, 1: ?string, 2: mixed}
+     */
+    private function required(array $field): array
+    {
+        $mode = $field['is_required'] ?? 'optional';
+        if ($mode === 'required') {
+            return ['yes', null, null];
+        }
+        if ($mode !== 'conditional') {
+            return ['', null, null];
+        }
+
+        $validations = is_array($field['validations'] ?? null) ? array_values(array_filter($field['validations'], 'is_array')) : [];
+        $formula = $this->requiredFormula->render($validations, $this->typesByKey);
+        if ($formula === null) {
+            return ['yes', null, null];
+        }
+
+        foreach ($validations as $validation) {
+            $type = ValidationRuleType::tryFrom((string) ($validation['rule_type'] ?? ''));
+            if ($type !== null && $type->governsRequiredness() && ! empty($validation['error_message'])) {
+                return [$formula, (string) $validation['error_message'], $validation['error_message_translations'] ?? null];
+            }
+        }
+
+        return [$formula, null, null];
     }
 
     /**
@@ -358,8 +432,9 @@ final class XlsformExporter
     /**
      * A field's XLSForm `constraint` expression, message, and message translations. Expression-based
      * validation rows pass through verbatim; the numeric/field-comparison structured rules our frozen
-     * grammar can express are rendered; all rendered pieces are ANDed. Other structured rule types
-     * (pattern, length, required_if, …) are a documented export limitation and are omitted.
+     * grammar can express are rendered; all rendered pieces are ANDed. M244 (`D228`): a Pattern or length rule is
+     * written as ODK's `regex()` / `string-length()`, which the import reads back into the same rule. "Required
+     * when…" goes to the `required` column instead ({@see self::required()}).
      *
      * @param  array<string, mixed>  $field
      * @return array{0: string, 1: ?string, 2: mixed}
@@ -402,8 +477,25 @@ final class XlsformExporter
             'max_value' => is_numeric($value) ? '. <= '.$value : null,
             'greater_than_field', 'less_than_field' => $relatedKey !== null ? '. '.($validation['rule_type'] === 'greater_than_field' ? '>' : '<').' ${'.$relatedKey.'}' : null,
             'at_least_field', 'at_most_field' => $relatedKey !== null ? '. '.($validation['rule_type'] === 'at_least_field' ? '>=' : '<=').' ${'.$relatedKey.'}' : null,
-            default => null, // pattern / length / required_if / … : documented export limitation
+            'min_length' => is_numeric($value) ? 'string-length(.) >= '.(int) $value : null,
+            'max_length' => is_numeric($value) ? 'string-length(.) <= '.(int) $value : null,
+            'pattern' => is_string($value) && $value !== '' ? $this->regexCall($value) : null,
+            default => null, // required_if / required_with go to `required`; the skip rules have no XLSForm column
         };
+    }
+
+    /**
+     * A Pattern as ODK's `regex()`: the rule matches the whole answer, so it is anchored. The formula grammar has no
+     * escapes in a string, so a pattern holding both quote marks cannot be written and is left out.
+     */
+    private function regexCall(string $pattern): ?string
+    {
+        $regex = '^(?:'.$pattern.')$';
+        if (! str_contains($regex, "'")) {
+            return "regex(., '".$regex."')";
+        }
+
+        return str_contains($regex, '"') ? null : 'regex(., "'.$regex.'")';
     }
 
     /**
@@ -541,7 +633,12 @@ final class XlsformExporter
         foreach ($langs as $lang) {
             $headers[] = 'hint::'.$lang;
         }
-        $headers = array_merge($headers, ['required', 'relevant', 'constraint', 'constraint_message']);
+        $headers[] = 'required';
+        $headers[] = 'required_message';
+        foreach ($langs as $lang) {
+            $headers[] = 'required_message::'.$lang;
+        }
+        $headers = array_merge($headers, ['relevant', 'constraint', 'constraint_message']);
         foreach ($langs as $lang) {
             $headers[] = 'constraint_message::'.$lang;
         }

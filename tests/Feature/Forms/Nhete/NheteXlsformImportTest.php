@@ -10,10 +10,10 @@ use App\Services\Forms\FormService;
 use App\Services\Xlsform\XlsformWorkbookWriter;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Testing\TestResponse;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Nhete\NheteAnswers;
 use Tests\Support\Nhete\NhetePlan;
@@ -29,8 +29,10 @@ uses(RefreshDatabase::class);
 | take, is imported, published and answered; and every KOBO habit the module would carry is met on its own, so one
 | habit's failure cannot hide another's.
 |
-| ⚠️ SEVERAL CASES PIN TODAY'S DEFECTS, EACH NAMING ITS ROW. They are measurements, not wishes: the increment that fixes
+| ⚠️ THE CASES PINNED TODAY'S DEFECTS, EACH NAMING ITS ROW. They are measurements, not wishes: the increment that fixes
 | a row flips its assertion in the same pull request, on purpose, so the fix is proven by the case that recorded it.
+| M244 flipped the import's seven (long notes, markdown, `count-selected`, `regex`, `required` formulas, pictures, the
+| language name), and the whole module in the Kobo dialect now imports, publishes and refuses what the original does.
 */
 
 beforeEach(function (): void {
@@ -122,7 +124,26 @@ function nheteFieldsOf(Tenant $tenant, User $admin, Form $form): Collection
     return FormField::query()->where('form_version_id', $form->current_published_version_id ?? $form->draft_version_id)->get()->keyBy('key');
 }
 
-it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only the answer rules XLSForm carries here', function (): void {
+/**
+ * Share a published form for guest submissions; returns a submitter and a reader of which questions a refusal names.
+ *
+ * @return array{0: Closure(array<string, mixed>): TestResponse, 1: Closure(TestResponse): list<string>}
+ */
+function nheteSubmitter(Tenant $tenant, User $admin, Form $form, string $slug): array
+{
+    test()->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/share", [
+        'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null, 'public_slug' => $slug,
+    ]);
+    enterTenant($tenant->id, $admin->id);
+    $token = shareTokenFor(Form::query()->findOrFail($form->id));
+
+    return [
+        static fn (array $answers) => test()->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", ['answers' => $answers]),
+        static fn ($response): array => $response->status() === 422 ? array_column($response->json('error.details.fields') ?? [], 'field') : [],
+    ];
+}
+
+it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps the answer rules it carries', function (): void {
     [$tenant, $admin] = nheteWorkspace();
     $plan = new NhetePlan;
     $sheets = (new NheteWorkbook($plan, NheteWorkbook::MERIDIAN))->sheets();
@@ -133,16 +154,10 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
         ->and($outcome['published'])->toBeTrue('publish refused: '.json_encode($outcome['publish_toast']));
 
     $form = $outcome['form'];
-    // TODAY'S DEFECT (`xlsform-default-language-name`, found by `M239`'s walk): the settings sheet's `default_language`
-    // is a language NAME, stored as the locale as it stands, so the guest page writes `<html lang="English">`.
-    expect($form->default_locale)->toBe('English');
-    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/share", [
-        'allow_guest_submissions' => true, 'bot_challenge' => 'off', 'guest_rate_limit_per_minute' => null, 'public_slug' => 'nhete',
-    ]);
-    enterTenant($tenant->id, $admin->id);
-    $token = shareTokenFor(Form::query()->findOrFail($form->id));
-    $submit = fn (array $answers) => $this->postJson("http://acme.meridian.test/api/v1/public/f/{$token}/submissions", ['answers' => $answers]);
-    $refusedOn = static fn ($response): array => $response->status() === 422 ? array_column($response->json('error.details.fields') ?? [], 'field') : [];
+    // M244 (`R-49262cca`): the settings sheet's `default_language: English` is stored as its code, so the guest page
+    // writes a valid `<html lang>`. Until M244 it was stored as the name.
+    expect($form->default_locale)->toBe('en');
+    [$submit, $refusedOn] = nheteSubmitter($tenant, $admin, $form, 'nhete');
     $base = NheteAnswers::scenario($plan);
 
     expect($submit($base)->status())->toBe(201);
@@ -151,67 +166,95 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
     expect($refusedOn($submit([...$base, 'q3_1' => ['access', 'results', 'use']])))->toBe(['q3_1'])
         ->and($refusedOn($submit([...$base, 'q3_2' => ['noview', 'ip']])))->toBe(['q3_2']);
 
-    // LOST: the 1,500-word cap. Expressions here have no `regex()` or `string-length()` (`xlsform-import-odk-functions`).
-    expect($submit([...$base, 'q1_1' => NheteAnswers::words(1501)])->status())->toBe(201);
+    // Kept since M244: "required when", written in the `required` column and read as "Required when…" (`R-ea0cc482`).
+    // Until M244 the column was read as yes or blank, and a missing comment passed.
+    expect($refusedOn($submit(array_diff_key($base, ['a07_comment' => 1]))))->toBe(['a07_comment']);
 
-    // LOST: "required when". The importer reads `required` as yes or blank only, and the stand-in constraint
-    // `not(<when>) or . != ''` never runs on a blank answer, so a missing comment passes (`xlsform-required-when`).
-    expect($submit(array_diff_key($base, ['a07_comment' => 1]))->status())->toBe(201);
+    // LOST in this dialect: the 1,500-word cap, which it does not write (the Kobo dialect's `regex()` carries it below).
+    expect($submit([...$base, 'q1_1' => NheteAnswers::words(1501)])->status())->toBe(201);
+})->group('nhete');
+
+it('imports the whole module in the Kobo dialect, publishes it, and refuses what the original refuses', function (): void {
+    [$tenant, $admin] = nheteWorkspace();
+    $plan = new NhetePlan;
+
+    // M244: long markdown notes become note content, `count-selected` is `count`, the word cap's `regex()` is a Pattern
+    // rule (`D228`), the `required` formulas are "Required when…", and the three diagrams are named in warnings.
+    $outcome = nheteImportAndPublish($tenant, $admin, (new NheteWorkbook($plan, NheteWorkbook::KOBO))->sheets(), 'kobo module');
+    expect($outcome['import_status'])->toBe(302)
+        ->and($outcome['import_toast']['type'] ?? null)->toBe('success')
+        ->and($outcome['warnings'])->toHaveCount(3)
+        ->and(implode(' ', $outcome['warnings']))->toContain('nhete-diagram.png')
+        ->and($outcome['published'])->toBeTrue('publish refused: '.json_encode($outcome['publish_toast']));
+
+    $fields = nheteFieldsOf($tenant, $admin, $outcome['form']);
+    $notes = $fields->filter(static fn (FormField $field): bool => $field->field_type->value === 'note');
+    expect($outcome['form']->default_locale)->toBe('en')
+        ->and($notes->filter(static fn (FormField $note): bool => ($note->config['content'] ?? []) !== [])->count())->toBeGreaterThan(100)
+        ->and($notes->every(static fn (FormField $note): bool => mb_strlen($note->label) <= NheteWorkbook::LABEL_MAX))->toBeTrue()
+        ->and($notes->every(static fn (FormField $note): bool => ! str_contains($note->label, '**') && ! str_starts_with($note->label, '#')))->toBeTrue();
+
+    [$submit, $refusedOn] = nheteSubmitter($tenant, $admin, $outcome['form'], 'nhete-kobo');
+    $base = NheteAnswers::scenario($plan);
+
+    expect($submit($base)->status())->toBe(201)
+        ->and($refusedOn($submit([...$base, 'q1_1' => NheteAnswers::words(1501)])))->toBe(['q1_1'])
+        ->and($refusedOn($submit([...$base, 'q3_1' => ['access', 'results', 'use']])))->toBe(['q3_1'])
+        ->and($refusedOn($submit([...$base, 'q3_2' => ['noview', 'ip']])))->toBe(['q3_2'])
+        ->and($refusedOn($submit(array_diff_key($base, ['a07_comment' => 1]))))->toBe(['a07_comment']);
 })->group('nhete');
 
 it('meets each Kobo habit the NHETE module would carry, one at a time', function (): void {
     [$tenant, $admin] = nheteWorkspace();
     $choices = [['list_name' => 'l', 'name' => 'a', 'label' => 'A'], ['list_name' => 'l', 'name' => 'b', 'label' => 'B'], ['list_name' => 'l', 'name' => 'change', 'label' => 'Change']];
 
-    // A note longer than the 500-character label column is not refused: the INSERT fails, and the request is a server
-    // error with no message (`xlsform-import-long-label`). Asserted with exception handling off, because rendering the
-    // debug error page alone takes about two minutes here; the draft is untouched either way.
-    foreach ([
-        'a note over 500 characters' => nheteProbe([['type' => 'note', 'name' => 'long_note', 'label' => str_repeat('Long note text that a Kobo author keeps in one cell. ', 12)]]),
-        'the whole module in the Kobo dialect' => (new NheteWorkbook(new NhetePlan, NheteWorkbook::KOBO))->sheets(),
-    ] as $what => $sheets) {
-        enterTenant($tenant->id, $admin->id);
-        $form = app(FormService::class)->create($tenant, $admin, $what);
-        $this->withoutExceptionHandling();
-        try {
-            $this->actingAs($admin)->post("http://acme.meridian.test/forms/{$form->id}/draft/xlsform-import", ['file' => nheteUpload($sheets)]);
-            $thrown = null;
-        } catch (QueryException $e) {
-            $thrown = (string) $e->getCode();
-        }
-        $this->withExceptionHandling();
-        expect($thrown)->toBe('22001', "{$what}: expected the database to refuse a label over 500 characters")
-            ->and(nheteFieldsOf($tenant, $admin, $form))->toHaveCount(0);
-    }
+    // A note longer than the 500-character label column becomes note content, and the label keeps its words, cut to fit
+    // (`R-24ec82a6`). Until M244 the INSERT failed with `22001`, and the author saw a server error.
+    $long = str_repeat('Long note text that a Kobo author keeps in one cell. ', 12);
+    $out = nheteImportAndPublish($tenant, $admin, nheteProbe([['type' => 'note', 'name' => 'long_note', 'label' => $long]]), 'long note');
+    $note = nheteFieldsOf($tenant, $admin, $out['form'])->get('long_note');
+    expect($out['published'])->toBeTrue()
+        ->and(mb_strlen($note->label))->toBeLessThanOrEqual(NheteWorkbook::LABEL_MAX)
+        ->and($note->config['content'][0]['spans'][0]['text'])->toBe(trim($long));
 
-    // Markdown in a note is kept as literal characters (`xlsform-import-markdown`).
+    // Markdown in a note becomes a heading and a paragraph with bold and a link (`R-5957b273`).
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([['type' => 'note', 'name' => 'md', 'label' => "# Heading\n\nSome **bold** words and a [link](https://example.org)."]]), 'markdown');
     $note = nheteFieldsOf($tenant, $admin, $out['form'])->get('md');
     expect($out['published'])->toBeTrue()
-        ->and($note->label)->toContain('**bold**')->toContain('# Heading')
-        ->and($note->config['content'] ?? [])->toBe([]);
+        ->and($note->label)->toBe("Heading\nSome bold words and a link.")
+        ->and($note->config['content'])->toEqual([
+            ['type' => 'heading', 'level' => 1, 'text' => 'Heading'],
+            ['type' => 'paragraph', 'spans' => [
+                ['text' => 'Some '], ['text' => 'bold', 'bold' => true], ['text' => ' words and a '], ['text' => 'link', 'link' => 'https://example.org'], ['text' => '.'],
+            ]],
+        ]);
 
-    // `count-selected()` imports, then publish refuses it with a parser token, not its name (`xlsform-import-odk-functions`).
+    // `count-selected()` is `count()`, which publish takes (`R-bb470c3a`).
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([['type' => 'select_multiple l', 'name' => 'pick', 'label' => 'Pick', 'constraint' => 'count-selected(.) <= 2']], $choices), 'count-selected');
-    expect($out['import_status'])->toBe(302)->and($out['published'])->toBeFalse()
-        ->and($out['publish_toast']['message'] ?? '')->toContain('unexpected_token');
+    expect($out['import_status'])->toBe(302)->and($out['warnings'])->toBe([])->and($out['published'])->toBeTrue()
+        ->and(nheteFieldsOf($tenant, $admin, $out['form'])->get('pick')->validations()->sole()->expression)->toBe('count(.) <= 2');
 
-    // `regex()` imports, then publish refuses it as an unknown function (`xlsform-import-odk-functions`).
+    // A whole `regex()` constraint is a Pattern rule, which publish takes (`D228`).
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([['type' => 'text', 'name' => 'essay', 'label' => 'Essay', 'appearance' => 'multiline', 'constraint' => "regex(., '^[a-z ]*$')"]]), 'regex');
-    expect($out['published'])->toBeFalse()->and($out['publish_toast']['message'] ?? '')->toContain('unknown_function');
+    $rule = nheteFieldsOf($tenant, $admin, $out['form'])->get('essay')->validations()->sole();
+    expect($out['published'])->toBeTrue()
+        ->and($rule->rule_type?->value)->toBe('pattern')
+        ->and($rule->rule_value)->toBe('[a-z ]*');
 
-    // A `required` FORMULA imports as optional, with no warning (`xlsform-required-when`).
+    // A `required` FORMULA is "Required when…", with no warning (`R-ea0cc482`).
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([
         ['type' => 'select_one l', 'name' => 'cut', 'label' => 'Cut'],
         ['type' => 'text', 'name' => 'why', 'label' => 'Why', 'required' => "\${cut} = 'change'"],
     ], $choices), 'required formula');
+    $why = nheteFieldsOf($tenant, $admin, $out['form'])->get('why');
     expect($out['warnings'])->toBe([])
-        ->and(nheteFieldsOf($tenant, $admin, $out['form'])->get('why')->is_required->value)->toBe('optional');
+        ->and($out['published'])->toBeTrue()
+        ->and($why->is_required->value)->toBe('conditional')
+        ->and($why->validations()->sole()->rule_type?->value)->toBe('required_if');
 
-    // `media::image` on a note is dropped, with no warning (`xlsform-import-media`).
+    // `media::image` on a note cannot come with the workbook; the author is told which file to upload (`R-915e5d0c`).
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([['type' => 'note', 'name' => 'diagram', 'label' => 'Diagram', 'media::image' => 'diagram.png']]), 'media');
-    expect($out['warnings'])->toBe([])
-        ->and(nheteFieldsOf($tenant, $admin, $out['form'])->get('diagram')->config['content'] ?? [])->toBe([]);
+    expect($out['warnings'])->toBe(['Row 3: “diagram” names the file “diagram.png”, which an import cannot bring in. Upload it in the builder.']);
 
     // `begin_kobomatrix` is refused UPFRONT with a message naming the row, and nothing is written. Correct as built.
     $out = nheteImportAndPublish($tenant, $admin, nheteProbe([

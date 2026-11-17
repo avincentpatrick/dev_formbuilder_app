@@ -7,6 +7,7 @@ namespace App\Services\Xlsform;
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
 use App\Exceptions\Xlsform\XlsformImportException;
+use App\Rules\ContentBlocks;
 use App\Services\Xlsform\Dto\FieldSpec;
 use App\Services\Xlsform\Dto\ImportPlan;
 use App\Services\Xlsform\Dto\RawWorkbook;
@@ -19,13 +20,25 @@ use App\Support\Forms\OtherSpecify;
  * Turns a {@see RawWorkbook} into a DB-free {@see ImportPlan} (Increment G7b / docs/xlsform-interop-spec.md
  * §2–§6). Pure and side-effect-free: it reads the reverse type map ({@see XlsformTypeMap::toFieldType()}) and
  * the geo wire converter ({@see GeoWireConverter::wireToGeoJson()}) from G7a, and validates the whole file
- * UPFRONT — a missing `survey` sheet or an unmapped `type` throws {@see XlsformImportException} BEFORE any
- * plan is returned, so the importer's destructive draft-replace never runs on a bad workbook (§6).
+ * UPFRONT — a missing `survey` sheet, an unmapped `type` or a cell too long to store throws
+ * {@see XlsformImportException} BEFORE any plan is returned, so the importer's destructive draft-replace never runs
+ * on a bad workbook (§6).
  *
  * Lossy inputs degrade with a warning, never a failure: a dynamic `repeat_count`, a matrix/likert grid
  * marker, an illegal `name` (sanitized to a valid key). Cascades — ours and foreign — are reconstructed by
- * the {@see CascadeResolver}. Structured constraints are never decomposed: a `constraint` is always one
- * expression-based validation row (§2).
+ * the {@see CascadeResolver}.
+ *
+ * M244 reads the workbook the way ODK and Kobo write it:
+ *   - every row is named by the number the author sees ({@see RawWorkbook::rowNumber()});
+ *   - languages are codes, and the default language's column is the base text ({@see XlsformLanguages});
+ *   - a note's markdown, or a note too long for a label, becomes note content; a question's label, hint and choices
+ *     lose their formatting, with a warning ({@see XlsformMarkdown});
+ *   - formulas take ODK's spellings, and name what the grammar lacks ({@see XlsformExpressionTranslator});
+ *   - a whole `regex`/`string-length` constraint becomes a Pattern or length rule (`D228`);
+ *   - a `required` formula becomes "Required when…" ({@see XlsformRequiredFormula});
+ *   - a picture, sound or video a row names is reported, since the file cannot come with the workbook;
+ *   - every cell is measured against what can store it, and the file is refused naming each one too long
+ *     ({@see XlsformColumnLimits}).
  */
 final class XlsformImportParser
 {
@@ -36,6 +49,9 @@ final class XlsformImportParser
      */
     public const APPEARANCE_MAX_LENGTH = 60;
 
+    /** M244: the columns that name a picture, sound or video for a row, which an import cannot bring in. */
+    private const MEDIA_COLUMNS = ['image', 'big-image', 'audio', 'video'];
+
     /**
      * M177 (`R-71509975`): each `or_other` question and the Please specify question made for it, kept as objects so the
      * link survives {@see self::sanitizeKeys()} renaming either key. Reset at every parse.
@@ -44,11 +60,21 @@ final class XlsformImportParser
      */
     private array $otherPairs = [];
 
+    private XlsformColumnLimits $limits;
+
+    private XlsformLanguages $languages;
+
     public function __construct(
         private readonly XlsformTypeMap $types,
         private readonly GeoWireConverter $geo,
         private readonly CascadeResolver $cascades,
-    ) {}
+        private readonly XlsformExpressionTranslator $translator = new XlsformExpressionTranslator,
+        private readonly XlsformMarkdown $markdown = new XlsformMarkdown,
+        private readonly XlsformRequiredFormula $requiredFormula = new XlsformRequiredFormula,
+    ) {
+        $this->limits = new XlsformColumnLimits;
+        $this->languages = new XlsformLanguages(null, []);
+    }
 
     public function parse(RawWorkbook $workbook): ImportPlan
     {
@@ -58,12 +84,21 @@ final class XlsformImportParser
 
         $warnings = [];
         $this->otherPairs = [];
-        $choicesByList = $this->normalizeChoices($workbook);
+        $this->limits = new XlsformColumnLimits;
+        $settingsRow = $workbook->rows('settings')[0] ?? [];
+        $this->languages = new XlsformLanguages($this->trimToNull($this->col($settingsRow, 'default_language')), $workbook->headers('survey'));
+
+        $choicesByList = $this->normalizeChoices($workbook, $warnings);
 
         [$sections, $fields] = $this->walkSurvey($workbook, $choicesByList, $warnings);
+        $settings = $this->parseSettings($workbook, $warnings);
+
+        // Every cell is measured before anything is resolved further, and one refusal names them all (§6).
+        $this->limits->assertNoneTooLong();
 
         $fields = $this->cascades->resolve($fields, $choicesByList, $warnings);
 
+        $this->resolveRequiredFormulas($fields, $warnings);
         $this->sanitizeKeys($sections, $fields, $warnings);
         $this->relinkOtherPairs();
         $this->assignSequences($sections, $fields);
@@ -71,7 +106,7 @@ final class XlsformImportParser
         return new ImportPlan(
             sections: $sections,
             fields: $fields,
-            settings: $this->parseSettings($workbook),
+            settings: $settings,
             warnings: array_values(array_unique($warnings)),
         );
     }
@@ -93,31 +128,34 @@ final class XlsformImportParser
         $stack = [];
 
         foreach ($workbook->rows('survey') as $index => $row) {
-            $rowNumber = $index + 2; // header is row 1
+            $rowNumber = $workbook->rowNumber('survey', $index);
             $typeRaw = trim((string) ($this->col($row, 'type') ?? ''));
             if ($typeRaw === '') {
                 continue;
             }
 
             $lower = strtolower($typeRaw);
+            $name = trim((string) ($this->col($row, 'name') ?? ''));
+            $this->warnMedia('Row', $rowNumber, $row, $name, $warnings);
 
             if (str_starts_with($lower, 'begin ')) {
                 $marker = $this->trimToNull($this->col($row, '#meridian'));
-                $name = trim((string) ($this->col($row, 'name') ?? ''));
 
                 if ($marker === XlsformTypeMap::MARKER_PAGE_BREAK) {
+                    [$label] = $this->plainText($row, 'label', $rowNumber, XlsformColumnLimits::FIELD_LABEL, $warnings, $name);
                     $fields[] = new FieldSpec(
                         key: $name,
                         fieldType: FieldType::PageBreak,
                         sectionKey: $this->currentSectionKey($stack),
-                        label: (string) ($this->col($row, 'label') ?? ''),
+                        label: $label ?? '',
+                        sourceRow: $rowNumber,
                     );
                     $stack[] = ['kind' => 'pagebreak', 'sectionKey' => null];
 
                     continue;
                 }
 
-                $section = $this->beginSection($lower, $name, $row, $warnings);
+                $section = $this->beginSection($lower, $name, $row, $rowNumber, $warnings);
                 $sections[] = $section;
                 $stack[] = ['kind' => 'section', 'sectionKey' => $section->key];
 
@@ -147,7 +185,7 @@ final class XlsformImportParser
      * @param  array<string, ?string>  $row
      * @param  list<string>  $warnings
      */
-    private function beginSection(string $lowerType, string $name, array $row, array &$warnings): SectionSpec
+    private function beginSection(string $lowerType, string $name, array $row, int $rowNumber, array &$warnings): SectionSpec
     {
         $isRepeat = str_contains($lowerType, 'repeat');
 
@@ -161,13 +199,15 @@ final class XlsformImportParser
             }
         }
 
+        [$label, $translations] = $this->plainText($row, 'label', $rowNumber, XlsformColumnLimits::SECTION_LABEL, $warnings, $name);
+
         return new SectionSpec(
             key: $name,
-            label: (string) ($this->col($row, 'label') ?? ''),
-            labelTranslations: $this->translations($row, 'label') ?: null,
+            label: $label ?? '',
+            labelTranslations: $translations ?: null,
             isRepeatable: $isRepeat,
             maxInstances: $maxInstances,
-            relevantExpression: $this->trimToNull($this->col($row, 'relevant')),
+            relevantExpression: $this->formula($row, 'relevant', $rowNumber, $name, $warnings),
         );
     }
 
@@ -196,27 +236,230 @@ final class XlsformImportParser
             $config['options'] = $this->optionsFromList($choicesByList, $listName);
         }
 
-        [$defaultValue, $defaultIsExpression] = $this->resolveDefault($type, $row, $config);
+        [$defaultValue, $defaultIsExpression] = $this->resolveDefault($type, $row, $rowNumber, $key, $config, $warnings);
+
+        if ($type === FieldType::Note) {
+            [$label, $labelTranslations] = $this->noteText($row, $rowNumber, $key, $config, $warnings);
+        } else {
+            [$label, $labelTranslations] = $this->plainText($row, 'label', $rowNumber, XlsformColumnLimits::FIELD_LABEL, $warnings, $key);
+        }
+        [$hint, $hintTranslations] = $this->plainText($row, 'hint', $rowNumber, XlsformColumnLimits::HINT, $warnings, $key);
+
+        [$isRequired, $requiredFormula] = $this->resolveRequired($row, $rowNumber, $warnings);
+        [$requiredMessage, $requiredMessageTranslations] = $this->message($row, 'required_message', $rowNumber, $warnings);
+        if ($isRequired === RequiredMode::Required && $requiredMessage !== null) {
+            $warnings[] = "The required message of “{$key}” was not imported: a question that is always required shows this app's own message.";
+        }
 
         return new FieldSpec(
             key: $key,
             fieldType: $type,
             sectionKey: $sectionKey,
             config: $config,
-            label: (string) ($this->col($row, 'label') ?? ''),
-            labelTranslations: $this->translations($row, 'label') ?: null,
-            hint: $this->trimToNull($this->col($row, 'hint')),
-            hintTranslations: $this->translations($row, 'hint') ?: null,
+            label: $label ?? '',
+            labelTranslations: $labelTranslations ?: null,
+            hint: $this->trimToNull($hint),
+            hintTranslations: $hintTranslations ?: null,
             defaultValue: $defaultValue,
             defaultValueIsExpression: $defaultIsExpression,
-            isRequired: $this->resolveRequired($this->col($row, 'required')),
-            relevantExpression: $this->trimToNull($this->col($row, 'relevant')),
+            isRequired: $isRequired,
+            relevantExpression: $this->formula($row, 'relevant', $rowNumber, $key, $warnings),
             appearance: $this->resolveAppearance($type, $appearance, $key, $warnings),
-            validations: $this->resolveConstraint($row),
+            validations: $this->resolveConstraint($row, $type, $rowNumber, $key, $warnings),
             listName: $listName,
             choiceFilter: $this->trimToNull($this->col($row, 'choice_filter')),
             marker: $marker,
+            requiredFormula: $requiredFormula,
+            requiredMessage: $requiredMessage,
+            requiredMessageTranslations: $requiredMessageTranslations ?: null,
+            sourceRow: $rowNumber,
         );
+    }
+
+    /**
+     * A row's text in `$prefix` with its formatting taken out (M244, `R-5957b273`): a question's label, hint or a
+     * section's label is plain text here, so `**bold**` would reach a respondent as typed. One warning per row, only
+     * when something was taken out. Each language is measured against `$limit`.
+     *
+     * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
+     * @return array{0: ?string, 1: array<string, string>}
+     */
+    private function plainText(array $row, string $prefix, int $rowNumber, int $limit, array &$warnings, string $owner = ''): array
+    {
+        [$base, $translations] = $this->languages->text($row, $prefix, $warnings);
+
+        $changed = false;
+        if ($base !== null) {
+            $plain = $this->markdown->plainLabel($base);
+            $changed = $plain !== $base;
+            $base = $plain;
+            $this->limits->measure('survey', $rowNumber, $prefix, $base, $limit);
+        }
+        foreach ($translations as $language => $text) {
+            $plain = $this->markdown->plainLabel($text);
+            $changed = $changed || $plain !== $text;
+            $translations[$language] = $plain;
+            $this->limits->measure('survey', $rowNumber, $prefix.'::'.$language, $plain, $limit);
+        }
+
+        if ($changed) {
+            $warnings[] = "Row {$rowNumber}: the {$prefix} of “{$owner}” had formatting, which was removed; it is plain text in this app.";
+        }
+
+        return [$base, $translations];
+    }
+
+    /**
+     * A note's text (M244, `R-5957b273`, `R-24ec82a6`). It becomes note content when it is formatted or longer than a
+     * label holds, unless it shows an earlier answer (content is not piped) or, at a label's length, has translations
+     * (content shows in the default language only, `D70`, so its translations would stop reaching anyone). The label
+     * kept beside content is its plain words, cut to fit: it names the note in the builder and prints on paper.
+     *
+     * @param  array<string, ?string>  $row
+     * @param  array<string, mixed>  $config
+     * @param  list<string>  $warnings
+     * @return array{0: ?string, 1: array<string, string>}
+     */
+    private function noteText(array $row, int $rowNumber, string $key, array &$config, array &$warnings): array
+    {
+        [$base, $translations] = $this->languages->text($row, 'label', $warnings);
+        if ($base === null) {
+            return [null, $translations];
+        }
+
+        $pipes = str_contains($base, '${');
+        $long = mb_strlen($base) > XlsformColumnLimits::FIELD_LABEL;
+
+        if (! $pipes && ($long || $translations === [])) {
+            $reading = $this->markdown->toBlocks($base);
+            $blocks = $reading['blocks'];
+
+            if (($reading['formatted'] || $long) && $blocks !== []) {
+                if (count($blocks) > ContentBlocks::MAX_BLOCKS) {
+                    $this->limits->measureCount('survey', $rowNumber, 'label', count($blocks), ContentBlocks::MAX_BLOCKS, 'note content blocks');
+
+                    return [$base, $translations];
+                }
+
+                $problem = ContentBlocks::problem($blocks, true);
+                if ($problem === null) {
+                    $config['content'] = $blocks;
+                    $this->warnMarkdownIssues($rowNumber, $key, $reading['issues'], $warnings);
+                    if ($translations !== []) {
+                        $warnings[] = "Row {$rowNumber}: the note “{$key}” is too long for a label, so it became note content, which shows in the form's default language only; its translations were kept as its name.";
+                    }
+
+                    $label = XlsformMarkdown::cut(XlsformMarkdown::plainText($blocks), XlsformColumnLimits::FIELD_LABEL);
+                    foreach ($translations as $language => $text) {
+                        $translations[$language] = XlsformMarkdown::cut($this->markdown->plainLabel($text), XlsformColumnLimits::FIELD_LABEL);
+                    }
+
+                    return [$label, $translations];
+                }
+
+                $warnings[] = "Row {$rowNumber}: the note “{$key}” could not be carried as formatted content ({$problem}), so it was imported as plain text.";
+            }
+        }
+
+        $plain = $this->markdown->plainLabel($base);
+        $changed = $plain !== $base;
+        $this->limits->measure('survey', $rowNumber, 'label', $plain, XlsformColumnLimits::FIELD_LABEL);
+        foreach ($translations as $language => $text) {
+            $plainTranslation = $this->markdown->plainLabel($text);
+            $changed = $changed || $plainTranslation !== $text;
+            $translations[$language] = $plainTranslation;
+            $this->limits->measure('survey', $rowNumber, 'label::'.$language, $plainTranslation, XlsformColumnLimits::FIELD_LABEL);
+        }
+
+        if ($changed) {
+            $why = $pipes ? 'it shows an earlier answer, which formatted note content cannot' : 'it has translations, and formatted note content shows in one language only';
+            $warnings[] = "Row {$rowNumber}: the note “{$key}” had formatting, which was removed because {$why}.";
+        }
+
+        return [$plain, $translations];
+    }
+
+    /**
+     * @param  list<array{kind: string, detail: string}>  $issues
+     * @param  list<string>  $warnings
+     */
+    private function warnMarkdownIssues(int $rowNumber, string $key, array $issues, array &$warnings): void
+    {
+        foreach ($issues as $issue) {
+            $warnings[] = match ($issue['kind']) {
+                'image' => "Row {$rowNumber}: the note “{$key}” shows the picture “{$issue['detail']}”, which an import cannot bring in. Upload it into the note.",
+                'unsafe_link' => "Row {$rowNumber}: the note “{$key}” links to “{$issue['detail']}”, which is not a web, email or phone link, so its words were kept without the link.",
+                default => "Row {$rowNumber}: the note “{$key}” held HTML, whose tags were removed; its words were kept.",
+            };
+        }
+    }
+
+    /**
+     * A row's message column (`constraint_message`, `required_message`), measured in every language.
+     *
+     * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
+     * @return array{0: ?string, 1: array<string, string>}
+     */
+    private function message(array $row, string $prefix, int $rowNumber, array &$warnings): array
+    {
+        [$base, $translations] = $this->languages->text($row, $prefix, $warnings);
+        $base = $this->trimToNull($base);
+        $this->limits->measure('survey', $rowNumber, $prefix, $base, XlsformColumnLimits::MESSAGE);
+        foreach ($translations as $language => $text) {
+            $this->limits->measure('survey', $rowNumber, $prefix.'::'.$language, $text, XlsformColumnLimits::MESSAGE);
+        }
+
+        return [$base, $translations];
+    }
+
+    /**
+     * A formula column in ODK's spelling, renamed where this product has its own name for it, with a warning for
+     * anything the grammar does not have (M244, `R-bb470c3a`). It is kept as written, so nothing the author wrote is
+     * lost, and publish refuses it naming the function.
+     *
+     * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
+     */
+    private function formula(array $row, string $column, int $rowNumber, string $owner, array &$warnings): ?string
+    {
+        $value = $this->trimToNull($this->col($row, $column));
+        if ($value === null) {
+            return null;
+        }
+        $this->limits->measure('survey', $rowNumber, $column, $value, XlsformColumnLimits::EXPRESSION);
+
+        $translated = $this->translator->translate($value);
+        $this->warnFormula($column, $owner, $translated, $warnings);
+
+        return $translated;
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     */
+    private function warnFormula(string $column, string $owner, ?string $expression, array &$warnings): void
+    {
+        if ($expression === null) {
+            return;
+        }
+
+        $unsupported = $this->translator->unsupported($expression);
+        if ($unsupported !== []) {
+            $names = implode(', ', array_map(
+                static fn (string $name): string => XlsformExpressionTranslator::isOperatorWord($name) ? "the operator “{$name}”" : "“{$name}”",
+                $unsupported,
+            ));
+            $warnings[] = "The {$column} of “{$owner}” uses {$names}, which this app does not have. It was kept as written, so the form will not publish until it is changed.";
+
+            return;
+        }
+
+        $problem = $this->translator->syntaxProblem($expression);
+        if ($problem !== null) {
+            $warnings[] = "The {$column} of “{$owner}” cannot be read: {$problem} It was kept as written, so the form will not publish until it is changed.";
+        }
     }
 
     /**
@@ -226,11 +469,12 @@ final class XlsformImportParser
      *
      * @param  array<string, ?string>  $row
      * @param  array<string, mixed>  $config
+     * @param  list<string>  $warnings
      * @return array{0: ?string, 1: bool}
      */
-    private function resolveDefault(FieldType $type, array $row, array &$config): array
+    private function resolveDefault(FieldType $type, array $row, int $rowNumber, string $key, array &$config, array &$warnings): array
     {
-        $calculation = $this->trimToNull($this->col($row, 'calculation'));
+        $calculation = $this->formula($row, 'calculation', $rowNumber, $key, $warnings);
         $default = $this->trimToNull($this->col($row, 'default'));
 
         if ($type === FieldType::Calculated) {
@@ -257,21 +501,37 @@ final class XlsformImportParser
     }
 
     /**
+     * A `constraint` as this product's rows (§2; M244, `D228`): each top-level `and`-part that is a whole
+     * `regex(., …)` or `string-length(.) op N` becomes a Pattern or length rule where the question can take it, and the
+     * rest stays one expression row in the author's words. Every row carries the constraint's message.
+     *
      * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
      * @return list<ValidationSpec>
      */
-    private function resolveConstraint(array $row): array
+    private function resolveConstraint(array $row, FieldType $type, int $rowNumber, string $key, array &$warnings): array
     {
         $constraint = $this->trimToNull($this->col($row, 'constraint'));
+        [$message, $messageTranslations] = $this->message($row, 'constraint_message', $rowNumber, $warnings);
         if ($constraint === null) {
             return [];
         }
+        $this->limits->measure('survey', $rowNumber, 'constraint', $constraint, XlsformColumnLimits::EXPRESSION);
 
-        return [new ValidationSpec(
-            expression: $constraint,
-            errorMessage: $this->trimToNull($this->col($row, 'constraint_message')),
-            errorMessageTranslations: $this->translations($row, 'constraint_message') ?: null,
-        )];
+        [$rules, $kept] = $this->translator->constraint($this->translator->translate($constraint), $type);
+        $this->warnFormula('constraint', $key, $kept, $warnings);
+
+        $rows = $rules;
+        if ($kept !== null) {
+            $rows[] = new ValidationSpec(expression: $kept);
+        }
+
+        $out = [];
+        foreach ($rows as $i => $spec) {
+            $out[] = $spec->withMessage($message, $messageTranslations ?: null)->at($i);
+        }
+
+        return $out;
     }
 
     /**
@@ -310,11 +570,98 @@ final class XlsformImportParser
         return $appearance;
     }
 
-    private function resolveRequired(?string $required): RequiredMode
+    /**
+     * `required` as yes or no, or (M244, `R-ea0cc482`) a formula, kept to be read as "Required when…" once every
+     * question is known ({@see self::resolveRequiredFormulas()}).
+     *
+     * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
+     * @return array{0: RequiredMode, 1: ?string}
+     */
+    private function resolveRequired(array $row, int $rowNumber, array &$warnings): array
     {
-        $value = strtolower(trim((string) $required));
+        $value = $this->trimToNull($this->col($row, 'required'));
+        if ($value === null) {
+            return [RequiredMode::Optional, null];
+        }
 
-        return in_array($value, ['yes', 'true', '1'], true) ? RequiredMode::Required : RequiredMode::Optional;
+        $lower = strtolower($value);
+        if (in_array($lower, ['yes', 'true', '1', 'true()'], true)) {
+            return [RequiredMode::Required, null];
+        }
+        if (in_array($lower, ['no', 'false', '0', 'false()'], true)) {
+            return [RequiredMode::Optional, null];
+        }
+
+        $this->limits->measure('survey', $rowNumber, 'required', $value, XlsformColumnLimits::EXPRESSION);
+
+        return [RequiredMode::Optional, $value];
+    }
+
+    /**
+     * Each question's `required` formula as "Required when…" rules (M244, `R-ea0cc482`), read once every question is
+     * known so a rule may name a question further down. One that cannot be read leaves the question optional, with a
+     * warning naming it and its formula. Runs before {@see self::sanitizeKeys()}, because the formula names
+     * questions as the workbook writes them; each rule holds its question as an object, so a rename carries.
+     *
+     * @param  list<FieldSpec>  $fields
+     * @param  list<string>  $warnings
+     */
+    private function resolveRequiredFormulas(array $fields, array &$warnings): void
+    {
+        $byKey = [];
+        foreach ($fields as $field) {
+            $byKey[$field->key] ??= $field;
+        }
+
+        foreach ($fields as $field) {
+            if ($field->requiredFormula === null) {
+                continue;
+            }
+
+            $formula = $this->translator->translate($field->requiredFormula);
+            $rules = $this->requiredFormula->read($formula, $field, $byKey);
+            if ($rules === null) {
+                $warnings[] = "The required formula of “{$field->key}” ({$field->requiredFormula}) could not be read as “Required when…”, so the question was imported as optional. Set “Required when…” in the builder.";
+
+                continue;
+            }
+
+            $field->isRequired = RequiredMode::Conditional;
+            $rows = [...$field->validations];
+            foreach ($rules as $rule) {
+                $rows[] = $rule->withMessage($field->requiredMessage, $field->requiredMessageTranslations);
+            }
+            $field->validations = array_map(
+                static fn (ValidationSpec $spec, int $i): ValidationSpec => $spec->at($i),
+                $rows,
+                array_keys($rows),
+            );
+        }
+    }
+
+    /**
+     * M244 (`R-915e5d0c`): a row that names a picture, sound or video. The workbook carries only the file's name, so
+     * the import cannot attach it; the author is told which row lost which file.
+     *
+     * @param  array<string, ?string>  $row
+     * @param  list<string>  $warnings
+     */
+    private function warnMedia(string $where, int $rowNumber, array $row, string $name, array &$warnings): void
+    {
+        foreach ($row as $header => $value) {
+            if ($value === null || trim($value) === '') {
+                continue;
+            }
+            // `media::image`, `media::image::English (en)`, or the older bare `image`, `audio`, `video`, `big-image`.
+            $lower = strtolower(trim((string) $header));
+            $base = explode('::', str_starts_with($lower, 'media::') ? substr($lower, 7) : $lower)[0];
+            if (! in_array($base, self::MEDIA_COLUMNS, true)) {
+                continue;
+            }
+
+            $warnings[] = "{$where} {$rowNumber}: “{$name}” names the file “".trim($value).'”, which an import cannot bring in. Upload it in the builder.';
+        }
     }
 
     /**
@@ -342,27 +689,54 @@ final class XlsformImportParser
 
     /**
      * Group the `choices` sheet by `list_name`, normalized: `{value, label, label_translations, level, parent, raw}`.
-     * `raw` is a lowercase-keyed copy so the cascade resolver can read arbitrary foreign filter columns.
+     * `raw` is a lowercase-keyed copy so the cascade resolver can read arbitrary foreign filter columns. M244: a
+     * label's formatting is taken out (one warning per list), its languages are codes, and each cell is measured.
      *
+     * @param  list<string>  $warnings
      * @return array<string, list<array<string, mixed>>>
      */
-    private function normalizeChoices(RawWorkbook $workbook): array
+    private function normalizeChoices(RawWorkbook $workbook, array &$warnings): array
     {
         $byList = [];
-        foreach ($workbook->rows('choices') as $row) {
+        $formatted = [];
+        foreach ($workbook->rows('choices') as $index => $row) {
             $listName = $this->trimToNull($this->col($row, 'list_name')) ?? $this->trimToNull($this->col($row, 'list name'));
             if ($listName === null) {
                 continue;
             }
+            $rowNumber = $workbook->rowNumber('choices', $index);
+            $value = trim((string) ($this->col($row, 'name') ?? ''));
+            $this->warnMedia('Choices row', $rowNumber, $row, $value, $warnings);
+            $this->limits->measure('choices', $rowNumber, 'name', $value, XlsformColumnLimits::CHOICE_NAME);
+
+            [$label, $translations] = $this->languages->text($row, 'label', $warnings);
+            $label ??= '';
+            $plain = $this->markdown->plainLabel($label);
+            if ($plain !== $label) {
+                $formatted[$listName] = true;
+            }
+            $this->limits->measure('choices', $rowNumber, 'label', $plain, XlsformColumnLimits::CHOICE_LABEL);
+            foreach ($translations as $language => $text) {
+                $plainTranslation = $this->markdown->plainLabel($text);
+                if ($plainTranslation !== $text) {
+                    $formatted[$listName] = true;
+                }
+                $translations[$language] = $plainTranslation;
+                $this->limits->measure('choices', $rowNumber, 'label::'.$language, $plainTranslation, XlsformColumnLimits::CHOICE_LABEL);
+            }
 
             $byList[$listName][] = [
-                'value' => trim((string) ($this->col($row, 'name') ?? '')),
-                'label' => (string) ($this->col($row, 'label') ?? ''),
-                'label_translations' => $this->translations($row, 'label'),
+                'value' => $value,
+                'label' => $plain,
+                'label_translations' => $translations,
                 'level' => $this->col($row, 'level'),
                 'parent' => $this->col($row, 'parent'),
                 'raw' => $this->lowercaseKeys($row),
             ];
+        }
+
+        foreach (array_keys($formatted) as $listName) {
+            $warnings[] = "The choices of the list “{$listName}” had formatting, which was removed; a choice is plain text in this app.";
         }
 
         return $byList;
@@ -391,14 +765,19 @@ final class XlsformImportParser
         return $options;
     }
 
-    private function parseSettings(RawWorkbook $workbook): SettingsSpec
+    /**
+     * @param  list<string>  $warnings
+     */
+    private function parseSettings(RawWorkbook $workbook, array &$warnings): SettingsSpec
     {
         $row = $workbook->rows('settings')[0] ?? [];
+        $title = $this->trimToNull($this->col($row, 'form_title'));
+        $this->limits->measure('settings', $workbook->rowNumber('settings', 0), 'form_title', $title, XlsformColumnLimits::FORM_TITLE);
 
         return new SettingsSpec(
-            formTitle: $this->trimToNull($this->col($row, 'form_title')),
+            formTitle: $title,
             formId: $this->trimToNull($this->col($row, 'form_id')),
-            defaultLanguage: $this->trimToNull($this->col($row, 'default_language')),
+            defaultLanguage: $this->languages->locale($warnings),
         );
     }
 
@@ -440,6 +819,9 @@ final class XlsformImportParser
     }
 
     /**
+     * M244: a key is at most {@see XlsformColumnLimits::KEY} characters with its `_2` suffix, the width of the key
+     * columns, so a long ODK name is shortened (and the rename warned) rather than failing the insert.
+     *
      * @param  array<string, true>  $used
      */
     private function sanitizeKey(string $key, array $used): string
@@ -449,11 +831,13 @@ final class XlsformImportParser
         if ($slug === '' || ! preg_match('/^[a-z]/', $slug)) {
             $slug = 'x_'.$slug;
         }
+        $slug = substr($slug, 0, XlsformColumnLimits::KEY);
 
         $candidate = $slug;
         $n = 2;
         while (isset($used[$candidate])) {
-            $candidate = $slug.'_'.$n;
+            $suffix = '_'.$n;
+            $candidate = substr($slug, 0, XlsformColumnLimits::KEY - strlen($suffix)).$suffix;
             $n++;
         }
 
@@ -544,29 +928,6 @@ final class XlsformImportParser
         }
 
         return null;
-    }
-
-    /**
-     * The `{prefix}::{lang}` translation columns of a row → `{lang: value}`, lang case preserved.
-     *
-     * @param  array<string, ?string>  $row
-     * @return array<string, string>
-     */
-    private function translations(array $row, string $prefix): array
-    {
-        $needle = strtolower($prefix).'::';
-        $out = [];
-        foreach ($row as $header => $value) {
-            if (! str_starts_with(strtolower((string) $header), $needle)) {
-                continue;
-            }
-            $lang = trim(substr((string) $header, strlen($prefix) + 2));
-            if ($lang !== '' && $value !== null && trim($value) !== '') {
-                $out[$lang] = $value;
-            }
-        }
-
-        return $out;
     }
 
     /**

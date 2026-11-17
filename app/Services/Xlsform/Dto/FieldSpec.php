@@ -26,6 +26,7 @@ final class FieldSpec
      * @param  array<string, string>|null  $labelTranslations
      * @param  array<string, string>|null  $hintTranslations
      * @param  list<ValidationSpec>  $validations
+     * @param  array<string, string>|null  $requiredMessageTranslations
      */
     public function __construct(
         public string $key,
@@ -49,5 +50,10 @@ final class FieldSpec
         public ?string $listName = null,
         public ?string $choiceFilter = null,
         public ?string $marker = null,
+        // ── parse-time only (M244): a `required` formula, read once every question is known, and its message ──
+        public ?string $requiredFormula = null,
+        public ?string $requiredMessage = null,
+        public ?array $requiredMessageTranslations = null,
+        public ?int $sourceRow = null,
     ) {}
 }

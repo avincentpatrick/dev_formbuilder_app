@@ -22,6 +22,7 @@ use App\Services\Xlsform\Dto\XlsformImportResult;
 use App\Support\Forms\FormSlug;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Imports an XLSForm `.xlsx` into an EXISTING form's current draft (Increment G7b /
@@ -125,14 +126,27 @@ final class XlsformImporter
             $fieldIdByKey[$field->key] = $row->id;
         }
 
+        // M244: a row is an expression or (a converted constraint, "Required when…") a structured rule. A required
+        // rule names its question as the parsed field, whose key is final by now, so it may name a later question.
         $validationCount = 0;
         foreach ($plan->fields as $field) {
             $fieldId = $fieldIdByKey[$field->key];
+            /** @var array<int, string> $groups the field's all-of units, each its own `logic_group` */
+            $groups = [];
             foreach ($field->validations as $validation) {
+                if ($validation->group !== null) {
+                    $groups[$validation->group] ??= (string) Str::uuid();
+                }
                 FormFieldValidation::create([
                     'form_version_id' => $draft->id,
                     'form_field_id' => $fieldId,
                     'expression' => $validation->expression,
+                    'rule_type' => $validation->ruleType,
+                    'operator' => $validation->operator,
+                    'rule_value' => $validation->ruleValue,
+                    'related_form_field_id' => $validation->relatedField !== null ? ($fieldIdByKey[$validation->relatedField->key] ?? null) : null,
+                    'logic_group' => $validation->group !== null ? $groups[$validation->group] : null,
+                    'logic_operator' => $validation->logicOperator,
                     'error_message' => $validation->errorMessage,
                     'error_message_translations' => $validation->errorMessageTranslations,
                     'sequence' => $validation->sequence,
@@ -157,6 +171,8 @@ final class XlsformImporter
             $draft->forceFill(['title' => $settings->formTitle])->save();
         }
 
+        // M244 (`R-49262cca`): already a code — the parser reads `English` or `English (en)` as `en`, and leaves it
+        // null (the form keeps its own) when it cannot name the language, so `<html lang>` is always valid.
         if ($settings->defaultLanguage !== null && $settings->defaultLanguage !== '') {
             $changes['default_locale'] = $settings->defaultLanguage;
         }

@@ -13,6 +13,8 @@ use RuntimeException;
  * {@see XlsformImportParser} entirely UPFRONT — before the importer's destructive
  * draft-replace runs — so a malformed workbook never partially replaces a draft.
  *
+ * Every row number it names is the one the author sees in the sheet (M244: the reader keeps blank rows' numbers).
+ *
  * Unlike {@see PublishValidationException} (message-only), this carries a stable
  * machine `code` and optional `details` so the /api/v1 envelope can emit
  * `{ code: "xlsform_unsupported_field_type", details: { row, type } }` (api-specification.md §2.3); the
@@ -47,6 +49,38 @@ final class XlsformImportException extends RuntimeException
             "Row {$row}: the field type “{$type}” is not a supported XLSForm type.",
             'xlsform_unsupported_field_type',
             ['row' => $row, 'type' => $type],
+        );
+    }
+
+    /**
+     * One or more cells are longer than this product can store (M244, `R-24ec82a6`). Every one is named, by sheet,
+     * the row the author sees and the column, so the file can be fixed in one pass; the message lists the first ten.
+     *
+     * @param  non-empty-list<array{sheet: string, row: int, column: string, length: int, limit: int, unit: string}>  $cells
+     */
+    public static function cellsTooLong(array $cells): self
+    {
+        $shown = array_slice($cells, 0, 10);
+        $parts = array_map(
+            static fn (array $cell): string => sprintf(
+                '%s row %d, %s (%s of %s %s)',
+                $cell['sheet'],
+                $cell['row'],
+                $cell['column'],
+                number_format($cell['length']),
+                number_format($cell['limit']),
+                $cell['unit'],
+            ),
+            $shown,
+        );
+        $more = count($cells) - count($shown);
+        $list = implode('; ', $parts).($more > 0 ? "; and {$more} more" : '');
+        $lead = count($cells) === 1 ? 'A cell is' : count($cells).' cells are';
+
+        return new self(
+            "{$lead} longer than this app can store: {$list}. Shorten them and import the file again.",
+            'xlsform_cell_too_long',
+            ['cells' => $cells],
         );
     }
 

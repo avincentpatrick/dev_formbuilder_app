@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
+use App\Enums\ValidationRuleType;
 use App\Exceptions\Xlsform\XlsformImportException;
 use App\Services\Xlsform\CascadeResolver;
 use App\Services\Xlsform\Dto\FieldSpec;
@@ -83,14 +84,40 @@ it('rejects a workbook with no survey sheet', function (): void {
     }
 });
 
-it('maps required yes/blank to required/optional and never conditional', function (): void {
+it('maps required yes/blank to required/optional, and a formula to Required when… (M244)', function (): void {
     $plan = xlsformParser()->parse(xlsformWb([
         ['type' => 'text', 'name' => 'must', 'label' => 'M', 'required' => 'yes'],
         ['type' => 'text', 'name' => 'may', 'label' => 'O', 'required' => ''],
+        ['type' => 'text', 'name' => 'nope', 'label' => 'N', 'required' => 'false()'],
+        ['type' => 'select_one cuts', 'name' => 'cut', 'label' => 'Cut'],
+        ['type' => 'text', 'name' => 'why', 'label' => 'Why', 'required' => '${cut} = \'change\'', 'required_message' => 'Say why'],
+    ], [
+        ['list_name' => 'cuts', 'name' => 'keep', 'label' => 'Keep'],
+        ['list_name' => 'cuts', 'name' => 'change', 'label' => 'Change'],
     ]));
 
+    $why = xlsformField($plan, 'why');
     expect(xlsformField($plan, 'must')->isRequired)->toBe(RequiredMode::Required)
-        ->and(xlsformField($plan, 'may')->isRequired)->toBe(RequiredMode::Optional);
+        ->and(xlsformField($plan, 'may')->isRequired)->toBe(RequiredMode::Optional)
+        ->and(xlsformField($plan, 'nope')->isRequired)->toBe(RequiredMode::Optional)
+        ->and($why->isRequired)->toBe(RequiredMode::Conditional)
+        ->and($why->validations)->toHaveCount(1)
+        ->and($why->validations[0]->ruleType)->toBe(ValidationRuleType::RequiredIf)
+        ->and($why->validations[0]->relatedField?->key)->toBe('cut')
+        ->and($why->validations[0]->ruleValue)->toBe('change')
+        ->and($why->validations[0]->errorMessage)->toBe('Say why')
+        ->and($plan->warnings)->toBe([]);
+});
+
+it('imports a required formula it cannot read as optional, naming it (M244)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'integer', 'name' => 'n', 'label' => 'N'],
+        ['type' => 'text', 'name' => 'why', 'label' => 'Why', 'required' => '${n} * 2 > 3'],
+    ]));
+
+    expect(xlsformField($plan, 'why')->isRequired)->toBe(RequiredMode::Optional)
+        ->and($plan->warnings)->toHaveCount(1)
+        ->and($plan->warnings[0])->toContain('“why”')->toContain('${n} * 2 > 3')->toContain('optional');
 });
 
 it('routes a calculate field formula to config and a calculation on a plain field to an expression default', function (): void {
@@ -119,7 +146,7 @@ it('deserialises a geo default through the wire converter (lat/lon flip)', funct
         ->and($envelope['coordinates'])->toEqual([121.0, 14.6]); // longitude-first internal order (JSON re-casts 121.0→121)
 });
 
-it('stores a constraint as one expression validation row (never structured)', function (): void {
+it('keeps a constraint it cannot convert as one expression validation row', function (): void {
     $plan = xlsformParser()->parse(xlsformWb([
         ['type' => 'integer', 'name' => 'age', 'constraint' => '. >= 0', 'constraint_message' => 'Too small'],
     ]));
@@ -302,4 +329,171 @@ it('nests fields under a group and maps settings without a version', function ()
         ->and($plan->settings->formTitle)->toBe('My Form')
         ->and($plan->settings->formId)->toBe('my-form')
         ->and($plan->settings->defaultLanguage)->toBe('en');
+});
+
+it('names the row the author sees, past blank rows the reader skipped (M244)', function (): void {
+    $wb = new RawWorkbook([
+        'survey' => ['headers' => [], 'rows' => [
+            ['type' => 'text', 'name' => 'a', 'label' => 'A'],
+            ['type' => 'rank', 'name' => 'b', 'label' => 'B'],
+        ], 'row_numbers' => [2, 7]],
+    ]);
+
+    try {
+        xlsformParser()->parse($wb);
+        $this->fail('expected XlsformImportException');
+    } catch (XlsformImportException $e) {
+        expect($e->details())->toBe(['row' => 7, 'type' => 'rank']);
+    }
+});
+
+it('refuses every cell too long to store, once, naming each (M244)', function (): void {
+    $wb = new RawWorkbook([
+        'survey' => ['headers' => [], 'rows' => [
+            ['type' => 'begin group', 'name' => 'g', 'label' => str_repeat('s', 256)],
+            ['type' => 'text', 'name' => 'q', 'label' => str_repeat('q', 501), 'label::fr' => str_repeat('f', 501), 'hint' => str_repeat('h', 2001)],
+            ['type' => 'note', 'name' => 'n', 'label' => 'Hello ${q} '.str_repeat('n', 500)],
+            ['type' => 'select_one l', 'name' => 'c', 'label' => 'C', 'constraint_message' => str_repeat('m', 501)],
+            ['type' => 'end group', 'name' => 'g'],
+        ], 'row_numbers' => [2, 3, 5, 6, 7]],
+        'choices' => ['headers' => [], 'rows' => [
+            ['list_name' => 'l', 'name' => 'x', 'label' => str_repeat('c', 501)],
+        ], 'row_numbers' => [4]],
+        'settings' => ['headers' => [], 'rows' => [['form_title' => str_repeat('t', 256)]]],
+    ]);
+
+    try {
+        xlsformParser()->parse($wb);
+        $this->fail('expected XlsformImportException');
+    } catch (XlsformImportException $e) {
+        $cells = array_map(static fn (array $cell): string => "{$cell['sheet']}:{$cell['row']}:{$cell['column']}:{$cell['length']}/{$cell['limit']}", $e->details()['cells']);
+        expect($e->code())->toBe('xlsform_cell_too_long')
+            ->and($cells)->toBe([
+                'choices:4:label:501/500',
+                'survey:2:label:256/255',
+                'survey:3:label:501/500',
+                'survey:3:label::fr:501/500',
+                'survey:3:hint:2001/2000',
+                'survey:5:label:511/500',
+                'survey:6:constraint_message:501/500',
+                'settings:2:form_title:256/255',
+            ])
+            ->and($e->getMessage())->toStartWith('8 cells are longer than this app can store: choices row 4, label (501 of 500 characters);');
+    }
+});
+
+it('turns a long or formatted note into content and keeps a plain short one as its label (M244)', function (): void {
+    $long = str_repeat('Long note words. ', 60);
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'note', 'name' => 'plain', 'label' => 'Just words.'],
+        ['type' => 'note', 'name' => 'styled', 'label' => "# Welcome\n\nSome **bold** words."],
+        ['type' => 'note', 'name' => 'long', 'label' => $long],
+        ['type' => 'note', 'name' => 'piped', 'label' => 'Hello **${plain}**'],
+        ['type' => 'note', 'name' => 'translated', 'label' => 'Some **bold**', 'label::fil' => 'Ilang **makapal**'],
+    ]));
+
+    $styled = xlsformField($plan, 'styled');
+    $longNote = xlsformField($plan, 'long');
+
+    expect(xlsformField($plan, 'plain')->label)->toBe('Just words.')
+        ->and(xlsformField($plan, 'plain')->config)->toBe([])
+        ->and($styled->config['content'])->toBe([
+            ['type' => 'heading', 'level' => 1, 'text' => 'Welcome'],
+            ['type' => 'paragraph', 'spans' => [['text' => 'Some '], ['text' => 'bold', 'bold' => true], ['text' => ' words.']]],
+        ])
+        ->and($styled->label)->toBe("Welcome\nSome bold words.")
+        ->and(mb_strlen($longNote->label))->toBeLessThanOrEqual(500)
+        ->and($longNote->label)->toEndWith('…')
+        ->and($longNote->config['content'][0]['spans'][0]['text'])->toBe(trim($long))
+        ->and(xlsformField($plan, 'piped')->label)->toBe('Hello ${plain}')
+        ->and(xlsformField($plan, 'piped')->config)->toBe([])
+        ->and(xlsformField($plan, 'translated')->label)->toBe('Some bold')
+        ->and(xlsformField($plan, 'translated')->labelTranslations)->toBe(['fil' => 'Ilang makapal'])
+        ->and(xlsformField($plan, 'translated')->config)->toBe([])
+        ->and($plan->warnings)->toHaveCount(2);
+});
+
+it('takes formatting out of question labels, hints and choices with one warning each (M244)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'select_one yn', 'name' => 'q', 'label' => 'Do you **agree**?', 'hint' => 'See [the guide](https://example.org)'],
+        ['type' => 'text', 'name' => 'n', 'label' => '1. Name'],
+    ], [
+        ['list_name' => 'yn', 'name' => 'y', 'label' => '*Yes*'],
+        ['list_name' => 'yn', 'name' => 'n', 'label' => 'No'],
+    ]));
+
+    $q = xlsformField($plan, 'q');
+    expect($q->label)->toBe('Do you agree?')
+        ->and($q->hint)->toBe('See the guide (https://example.org)')
+        ->and($q->config['options'][0]['label'])->toBe('Yes')
+        ->and(xlsformField($plan, 'n')->label)->toBe('1. Name')
+        ->and($plan->warnings)->toHaveCount(3);
+});
+
+it('reads Kobo\'s label::English (en) columns as the base text and codes (M244)', function (): void {
+    $wb = new RawWorkbook([
+        'survey' => ['headers' => ['type', 'name', 'label::English (en)', 'label::Filipino (fil)', 'hint::English (en)'], 'rows' => [
+            ['type' => 'text', 'name' => 'q', 'label::English (en)' => 'Name', 'label::Filipino (fil)' => 'Pangalan', 'hint::English (en)' => 'Full name'],
+            ['type' => 'select_one yn', 'name' => 'c', 'label::English (en)' => 'OK?'],
+        ]],
+        'choices' => ['headers' => [], 'rows' => [
+            ['list_name' => 'yn', 'name' => 'y', 'label::English (en)' => 'Yes', 'label::Filipino (fil)' => 'Oo'],
+        ]],
+        'settings' => ['headers' => [], 'rows' => [['default_language' => 'English (en)']]],
+    ]);
+
+    $plan = xlsformParser()->parse($wb);
+
+    $q = xlsformField($plan, 'q');
+    expect($q->label)->toBe('Name')
+        ->and($q->labelTranslations)->toBe(['fil' => 'Pangalan'])
+        ->and($q->hint)->toBe('Full name')
+        ->and(xlsformField($plan, 'c')->config['options'][0])->toBe(['value' => 'y', 'label' => 'Yes', 'label_translations' => ['fil' => 'Oo']])
+        ->and($plan->settings->defaultLanguage)->toBe('en')
+        ->and($plan->warnings)->toBe([]);
+});
+
+it('renames count-selected, converts a whole regex, and names what it keeps (M244, D228)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'select_multiple l', 'name' => 'pick', 'label' => 'Pick', 'constraint' => 'count-selected(.) <= 2', 'relevant' => 'string-length(${essay}) > 0'],
+        ['type' => 'text', 'name' => 'essay', 'label' => 'Essay', 'constraint' => 'regex(., \'^[a-z ]+$\')', 'constraint_message' => 'Letters only'],
+        ['type' => 'integer', 'name' => 'n', 'label' => 'N', 'constraint' => 'regex(., \'^[0-9]+$\')'],
+    ], [['list_name' => 'l', 'name' => 'a', 'label' => 'A']]));
+
+    $pick = xlsformField($plan, 'pick');
+    $essay = xlsformField($plan, 'essay');
+    expect($pick->validations[0]->expression)->toBe('count(.) <= 2')
+        ->and($essay->validations)->toHaveCount(1)
+        ->and($essay->validations[0]->ruleType)->toBe(ValidationRuleType::Pattern)
+        ->and($essay->validations[0]->ruleValue)->toBe('[a-z ]+')
+        ->and($essay->validations[0]->errorMessage)->toBe('Letters only')
+        ->and(xlsformField($plan, 'n')->validations[0]->expression)->toBe('regex(., \'^[0-9]+$\')')
+        ->and($plan->warnings)->toBe([
+            'The relevant of “pick” uses “string-length”, which this app does not have. It was kept as written, so the form will not publish until it is changed.',
+            'The constraint of “n” uses “regex”, which this app does not have. It was kept as written, so the form will not publish until it is changed.',
+        ]);
+});
+
+it('names each picture, sound or video a row names, which cannot come with the workbook (M244)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'note', 'name' => 'diagram', 'label' => 'See below', 'media::image' => 'nhete-diagram.png'],
+        ['type' => 'select_one l', 'name' => 'c', 'label' => 'C', 'audio' => 'question.mp3'],
+    ], [['list_name' => 'l', 'name' => 'a', 'label' => 'A', 'media::image::English (en)' => 'a.png']]));
+
+    expect($plan->warnings)->toBe([
+        'Choices row 2: “a” names the file “a.png”, which an import cannot bring in. Upload it in the builder.',
+        'Row 2: “diagram” names the file “nhete-diagram.png”, which an import cannot bring in. Upload it in the builder.',
+        'Row 3: “c” names the file “question.mp3”, which an import cannot bring in. Upload it in the builder.',
+    ]);
+});
+
+it('shortens a key past the column\'s 150 characters, suffix included (M244)', function (): void {
+    $plan = xlsformParser()->parse(xlsformWb([
+        ['type' => 'text', 'name' => str_repeat('a', 160), 'label' => 'One'],
+        ['type' => 'text', 'name' => str_repeat('a', 170), 'label' => 'Two'],
+    ]));
+
+    expect(strlen($plan->fields[0]->key))->toBe(150)
+        ->and(strlen($plan->fields[1]->key))->toBe(150)
+        ->and($plan->fields[1]->key)->toEndWith('_2');
 });

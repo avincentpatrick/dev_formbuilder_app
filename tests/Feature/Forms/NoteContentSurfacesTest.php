@@ -25,8 +25,8 @@ uses(RefreshDatabase::class);
 | M129 — where a note's content blocks go today, and where they do not (R-6dedc3a9's editor half).
 |--------------------------------------------------------------------------
 | Since M130 (`R-c9f50df2`) the screens render the content — the guest page, the encode page, the preview — and
-| these four outputs still do not: the printed form, the response PDF, the XLSForm export and the CSV export each
-| show the note by its label, or not at all. `docs/piping-output-encoding-design.md` §5 records it per surface;
+| three outputs still do not: the printed form, the response PDF and the CSV export each show the note by its label,
+| or not at all. Since M244 (`R-7e134c37`) the XLSForm export carries the content, as markdown in the note's label. `docs/piping-output-encoding-design.md` §5 records it per surface;
 | these cases hold that record true, and the printed form's half is `R-c083b711`.
 |
 | ⚠️ EVERY ABSENCE IS PAIRED WITH A PRESENCE FROM THE SAME OUTPUT. "The sentinel is not in it" is also what an empty
@@ -88,11 +88,15 @@ it('keeps the content out of a response’s PDF, which carries the answers', fun
         ->and($html)->not->toContain(NOTE_SURFACES_SENTINEL);
 });
 
-it('keeps the content out of the XLSForm export, which still carries the note by its label', function (): void {
-    $workbook = json_encode(app(XlsformExporter::class)->build($this->form, $this->version), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+it('carries the content into the XLSForm export as the markdown ODK renders, leaving out the picture (M244)', function (): void {
+    $survey = app(XlsformExporter::class)->build($this->form, $this->version)['survey']['rows'];
+    $note = array_values(array_filter($survey, static fn (array $row): bool => ($row['name'] ?? null) === 'welcome'))[0];
 
-    expect($workbook)->toContain('Welcome to the clinic.')
-        ->and($workbook)->not->toContain(NOTE_SURFACES_SENTINEL);
+    expect($note['label'])->toBe(
+        '# '.NOTE_SURFACES_SENTINEL." heading\n\n"
+        .NOTE_SURFACES_SENTINEL.' paragraph, [and a link](https://example.org/'.NOTE_SURFACES_SENTINEL.")\n\n"
+        .'> '.NOTE_SURFACES_SENTINEL.' callout'
+    )->and($note['label'])->not->toContain('image');
 });
 
 it('keeps the content out of the CSV export, which no note ever reaches', function (): void {

@@ -475,15 +475,16 @@ export function DatasetCanvas({
         aria-hidden="true"
         data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
-        className={
+        className={[
+          ready ? "maplibregl-map" : "",
           mapOnly
-            ? "maplibregl-map h-full w-full"
+            ? "h-full w-full"
             : compact
-              ? "maplibregl-map h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
+              ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
               : expanded
-                ? "maplibregl-map h-[55vh] min-h-64 w-full rounded-lg border border-border"
-                : "maplibregl-map h-64 w-full rounded-lg border border-border"
-        }
+                ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+                : "h-64 w-full rounded-lg border border-border",
+        ].join(" ")}
       />
       {geographyLabel && ready && !mapOnly && (
         <p

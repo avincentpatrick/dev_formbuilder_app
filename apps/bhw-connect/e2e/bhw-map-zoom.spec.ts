@@ -83,6 +83,8 @@ for (const width of [390, 1440]) {
     const ready = page.locator('[data-map-state="ready"]');
     await expect(ready).toBeVisible();
     for (const level of ["region", "province", "citymun"] as const) {
+      if (width === 1440 && level === "region")
+        await page.getByRole("button", { name: "Map only", exact: true }).click();
       for (
         let attempt = 0;
         attempt < 5 && new URL(page.url()).searchParams.get("level") !== level;
@@ -90,15 +92,17 @@ for (const width of [390, 1440]) {
       ) {
         if (width === 1440 && level === "region") {
           await ready.hover();
-          await page.keyboard.down("Control");
           await page.mouse.wheel(0, -600);
-          await page.keyboard.up("Control");
         } else await page.getByRole("button", { name: "Zoom in", exact: true }).click();
         await page.waitForTimeout(400);
         await expect(ready).toBeVisible();
       }
       await expect(page).toHaveURL((url) => url.searchParams.get("level") === level);
       await expect(page).toHaveURL(/valueMin=2/);
+      if (width === 1440 && level === "region") {
+        await expect(page.getByRole("dialog", { name: "Map only" })).toBeVisible();
+        await page.getByRole("button", { name: "Exit map only" }).click();
+      }
       await expect(
         page.getByText(
           {

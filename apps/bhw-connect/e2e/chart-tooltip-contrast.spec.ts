@@ -1,16 +1,35 @@
+import { buildSync } from "esbuild";
 import { expect, test } from "@playwright/test";
+
+// Exercise the production Plot spec and post-render styling with deterministic
+// data; the development database intentionally has sparse education records.
+const chartScript = buildSync({
+  stdin: {
+    contents: `import * as Plot from "@observablehq/plot";
+      import { horizontalBarSpec } from "./lib/charts/bar-chart";
+      import { styleAxisTitles } from "./lib/charts/style-axis";
+      const chart = Plot.plot(horizontalBarSpec([
+        { label: "High School Graduate", value: 130334 },
+        { label: "College Level", value: 35352 }
+      ], { width: 350, xLabel: "Validated profiles" }));
+      styleAxisTitles(chart);
+      document.body.append(chart);`,
+    resolveDir: process.cwd(),
+  },
+  bundle: true,
+  write: false,
+  format: "iife",
+  platform: "browser",
+}).outputFiles[0].text;
 
 for (const theme of ["dark", "light"]) {
   test(`tapped chart labels remain readable on a phone in ${theme} mode`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.addInitScript((theme) => {
-      localStorage.setItem(
-        "bhw-settings",
-        JSON.stringify({ theme, palette: "teal", fontSize: "base" }),
-      );
-    }, theme);
-    await page.goto("bhw?location=region:01");
-    const chart = page.locator("#education svg");
+    await page.setContent(
+      `<html style="--surface:${theme === "dark" ? "#181d1e" : "#f6f7f8"};color:${theme === "dark" ? "#edf1f1" : "#1a1d1e"}"><body></body></html>`,
+    );
+    await page.addScriptTag({ content: chartScript });
+    const chart = page.locator("svg");
     await expect(chart).toBeVisible();
     const bar = chart.locator('g[aria-label="bar"] rect').first();
     await bar.click();

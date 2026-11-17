@@ -1,4 +1,5 @@
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
+import { countAndShare } from "@/lib/format";
 export { countAndShare, shareOf } from "@/lib/format";
 import { hasAvailableValue } from "@/lib/catalog/summary";
 
@@ -39,4 +40,26 @@ export function shareCount(indicator: CatalogIndicator | undefined): number | nu
   const values = publicValues(indicator);
   const count = values.length === 1 ? values[0].numerator : null;
   return count != null && Number.isFinite(count) && count >= 0 ? count : null;
+}
+
+/** Prefer a reported numerator; otherwise estimate from this observation's base.
+ * Only accepted public values can enter this path, including the fallback base. */
+export function shareSummary(
+  indicator: CatalogIndicator | undefined,
+  fallbackBase: number | null = null,
+) {
+  const percent = scalar(indicator);
+  const reported = shareCount(indicator);
+  if (reported !== null) return { text: countAndShare(reported, percent), estimated: false };
+  const values = publicValues(indicator);
+  const base = values.length === 1 ? (values[0].denominator ?? fallbackBase) : null;
+  const estimated =
+    percent !== null &&
+    percent >= 0 &&
+    percent <= 100 &&
+    base !== null &&
+    Number.isFinite(base) &&
+    base > 0;
+  const count = estimated ? Math.round((percent * base) / 100) : null;
+  return { text: `${estimated ? "≈" : ""}${countAndShare(count, percent)}`, estimated };
 }

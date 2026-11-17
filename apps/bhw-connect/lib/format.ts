@@ -45,7 +45,7 @@ export function formatterFor(kind: ValueFormatKind = "count"): (n: number) => st
   }
 }
 
-/** Pair a source count with its share; never reconstruct counts from rounded rates. */
+/** Pair a count with its share; callers must label any estimated count. */
 export function countAndShare(count: number | null, percent: number | null): string {
   return `${count === null ? "Count unavailable" : formatCount(count)} (${percent === null ? "percentage unavailable" : formatPct(Math.round(percent * 100) / 100)})`;
 }

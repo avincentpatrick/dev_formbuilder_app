@@ -102,3 +102,30 @@ it("pairs counts and percentages without hiding zero or capping cross-source rat
   expect(shareCount({ ...row, state: "suppressed" })).toBeNull();
   expect(shareCount(indicator("share", 65.72))).toBeNull();
 });
+
+it("estimates missing numerators from the matching population and labels them approximate", async () => {
+  const { shareSummary } = await import("./overview");
+  const row = {
+    ...indicator("bhw.any-honorarium", 94.7),
+    values: [{ value: 94.7, denominator: 1000 }],
+  };
+  expect(shareSummary(row)).toEqual({ text: "≈947 (94.7%)", estimated: true });
+  expect(shareSummary(row, 2000).text).toBe("≈947 (94.7%)");
+  expect(
+    shareSummary({ ...row, values: [{ value: 94.7, numerator: 946, denominator: 1000 }] }),
+  ).toEqual({ text: "946 (94.7%)", estimated: false });
+  expect(shareSummary(indicator("share", 94.7), 1000).text).toBe("≈947 (94.7%)");
+  expect(shareSummary({ ...row, values: [{ value: 0, denominator: 1000 }] }).text).toBe("≈0 (0%)");
+  for (const state of ["suppressed", "failed", "unavailable", "unsupported"] as const) {
+    expect(shareSummary({ ...row, state }, 1000)).toEqual({
+      text: "Count unavailable (percentage unavailable)",
+      estimated: false,
+    });
+  }
+  for (const denominator of [0, -1, NaN, Infinity]) {
+    expect(shareSummary({ ...row, values: [{ value: 94.7, denominator }] }, 1000).estimated).toBe(
+      false,
+    );
+  }
+  expect(shareSummary(indicator("share", 94.7)).estimated).toBe(false);
+});

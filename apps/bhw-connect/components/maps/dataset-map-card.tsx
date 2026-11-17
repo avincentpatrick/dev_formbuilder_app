@@ -134,6 +134,7 @@ export function DatasetMapCard({
   const [notice, setNotice] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [renderAttempt, setRenderAttempt] = useState(0);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [capture, setCapture] = useState<{
     key: string;
     run: () => Promise<HTMLCanvasElement>;
@@ -575,7 +576,7 @@ export function DatasetMapCard({
               aria-label={workspace ? "Map and legend" : undefined}
               className={
                 workspace
-                  ? `${panel === "map" ? "block" : "hidden"} min-w-0 space-y-2 lg:block`
+                  ? `${panel === "map" ? "flex" : "hidden"} min-w-0 flex-col gap-2 lg:flex`
                   : "min-h-64"
               }
             >
@@ -586,7 +587,6 @@ export function DatasetMapCard({
                 </p>
               ) : data ? (
                 <>
-                  {workspace && legend}
                   <DatasetCanvas
                     key={`${key}:render=${renderAttempt}`}
                     url={data.geometryUrl}
@@ -608,6 +608,25 @@ export function DatasetMapCard({
                     excludedCodes={excludedCodes}
                     view={view}
                   />
+                  {workspace && (
+                    <div className="rounded border border-border p-2 text-sm lg:order-first lg:border-0 lg:p-0">
+                      <button
+                        type="button"
+                        className="min-h-11 w-full text-left lg:hidden"
+                        aria-expanded={legendOpen}
+                        aria-controls={`${panelId}-legend`}
+                        onClick={() => setLegendOpen((open) => !open)}
+                      >
+                        {legendOpen ? "Hide" : "Show"} map legend and reading guide
+                      </button>
+                      <div
+                        id={`${panelId}-legend`}
+                        className={legendOpen ? "mt-2 lg:mt-0" : "hidden lg:block"}
+                      >
+                        {legend}
+                      </div>
+                    </div>
+                  )}
                   {rangeKind && view === "choropleth" && (
                     <p className="text-xs text-muted" aria-label="Effective classification">
                       {classificationDescription(choice, bins, rangeKind ?? "count")}

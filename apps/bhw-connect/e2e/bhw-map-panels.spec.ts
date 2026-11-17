@@ -27,7 +27,7 @@ async function fixture(page: Page) {
 }
 
 for (const width of [320, 390, 1440]) {
-  test(`workspace keeps controls and legend in the first viewport at ${width}px`, async ({
+  test(`workspace prioritizes the map with accessible controls and legend at ${width}px`, async ({
     browser,
   }) => {
     const context = await browser.newContext({
@@ -41,7 +41,6 @@ for (const width of [320, 390, 1440]) {
     await expect(canvas).toBeVisible();
     for (const control of [
       page.getByLabel("BHW Headcount 2025 indicator", { exact: true }),
-      page.getByRole("region", { name: "Circle size legend" }),
       page.getByRole("button", { name: "Reset map view" }),
     ]) {
       const box = await control.boundingBox();
@@ -50,8 +49,15 @@ for (const width of [320, 390, 1440]) {
       expect(box!.y + box!.height).toBeLessThan(844);
     }
     const initial = await canvas.boundingBox();
-    expect(initial!.height).toBeGreaterThanOrEqual(240);
-    expect(initial!.y).toBeLessThan(650);
+    expect(initial!.height).toBeGreaterThanOrEqual(width < 1024 ? 500 : 240);
+    expect(initial!.y).toBeLessThan(width < 1024 ? 400 : 650);
+    if (width < 1024) {
+      expect(Math.min(844, initial!.y + initial!.height) - initial!.y).toBeGreaterThan(422);
+      await expect(page.getByRole("region", { name: "Circle size legend" })).not.toBeVisible();
+      await page.getByRole("button", { name: /map legend and reading guide/ }).click();
+      await expect(page.getByRole("region", { name: "Circle size legend" })).toBeVisible();
+      await page.getByRole("button", { name: /map legend and reading guide/ }).click();
+    }
     const areas = page.getByRole("region", { name: "Areas and data", exact: true });
     if (width < 1024) {
       await expect(areas).not.toBeVisible();

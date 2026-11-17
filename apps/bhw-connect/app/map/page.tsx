@@ -24,10 +24,22 @@ export default async function MapPage({
     <div
       className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl space-y-2 px-3 py-2" : "max-w-6xl space-y-6 px-4 py-8"}`}
     >
-      <DatasetMapBackLink />
-      <h1 className={subject?.id === "bhw" ? "text-2xl font-semibold" : "text-3xl font-semibold"}>
-        {subject ? `${subject.title} map` : "Dataset maps"}
-      </h1>
+      <div
+        className={
+          subject?.id === "bhw" ? "flex flex-wrap items-center justify-between gap-2" : "space-y-6"
+        }
+      >
+        <DatasetMapBackLink />
+        <h1
+          className={
+            subject?.id === "bhw"
+              ? "order-first text-xl font-semibold lg:text-2xl"
+              : "text-3xl font-semibold"
+          }
+        >
+          {subject ? `${subject.title} map` : "Dataset maps"}
+        </h1>
+      </div>
       <DatasetMapPage
         choice={choice}
         districtView={choice?.dataset === DISTRICT_MAP_SLUG ? parseDistrictView(params) : undefined}

@@ -23,7 +23,7 @@ it("handles indicator-only queries and every catalog measure without importing h
   for (const spec of BHW_MEASURES) {
     expect(parseBhwSearch(spec.id).measures.map((s) => s.id)).toContain(spec.id);
   }
-  expect(BHW_MEASURES).toHaveLength(66);
+  expect(BHW_MEASURES).toHaveLength(152);
   expect(parseBhwSearch("Cebu basic life support").measures[0].id).toBe(
     "bhw.training.basic_life_support",
   );

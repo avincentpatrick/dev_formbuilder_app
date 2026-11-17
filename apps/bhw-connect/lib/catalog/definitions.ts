@@ -8,6 +8,10 @@ export type CatalogTable =
   | "agg_bhw_counts"
   | "agg_training"
   | "agg_certification"
+  | "agg_cohorts"
+  | "agg_workload"
+  | "agg_honorarium_inequality"
+  | "agg_honorarium_cumulative"
   | "agg_demographics"
   | "agg_honorarium"
   | "agg_nhfr_counts"
@@ -27,6 +31,8 @@ export type IndicatorSpec = {
   levels: readonly GeoLevel[];
   filters?: Readonly<Record<string, string | number>>;
   suppression?: string;
+  /** Extended analyses retain source masking at the selected location, including category residual protection. */
+  locationPrivacy?: boolean;
   categoryColumn?: string;
   attributes?: Readonly<Partial<Record<"numerator" | "denominator" | "ciLow" | "ciHigh", string>>>;
   partialReason?: string;
@@ -246,7 +252,16 @@ const bhw: IndicatorSpec[] = [
   ...["sex", "civil_status", "bloodtype", "education", "ip_status", "age_band"].map(
     (key): IndicatorSpec => ({
       id: `bhw.demographics.${key}`,
-      label: key.replaceAll("_", " "),
+      label: (
+        {
+          sex: "Sex",
+          civil_status: "Civil status",
+          bloodtype: "Blood type",
+          education: "Educational attainment",
+          ip_status: "Indigenous Peoples status",
+          age_band: "Age group",
+        } as Record<string, string>
+      )[key],
       unit: "people",
       source: R.bhw,
       table: "agg_demographics",
@@ -269,8 +284,114 @@ const bhw: IndicatorSpec[] = [
   })),
 ];
 
+// Extended analyses use the same accepted profile release and public aggregate reader.
+const extendedBhw: IndicatorSpec[] = [
+  ...["region", "province", "citymun", "barangay"].flatMap((payer) =>
+    (
+      [
+        ["mean", "Average", "avg_monthly_amount"],
+        ["median", "Median", "median_amount"],
+        ["p25", "25th percentile", "p25_amount"],
+        ["p75", "75th percentile", "p75_amount"],
+        ["min", "Minimum", "min_amount"],
+        ["max", "Maximum", "max_amount"],
+      ] as const
+    ).map(([key, label, column]): IndicatorSpec => ({
+      id: `bhw.honorarium-amount.${payer}.${key}`,
+      label: `${label} monthly honorarium from ${payer === "citymun" ? "city/municipality" : payer}`,
+      unit: "PHP/month",
+      source: R.bhw,
+      table: "agg_honorarium",
+      column,
+      levels: BARANGAY_LEVELS,
+      filters: { payer_level: payer },
+      suppression: "is_suppressed",
+      locationPrivacy: true,
+    })),
+  ),
+  ...make(R.bhw, "agg_honorarium_cumulative", "bhw.combined-honorarium", [
+    ["median", "Median combined monthly honorarium", "median_cumulative_monthly", "PHP/month"],
+    [
+      "below-reference",
+      "Profiles below the recorded ₱2,040/month reference",
+      "pct_below_sufficiency",
+      "%",
+    ],
+    ["none", "Profiles with no positive recorded honorarium", "pct", "%"],
+  ]).map((spec) => ({
+    ...spec,
+    filters: { band_order: 0 },
+    suppression: "is_suppressed",
+    locationPrivacy: true,
+  })),
+  {
+    id: "bhw.combined-honorarium.bands",
+    label: "Combined monthly honorarium payment bands",
+    unit: "%",
+    source: R.bhw,
+    table: "agg_honorarium_cumulative",
+    column: "pct",
+    levels: AREA_LEVELS,
+    categoryColumn: "band_label",
+    suppression: "is_suppressed",
+    locationPrivacy: true,
+  },
+  ...make(R.bhw, "agg_honorarium_inequality", "bhw.honorarium-inequality", [
+    ["gini", "Honorarium inequality (Gini)", "gini", "index"],
+    ["ratio", "Honorarium 90th-to-10th percentile ratio", "p90_p10_ratio", "times"],
+    [
+      "p10",
+      "Combined monthly honorarium: 10th percentile among recipients",
+      "p10_amount",
+      "PHP/month",
+    ],
+    [
+      "p90",
+      "Combined monthly honorarium: 90th percentile among recipients",
+      "p90_amount",
+      "PHP/month",
+    ],
+  ]).map((spec) => ({ ...spec, suppression: "is_suppressed", locationPrivacy: true })),
+  ...make(R.bhw, "agg_workload", "bhw.workload", [
+    ["p10", "Assigned households: 10th percentile", "p10", "households"],
+    ["p25", "Assigned households: 25th percentile", "p25", "households"],
+    ["median", "Median assigned households per BHW", "median", "households"],
+    ["p75", "Assigned households: 75th percentile", "p75", "households"],
+    ["p90", "Assigned households: 90th percentile", "p90", "households"],
+    ["mean", "Mean assigned households per BHW", "mean", "households"],
+    ["busiest-share", "Household workload held by the busiest tenth", "busiest_decile_share", "%"],
+  ]).map((spec) => ({ ...spec, suppression: "is_suppressed", locationPrivacy: true })),
+  ...["registered", "accredited", "first_active"].map((kind): IndicatorSpec => ({
+    id: `bhw.cohorts.${kind}`,
+    label: `Joining waves: ${kind.replaceAll("_", " ")}`,
+    unit: "people",
+    source: R.bhw,
+    table: "agg_cohorts",
+    column: "n",
+    levels: AREA_LEVELS,
+    filters: { kind },
+    categoryColumn: "cohort_year",
+  })),
+  ...TRAINING_TOPICS.map(([key, label]): IndicatorSpec => ({
+    id: `bhw.training-recency.${key}`,
+    label: `Median training year: ${label}`,
+    unit: "calendar year",
+    source: R.bhw,
+    table: "agg_training",
+    column: "median_training_year",
+    levels: AREA_LEVELS,
+    filters: { topic_slug: key },
+  })),
+];
+
 export const CATALOG: readonly DatasetSpec[] = [
-  { id: "bhw", title: "BHW", category: "Health workforce", detailRoot: "/bhw", indicators: bhw },
+  {
+    id: "bhw",
+    title: "BHW",
+    category: "Health workforce",
+    detailRoot: "/bhw",
+    indicators: [...bhw, ...extendedBhw],
+  },
   {
     id: "nhfr",
     title: "NHFR",

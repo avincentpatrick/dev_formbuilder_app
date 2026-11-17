@@ -25,6 +25,8 @@ export function previewIndicators(dataset: CatalogDataset): CatalogIndicator[] {
 }
 export function formatValue(value: PublicValue, unit: string): string {
   const formatted = value.value.toLocaleString("en-PH", { maximumFractionDigits: 2 });
+  if (unit === "calendar year") return String(value.value);
+  if (unit === "PHP/month") return `₱${formatted}/month`;
   if (unit === "%" || unit.startsWith("percent")) return formatPct(value.value);
   const singular: Record<string, string> = {
     facilities: "facility",

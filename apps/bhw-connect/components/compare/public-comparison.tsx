@@ -117,8 +117,10 @@ export async function PublicComparison({
                 label: `${geo.geoName} (${geo.geoCode})`,
                 value: scalar(indicator),
               }))}
-              format={spec.unit === "%" ? "percent" : "count"}
-              unitSuffix={spec.unit === "%" ? undefined : spec.unit}
+              format={spec.unit === "%" ? "percent" : spec.unit === "PHP/month" ? "peso" : "count"}
+              unitSuffix={
+                spec.unit === "%" ? undefined : spec.unit === "PHP/month" ? "/month" : spec.unit
+              }
             />
           )}
           <p className="text-sm text-muted">

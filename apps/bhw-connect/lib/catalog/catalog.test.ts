@@ -564,7 +564,7 @@ it.each(["suppressed", "failed"] as const)(
       { mode: "psgc", level: "national", code: "PH" },
       db,
     );
-    expect(result.indicators).toHaveLength(66);
+    expect(result.indicators).toHaveLength(152);
     expect(result.indicators.find((i) => i.id === "bhw.total")?.values).toEqual([{ value: 100 }]);
     expect(result.indicators.find((i) => i.id === "bhw.demographics.education")?.values).toEqual([
       { value: 987654, label: "Protected example" },
@@ -610,4 +610,76 @@ it("preserves supplied license metadata with its own accepted source", async () 
     "Synthetic profile terms",
   );
   expect(sources.find((s) => s.slug === ACCEPTED_RELEASES.stepzero)?.license).toBeNull();
+});
+
+it("exposes recorded honorarium statistics without summing payer averages or leaking withheld amounts", async () => {
+  const db = reader({
+    agg_honorarium: [
+      {
+        payer_level: "barangay",
+        avg_monthly_amount: 1291,
+        median_amount: 1000,
+        is_suppressed: false,
+      },
+      {
+        payer_level: "province",
+        avg_monthly_amount: 999999,
+        median_amount: 999999,
+        is_suppressed: true,
+      },
+    ],
+    agg_honorarium_cumulative: [
+      {
+        band_order: 0,
+        band_label: "None",
+        pct: 2,
+        median_cumulative_monthly: 1750,
+        pct_below_sufficiency: 59,
+        is_suppressed: false,
+      },
+    ],
+    agg_cohorts: [{ kind: "registered", cohort_year: 2020, n: 25 }],
+  });
+  const result = await getPublicCatalog(area, db, "bhw");
+  expect(find(result, "bhw.honorarium-amount.barangay.mean").values).toEqual([{ value: 1291 }]);
+  expect(find(result, "bhw.honorarium-amount.province.mean")).toMatchObject({
+    state: "suppressed",
+    values: [],
+  });
+  expect(find(result, "bhw.combined-honorarium.median").values).toEqual([{ value: 1750 }]);
+  expect(find(result, "bhw.combined-honorarium.none").values).toEqual([{ value: 2 }]);
+  expect(find(result, "bhw.cohorts.registered").values).toEqual([{ value: 25, label: "2020" }]);
+  expect(JSON.stringify(result)).not.toContain("999999");
+});
+
+it("does not substitute municipal analyses for an unsupported barangay selection", async () => {
+  const db = reader({ agg_workload: [{ median: 50, is_suppressed: false }] });
+  const result = await getPublicCatalog(
+    { mode: "psgc", level: "barangay", code: "0102801001" },
+    db,
+    "bhw",
+  );
+  expect(find(result, "bhw.workload.median")).toMatchObject({ state: "unsupported", values: [] });
+  expect(find(result, "bhw.training-recency.basic_life_support").state).toBe("unsupported");
+});
+
+it("does not reveal a complementary-masked zero-payment band through its separate share", async () => {
+  const result = await getPublicCatalog(
+    area,
+    reader({
+      agg_honorarium_cumulative: [
+        { band_order: 0, band_label: "None", pct: 5, is_suppressed: false },
+        { band_order: 1, band_label: "Low", pct: 95, is_suppressed: false },
+        { band_order: 2, band_label: "High", pct: null, is_suppressed: true },
+      ],
+    }),
+    "bhw",
+  );
+  expect(find(result, "bhw.combined-honorarium.none")).toMatchObject({
+    state: "suppressed",
+    values: [],
+  });
+  expect(find(result, "bhw.combined-honorarium.bands").values).toEqual([
+    { label: "Low", value: 95 },
+  ]);
 });

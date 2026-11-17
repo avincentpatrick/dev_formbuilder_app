@@ -1,3 +1,4 @@
+import { BhwAnalysisSection } from "./analysis-section";
 import Link from "next/link";
 import { comparisonHref } from "@/lib/bhw/comparison";
 import { bhwScopedCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
@@ -155,10 +156,13 @@ export function BhwOverview({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <nav
             aria-label="BHW analysis"
-            className="flex flex-wrap gap-3 text-sm underline underline-offset-4"
+            className="flex max-w-full gap-3 overflow-x-auto whitespace-nowrap pb-2 text-sm underline underline-offset-4 md:flex-wrap md:whitespace-normal"
           >
             <Link href="#workforce">Workforce distribution</Link>
             <Link href="#qualifications">Qualifications and training</Link>
+            <Link href="#demographics">Demographics</Link>
+            <Link href="#service-history">Service history and workload</Link>
+            <Link href="#training-topics">Training topics and recency</Link>
             <Link href="#support">Support and compensation</Link>
             <Link href={compareHref}>Compare places</Link>
             <Link href={previousMapHref ?? mapHref}>
@@ -308,6 +312,36 @@ export function BhwOverview({
             </FigureCard>
           </PresentationSlide>
         </section>
+        <BhwAnalysisSection
+          dataset={dataset}
+          level={selection.level}
+          code={selection.code}
+          areaName={areaName}
+          mapState={mapState}
+          id="demographics"
+          title="Demographics"
+          prefixes={["bhw.demographics."]}
+        />
+        <BhwAnalysisSection
+          dataset={dataset}
+          level={selection.level}
+          code={selection.code}
+          areaName={areaName}
+          mapState={mapState}
+          id="service-history"
+          title="Service history and household workload"
+          prefixes={["bhw.cohorts.", "bhw.workload.", "bhw.active-years"]}
+        />
+        <BhwAnalysisSection
+          dataset={dataset}
+          level={selection.level}
+          code={selection.code}
+          areaName={areaName}
+          mapState={mapState}
+          id="training-topics"
+          title="Training topics and recency"
+          prefixes={["bhw.training.", "bhw.training-recency."]}
+        />
         <section id="support" aria-labelledby="support-heading" className="scroll-mt-20 space-y-4">
           <h2 id="support-heading" className="text-2xl font-semibold">
             Support and compensation
@@ -346,6 +380,26 @@ export function BhwOverview({
               </ul>
             </FigureCard>
           </PresentationSlide>
+          <BhwAnalysisSection
+            dataset={dataset}
+            level={selection.level}
+            code={selection.code}
+            areaName={areaName}
+            mapState={mapState}
+            id="honorarium-amounts"
+            title="Honorarium amounts and payment spread"
+            prefixes={["bhw.honorarium-amount."]}
+          />
+          <BhwAnalysisSection
+            dataset={dataset}
+            level={selection.level}
+            code={selection.code}
+            areaName={areaName}
+            mapState={mapState}
+            id="combined-honorarium"
+            title="Combined honorarium and payment inequality"
+            prefixes={["bhw.combined-honorarium.", "bhw.honorarium-inequality."]}
+          />
         </section>
         <section aria-labelledby="examine-heading" className="space-y-3">
           <h2 id="examine-heading" className="text-2xl font-semibold">

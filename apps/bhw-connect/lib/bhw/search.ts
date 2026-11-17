@@ -17,6 +17,18 @@ const aliases: Record<string, readonly string[]> = {
   "lgu accreditation": ["bhw.declared-accreditation"],
   "profile accreditation": ["bhw.profile-accreditation"],
   "years active": ["bhw.active-years"],
+  "honorarium amount": BHW_MEASURES.filter((s) => s.id.startsWith("bhw.honorarium-amount.")).map(
+    (s) => s.id,
+  ),
+  "combined honorarium": BHW_MEASURES.filter((s) =>
+    s.id.startsWith("bhw.combined-honorarium."),
+  ).map((s) => s.id),
+  "payment bands": ["bhw.combined-honorarium.bands"],
+  "training recency": BHW_MEASURES.filter((s) => s.id.startsWith("bhw.training-recency.")).map(
+    (s) => s.id,
+  ),
+  "joining waves": BHW_MEASURES.filter((s) => s.id.startsWith("bhw.cohorts.")).map((s) => s.id),
+  workload: BHW_MEASURES.filter((s) => s.id.startsWith("bhw.workload.")).map((s) => s.id),
   honorarium: BHW_MEASURES.filter((s) => s.id.includes("honorarium")).map((s) => s.id),
   training: BHW_MEASURES.filter((s) => s.id.includes(".training.")).map((s) => s.id),
   education: ["bhw.demographics.education"],

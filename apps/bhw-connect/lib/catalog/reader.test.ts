@@ -54,7 +54,7 @@ describe("catalog read boundary", () => {
       ["geo_level", "citymun"],
     ]);
     expect(query.select).toHaveBeenCalledWith(
-      "coverage_pct,topic_slug,n_trained,n_total,ci_low,ci_high",
+      "coverage_pct,topic_slug,n_trained,n_total,ci_low,ci_high,median_training_year",
     );
     expect(query.select.mock.calls.flat()).not.toContain("*");
   });

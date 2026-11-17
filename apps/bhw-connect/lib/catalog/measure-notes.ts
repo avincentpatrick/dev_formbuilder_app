@@ -50,7 +50,19 @@ export function measureDefinition(indicator: CatalogIndicator): string {
   }
   if (definitions[indicator.id]) return definitions[indicator.id];
   const spec = specs.get(indicator.id);
+  if (indicator.id.startsWith("bhw.training-recency."))
+    return "Median recorded training year among profiles trained in this topic. Missing years remain unavailable; this is not a current certification-validity assessment.";
+  if (indicator.id.startsWith("bhw.honorarium-amount."))
+    return "Normalized monthly pesos among recipients paid by this government level. Payers overlap; payer-specific averages and percentiles cannot be added to obtain a worker’s combined total. These are 2025 profile records, not current payroll.";
   switch (spec?.table) {
+    case "agg_cohorts":
+      return "Counts of today’s validated profiles by recorded registration, accreditation or first-active year. These joining waves do not measure historical workforce size or retention. Missing year categories are not asserted to be zero.";
+    case "agg_workload":
+      return "Distribution of positive assigned-household counts reported by individual validated BHWs; not the Headcount household-to-worker ratio. Busiest-tenth share describes concentration of assigned households.";
+    case "agg_honorarium_cumulative":
+      return "Each profile’s normalized monthly honorarium summed across paying levels; denominator includes all validated profiles, including profiles with no positive recorded amount. The stored ₱2,040/month comparison is a historical analysis reference, not a legal minimum or current sufficiency standard. Missing amounts do not establish confirmed non-payment.";
+    case "agg_honorarium_inequality":
+      return "Combined normalized monthly honorarium among positive-amount recipients. Gini ranges from 0 (equal) to 1; the 90th-to-10th percentile ratio describes payment spread. Non-recipients are excluded.";
     case "agg_training":
       return "Validated profiles recorded as trained in this topic divided by all validated profiles, multiplied by 100. Topics overlap and are not summed.";
     case "agg_certification":

@@ -61,6 +61,8 @@ for (const width of [390, 1440]) {
       "circles",
     );
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    if (width < 1024)
+      await page.getByRole("button", { name: /map legend and reading guide/ }).click();
     await expect(page.getByRole("region", { name: "Circle size legend" })).toBeVisible();
     await expect(
       page.getByText("1 of 4 areas have no drawable shape.", { exact: false }),

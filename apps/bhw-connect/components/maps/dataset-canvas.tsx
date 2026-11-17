@@ -322,11 +322,15 @@ export function DatasetCanvas({
     };
   }, [url, rows, emphasisKey, view, labels, renderVersion]);
   return (
-    <div>
+    <div className={compact ? "relative" : undefined}>
       <div
         aria-label="Map viewport controls"
         role="group"
-        className="mb-2 flex flex-wrap gap-3 text-sm"
+        className={
+          compact
+            ? "absolute right-2 top-2 z-10 flex gap-1 rounded-lg border border-border bg-background p-1 text-sm lg:static lg:mb-2 lg:border-0 lg:p-0"
+            : "mb-2 flex flex-wrap gap-3 text-sm"
+        }
       >
         <button
           type="button"
@@ -351,8 +355,9 @@ export function DatasetCanvas({
           className="min-h-11 min-w-11 rounded border border-border p-2"
           disabled={!ready || failed}
           onClick={() => resetView.current?.()}
+          aria-label="Reset map view"
         >
-          Reset map view
+          {compact ? "Reset" : "Reset map view"}
         </button>
       </div>
       <div
@@ -361,7 +366,7 @@ export function DatasetCanvas({
         ref={container}
         className={
           compact
-            ? "h-[32svh] min-h-60 w-full rounded-lg border border-border lg:h-[55vh]"
+            ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
             : expanded
               ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
               : "h-64 w-full rounded-lg border border-border"

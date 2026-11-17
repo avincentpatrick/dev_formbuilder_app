@@ -1,10 +1,11 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
-import { colorForValue, NO_DATA_COLOR, type ColorBin } from "@/lib/charts/color-scale";
+import type { ColorBin } from "@/lib/charts/color-scale";
+import { applyDatasetStyle } from "./dataset-style";
 import type { MapRow } from "@/lib/maps/prototype";
 import { mapLabelPoints } from "@/lib/maps/orientation";
 import type { BoundaryCollection } from "@/lib/geo/locator-shapes";
@@ -53,18 +54,37 @@ export function DatasetCanvas({
     if (mapRef.current?.getLayer("selection"))
       mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
   }, [selected]);
-  const [failed, setFailed] = useState(false);
-  const [ready, setReady] = useState(false);
+
   const callbacks = useRef({ onSelect, onGeometry, onCapture });
   const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
+  // A new renderer must not inherit the previous canvas's ready/error status.
+  const renderVersion = useMemo(
+    () => ({ url, rows, emphasisKey, view, labels }),
+    [url, rows, emphasisKey, view, labels],
+  );
+  const [renderResult, setRenderResult] = useState<{
+    version: typeof renderVersion;
+    state: "ready" | "failed";
+  } | null>(null);
+  const ready = renderResult?.version === renderVersion && renderResult.state === "ready";
+  const failed = renderResult?.version === renderVersion && renderResult.state === "failed";
   useEffect(() => {
     callbacks.current = { onSelect, onGeometry, onCapture };
   });
+  const display = useRef({ rows, bins, excludedKey, view });
+  useEffect(() => {
+    display.current = { rows, bins, excludedKey, view };
+    const map = mapRef.current;
+    if (map?.getLayer("fill")) {
+      applyDatasetStyle(map, rows, bins, excludedKey.split(",").filter(Boolean), view);
+    }
+  }, [rows, bins, excludedKey, view]);
   useEffect(() => {
     const abort = new AbortController();
     let map: import("maplibre-gl").Map | undefined;
     let disposed = false;
+    let renderFailed = false;
     let resize: ResizeObserver | undefined;
     async function start() {
       try {
@@ -77,7 +97,6 @@ export function DatasetCanvas({
         if (disposed || !container.current) return;
         if (geometry.type !== "FeatureCollection" || !Array.isArray(geometry.features))
           throw new Error("Invalid boundary");
-        const excluded = new Set(excludedKey.split(",").filter(Boolean));
         const byCode = new Map(rows.map((r) => [r.code, r]));
         const codes: string[] = [];
         const bounds = new gl.LngLatBounds();
@@ -95,13 +114,7 @@ export function DatasetCanvas({
           codes.push(code);
           const row = byCode.get(code)!;
           const center = boundaryCenter(feature.geometry);
-          if (
-            !excluded.has(code) &&
-            center &&
-            row.value !== null &&
-            Number.isFinite(row.value) &&
-            row.value >= 0
-          )
+          if (center && row.value !== null && Number.isFinite(row.value) && row.value >= 0)
             points.push({
               type: "Feature",
               geometry: { type: "Point", coordinates: center },
@@ -111,10 +124,7 @@ export function DatasetCanvas({
                 radius: symbolRadius(row.value, maximum),
               },
             });
-          feature.properties.excluded = excluded.has(code);
           feature.properties.smallSample = row.value !== null && row.smallSample === true;
-          feature.properties.color =
-            row.value === null ? NO_DATA_COLOR : colorForValue(row.value, bins);
           for (const position of geometryPositions(feature.geometry)) bounds.extend(position);
         }
         callbacks.current.onGeometry(codes, geometry);
@@ -137,7 +147,8 @@ export function DatasetCanvas({
         resize.observe(container.current);
         map.on("error", () => {
           if (!disposed) {
-            setFailed(true);
+            renderFailed = true;
+            setRenderResult({ version: renderVersion, state: "failed" });
             callbacks.current.onCapture(null);
           }
         });
@@ -150,12 +161,7 @@ export function DatasetCanvas({
             type: "fill",
             source: "areas",
             paint: {
-              "fill-color": [
-                "case",
-                ["==", ["get", "excluded"], true],
-                "#ffffff",
-                view === "circles" ? "#e5e7eb" : ["get", "color"],
-              ],
+              "fill-color": "#e5e7eb",
               "fill-opacity": ["case", ["==", ["get", "smallSample"], true], 0.4, 0.9],
             },
           });
@@ -234,10 +240,7 @@ export function DatasetCanvas({
           if (labels) {
             map.addSource("place-names", {
               type: "geojson",
-              data: mapLabelPoints(
-                rows.filter((row) => !excluded.has(row.code)),
-                geometry,
-              ),
+              data: mapLabelPoints(rows, geometry),
             });
             map.addLayer({
               id: "place-labels",
@@ -264,6 +267,14 @@ export function DatasetCanvas({
               if (typeof code === "string") callbacks.current.onSelect(code);
             });
           }
+          const currentDisplay = display.current;
+          applyDatasetStyle(
+            map,
+            currentDisplay.rows,
+            currentDisplay.bins,
+            currentDisplay.excludedKey.split(",").filter(Boolean),
+            currentDisplay.view,
+          );
           map.addControl(new gl.ScaleControl({ unit: "metric", maxWidth: 120 }), "bottom-left");
           if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 20, animate: false });
           resetView.current = () => {
@@ -271,8 +282,8 @@ export function DatasetCanvas({
           };
           map.getCanvas().tabIndex = -1;
           map.once("idle", () => {
-            if (!disposed && map) {
-              setReady(true);
+            if (!disposed && !renderFailed && map) {
+              setRenderResult({ version: renderVersion, state: "ready" });
               const readyMap = map;
               callbacks.current.onCapture(codes.length ? () => captureMapFrame(readyMap) : null);
             }
@@ -293,7 +304,8 @@ export function DatasetCanvas({
         });
       } catch {
         if (!disposed) {
-          setFailed(true);
+          renderFailed = true;
+          setRenderResult({ version: renderVersion, state: "failed" });
           callbacks.current.onCapture(null);
         }
       }
@@ -308,7 +320,7 @@ export function DatasetCanvas({
       mapRef.current = null;
       resetView.current = null;
     };
-  }, [url, rows, bins, emphasisKey, view, labels, excludedKey]);
+  }, [url, rows, emphasisKey, view, labels, renderVersion]);
   return (
     <div>
       <div

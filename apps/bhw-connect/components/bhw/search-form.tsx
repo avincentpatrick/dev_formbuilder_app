@@ -1,5 +1,5 @@
 import { restoredBhwMapHref } from "@/lib/maps/catalog-return";
-import { withBasePath } from "@/lib/base-path";
+import Form from "next/form";
 
 export function BhwSearchForm({
   query = "",
@@ -12,7 +12,7 @@ export function BhwSearchForm({
 }) {
   const snapshot = restoredBhwMapHref(mapState)?.split("?")[1];
   return (
-    <form action={withBasePath("/bhw/search")} method="get" role="search" className="space-y-2">
+    <Form action="/bhw/search" prefetch={false} role="search" className="space-y-2">
       {snapshot && <input type="hidden" name="mapState" value={snapshot} />}
       <label htmlFor="bhw-search" className="block font-medium">
         Search BHW places and indicators
@@ -35,6 +35,6 @@ export function BhwSearchForm({
           ? "Place, PSGC code, or indicator."
           : "Try a place name or PSGC code, “headcount”, “Cebu accreditation”, or “Compare Cebu and Bohol accreditation”. Choose among matching places and measures before opening a figure."}
       </p>
-    </form>
+    </Form>
   );
 }

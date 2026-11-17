@@ -28,6 +28,7 @@ it("suggests places with parent labels, no counts, and validated map context", a
   const data = await response.json();
   expect(data.suggestions[0].detail).toContain("Parent province");
   expect(data.suggestions[0].href).toContain("mapState=");
+  expect(data.suggestions[0].href).toMatch(/^\/bhw\?location=citymun%3A0102801/);
   expect(JSON.stringify(data)).not.toContain("987654");
 });
 it("suggests partial indicator terms and preserves explicit accreditation choices", async () => {

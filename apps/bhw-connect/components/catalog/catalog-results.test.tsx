@@ -199,7 +199,7 @@ it("gives each card and the dataset view its own full map, at the chosen place",
   }
 });
 
-it("opens BHW visuals from the all-location card while retaining scoped indicator links", () => {
+it("opens the same BHW visuals from national and scoped cards", () => {
   const bhw = { ...dataset, id: "bhw" as const, title: "BHW", detailHref: "/bhw" };
   const all = { ...catalog([bhw]), selection: { mode: "all" } as const };
   const national = parseHTML(
@@ -215,7 +215,7 @@ it("opens BHW visuals from the all-location card while retaining scoped indicato
     renderToStaticMarkup(<CatalogResults catalog={catalog([bhw])} locationName="Region I" />),
   ).document;
   expect(scoped.querySelector("article h2 a")?.getAttribute("href")).toContain(
-    "location=region%3A01&dataset=bhw",
+    "/bhw?location=region%3A01",
   );
 });
 

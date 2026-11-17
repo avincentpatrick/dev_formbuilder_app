@@ -69,7 +69,7 @@ it("canonicalizes known settings rather than forwarding arbitrary parameters", (
   expect(href).toBe(mapHref(initialMapChoice("bhw-2025")));
 });
 
-it("preserves the complete BHW map snapshot through the national overview without changing its scope", () => {
+it("opens the locality dashboard while preserving the complete BHW map snapshot", () => {
   const choice: MapChoice = {
     ...initialMapChoice("bhw-2025"),
     indicator: "bhw.active-years",
@@ -84,7 +84,8 @@ it("preserves the complete BHW map snapshot through the national overview withou
   const href = bhwOverviewReturnHref(choice)!;
   expect(href.startsWith("/bhw?")).toBe(true);
   const params = new URLSearchParams(href.split("?")[1]);
-  expect([...params.keys()]).toEqual(["mapState"]);
+  expect([...params.keys()]).toEqual(["location", "mapState"]);
+  expect(params.get("location")).toBe("region:07");
   expect(restoredBhwMapHref(params.get("mapState")!)).toBe(mapHref(choice));
   expect(bhwOverviewReturnHref(initialMapChoice("psa-popcen-2024"))).toBeNull();
 });

@@ -22,11 +22,13 @@ export function restoredBhwMapHref(raw: string | string[] | undefined): string |
   return choice && isBhw(choice) ? mapHref(choice) : null;
 }
 
-/** The overview keeps its national figures; the snapshot is only a way back to the map. */
+/** Open the shared dashboard at the map area and preserve the full map snapshot. */
 export function bhwOverviewReturnHref(choice: MapChoice): string | null {
   if (!isBhw(choice)) return null;
-  const query = new URLSearchParams({ mapState: mapHref(choice).split("?")[1] });
-  return `/bhw?${query}`;
+  return bhwLocalityHref(
+    { mode: "psgc", level: choice.level, code: choice.code },
+    mapHref(choice).split("?")[1],
+  );
 }
 
 /** Keep a validated map return snapshot when navigating back from comparison. */
@@ -50,4 +52,16 @@ export function bhwScopedCatalogHref(
 /** National methodology keeps its scope while carrying only validated return settings. */
 export function bhwNationalCatalogHref(raw?: string | string[]): string {
   return bhwScopedCatalogHref({ mode: "psgc", level: "national", code: "PH" }, raw);
+}
+
+/** Dashboard geography is explicit; map filters never change its figures. */
+export function bhwLocalityHref(
+  selection: Extract<CatalogSelection, { mode: "psgc" }>,
+  raw?: string | string[],
+): string {
+  const query = new URLSearchParams();
+  if (selection.level !== "national") query.set("location", `${selection.level}:${selection.code}`);
+  const restored = restoredBhwMapHref(raw);
+  if (restored) query.set("mapState", restored.split("?")[1]);
+  return query.size ? `/bhw?${query}` : "/bhw";
 }

@@ -4,7 +4,7 @@ for (const width of [390, 1440]) {
   test(`BHW search preserves a chosen population and place at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("bhw");
-    const input = page.getByRole("searchbox", { name: "Search BHW places and indicators" });
+    const input = page.getByRole("combobox", { name: "Search BHW places and indicators" });
     await input.fill("01 accreditation");
     await input.press("Enter");
     await expect(page).toHaveURL(/\/bhw-connect\/bhw\/search\?q=/);
@@ -28,8 +28,8 @@ for (const width of [390, 1440]) {
       true,
     );
     await page.goBack();
-    await expect(page.getByRole("searchbox")).toHaveValue("01 accreditation");
-    await page.getByRole("searchbox").fill("headcount");
+    await expect(page.getByRole("combobox")).toHaveValue("01 accreditation");
+    await page.getByRole("combobox").fill("headcount");
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await page.getByRole("link", { name: "Total BHWs (LGU-reported)", exact: true }).click();
     await expect(page).toHaveURL(/location=national%3APH/);

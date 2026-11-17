@@ -10,7 +10,7 @@ for (const width of [390, 1440]) {
     await page.goto(`bhw?${new URLSearchParams({ mapState })}`);
     const back = page.getByRole("link", { name: "Return to previous BHW map", exact: true });
     const original = await back.getAttribute("href");
-    const search = page.getByRole("searchbox", { name: "Search BHW places and indicators" });
+    const search = page.getByRole("combobox", { name: "Search BHW places and indicators" });
     await search.fill("01 headcount");
     await search.press("Enter");
     await expect(page.getByRole("region", { name: "Search results" })).toBeVisible();

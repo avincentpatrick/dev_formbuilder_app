@@ -124,15 +124,9 @@ for (const width of [390, 1440]) {
         (url) => (url.searchParams.get("level") ?? "national") === level,
       );
     }
-    expect(requested).toEqual([
-      "national",
-      "region",
-      "province",
-      "citymun",
-      "province",
-      "region",
-      "national",
-    ]);
+    await expect
+      .poll(() => requested)
+      .toEqual(["national", "region", "province", "citymun", "province", "region", "national"]);
     await page.reload();
     await expect(ready).toBeVisible();
   });

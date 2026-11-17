@@ -74,3 +74,11 @@ export const levelLabel: Record<GeoLevel, string> = {
   citymun: "City/Municipality",
   barangay: "Barangay",
 };
+
+/** Prefix/substring suggestions reuse the same canonical labels and aliases as full search. */
+export function suggestBhwMeasures(query: string) {
+  const text = normalize(query);
+  if (text.length < 2) return [];
+  const ids = new Set(terms.filter(([term]) => term.includes(text)).flatMap(([, ids]) => ids));
+  return BHW_MEASURES.filter((spec) => ids.has(spec.id)).slice(0, 4);
+}

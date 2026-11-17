@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { regionalSpread } from "@/lib/analysis/regional-spread";
 import type { ProfilingStatusChild } from "@/lib/db/profiling-status";
@@ -6,7 +7,7 @@ import type { ProfilingStatusChild } from "@/lib/db/profiling-status";
 const TOP_N = 3;
 
 function pctLabel(pct: number | null): string {
-  return pct === null ? "—" : `${pct}%`;
+  return formatPct(pct);
 }
 
 function Row({ child }: { child: ProfilingStatusChild }) {
@@ -47,9 +48,7 @@ export function AreaRanking({
   if (!spread || spread.max === spread.min) return null;
 
   const leaders = ranked.slice(0, Math.min(TOP_N, ranked.length));
-  const laggards = ranked
-    .slice(Math.max(ranked.length - TOP_N, leaders.length))
-    .reverse();
+  const laggards = ranked.slice(Math.max(ranked.length - TOP_N, leaders.length)).reverse();
 
   return (
     <section
@@ -59,7 +58,7 @@ export function AreaRanking({
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Furthest along vs. most still to do</h2>
         <span className="text-xs text-muted">
-          {heading}: {spread.min}%–{spread.max}% attested
+          {heading}: {formatPct(spread.min)}–{formatPct(spread.max)} attested
         </span>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">

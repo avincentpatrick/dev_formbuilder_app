@@ -1,3 +1,4 @@
+import { StatValue } from "@/components/home/stat-value";
 import { countAndShare, shareOf } from "@/lib/format";
 import type { NhfrCounts } from "@/lib/db/nhfr";
 
@@ -55,8 +56,10 @@ export function FacilityStats({ counts }: { counts: NhfrCounts }) {
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-md border border-border bg-surface/40 p-3">
-            <dd className="text-xl font-semibold tabular-nums">
-              {countAndShare(t.value, shareOf(t.value, counts.nFacilities))}
+            <dd>
+              <StatValue
+                value={countAndShare(t.value, shareOf(t.value, counts.nFacilities), "multiple")}
+              />
             </dd>
             <dt className="mt-0.5 text-xs text-muted">{t.label}</dt>
           </div>

@@ -1,6 +1,10 @@
+import { formatPct } from "@/lib/format";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { IncomeClassRow } from "@/lib/db/derived-figures";
 import { formatPeso } from "@/lib/format";
 
@@ -100,10 +104,10 @@ export function IncomeClassFigure({
                   </td>
                   <td className="px-3 py-2 sm:px-4">{r.nBhw.toLocaleString()}</td>
                   <td className="px-3 py-2 sm:px-4">
-                    {r.pctAccredited !== null ? `${r.pctAccredited}%` : "—"}
+                    {r.pctAccredited !== null ? formatPct(r.pctAccredited) : "—"}
                   </td>
                   <td className="px-3 py-2 sm:px-4">
-                    {r.anyHonorariumPct !== null ? `${r.anyHonorariumPct}%` : "—"}
+                    {r.anyHonorariumPct !== null ? formatPct(r.anyHonorariumPct) : "—"}
                   </td>
                   <td className="px-3 py-2 sm:px-4">
                     <div className="flex items-center gap-2">

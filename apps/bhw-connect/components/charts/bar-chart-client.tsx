@@ -1,5 +1,7 @@
 "use client";
 
+import { percentageFormatter } from "@/lib/format";
+
 import { useEffect, useRef, useState } from "react";
 import type { BarDatum } from "@/lib/charts/bar-chart";
 import { styleAxisTitles } from "@/lib/charts/style-axis";
@@ -88,13 +90,16 @@ export function BarChartClient({
     };
   }, [data, xLabel, yLabel, valueSuffix, valueFormat, plotWidth, barHeight, resolvedFill]);
 
-  const format = valueFormat ?? ((n: number) => n.toLocaleString());
+  const format =
+    valueSuffix === "%"
+      ? percentageFormatter(data.map((d) => d.value))
+      : (valueFormat ?? ((n: number) => n.toLocaleString()));
 
   return (
     <div
       ref={containerRef}
       role="img"
-      aria-label={`${xLabel ?? "Chart"}: ${data.map((d) => `${d.label} ${format(d.value)}${valueSuffix ?? ""}`).join(", ")}`}
+      aria-label={`${xLabel ?? "Chart"}: ${data.map((d) => `${d.label} ${format(d.value)}${valueSuffix === "%" ? "" : (valueSuffix ?? "")}`).join(", ")}`}
       // text-foreground sets CSS `color`, which Plot's text (rendered with
       // fill: currentColor, see lib/charts/bar-chart.ts + style-axis.ts) inherits
       // — so axis/tick/value labels stay readable in dark mode instead of Plot's

@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { countAndShare } from "@/lib/format";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -127,7 +128,7 @@ export async function generateMetadata({
     headlineTotal !== null
       ? `${headlineTotal.toLocaleString()} Barangay Health Workers in ${geo.geoName}${
           counts?.pctAccredited !== null && counts?.pctAccredited !== undefined
-            ? `, ${counts.pctAccredited}% of profiled BHWs accredited`
+            ? `, ${formatPct(counts.pctAccredited, "single")} of profiled BHWs accredited`
             : ""
         }.`
       : `Barangay Health Worker figures for ${geo.geoName}.`;
@@ -282,7 +283,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
   if (overview.validatedProfiles !== null) {
     benchmarkNoteParts.push(
       `n = ${overview.validatedProfiles.toLocaleString()} profiled${
-        profileCoverage !== null ? ` (${profileCoverage}%)` : ""
+        profileCoverage !== null ? ` (${formatPct(profileCoverage, "single")})` : ""
       }`,
     );
   }
@@ -385,7 +386,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
                 <p>
                   {counts?.nAccredited?.toLocaleString() ?? "—"} of{" "}
                   {counts?.nTotal?.toLocaleString() ?? "—"} validated profiles are accredited (
-                  {counts?.pctAccredited ?? "—"}%).
+                  {formatPct(counts?.pctAccredited ?? null, "single")}).
                   {counts?.ciLow !== null &&
                   counts?.ciLow !== undefined &&
                   counts?.ciHigh !== null &&
@@ -395,7 +396,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
                       95%{" "}
                       <GlossaryTerm slug="confidence_interval">
                         confidence interval
-                      </GlossaryTerm>: {counts.ciLow}–{counts.ciHigh}%.
+                      </GlossaryTerm>: {formatPct(counts.ciLow)}–{formatPct(counts.ciHigh)}.
                     </>
                   ) : null}
                 </p>

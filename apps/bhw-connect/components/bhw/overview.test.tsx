@@ -198,10 +198,10 @@ it("shows the derived honorarium count with its percentage and explains the appr
     ]),
   );
   const support = document.getElementById("support")!;
-  expect(support.textContent).toContain("≈947 (94.7%)");
+  expect(support.textContent).toContain("≈947 (95%)");
   expect(support.textContent).toContain("Approximate count calculated");
   expect(support.textContent).not.toContain("Count unavailable");
   expect(support.querySelector('svg[role="img"]')?.getAttribute("aria-label")).toContain(
-    "≈947 (94.7%)",
+    "≈947 (95%)",
   );
 });

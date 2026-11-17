@@ -1,5 +1,7 @@
 "use client";
 
+import { StatValue } from "./stat-value";
+
 import { type ReactNode, useState } from "react";
 import { BarChartClient } from "@/components/charts/bar-chart-client";
 import { ColorSwatches } from "@/components/charts/color-swatches";
@@ -8,7 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { ViewToggle, type ViewMode } from "@/components/ui/view-toggle";
 import type { BarDatum } from "@/lib/charts/bar-chart";
 import { usePaletteAccent } from "@/lib/charts/use-palette-accent";
-import { formatterFor, type ValueFormatKind } from "@/lib/format";
+import { percentageFormatter, formatterFor, type ValueFormatKind } from "@/lib/format";
 
 export type StatTileDetail = {
   label: string;
@@ -48,9 +50,16 @@ export function StatEnlargeModal({
   const paletteAccent = usePaletteAccent();
   const [override, setOverride] = useState<string | null>(null);
   const color = override ?? paletteAccent;
-  const format = formatterFor(enlarge.valueFormat);
+  const format =
+    enlarge.valueFormat === "percent"
+      ? percentageFormatter(enlarge.chartData.map((d) => d.value))
+      : formatterFor(enlarge.valueFormat);
   const valueKind: "count" | "percent" | "amount" =
-    enlarge.valueFormat === "peso" ? "amount" : enlarge.valueFormat === "percent" ? "percent" : "count";
+    enlarge.valueFormat === "peso"
+      ? "amount"
+      : enlarge.valueFormat === "percent"
+        ? "percent"
+        : "count";
 
   return (
     <Modal open={open} onClose={onClose} title={enlarge.title} caption={enlarge.caption}>
@@ -109,7 +118,7 @@ export function StatTile({
 
   const body = (
     <>
-      <p className="mt-1 text-4xl font-semibold tracking-tight">{value}</p>
+      <StatValue value={value} />
       {visual && <div className="mt-3">{visual}</div>}
       <p className="mt-2 text-xs text-muted">{caption}</p>
       {context}

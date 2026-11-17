@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { NhfrCounts } from "@/lib/db/nhfr";
 
@@ -31,7 +32,7 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
         aria-label={`${formatCount(nBarangaysWithFacility)} of ${formatCount(
           nBarangays,
         )} barangays have at least one health facility${
-          coveragePct === null ? "" : ` (${coveragePct}%)`
+          coveragePct === null ? "" : ` (${formatPct(coveragePct, "single")})`
         }`}
       >
         <div className="h-full bg-accent" style={{ width: `${coverageFraction * 100}%` }} />
@@ -42,7 +43,9 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
           <dt className="text-muted">Barangays with a facility</dt>
           <dd className="font-semibold tabular-nums">
             {formatCount(nBarangaysWithFacility)}
-            {coveragePct !== null && <span className="text-muted"> · {coveragePct}%</span>}
+            {coveragePct !== null && (
+              <span className="text-muted"> · {formatPct(coveragePct)}</span>
+            )}
           </dd>
         </div>
         <div className="flex items-center gap-2">
@@ -53,7 +56,9 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
           <dt className="text-muted">Barangays with none</dt>
           <dd className="font-semibold tabular-nums">
             {formatCount(without)}
-            {coveragePct !== null && <span className="text-muted"> · {100 - coveragePct}%</span>}
+            {coveragePct !== null && (
+              <span className="text-muted"> · {formatPct(100 - coveragePct)}</span>
+            )}
           </dd>
         </div>
       </dl>

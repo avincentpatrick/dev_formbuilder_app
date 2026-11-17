@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -146,7 +147,7 @@ export default async function DistrictDetailPage({ params }: { params: Promise<D
               }
             >
               <p className="text-4xl font-semibold tracking-tight">
-                {figures.pctAccredited !== null ? `${figures.pctAccredited}%` : "—"}
+                {figures.pctAccredited !== null ? formatPct(figures.pctAccredited, "single") : "—"}
               </p>
             </FigureCard>
 
@@ -203,7 +204,9 @@ export default async function DistrictDetailPage({ params }: { params: Promise<D
               }
             >
               <p className="text-4xl font-semibold tracking-tight">
-                {figures.anyHonorariumPct !== null ? `${figures.anyHonorariumPct}%` : "—"}
+                {figures.anyHonorariumPct !== null
+                  ? formatPct(figures.anyHonorariumPct, "single")
+                  : "—"}
               </p>
             </FigureCard>
           </div>

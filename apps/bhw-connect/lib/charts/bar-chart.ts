@@ -1,3 +1,4 @@
+import { percentageFormatter } from "@/lib/format";
 import * as Plot from "@observablehq/plot";
 import { accent } from "./palette";
 
@@ -34,8 +35,11 @@ export function horizontalBarSpec(
     fill?: string;
   } = {},
 ): Plot.PlotOptions {
-  const suffix = options.valueSuffix ?? "";
-  const format = options.valueFormat ?? ((n: number) => n.toLocaleString());
+  const percent = options.valueSuffix === "%";
+  const suffix = percent ? "" : (options.valueSuffix ?? "");
+  const format = percent
+    ? percentageFormatter(data.map((d) => d.value))
+    : (options.valueFormat ?? ((n: number) => n.toLocaleString()));
   const fill = options.fill ?? accent;
   const width = options.width ?? 640;
   // On narrow (mobile) widths the fixed desktop margins would eat most of the

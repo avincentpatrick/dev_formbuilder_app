@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { getDataCompleteness } from "@/lib/db/data-quality";
 import { getActiveDataset } from "@/lib/db/dataset";
 import { COMPLETENESS_FIELD_LABEL } from "@/components/place/completeness-figure";
@@ -12,9 +13,9 @@ export default async function DataQualityPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Data quality</h1>
         <p className="mt-2 text-muted">
-          BHW Connect publishes what the source dataset actually contains, gaps included. This
-          page shows what&apos;s complete and what isn&apos;t, so a missing number reads as a
-          known finding rather than a hidden one.
+          BHW Connect publishes what the source dataset actually contains, gaps included. This page
+          shows what&apos;s complete and what isn&apos;t, so a missing number reads as a known
+          finding rather than a hidden one.
         </p>
       </div>
 
@@ -33,9 +34,11 @@ export default async function DataQualityPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.fieldName} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{COMPLETENESS_FIELD_LABEL[row.fieldName] ?? row.fieldName}</td>
+                  <td className="px-4 py-3">
+                    {COMPLETENESS_FIELD_LABEL[row.fieldName] ?? row.fieldName}
+                  </td>
                   <td className="px-4 py-3">{row.nMissing?.toLocaleString() ?? "—"}</td>
-                  <td className="px-4 py-3">{row.pctMissing ?? "—"}%</td>
+                  <td className="px-4 py-3">{formatPct(row.pctMissing)}</td>
                 </tr>
               ))}
             </tbody>

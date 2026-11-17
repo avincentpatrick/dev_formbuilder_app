@@ -1,8 +1,12 @@
+import { formatPct } from "@/lib/format";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { FigureView } from "@/components/charts/figure-view";
 import { ExportMenu } from "@/components/narrative/export-menu";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { HonorariumRow } from "@/lib/db/indicators";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -40,7 +44,7 @@ export function HonorariumFigure({
     .sort((a, b) => (b.pctReceiving as number) - (a.pctReceiving as number))[0];
   const topPayerCi =
     topPayerRow && topPayerRow.ciLow !== null && topPayerRow.ciHigh !== null
-      ? `${topPayerRow.ciLow}–${topPayerRow.ciHigh}%`
+      ? `${formatPct(topPayerRow.ciLow)}–${formatPct(topPayerRow.ciHigh)}`
       : null;
 
   return (
@@ -54,7 +58,7 @@ export function HonorariumFigure({
       }
       headline={
         topPayer
-          ? `Most honorarium here is paid at the ${topPayer.label.toLowerCase()} level (${topPayer.value}% of BHWs).`
+          ? `Most honorarium here is paid at the ${topPayer.label.toLowerCase()} level (${formatPct(topPayer.value)} of BHWs).`
           : "No honorarium data available."
       }
       technicalDetails={
@@ -64,7 +68,7 @@ export function HonorariumFigure({
           {topPayerCi && topPayer ? (
             <>
               {" "}
-              The top level&apos;s {topPayer.value}% has a 95%{" "}
+              The top level&apos;s {formatPct(topPayer.value)} has a 95%{" "}
               <GlossaryTerm slug="confidence_interval">confidence interval</GlossaryTerm> of{" "}
               {topPayerCi}.
             </>

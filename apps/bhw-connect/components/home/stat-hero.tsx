@@ -1,5 +1,7 @@
 "use client";
 
+import { StatValue } from "./stat-value";
+
 import { useState, type ReactNode } from "react";
 import { StackedMiniBar } from "@/components/home/mini-viz";
 import { StatEnlargeModal, type StatEnlarge } from "@/components/home/stat-tile";
@@ -30,12 +32,14 @@ export function StatHero({
 
   const body = (
     <>
-      <p className="mt-1 text-[3rem] font-semibold tracking-tight sm:text-[3.5rem]">{value}</p>
+      <StatValue value={value} hero />
       {registrationMix && (
         <div className="mt-3">
           <StackedMiniBar
             segments={registrationMix}
-            ariaLabel={registrationMix.map((s) => `${s.label} ${s.value.toLocaleString()}`).join(", ")}
+            ariaLabel={registrationMix
+              .map((s) => `${s.label} ${s.value.toLocaleString()}`)
+              .join(", ")}
             showLegend
           />
         </div>

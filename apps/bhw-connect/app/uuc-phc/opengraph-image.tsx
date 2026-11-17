@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { ImageResponse } from "next/og";
 import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
 import { getUucPhcCounts } from "@/lib/db/uuc-phc";
@@ -26,41 +27,42 @@ export default async function Image() {
 
   const listed = (counts?.nListed ?? 5987).toLocaleString();
   const total = (counts?.nBarangays ?? 41958).toLocaleString();
-  const share = counts?.sharePct === null || counts === undefined ? "" : ` · ${counts?.sharePct}%`;
+  const share =
+    counts?.sharePct === null || counts === undefined
+      ? ""
+      : ` · ${formatPct(counts?.sharePct ?? null, "single")}`;
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: 80,
+        background: "#ffffff",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", fontSize: 30, color: "#0a6e6e", fontWeight: 600 }}>
+        UUC for PHC · 2025
+      </div>
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: 80,
-          background: "#ffffff",
-          fontFamily: "system-ui, sans-serif",
+          fontSize: 56,
+          fontWeight: 700,
+          color: "#1a1d1e",
+          marginTop: 20,
         }}
       >
-        <div style={{ display: "flex", fontSize: 30, color: "#0a6e6e", fontWeight: 600 }}>
-          UUC for PHC · 2025
-        </div>
-        <div
-          style={{
-            display: "flex",
-            fontSize: 56,
-            fontWeight: 700,
-            color: "#1a1d1e",
-            marginTop: 20,
-          }}
-        >
-          {`${listed} unserved and underserved barangays`}
-        </div>
-        <div style={{ display: "flex", fontSize: 28, color: "#57616a", marginTop: 30 }}>
-          {`of ${total} in the Philippines${share} · DC No. 2025-0549`}
-        </div>
+        {`${listed} unserved and underserved barangays`}
       </div>
-    ),
+      <div style={{ display: "flex", fontSize: 28, color: "#57616a", marginTop: 30 }}>
+        {`of ${total} in the Philippines${share} · DC No. 2025-0549`}
+      </div>
+    </div>,
     { ...size },
   );
 }

@@ -1,6 +1,10 @@
+import { formatPct } from "@/lib/format";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { CohortRow } from "@/lib/db/derived-figures";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -124,7 +128,9 @@ export function CohortsFigure({
       peakYear = y;
     }
   }
-  const last5 = years.filter((y) => y >= maxYear - 4).reduce((s, y) => s + (firstActive.get(y) ?? 0), 0);
+  const last5 = years
+    .filter((y) => y >= maxYear - 4)
+    .reduce((s, y) => s + (firstActive.get(y) ?? 0), 0);
   const last5Pct = faTotal > 0 ? Math.round((100 * last5) / faTotal) : null;
 
   const scopeSuffix = fallbackCitymunName ? ` (shown for ${fallbackCitymunName})` : "";
@@ -132,7 +138,9 @@ export function CohortsFigure({
   const headline =
     faTotal > 0
       ? `Most of today's BHWs here first became active around ${peakYear}` +
-        (last5Pct !== null ? `; ${last5Pct}% joined in the last five recorded years.` : ".")
+        (last5Pct !== null
+          ? `; ${formatPct(last5Pct)} joined in the last five recorded years.`
+          : ".")
       : "No year-of-joining data for this area.";
 
   return (
@@ -166,7 +174,13 @@ export function CohortsFigure({
           const peak = Math.max(0, ...years.map((y) => series.get(y) ?? 0));
           if (peak === 0) return null;
           return (
-            <WaveStrip key={kind} label={KIND_LABEL[kind]} byYear={series} years={years} peak={peak} />
+            <WaveStrip
+              key={kind}
+              label={KIND_LABEL[kind]}
+              byYear={series}
+              years={years}
+              peak={peak}
+            />
           );
         })}
         <div className="flex justify-between text-[0.65rem] text-muted" aria-hidden="true">

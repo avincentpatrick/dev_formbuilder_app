@@ -150,7 +150,7 @@ test("poverty starts with geographic navigation, never regional rates or a paren
   );
 });
 
-test("poverty table retains published decimal rates, uncertainty, and missing coverage", async ({
+test("poverty table formats rates and uncertainty while downloads retain published precision", async ({
   page,
 }) => {
   await page.route("**/api/dataset-map?**", (route) =>
@@ -181,7 +181,7 @@ test("poverty table retains published decimal rates, uncertainty, and missing co
   await page.goto("map?dataset=psa-sae-poverty-2023&level=province&code=01028");
   await page.getByText(/Complete area table/).click();
   await expect(
-    page.getByRole("row", { name: /Synthetic town 12.345 10.125%–14.875%/ }),
+    page.getByRole("row", { name: /Synthetic town 12.3% 10.1%–14.9%/ }),
   ).toBeVisible();
   await expect(
     page.getByRole("row", { name: /Synthetic excluded area Not reported Not available/ }),
@@ -191,6 +191,13 @@ test("poverty table retains published decimal rates, uncertainty, and missing co
     page.getByText("No barangay poverty estimates are published in this source."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: /Show areas within/ })).toHaveCount(0);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download map data (JSON)" }).click();
+  const stream = await (await downloadPromise).createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  const exported = JSON.parse(Buffer.concat(chunks).toString());
+  expect(exported.rows[0]).toMatchObject({ value: 12.345, ciLow: 10.125, ciHigh: 14.875 });
 });
 
 test("expanded map follows container resizing without a window resize", async ({ page }) => {
@@ -593,7 +600,7 @@ test("StepZero accreditation uses a published parent rate and fixed percentage l
   await expect(page.getByLabel("Effective classification")).toContainText("Fixed percentage breaks across areas");
   await expect(page.getByText(/Reported area total:/)).toHaveCount(0);
   await page.getByText(/Complete area table/).click();
-  await expect(page.getByRole("row", { name: /Synthetic decimal 33.33/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Synthetic decimal 33.3%/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Synthetic undefined Not reported/ })).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download map data (JSON)" }).click();
@@ -603,6 +610,7 @@ test("StepZero accreditation uses a published parent rate and fixed percentage l
   const exported = JSON.parse(Buffer.concat(chunks).toString());
   expect(exported.parentMeasure).toEqual({ kind: "rate", value: 25, unit: "%" });
   expect(exported.total).toBeNull();
+  expect(exported.rows.find((row: { code: string }) => row.code === "02").value).toBe(33.33);
   expect(exported.legend.method).toBe("fixed");
   expect(exported.indicator.period).toBe("2025");
 });
@@ -621,7 +629,7 @@ test("Census accreditation preserves profile denominator, Wilson intervals and s
   await expect(page.getByText(/Denominator: Validated BHW Profiles 2025 records/)).toBeVisible();
   await page.getByText("Complete area table (1)").click();
   await expect(page.getByRole("columnheader", { name: "Published 95% confidence interval" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "6.15%–79.23%" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "6.2%–79.2%" })).toBeVisible();
   await expect(page.getByRole("cell", { name: /Few BHWs profiled/ })).toBeVisible();
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download map data (JSON)" }).click();

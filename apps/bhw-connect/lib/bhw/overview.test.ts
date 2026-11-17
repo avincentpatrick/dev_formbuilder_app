@@ -88,11 +88,11 @@ it("keeps full names in chart data while using optional compact tick labels on p
 
 it("pairs counts and percentages without hiding zero or capping cross-source ratios", async () => {
   const { countAndShare, shareOf, shareCount } = await import("./overview");
-  expect(countAndShare(270917, shareOf(270917, 306835))).toBe("270,917 (88.29%)");
+  expect(countAndShare(270917, shareOf(270917, 306835))).toBe("270,917 (88%)");
   expect(countAndShare(0, 0)).toBe("0 (0%)");
   expect(shareOf(120, 100)).toBe(120);
   expect(shareOf(0, 0)).toBeNull();
-  expect(countAndShare(null, 65.72)).toBe("Count unavailable (65.72%)");
+  expect(countAndShare(null, 65.72)).toBe("Count unavailable (66%)");
   expect(countAndShare(20, null)).toBe("20 (percentage unavailable)");
   const row = {
     ...indicator("share", 65.72),
@@ -109,12 +109,12 @@ it("estimates missing numerators from the matching population and labels them ap
     ...indicator("bhw.any-honorarium", 94.7),
     values: [{ value: 94.7, denominator: 1000 }],
   };
-  expect(shareSummary(row)).toEqual({ text: "≈947 (94.7%)", estimated: true });
-  expect(shareSummary(row, 2000).text).toBe("≈947 (94.7%)");
+  expect(shareSummary(row)).toEqual({ text: "≈947 (95%)", estimated: true });
+  expect(shareSummary(row, 2000).text).toBe("≈947 (95%)");
   expect(
     shareSummary({ ...row, values: [{ value: 94.7, numerator: 946, denominator: 1000 }] }),
-  ).toEqual({ text: "946 (94.7%)", estimated: false });
-  expect(shareSummary(indicator("share", 94.7), 1000).text).toBe("≈947 (94.7%)");
+  ).toEqual({ text: "946 (95%)", estimated: false });
+  expect(shareSummary(indicator("share", 94.7), 1000).text).toBe("≈947 (95%)");
   expect(shareSummary({ ...row, values: [{ value: 0, denominator: 1000 }] }).text).toBe("≈0 (0%)");
   for (const state of ["suppressed", "failed", "unavailable", "unsupported"] as const) {
     expect(shareSummary({ ...row, state }, 1000)).toEqual({

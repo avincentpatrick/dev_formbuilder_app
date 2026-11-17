@@ -13,6 +13,7 @@ import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { formatPct } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -864,8 +865,10 @@ export function DatasetMapCard({
                     ) : accreditation ? (
                       <>
                         Reported area rate:{" "}
-                        {data.parentRate == null ? "Not reported" : `${data.parentRate}%`}.
-                        Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}.
+                        {data.parentRate == null
+                          ? "Not reported"
+                          : formatPct(data.parentRate, "single")}
+                        . Denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}.
                         Published percentages are not averaged across areas.
                         {censusRate
                           ? censusUncertainty
@@ -986,8 +989,14 @@ export function DatasetMapCard({
                             ? (incomeClassLabel(selected.value) ??
                               selected.note ??
                               "No matched source record")
-                            : (selected.value ?? "Not reported")}{" "}
-                        {selected.value !== null && !income ? metric?.unit : ""}
+                            : selected.value === null
+                              ? "Not reported"
+                              : metric?.unit === "%"
+                                ? formatPct(selected.value)
+                                : selected.value}{" "}
+                        {selected.value !== null && !income && metric?.unit !== "%"
+                          ? metric?.unit
+                          : ""}
                       </p>
                       {comparisonHref && (
                         <div>
@@ -1008,7 +1017,7 @@ export function DatasetMapCard({
                         <p>
                           Published {censusRate ? 95 : 90}% confidence interval:{" "}
                           {selected.ciLow != null && selected.ciHigh != null
-                            ? `${selected.ciLow}%–${selected.ciHigh}%`
+                            ? `${formatPct(selected.ciLow)}–${formatPct(selected.ciHigh)}`
                             : "Not available"}
                           .
                         </p>
@@ -1113,12 +1122,16 @@ export function DatasetMapCard({
                                     ? (incomeClassLabel(r.value) ??
                                       r.note ??
                                       "No matched source record")
-                                    : (r.value ?? "Not reported")}
+                                    : r.value === null
+                                      ? "Not reported"
+                                      : metric?.unit === "%"
+                                        ? formatPct(r.value)
+                                        : r.value}
                               </td>
                               {(poverty || censusUncertainty) && !navigationOnly && (
                                 <td>
                                   {r.ciLow != null && r.ciHigh != null
-                                    ? `${r.ciLow}%–${r.ciHigh}%`
+                                    ? `${formatPct(r.ciLow)}–${formatPct(r.ciHigh)}`
                                     : "Not available"}
                                 </td>
                               )}

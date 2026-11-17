@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { UucPhcCounts } from "@/lib/db/uuc-phc";
 
@@ -29,7 +30,7 @@ export function CoverageHero({ counts, areaLabel }: { counts: UucPhcCounts; area
             <span aria-hidden="true" className="text-muted">
               ·
             </span>{" "}
-            <span className="font-semibold text-foreground">{sharePct}%</span>
+            <span className="font-semibold text-foreground">{formatPct(sharePct, "single")}</span>
           </>
         )}
       </p>

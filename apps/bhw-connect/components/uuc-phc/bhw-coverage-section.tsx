@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { formatCount } from "@/lib/format";
 import {
@@ -78,7 +79,7 @@ function SideCard({
         <div>
           <dt className="text-muted">Individually profiled</dt>
           <dd className="tabular-nums font-medium">
-            {side.profilingCoveragePct === null ? DASH : `${side.profilingCoveragePct.toFixed(1)}%`}
+            {side.profilingCoveragePct === null ? DASH : formatPct(side.profilingCoveragePct)}
           </dd>
         </div>
       </dl>

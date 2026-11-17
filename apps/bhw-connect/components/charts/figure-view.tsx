@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { ViewToggle, type ViewMode } from "@/components/ui/view-toggle";
 import type { BarDatum } from "@/lib/charts/bar-chart";
 import { usePaletteAccent } from "@/lib/charts/use-palette-accent";
-import { formatterFor, type ValueFormatKind } from "@/lib/format";
+import { percentageFormatter, formatterFor, type ValueFormatKind } from "@/lib/format";
 
 /**
  * Chart/table toggle + "Enlarge" wrapper around a figure's data. Keeps the
@@ -53,8 +53,12 @@ export function FigureView({
   const [override, setOverride] = useState<string | null>(null);
   const color = override ?? paletteAccent;
 
-  const format = formatterFor(valueFormat);
-  const tableFormat = (n: number) => `${format(n)}${valueSuffix ?? ""}`;
+  const percent = valueFormat === "percent" || valueSuffix === "%";
+  const format = percent
+    ? percentageFormatter(data.map((d) => d.value))
+    : formatterFor(valueFormat);
+  const suffix = percent ? "" : valueSuffix;
+  const tableFormat = (n: number) => `${format(n)}${suffix ?? ""}`;
   // "amount" (e.g. peso averages) can't be turned into a "% of total" — the
   // honorarium-amount figure's averages aren't additive across payer levels —
   // so that table keeps a single sortable value column instead of No./%.
@@ -83,7 +87,7 @@ export function FigureView({
           data={data}
           xLabel={xLabel}
           yLabel={yLabel}
-          valueSuffix={valueSuffix}
+          valueSuffix={suffix}
           valueFormat={format}
           fill={color}
         />
@@ -110,7 +114,7 @@ export function FigureView({
               data={data}
               xLabel={xLabel}
               yLabel={yLabel}
-              valueSuffix={valueSuffix}
+              valueSuffix={suffix}
               valueFormat={format}
               barHeight={56}
               fill={color}

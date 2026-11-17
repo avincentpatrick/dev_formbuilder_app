@@ -7,6 +7,9 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.goto("bhw");
     await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
+    await expect(
+      page.getByText("Withheld across locations to protect small groups.", { exact: true }),
+    ).toHaveCount(0);
     const firstVisual = await page.getByTestId("bhw-first-visual").boundingBox();
     expect(firstVisual!.y).toBeLessThan(page.viewportSize()!.height - 120);
     await expect(page.getByRole("link", { name: "Ask the Data · approved users" })).toHaveCSS(

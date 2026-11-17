@@ -56,9 +56,9 @@ export function measureDefinition(indicator: CatalogIndicator): string {
     case "agg_certification":
       return "Validated profiles with this recorded certification or training, as a percentage of all validated profiles.";
     case "agg_demographics":
-      return "Counts of validated profiles in each recorded category. Missing categories need not sum to the profile total. Small groups and reconstructable breakdowns are withheld across catalog locations.";
+      return "Counts of validated profiles in each recorded category. Missing categories need not sum to the profile total. All stored category counts are published. Categories already nulled in the source remain unavailable.";
     case "agg_honorarium":
-      return "Validated profiles receiving honorarium from this payer level, as a percentage of all validated profiles. Payers overlap; their shares must not be added. Privacy restrictions apply.";
+      return "Validated profiles receiving honorarium from this payer level, as a percentage of all validated profiles. Payers overlap; their shares must not be added. Receipt does not establish the amount paid.";
     case "agg_nhfr_counts":
       return `Registered facilities classified as ${indicator.label.toLowerCase()} in the accepted NHFR snapshot. These headline types are not an exhaustive partition of all facilities.`;
     case "fact_fhsis_workforce":

@@ -112,15 +112,15 @@ describe("catalog read boundary", () => {
     });
   });
 
-  it("distinguishes suppressed-only records from no records in All locations", async () => {
+  it("counts all stored receipt values without filtering by amount suppression", async () => {
     const { query } = client({ count: 3, error: null });
     expect(await createCatalogReader().probe(spec("bhw.honorarium.province"), 10)).toEqual({
       state: "available",
       count: 3,
-      hasSuppressed: true,
+      hasSuppressed: false,
     });
-    expect(query.eq).toHaveBeenCalledWith("is_suppressed", false);
-    expect(query.eq).toHaveBeenCalledWith("is_suppressed", true);
+    expect(query.eq).not.toHaveBeenCalledWith("is_suppressed", false);
+    expect(query.eq).not.toHaveBeenCalledWith("is_suppressed", true);
   });
 
   it("reads only public definition metadata once per catalog request", async () => {
@@ -135,16 +135,9 @@ describe("catalog read boundary", () => {
   });
 });
 
-it("checks protected cells across all source locations before permitting geographic peers", async () => {
+it("does not run a global suppression query for public aggregate counts", async () => {
   const { query } = client({ count: 1, data: [] });
   const db = createCatalogReader();
-  expect(await db.privacy(spec("bhw.demographics.sex"), 42)).toBe("suppressed");
-  expect(await db.privacy(spec("bhw.demographics.sex"), 42)).toBe("suppressed");
-  expect(query.eq.mock.calls).toEqual([
-    ["dataset_id", 42],
-    ["is_suppressed", true],
-    ["dimension", "sex"],
-  ]);
-  expect(query.select).toHaveBeenCalledTimes(1);
-  expect(query.in).not.toHaveBeenCalled();
+  expect(await db.privacy(spec("bhw.demographics.sex"), 42)).toBe("clear");
+  expect(query.select).not.toHaveBeenCalled();
 });

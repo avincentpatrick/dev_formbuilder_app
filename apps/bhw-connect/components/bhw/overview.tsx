@@ -327,8 +327,9 @@ export function BhwOverview({
             not zero.
           </p>
           <p className="mt-3 text-sm">
-            A demographic or payer-specific measure is withheld across locations when its accepted
-            source contains protected cells. If that check fails, no chart value is shown.
+            Demographic counts and honorarium receipt shares show all stored aggregate values.
+            Values absent from the accepted source remain unavailable. Individual records are not
+            included.
           </p>
           <SourceDates dataset={dataset} />
           <Link

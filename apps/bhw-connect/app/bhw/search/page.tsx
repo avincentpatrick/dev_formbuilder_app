@@ -2,11 +2,7 @@ import Link from "next/link";
 import { BhwSearchForm } from "@/components/bhw/search-form";
 import { searchGeo, type GeoSearchResult } from "@/lib/db/search";
 import { bhwMeasureHref, levelLabel, parseBhwSearch } from "@/lib/bhw/search";
-import {
-  bhwOverviewHref,
-  bhwScopedCatalogHref,
-  restoredBhwMapHref,
-} from "@/lib/maps/catalog-return";
+import { bhwOverviewHref, bhwLocalityHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import { parseComparisonSearch, publicPlace, type PlaceGroup } from "@/lib/bhw/comparison";
 import { ComparisonQueryResolver } from "@/components/compare/query-resolver";
@@ -155,7 +151,7 @@ export default async function BhwSearchPage({
                 <Link
                   prefetch={false}
                   className="underline"
-                  href={bhwScopedCatalogHref(
+                  href={bhwLocalityHref(
                     { mode: "psgc", level: place.geoLevel, code: place.geoCode },
                     mapState,
                   )}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { searchGeo } from "@/lib/db/search";
 import { bhwMeasureHref, levelLabel, parseBhwSearch, suggestBhwMeasures } from "@/lib/bhw/search";
-import { bhwScopedCatalogHref } from "@/lib/maps/catalog-return";
+import { bhwLocalityHref } from "@/lib/maps/catalog-return";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
           suggestions.push({
             label: place.geoName,
             detail,
-            href: bhwScopedCatalogHref(
+            href: bhwLocalityHref(
               { mode: "psgc", level: place.geoLevel, code: place.geoCode },
               mapState,
             ),

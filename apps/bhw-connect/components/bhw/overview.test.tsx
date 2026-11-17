@@ -130,3 +130,40 @@ it("opens a fresh headcount distribution preview independently of a saved map re
     "bhw-stepzero-2026",
   );
 });
+
+it("keeps the national figure sections for a locality and scopes captions, map and onward links", () => {
+  const selection = { mode: "psgc", level: "province", code: "01028" } as const;
+  const dataset: CatalogDataset = {
+    id: "bhw",
+    title: "BHW",
+    category: "Health workforce",
+    state: "available",
+    indicators: [item("bhw.total", "available", 125)],
+    availableIndicators: 1,
+    totalIndicators: 1,
+    supportedLevels: ["province"],
+    detailHref: null,
+    sources: [],
+  };
+  const { document } = parseHTML(
+    renderToStaticMarkup(
+      <BhwOverview dataset={dataset} selection={selection} areaName="Chosen province" />,
+    ),
+  );
+  for (const id of ["workforce", "qualifications", "support", "methodology"])
+    expect(document.getElementById(id)).not.toBeNull();
+  expect(document.getElementById("workforce-heading")?.textContent).toBe(
+    "Workforce in Chosen province",
+  );
+  expect(document.querySelector('[data-testid="bhw-first-visual"]')?.textContent).toContain("125");
+  expect(document.querySelector('[data-testid="bhw-overview"]')?.textContent).not.toContain(
+    "Philippines",
+  );
+  expect(document.querySelector('a[href^="/compare"]')?.getAttribute("href")).toContain(
+    "geos=01028",
+  );
+  expect(document.querySelector('a[href^="/map?"]')?.getAttribute("href")).toContain("code=01028");
+  expect(document.querySelector("#methodology a")?.getAttribute("href")).toContain(
+    "location=province%3A01028",
+  );
+});

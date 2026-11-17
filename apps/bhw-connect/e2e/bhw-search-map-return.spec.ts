@@ -22,7 +22,9 @@ for (const width of [390, 1440]) {
     await search.fill("01");
     await search.press("Enter");
     await page.getByRole("link", { name: /^View BHW indicators for / }).click();
-    await expect(page.getByRole("heading", { name: "Dataset catalog", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Barangay Health Workers", exact: true }),
+    ).toBeVisible();
     await expect(back).toHaveAttribute("href", original!);
     await page.goBack();
     await search.fill("Compare 01 and 02 headcount");

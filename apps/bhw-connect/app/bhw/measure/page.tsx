@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import {
-  bhwOverviewHref,
+  bhwLocalityHref,
   bhwScopedCatalogHref,
   restoredBhwMapHref,
 } from "@/lib/maps/catalog-return";
@@ -47,7 +47,7 @@ export default async function BhwMeasurePage({
   const values = publicValues(indicator);
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6">
-      <Link href={bhwOverviewHref(mapState)} className="underline">
+      <Link href={bhwLocalityHref(selection, mapState)} className="underline">
         ← BHW overview
       </Link>
       <h1 className="text-2xl font-semibold">{indicator.label}</h1>

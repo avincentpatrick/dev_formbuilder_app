@@ -2,7 +2,7 @@ import Link from "next/link";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
-import { bhwOverviewHref } from "@/lib/maps/catalog-return";
+import { bhwOverviewHref, bhwLocalityHref } from "@/lib/maps/catalog-return";
 import { subjectMapHref } from "@/lib/maps/subjects";
 import type { CatalogSelection } from "@/lib/catalog/types";
 import { hasAvailableValue } from "@/lib/catalog/summary";
@@ -133,7 +133,11 @@ export function CatalogResults({
             <h2 className="mt-1 text-xl font-semibold">
               <Link
                 prefetch={false}
-                href={catalogJourneyHref(catalog.selection, dataset.id, mapState)}
+                href={
+                  dataset.id === "bhw" && catalog.selection.mode === "psgc"
+                    ? bhwLocalityHref(catalog.selection, mapState)
+                    : catalogJourneyHref(catalog.selection, dataset.id, mapState)
+                }
                 className="underline decoration-transparent underline-offset-4 hover:decoration-current"
               >
                 {dataset.title}
@@ -189,7 +193,11 @@ export function CatalogResults({
             <div className="mt-auto pt-4">
               <Link
                 prefetch={false}
-                href={catalogJourneyHref(catalog.selection, dataset.id, mapState)}
+                href={
+                  dataset.id === "bhw" && catalog.selection.mode === "psgc"
+                    ? bhwLocalityHref(catalog.selection, mapState)
+                    : catalogJourneyHref(catalog.selection, dataset.id, mapState)
+                }
                 className="text-sm font-semibold text-accent underline underline-offset-4"
               >
                 {dataset.id === "bhw" && catalog.selection.mode === "all"
@@ -288,7 +296,13 @@ export function CatalogDetails({
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {dataset.detailHref && (
         <Link
-          href={dataset.id === "bhw" ? bhwOverviewHref(mapState) : dataset.detailHref}
+          href={
+            dataset.id === "bhw"
+              ? catalog.selection.mode === "psgc"
+                ? bhwLocalityHref(catalog.selection, mapState)
+                : bhwOverviewHref(mapState)
+              : dataset.detailHref
+          }
           className="inline-block text-sm text-accent underline underline-offset-4"
         >
           Open existing {dataset.title} dashboard →

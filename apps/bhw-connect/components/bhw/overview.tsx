@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { comparisonHref } from "@/lib/bhw/comparison";
-import { bhwNationalCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
-import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
+import { bhwScopedCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
+import type { CatalogDataset, CatalogIndicator, CatalogSelection } from "@/lib/catalog/types";
 import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
 import { formatCount, formatPct } from "@/lib/format";
 import { DatasetMapCard } from "@/components/maps/dataset-map-card";
+import { parseMapChoice } from "@/lib/maps/prototype";
 import { subjectMapHref } from "@/lib/maps/subjects";
 import { StatHero } from "@/components/home/stat-hero";
 import { StatTile } from "@/components/home/stat-tile";
@@ -16,7 +17,6 @@ import { PresentationProvider } from "@/components/present/presentation-context"
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
 
-const caption = "Philippines · 2025 · validated profiles";
 const mixLabels = ["Registered only", "Registered and accredited", "Nonregistered (LGU-reported)"];
 const mixColors = ["var(--seq-3)", "var(--seq-6)", "var(--seq-1)"];
 
@@ -55,10 +55,16 @@ function ShareTile({
 export function BhwOverview({
   dataset,
   mapState,
+  selection = { mode: "psgc", level: "national", code: "PH" },
+  areaName = "Philippines",
 }: {
   dataset: CatalogDataset;
   mapState?: string | string[];
+  selection?: Extract<CatalogSelection, { mode: "psgc" }>;
+  areaName?: string;
 }) {
+  const national = selection.level === "national";
+  const caption = `${areaName} · 2025 · validated profiles`;
   const { get, total, parts } = overviewMeasures(dataset);
   const profiles = scalar(get("bhw.validated-profiles"));
   const registrationMix = parts?.map((value, index) => ({
@@ -110,13 +116,18 @@ export function BhwOverview({
     shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
   const previousMapHref = restoredBhwMapHref(mapState);
-  const compareHref = comparisonHref("bhw.total", [], undefined, mapState);
-  const mapHref = subjectMapHref("bhw", { mode: "all" })!;
+  const compareHref = comparisonHref(
+    "bhw.total",
+    national ? [] : [selection.code],
+    undefined,
+    mapState,
+  );
+  const mapHref = subjectMapHref("bhw", selection)!;
   return (
     <PresentationProvider
       meta={{
         pageLabel: "BHW overview",
-        areaName: "Philippines",
+        areaName,
         filterChips: [],
         captionLine: "BHW Headcount and Profiles · 2025 · distinct populations",
       }}
@@ -143,18 +154,21 @@ export function BhwOverview({
           className="scroll-mt-20 space-y-4"
         >
           <h2 id="workforce-heading" className="text-2xl font-semibold">
-            National workforce
+            {national ? "National workforce" : `Workforce in ${areaName}`}
           </h2>
           <p className="text-sm text-muted">
             Headcount and validated profiles describe different populations. Do not add them or read
             them as change over time.
           </p>
-          <PresentationSlide id="national-figures" title="National workforce figures">
+          <PresentationSlide
+            id="national-figures"
+            title={national ? "National workforce figures" : `Workforce figures · ${areaName}`}
+          >
             <div className="grid gap-4 sm:grid-cols-2" data-testid="bhw-first-visual">
               <StatHero
                 label="LGU-reported BHW headcount"
                 value={formatCount(total)}
-                caption="Philippines · BHW Headcount 2025"
+                caption={`${areaName} · BHW Headcount 2025`}
                 registrationMix={registrationMix}
                 context={
                   <>
@@ -168,7 +182,7 @@ export function BhwOverview({
                   registrationMix
                     ? {
                         title: "LGU-reported registration",
-                        caption: "Philippines · BHW Headcount 2025",
+                        caption: `${areaName} · BHW Headcount 2025`,
                         chartData: registrationMix.map(({ label, value }) => ({ label, value })),
                         xLabel: "BHWs",
                         yLabel: "Registration",
@@ -192,18 +206,24 @@ export function BhwOverview({
           <section aria-label="Workforce distribution preview" className="space-y-3">
             <h3 className="text-xl font-semibold">Where are BHWs reported?</h3>
             <p className="text-sm text-muted">
-              Start with regional LGU-reported headcount. Circles show area totals, not worker
+              Explore LGU-reported headcount within {areaName}. Circles show area totals, not worker
               locations. Use Areas and data for ranked counts and exact values. Preview choices do
-              not change the national headline figures; enlarge the map to continue exploring.
+              not change the dashboard headline figures; enlarge the map to continue exploring.
             </p>
-            <DatasetMapCard dataset="bhw-stepzero-2026" overviewPreview />
+            <DatasetMapCard
+              key={`${selection.level}:${selection.code}`}
+              dataset="bhw-stepzero-2026"
+              initial={parseMapChoice(new URLSearchParams(mapHref.split("?")[1])) ?? undefined}
+              overviewPreview
+            />
           </section>
           <div className="flex flex-wrap items-center gap-4">
             <Link
               href={mapHref}
               className="inline-block text-sm font-semibold text-accent underline"
             >
-              Explore national headcount on the BHW map →
+              Explore {national ? "national headcount" : `headcount for ${areaName}`} on the BHW map
+              →
             </Link>
             <PresentButton variant="secondary" />
           </div>
@@ -219,7 +239,7 @@ export function BhwOverview({
           <ShareTile
             indicator={get("bhw.profile-accreditation")}
             label="Accreditation among validated profiles"
-            population="Accredited profiles / validated profiles · Philippines · 2025"
+            population={`Accredited profiles / validated profiles · ${areaName} · 2025`}
           />
           <PresentationSlide id="certification" title="Training and certification">
             <FigureCard
@@ -273,7 +293,7 @@ export function BhwOverview({
           <ShareTile
             indicator={get("bhw.any-honorarium")}
             label="Receiving any honorarium"
-            population="Share of validated profiles · Philippines · 2025"
+            population={`Share of validated profiles · ${areaName} · 2025`}
           />
           <PresentationSlide id="honorarium" title="Honorarium receipt">
             <FigureCard
@@ -322,7 +342,7 @@ export function BhwOverview({
             Sources, coverage and detailed data
           </summary>
           <p className="mt-3 text-sm">
-            National figures use the accepted national record, not the sum of overlapping location
+            Figures use the accepted record for {areaName}, not the sum of overlapping location
             records. Headcount is never replaced with profile counts. Missing and failed reads are
             not zero.
           </p>
@@ -334,10 +354,14 @@ export function BhwOverview({
           <SourceDates dataset={dataset} />
           <Link
             prefetch={false}
-            href={bhwNationalCatalogHref(mapState)}
+            href={bhwScopedCatalogHref(selection, mapState)}
             className="mt-4 inline-block text-sm underline"
           >
-            View national indicators and availability →
+            View{" "}
+            {national
+              ? "national indicators and availability"
+              : `indicators and availability for ${areaName}`}{" "}
+            →
           </Link>
         </details>
       </div>

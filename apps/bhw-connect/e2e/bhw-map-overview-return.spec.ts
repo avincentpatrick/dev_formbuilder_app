@@ -74,14 +74,12 @@ for (const width of [390, 1440]) {
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     const previous = page.url();
     await page.getByRole("link", { name: "Open dashboard", exact: true }).click();
-    await expect(page).toHaveURL(/bhw\?mapState=/);
+    await expect(page).toHaveURL(/bhw\?location=region%3A07&mapState=/);
     await page.reload();
     await expect(
-      page.getByText("Workforce, qualifications and support. Philippines · 2025."),
+      page.getByText(/Workforce, qualifications and support\..*REGION VII/i),
     ).toBeVisible();
-    await expect(
-      page.getByText(/Overview figures remain national and are not filtered/),
-    ).toBeVisible();
+    await expect(page.getByText(/Dashboard figures describe.*REGION VII/i)).toBeVisible();
     const back = page.getByRole("link", { name: "Return to previous BHW map", exact: true });
     await expect(back).toHaveAttribute(
       "href",
@@ -96,12 +94,12 @@ for (const width of [390, 1440]) {
       new URL(previous).pathname + new URL(previous).search,
     );
     const fresh = page.getByRole("link", {
-      name: "Explore national headcount on the BHW map",
+      name: /^Explore headcount for /,
       exact: false,
     });
     const freshParams = new URL((await fresh.getAttribute("href"))!, page.url()).searchParams;
     expect(freshParams.get("dataset")).toBe("bhw-stepzero-2026");
-    expect(freshParams.get("code")).toBe("PH");
+    expect(freshParams.get("code")).toBe("07");
     expect(freshParams.has("valueMin")).toBe(false);
     await explorer.click();
     await expect(page).toHaveURL(previous);
@@ -120,9 +118,9 @@ for (const width of [390, 1440]) {
     expect(new URL(page.url()).searchParams.get("mapState")).toBe(
       new URL(previous).search.slice(1),
     );
-    expect(new URL(page.url()).searchParams.has("geos")).toBe(false);
+    expect(new URL(page.url()).searchParams.get("geos")).toBe("07");
     await page.reload();
-    await page.getByRole("link", { name: "← BHW overview", exact: true }).click();
+    await page.goBack();
     await expect(page).toHaveURL(overviewBeforeCompare);
     await page.reload();
     await expect(back).toHaveAttribute(
@@ -158,11 +156,11 @@ for (const width of [390, 1440]) {
     // Keep strict matching, but target the summary the reader can interact with.
     await page.locator("#methodology > summary:visible").click();
     await page
-      .getByRole("link", { name: "View national indicators and availability", exact: false })
+      .getByRole("link", { name: /^View indicators and availability for /, exact: false })
       .click();
     await expect(page).toHaveURL(/catalog\?/);
     const catalogQuery = new URL(page.url()).searchParams;
-    expect(catalogQuery.get("location")).toBe("national:PH");
+    expect(catalogQuery.get("location")).toBe("region:07");
     expect(catalogQuery.get("dataset")).toBe("bhw");
     expect(catalogQuery.get("mapState")).toBe(new URL(previous).search.slice(1));
     await page.reload();

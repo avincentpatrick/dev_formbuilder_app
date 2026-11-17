@@ -2,6 +2,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapCamera } from "@/lib/maps/zoom-geography";
+import { formatCount } from "@/lib/format";
 import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
@@ -24,6 +25,9 @@ export function DatasetCanvas({
   onZoomGeography,
   initialCamera,
   geographyLabel,
+  mapOnly = false,
+  onMapOnly,
+  unit = "",
   expanded,
   emphasis,
   compact = false,
@@ -31,6 +35,9 @@ export function DatasetCanvas({
   excludedCodes = [],
   view = "choropleth",
 }: {
+  mapOnly?: boolean;
+  onMapOnly?: () => void;
+  unit?: string;
   geographyLabel?: string;
   initialCamera?: MapCamera;
   onZoomGeography?: (camera: MapCamera, direction: "in" | "out", focus: string | null) => void;
@@ -52,6 +59,8 @@ export function DatasetCanvas({
   excludedCodes?: readonly string[];
   view?: "circles" | "choropleth";
 }) {
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const valueRow = selected !== dismissed ? rows.find((row) => row.code === selected) : undefined;
   const cameraOnMount = useRef(initialCamera);
   const zoomIntent = useRef(false);
   const container = useRef<HTMLDivElement>(null);
@@ -98,7 +107,20 @@ export function DatasetCanvas({
   const ready = renderResult?.version === renderVersion && renderResult.state === "ready";
   const failed = renderResult?.version === renderVersion && renderResult.state === "failed";
   useEffect(() => {
-    callbacks.current = { onSelect, onGeometry, onCapture, onZoomGeography };
+    const map = mapRef.current;
+    if (mapOnly) map?.cooperativeGestures.disable();
+    else map?.cooperativeGestures.enable();
+  }, [mapOnly, ready]);
+  useEffect(() => {
+    callbacks.current = {
+      onSelect: (code: string) => {
+        setDismissed(null);
+        onSelect(code);
+      },
+      onGeometry,
+      onCapture,
+      onZoomGeography,
+    };
   });
   const display = useRef({ rows, bins, excludedKey, view });
   useEffect(() => {
@@ -259,11 +281,6 @@ export function DatasetCanvas({
                 "circle-stroke-color": "#0c747b",
               },
             });
-            for (const layer of ["counts", "zeros"])
-              map.on("click", layer, (e) => {
-                const code = e.features?.[0]?.properties?.geo_code;
-                if (typeof code === "string") callbacks.current.onSelect(code);
-              });
           }
           if (labels) {
             map.addSource("place-names", {
@@ -289,10 +306,6 @@ export function DatasetCanvas({
                 "text-halo-color": "#ffffff",
                 "text-halo-width": 1.5,
               },
-            });
-            map.on("click", "place-labels", (e) => {
-              const code = e.features?.[0]?.properties?.geo_code;
-              if (typeof code === "string") callbacks.current.onSelect(code);
             });
           }
           const currentDisplay = display.current;
@@ -365,7 +378,7 @@ export function DatasetCanvas({
               callbacks.current.onCapture(codes.length ? () => captureMapFrame(readyMap) : null);
             }
           });
-          map.on("click", "fill", (e) => {
+          map.on("click", (e) => {
             const symbolCode =
               view === "circles"
                 ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
@@ -375,7 +388,10 @@ export function DatasetCanvas({
               ? map?.queryRenderedFeatures(e.point, { layers: ["place-labels"] })[0]?.properties
                   ?.geo_code
               : undefined;
-            const code = labelCode ?? symbolCode ?? e.features?.[0]?.properties?.geo_code;
+            const code =
+              symbolCode ??
+              labelCode ??
+              map?.queryRenderedFeatures(e.point, { layers: ["fill"] })[0]?.properties?.geo_code;
             if (typeof code === "string") callbacks.current.onSelect(code);
           });
         });
@@ -399,14 +415,16 @@ export function DatasetCanvas({
     };
   }, [url, rows, emphasisKey, view, labels, renderVersion]);
   return (
-    <div className={compact ? "relative" : undefined}>
+    <div data-map-canvas className={mapOnly ? "relative h-full w-full" : "relative"}>
       <div
         aria-label="Map viewport controls"
         role="group"
         className={
-          compact
-            ? "absolute right-2 top-2 z-10 flex gap-1 rounded-lg border border-border bg-background p-1 text-sm lg:static lg:mb-2 lg:border-0 lg:p-0"
-            : "mb-2 flex flex-wrap gap-3 text-sm"
+          mapOnly
+            ? "hidden"
+            : compact
+              ? "absolute right-2 top-2 z-10 flex gap-1 rounded-lg border border-border bg-background p-1 text-sm lg:static lg:mb-2 lg:border-0 lg:p-0"
+              : "mb-2 flex flex-wrap gap-3 text-sm"
         }
       >
         <button
@@ -442,20 +460,33 @@ export function DatasetCanvas({
         >
           {compact ? "Reset" : "Reset map view"}
         </button>
+        {onMapOnly && (
+          <button
+            type="button"
+            data-map-only-trigger
+            className="min-h-11 rounded border border-border p-2"
+            onClick={onMapOnly}
+          >
+            Map only
+          </button>
+        )}
       </div>
       <div
         aria-hidden="true"
         data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
         ref={container}
-        className={
-          compact
-            ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
-            : expanded
-              ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
-              : "h-64 w-full rounded-lg border border-border"
-        }
+        className={[
+          ready ? "maplibregl-map" : "",
+          mapOnly
+            ? "h-full w-full"
+            : compact
+              ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
+              : expanded
+                ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+                : "h-64 w-full rounded-lg border border-border",
+        ].join(" ")}
       />
-      {geographyLabel && ready && (
+      {geographyLabel && ready && !mapOnly && (
         <p
           className="pointer-events-none absolute bottom-2 right-2 rounded bg-background px-2 py-1 text-xs"
           aria-live="polite"
@@ -463,13 +494,46 @@ export function DatasetCanvas({
           {geographyLabel}
         </p>
       )}
+      {valueRow && ready && (
+        <div
+          role="status"
+          aria-label="Selected map value"
+          className="absolute bottom-10 left-2 right-2 z-20 flex items-start justify-between gap-3 rounded-lg border border-border bg-background p-3 text-left text-sm shadow-lg"
+        >
+          <div>
+            <strong>{valueRow.name}</strong>
+            <p>
+              {valueRow.value === null
+                ? "Not reported"
+                : `${formatCount(valueRow.value)} ${unit}`.trim()}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="min-h-11 min-w-11 rounded border border-border px-2"
+            aria-label="Close map value"
+            onClick={() => setDismissed(valueRow.code)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {!ready && !failed && (
-        <p role="status" className="text-sm">
+        <p
+          role="status"
+          className={mapOnly ? "absolute left-2 top-16 bg-background p-3 text-sm" : "text-sm"}
+        >
           Loading map rendering…
         </p>
       )}
       {failed && (
-        <div className="space-y-2 text-sm">
+        <div
+          className={
+            mapOnly
+              ? "absolute left-2 top-16 space-y-2 bg-background p-3 text-sm"
+              : "space-y-2 text-sm"
+          }
+        >
           <p role="status">Map unavailable. Use the area selector and complete table below.</p>
           <button type="button" className="underline" onClick={onRetry}>
             Retry map rendering

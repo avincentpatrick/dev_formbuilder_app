@@ -133,11 +133,42 @@ export function DatasetMapCard({
     collection?: BoundaryCollection;
   } | null>(null);
   const [visible, setVisible] = useState(expanded);
-  const active = useMapActivity(visible && metrics.length > 0);
+
   const [notice, setNotice] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [renderAttempt, setRenderAttempt] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [mapOnly, setMapOnly] = useState(false);
+  const active = useMapActivity((visible || mapOnly) && metrics.length > 0);
+  const mapDialog = useRef<HTMLDialogElement>(null);
+  const mapFocusReturn = useRef<HTMLElement | null>(null);
+  const exitMapOnly = () => {
+    mapDialog.current?.close();
+    mapDialog.current?.show();
+    setMapOnly(false);
+    requestAnimationFrame(() => {
+      const target = mapFocusReturn.current?.isConnected
+        ? mapFocusReturn.current
+        : mapDialog.current?.querySelector<HTMLElement>("[data-map-only-trigger]");
+      target?.focus();
+    });
+  };
+  const enterMapOnly = () => {
+    mapFocusReturn.current = document.activeElement as HTMLElement;
+    mapDialog.current?.close();
+    mapDialog.current?.showModal();
+    setMapOnly(true);
+  };
+  useEffect(() => {
+    if (!mapOnly) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    mapDialog.current?.querySelector<HTMLElement>("[data-map-only-exit]")?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mapOnly]);
+
   const [capture, setCapture] = useState<{
     key: string;
     run: () => Promise<HTMLCanvasElement>;
@@ -584,172 +615,214 @@ export function DatasetMapCard({
                   : "min-h-64"
               }
             >
-              {!active ? (
-                <p className="min-h-64 bg-surface p-4">
-                  Map paused. Scroll this card into view or enlarge it to explore. Your selection is
-                  retained.
-                </p>
-              ) : data ? (
-                <>
-                  <DatasetCanvas
-                    key={`${key}:render=${renderAttempt}`}
-                    geographyLabel={
-                      workspace
-                        ? `${data.childLevel === "citymun" ? "City/municipality" : data.childLevel.charAt(0).toUpperCase() + data.childLevel.slice(1)} figures`
-                        : undefined
-                    }
-                    initialCamera={
-                      zoomCamera?.scope === `${choice.level}:${choice.code}`
-                        ? zoomCamera.camera
-                        : undefined
-                    }
-                    onZoomGeography={
-                      workspace
-                        ? (camera, direction, focus) => {
-                            const next = zoomGeography(choice, data, camera.zoom, direction, focus);
-                            if (!next) return;
-                            setZoomCamera({ scope: `${next.level}:${next.code}`, camera });
-                            setNotice(null);
-                            setChoice(next);
-                          }
-                        : undefined
-                    }
-                    url={data.geometryUrl}
-                    rows={data.rows}
-                    bins={bins}
-                    selected={choice.selected}
-                    onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
-                    onGeometry={(codes, collection) => setGeometry({ key, codes, collection })}
-                    onCapture={(run) => setCapture(run ? { key, run } : null)}
-                    onRetry={() => {
-                      setGeometry(null);
-                      setCapture(null);
-                      setExportError(null);
-                      setRenderAttempt((attempt) => attempt + 1);
-                    }}
-                    expanded={expanded}
-                    compact={workspace}
-                    labels={bhw}
-                    excludedCodes={excludedCodes}
-                    view={view}
-                  />
-                  {workspace && (
-                    <div className="rounded border border-border p-2 text-sm lg:order-first lg:border-0 lg:p-0">
-                      <button
-                        type="button"
-                        className="min-h-11 w-full text-left lg:hidden"
-                        aria-expanded={legendOpen}
-                        aria-controls={`${panelId}-legend`}
-                        onClick={() => setLegendOpen((open) => !open)}
-                      >
-                        {legendOpen ? "Hide" : "Show"} map legend and reading guide
-                      </button>
-                      <div
-                        id={`${panelId}-legend`}
-                        className={legendOpen ? "mt-2 lg:mt-0" : "hidden lg:block"}
-                      >
-                        {legend}
-                      </div>
-                    </div>
-                  )}
-                  {rangeKind && view === "choropleth" && (
-                    <p className="text-xs text-muted" aria-label="Effective classification">
-                      {classificationDescription(choice, bins, rangeKind ?? "count")}
-                    </p>
-                  )}
-                  {filterSummary && (
-                    <p role="status" className="rounded border border-border p-2 text-sm">
-                      {rangeLabel} range{rangeKind === "percentage" ? " (%)" : ""}:{" "}
-                      {choice.valueMin ?? "no minimum"} to {choice.valueMax ?? "no maximum"},
-                      inclusive. {filterSummary.included} included, {filterSummary.excluded}{" "}
-                      excluded, {filterSummary.unavailable} unavailable. Published{" "}
-                      {rangeKind === "percentage"
-                        ? "parent rate"
-                        : rangeKind === "years"
-                          ? "parent mean"
-                          : "total"}{" "}
-                      and complete table unchanged. White shapes with dashed outlines are excluded.{" "}
-                      {rangeKind !== "count"
-                        ? "Value filtering does not change the color breaks."
-                        : "Scales and classification use all areas."}
-                      {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
-                    </p>
-                  )}
-                  {workspace && (choice.level !== "national" || selected) && (
-                    <NationalMapLocator
-                      onLocator={trackLocator}
-                      geometry={geometry?.key === key ? geometry.collection : undefined}
-                      selected={selected?.code ?? null}
-                      name={selected?.name ?? data.area}
-                    />
-                  )}
-                  {bhw && (
-                    <p className="text-xs text-muted">
-                      Place labels adjust with zoom to avoid overlaps. Use the area selector for
-                      every name, including missing shapes.
-                    </p>
-                  )}
-                  {workspace && selected && (
-                    <p role="status" className="rounded bg-surface p-2 text-sm">
-                      Selected: {selected.name} · {selected.value ?? "Not reported"}
-                      {selected.value !== null ? ` ${metric?.unit}` : ""}. Use Areas and data for
-                      details and drill-down.
-                    </p>
-                  )}
-                  <p className="text-xs text-muted">
-                    {view === "circles"
-                      ? "Circle area is proportional to the count. Hollow markers identify reported zero; missing counts have no circle. "
-                      : navigationOnly
-                        ? income
-                          ? "Geography navigation only. Choose a region to see published LGU classes, then a province for its cities and municipalities."
-                          : "Geography navigation only. Choose a province to see published city/municipality estimates."
-                        : income
-                          ? "Published classes, not income amounts or relative quantiles. Gray indicates an unclassified or unmatched area; see the table for the reason."
-                          : poverty
-                            ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
-                            : accreditation
-                              ? `${choice.classification ? "Color groups use all reported child-area shares." : "Fixed percentage breaks across areas."} Gray means the published share or its denominator is unavailable, not zero percent.`
-                              : profiling
-                                ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
-                                : censusMean
-                                  ? "Color classification uses all reported child-area means. Gray means no reported value."
-                                  : supportsCircles(choice)
-                                    ? "Color classification uses all reported child-area counts. Gray means no reported value."
-                                    : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
-                    Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers to
-                    pan.
+              <dialog
+                open
+                ref={mapDialog}
+                role={mapOnly ? "dialog" : "presentation"}
+                aria-label={mapOnly ? "Map only" : undefined}
+                onCancel={(event) => {
+                  event.preventDefault();
+                  exitMapOnly();
+                }}
+                className={
+                  mapOnly
+                    ? "fixed inset-0 m-0 h-dvh w-screen max-h-none max-w-none overflow-hidden border-0 bg-background p-0 text-inherit [&>*:not([data-map-canvas]):not([data-map-only-control])]:hidden [&_.maplibregl-control-container]:hidden"
+                    : "relative m-0 flex w-full min-w-0 max-h-none max-w-none flex-col gap-2 overflow-visible border-0 bg-background p-0 text-inherit"
+                }
+              >
+                {mapOnly && (
+                  <button
+                    data-map-only-control
+                    data-map-only-exit
+                    type="button"
+                    className="absolute right-2 top-2 z-30 min-h-11 rounded border border-border bg-background px-3 text-sm"
+                    onClick={exitMapOnly}
+                  >
+                    Exit map only
+                  </button>
+                )}
+                {!active ? (
+                  <p className="min-h-64 bg-surface p-4">
+                    Map paused. Scroll this card into view or enlarge it to explore. Your selection
+                    is retained.
                   </p>
-                  {workspace && (accreditation || censusMean) && (
+                ) : data ? (
+                  <>
+                    <DatasetCanvas
+                      key={`${key}:render=${renderAttempt}`}
+                      mapOnly={mapOnly}
+                      onMapOnly={workspace ? enterMapOnly : undefined}
+                      unit={metric?.unit}
+                      geographyLabel={
+                        workspace
+                          ? `${data.childLevel === "citymun" ? "City/municipality" : data.childLevel.charAt(0).toUpperCase() + data.childLevel.slice(1)} figures`
+                          : undefined
+                      }
+                      initialCamera={
+                        zoomCamera?.scope === `${choice.level}:${choice.code}`
+                          ? zoomCamera.camera
+                          : undefined
+                      }
+                      onZoomGeography={
+                        workspace
+                          ? (camera, direction, focus) => {
+                              const next = zoomGeography(
+                                choice,
+                                data,
+                                camera.zoom,
+                                direction,
+                                focus,
+                              );
+                              if (!next) return;
+                              setZoomCamera({ scope: `${next.level}:${next.code}`, camera });
+                              setNotice(null);
+                              setChoice(next);
+                            }
+                          : undefined
+                      }
+                      url={data.geometryUrl}
+                      rows={data.rows}
+                      bins={bins}
+                      selected={choice.selected}
+                      onSelect={(code) => setChoice((c) => ({ ...c, selected: code }))}
+                      onGeometry={(codes, collection) => setGeometry({ key, codes, collection })}
+                      onCapture={(run) => setCapture(run ? { key, run } : null)}
+                      onRetry={() => {
+                        setGeometry(null);
+                        setCapture(null);
+                        setExportError(null);
+                        setRenderAttempt((attempt) => attempt + 1);
+                      }}
+                      expanded={expanded}
+                      compact={workspace}
+                      labels={bhw}
+                      excludedCodes={excludedCodes}
+                      view={view}
+                    />
+                    {workspace && (
+                      <div className="rounded border border-border p-2 text-sm lg:order-first lg:border-0 lg:p-0">
+                        <button
+                          type="button"
+                          className="min-h-11 w-full text-left lg:hidden"
+                          aria-expanded={legendOpen}
+                          aria-controls={`${panelId}-legend`}
+                          onClick={() => setLegendOpen((open) => !open)}
+                        >
+                          {legendOpen ? "Hide" : "Show"} map legend and reading guide
+                        </button>
+                        <div
+                          id={`${panelId}-legend`}
+                          className={legendOpen ? "mt-2 lg:mt-0" : "hidden lg:block"}
+                        >
+                          {legend}
+                        </div>
+                      </div>
+                    )}
+                    {rangeKind && view === "choropleth" && (
+                      <p className="text-xs text-muted" aria-label="Effective classification">
+                        {classificationDescription(choice, bins, rangeKind ?? "count")}
+                      </p>
+                    )}
+                    {filterSummary && (
+                      <p role="status" className="rounded border border-border p-2 text-sm">
+                        {rangeLabel} range{rangeKind === "percentage" ? " (%)" : ""}:{" "}
+                        {choice.valueMin ?? "no minimum"} to {choice.valueMax ?? "no maximum"},
+                        inclusive. {filterSummary.included} included, {filterSummary.excluded}{" "}
+                        excluded, {filterSummary.unavailable} unavailable. Published{" "}
+                        {rangeKind === "percentage"
+                          ? "parent rate"
+                          : rangeKind === "years"
+                            ? "parent mean"
+                            : "total"}{" "}
+                        and complete table unchanged. White shapes with dashed outlines are
+                        excluded.{" "}
+                        {rangeKind !== "count"
+                          ? "Value filtering does not change the color breaks."
+                          : "Scales and classification use all areas."}
+                        {selected && ` Selected area: ${valueFilterState(selected, choice)}.`}
+                      </p>
+                    )}
+                    {workspace && (choice.level !== "national" || selected) && (
+                      <NationalMapLocator
+                        onLocator={trackLocator}
+                        geometry={geometry?.key === key ? geometry.collection : undefined}
+                        selected={selected?.code ?? null}
+                        name={selected?.name ?? data.area}
+                      />
+                    )}
+                    {bhw && (
+                      <p className="text-xs text-muted">
+                        Place labels adjust with zoom to avoid overlaps. Use the area selector for
+                        every name, including missing shapes.
+                      </p>
+                    )}
+                    {workspace && selected && (
+                      <p role="status" className="rounded bg-surface p-2 text-sm">
+                        Selected: {selected.name} · {selected.value ?? "Not reported"}
+                        {selected.value !== null ? ` ${metric?.unit}` : ""}. Use Areas and data for
+                        details and drill-down.
+                      </p>
+                    )}
                     <p className="text-xs text-muted">
-                      Map denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}.
-                      {censusMean
-                        ? " Missing active-year counts are excluded; contributing sample size is unavailable."
-                        : " Published shares are not averaged across places."}
+                      {view === "circles"
+                        ? "Circle area is proportional to the count. Hollow markers identify reported zero; missing counts have no circle. "
+                        : navigationOnly
+                          ? income
+                            ? "Geography navigation only. Choose a region to see published LGU classes, then a province for its cities and municipalities."
+                            : "Geography navigation only. Choose a province to see published city/municipality estimates."
+                          : income
+                            ? "Published classes, not income amounts or relative quantiles. Gray indicates an unclassified or unmatched area; see the table for the reason."
+                            : poverty
+                              ? "Fixed percentage breaks across provinces. Gray means missing coverage, including excluded HUCs; it does not mean zero poverty."
+                              : accreditation
+                                ? `${choice.classification ? "Color groups use all reported child-area shares." : "Fixed percentage breaks across areas."} Gray means the published share or its denominator is unavailable, not zero percent.`
+                                : profiling
+                                  ? "Fixed share breaks: 0–<25%, 25–<50%, 50–<75%, 75–<100%, and 100% or more. Missing snapshots and zero denominators have no share."
+                                  : censusMean
+                                    ? "Color classification uses all reported child-area means. Gray means no reported value."
+                                    : supportsCircles(choice)
+                                      ? "Color classification uses all reported child-area counts. Gray means no reported value."
+                                      : "Quantiles relative to displayed areas. Gray means no reported value."}{" "}
+                      Missing shapes remain in the table. Use Ctrl/⌘ + scroll to zoom; two fingers
+                      to pan.
                     </p>
-                  )}
-                  {!workspace && legend}
-                  {shapeCodes && data.rows.some((r) => !shapeCodes.includes(r.code)) && (
-                    <p role="status" className="rounded border border-border p-3 text-sm">
-                      {data.rows.filter((r) => !shapeCodes.includes(r.code)).length} of{" "}
-                      {data.rows.length} areas have no drawable shape. Their values remain in the
-                      total, selector and complete table. No substitute positions are inferred.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p role="status" className="min-h-64 bg-surface p-4">
-                  {result?.key !== key
-                    ? "Loading dataset map…"
-                    : result.data.state === "unavailable"
-                      ? "This dataset is unavailable. No values are shaded."
-                      : "Map data could not be loaded. This does not mean zero."}
-                </p>
-              )}
-              {result?.key === key && result.data.state === "failed" && (
-                <button type="button" className="underline" onClick={() => setRetry((r) => r + 1)}>
-                  Retry map
-                </button>
-              )}
+                    {workspace && (accreditation || censusMean) && (
+                      <p className="text-xs text-muted">
+                        Map denominator: {metric?.denominator ?? STEPZERO_ACCREDITATION_DENOMINATOR}
+                        .
+                        {censusMean
+                          ? " Missing active-year counts are excluded; contributing sample size is unavailable."
+                          : " Published shares are not averaged across places."}
+                      </p>
+                    )}
+                    {!workspace && legend}
+                    {shapeCodes && data.rows.some((r) => !shapeCodes.includes(r.code)) && (
+                      <p role="status" className="rounded border border-border p-3 text-sm">
+                        {data.rows.filter((r) => !shapeCodes.includes(r.code)).length} of{" "}
+                        {data.rows.length} areas have no drawable shape. Their values remain in the
+                        total, selector and complete table. No substitute positions are inferred.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p data-map-only-control role="status" className="min-h-64 bg-surface p-4">
+                    {result?.key !== key
+                      ? "Loading dataset map…"
+                      : result.data.state === "unavailable"
+                        ? "This dataset is unavailable. No values are shaded."
+                        : "Map data could not be loaded. This does not mean zero."}
+                  </p>
+                )}
+                {result?.key === key && result.data.state === "failed" && (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => setRetry((r) => r + 1)}
+                  >
+                    Retry map
+                  </button>
+                )}
+              </dialog>
             </div>
             <div
               id={`${panelId}-areas`}

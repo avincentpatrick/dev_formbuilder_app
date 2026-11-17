@@ -17,6 +17,21 @@
  * querySelectorAll/setAttribute.
  */
 export function styleAxisTitles(root: ParentNode): void {
+  // Plot defaults --plot-background to white inside its SVG stylesheet. Tooltip
+  // text inherits the themed foreground, so pair it with the themed surface.
+  // Set the variable on the SVG itself: a variable only on a parent loses to
+  // Plot’s own declaration. Inline styling also covers tips created after taps.
+  const elements = [root, ...Array.from(root.querySelectorAll("svg"))];
+  for (const element of elements) {
+    if (
+      "style" in element &&
+      "tagName" in element &&
+      String(element.tagName).toLowerCase() === "svg"
+    ) {
+      (element as SVGSVGElement).style.setProperty("--plot-background", "var(--surface, #ffffff)");
+    }
+  }
+
   // Theme-aware text everywhere: ticks, value labels, titles, tooltips.
   for (const el of Array.from(root.querySelectorAll("text"))) {
     el.setAttribute("fill", "currentColor");

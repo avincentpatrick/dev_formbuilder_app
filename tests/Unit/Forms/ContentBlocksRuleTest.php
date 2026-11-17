@@ -51,6 +51,20 @@ function contentBlocksEveryKind(): array
             contentBlocksSpan('call', ['link' => 'tel:+6321234567']),
         ]],
         ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'A map of the clinic entrance'],
+        // M245: a list, a details block holding every other kind, and glossary words.
+        ['type' => 'list', 'style' => 'bulleted', 'items' => [
+            ['spans' => [contentBlocksSpan('Bring your '), contentBlocksSpan('PhilHealth', ['term' => 'PhilHealth', 'bold' => true])]],
+            ['spans' => [contentBlocksSpan('Wear a mask', ['italic' => true])]],
+        ]],
+        ['type' => 'list', 'style' => 'numbered', 'items' => [['spans' => [contentBlocksSpan('First')]]]],
+        ['type' => 'details', 'summary' => 'More about this visit', 'blocks' => [
+            ['type' => 'heading', 'level' => 2, 'text' => 'Why we ask'],
+            ['type' => 'paragraph', 'spans' => [contentBlocksSpan('See the '), contentBlocksSpan('TWG', ['term' => 'TWG']), contentBlocksSpan(' note.')]],
+            ['type' => 'callout', 'tone' => 'warning', 'spans' => [contentBlocksSpan('Optional reading.')]],
+            ['type' => 'divider'],
+            ['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [contentBlocksSpan('One')]]]],
+            ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'A chart'],
+        ]],
     ];
 }
 
@@ -87,6 +101,12 @@ it('accepts what an author has mid-edit when lenient, and refuses it when strict
     'a link with no address' => [['type' => 'paragraph', 'spans' => [contentBlocksSpan('here', ['link' => null])]], 'link with no address'],
     'an image not described yet' => [['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => null], 'image with no description'],
     'an image described with spaces' => [['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => '   '], 'image with no description'],
+    'a list with no items yet' => [['type' => 'list', 'style' => 'bulleted', 'items' => []], 'list with no items'],
+    'a list item with no text yet' => [['type' => 'list', 'style' => 'numbered', 'items' => [['spans' => []]]], 'block 1 item 1 has no text'],
+    'a details block with no summary yet' => [['type' => 'details', 'summary' => null, 'blocks' => [['type' => 'divider']]], 'details block with no summary'],
+    'a details block of spaces' => [['type' => 'details', 'summary' => '  ', 'blocks' => [['type' => 'divider']]], 'details block with no summary'],
+    'a details block with nothing inside' => [['type' => 'details', 'summary' => 'More', 'blocks' => []], 'nothing inside it'],
+    'a blank heading inside a details block' => [['type' => 'details', 'summary' => 'More', 'blocks' => [['type' => 'heading', 'level' => 1, 'text' => null]]], 'block 1.1 is a heading with no text'],
 ]);
 
 it('refuses a bad shape in both modes', function (mixed $value, string $reason): void {
@@ -115,6 +135,30 @@ it('refuses a bad shape in both modes', function (mixed $value, string $reason):
     'spans that are not a list' => [[['type' => 'paragraph', 'spans' => 'Hi']], 'no list of text'],
     'a heading too long' => [[['type' => 'heading', 'level' => 1, 'text' => str_repeat('a', ContentBlocks::MAX_HEADING_LENGTH + 1)]], 'longer than'],
     'a span too long' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan(str_repeat('a', ContentBlocks::MAX_TEXT_LENGTH + 1))]]], 'longer than'],
+    // M245: lists, details blocks and glossary words.
+    'a list of an unknown style' => [[['type' => 'list', 'style' => 'checklist', 'items' => []]], 'neither bulleted nor numbered'],
+    'a list whose items are not a list' => [[['type' => 'list', 'style' => 'bulleted', 'items' => 'one']], 'no list of items'],
+    'a list item that is a list' => [[['type' => 'list', 'style' => 'bulleted', 'items' => [['One']]]], 'block 1 item 1 is not a list item'],
+    'a list item with an unknown setting' => [[['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [], 'level' => 2]]]], 'block 1 item 1 has an unknown setting “level”'],
+    'a list item carrying html' => [[['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [contentBlocksSpan('x', ['html' => '<b>'])]]]]], 'unknown setting “html”'],
+    'a list item with an unsafe link' => [[['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [contentBlocksSpan('x', ['link' => 'javascript:alert(1)'])]]]]], 'block 1 item 1 has a link this form cannot show'],
+    'too many list items' => [[['type' => 'list', 'style' => 'bulleted', 'items' => array_fill(0, ContentBlocks::MAX_LIST_ITEMS + 1, ['spans' => [contentBlocksSpan()]])]], 'more than '.ContentBlocks::MAX_LIST_ITEMS.' items'],
+    'a details block inside a details block' => [[['type' => 'details', 'summary' => 'A', 'blocks' => [['type' => 'details', 'summary' => 'B', 'blocks' => [['type' => 'divider']]]]]], 'block 1.1 is a details block inside another details block'],
+    'a details block whose summary is not text' => [[['type' => 'details', 'summary' => 42, 'blocks' => []]], 'summary is not text'],
+    'a details summary too long' => [[['type' => 'details', 'summary' => str_repeat('a', ContentBlocks::MAX_HEADING_LENGTH + 1), 'blocks' => []]], 'summary is longer than'],
+    'a details block whose blocks are not a list' => [[['type' => 'details', 'summary' => 'A', 'blocks' => 'x']], 'no list of blocks'],
+    'a bad block inside a details block, named by its path' => [[['type' => 'divider'], ['type' => 'details', 'summary' => 'A', 'blocks' => [['type' => 'divider'], ['type' => 'video']]]], 'block 2.2 has an unknown type'],
+    'an unsafe link inside a details block' => [[['type' => 'details', 'summary' => 'A', 'blocks' => [['type' => 'paragraph', 'spans' => [contentBlocksSpan('x', ['link' => 'data:x'])]]]]], 'block 1.1 has a link this form cannot show'],
+    'a glossary word whose text is not its term' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('TWGs', ['term' => 'TWG'])]]], 'whose text is not its term'],
+    'a glossary word that is also a link' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('TWG', ['term' => 'TWG', 'link' => 'https://example.org'])]]], 'also a link or code'],
+    'a glossary word that is also code' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('TWG', ['term' => 'TWG', 'code' => true])]]], 'also a link or code'],
+    'a glossary word that is a number' => [[['type' => 'paragraph', 'spans' => [['text' => '42', 'term' => 42]]]], 'not a term of up to'],
+    'an empty glossary word' => [[['type' => 'paragraph', 'spans' => [['text' => '', 'term' => '']]]], 'not a term of up to'],
+    'a glossary word with an edge space' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('TWG ', ['term' => 'TWG '])]]], 'not a term of up to'],
+    'a glossary word with a bar' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('a|b', ['term' => 'a|b'])]]], 'not a term of up to'],
+    'a glossary word with a line break' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan('a'.chr(10).'b', ['term' => 'a'.chr(10).'b'])]]], 'not a term of up to'],
+    'a glossary word too long' => [[['type' => 'paragraph', 'spans' => [contentBlocksSpan(str_repeat('a', ContentBlocks::MAX_TERM_LENGTH + 1), ['term' => str_repeat('a', ContentBlocks::MAX_TERM_LENGTH + 1)])]]], 'not a term of up to'],
+    'a glossary word in a list item that is not its text' => [[['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [contentBlocksSpan('x', ['term' => 'y'])]]]]], 'block 1 item 1 has a glossary word whose text is not its term'],
 ]);
 
 it('refuses more blocks or pieces of text than the bounds, in both modes', function (bool $strict): void {
@@ -124,6 +168,19 @@ it('refuses more blocks or pieces of text than the bounds, in both modes', funct
     expect(ContentBlocks::problem($blocks, $strict))->toContain('at most')
         ->and(ContentBlocks::problem(array_fill(0, ContentBlocks::MAX_BLOCKS, ['type' => 'divider']), $strict))->toBeNull()
         ->and(ContentBlocks::problem([['type' => 'paragraph', 'spans' => $spans]], $strict))->toContain('more than');
+})->with(['lenient' => [false], 'strict' => [true]]);
+
+it('counts the blocks inside a details block toward the bound, in both modes', function (bool $strict): void {
+    $inside = static fn (int $count): array => [
+        ...array_fill(0, ContentBlocks::MAX_BLOCKS - 1 - $count, ['type' => 'divider']),
+        ['type' => 'details', 'summary' => 'More', 'blocks' => array_fill(0, $count, ['type' => 'divider'])],
+    ];
+
+    expect(ContentBlocks::countBlocks($inside(10)))->toBe(ContentBlocks::MAX_BLOCKS)
+        ->and(ContentBlocks::problem($inside(10), $strict))->toBeNull()
+        ->and(ContentBlocks::problem([...$inside(10), ['type' => 'divider']], $strict))->toContain('at most '.ContentBlocks::MAX_BLOCKS.' blocks')
+        ->and(ContentBlocks::problem([['type' => 'details', 'summary' => 'More', 'blocks' => array_fill(0, ContentBlocks::MAX_BLOCKS, ['type' => 'divider'])]], $strict))
+        ->toContain('counting those inside a details block');
 })->with(['lenient' => [false], 'strict' => [true]]);
 
 it('refuses every link it cannot vouch for, in both modes', function (string $link): void {
@@ -170,16 +227,36 @@ it('reads a link fixture with both halves populated, so the vectors above can ne
         ->and(array_filter($cases, static fn (array $case): bool => ! $case[1]))->toHaveCount(23);
 });
 
-it('lists every image id by the position of its block, in lower case, and nothing else', function (): void {
+it('lists every image id by the path of its block, nested ones included, in lower case, and nothing else', function (): void {
     $blocks = [
         ['type' => 'divider'],
         ['type' => 'image', 'attachment_id' => strtoupper(CONTENT_BLOCKS_IMAGE_ID), 'alt' => 'A'],
         ['type' => 'paragraph', 'spans' => [contentBlocksSpan()]],
         ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID, 'alt' => 'B'],
         ['type' => 'image', 'alt' => 'no id'],
+        ['type' => 'details', 'summary' => 'More', 'blocks' => [
+            ['type' => 'divider'],
+            ['type' => 'image', 'attachment_id' => strtoupper(CONTENT_BLOCKS_IMAGE_ID), 'alt' => 'C'],
+        ]],
     ];
 
-    expect(ContentBlocks::imageIds($blocks))->toBe([1 => CONTENT_BLOCKS_IMAGE_ID, 3 => CONTENT_BLOCKS_IMAGE_ID])
+    expect(ContentBlocks::imageIds($blocks))->toBe([
+        ['block' => '2', 'id' => CONTENT_BLOCKS_IMAGE_ID],
+        ['block' => '4', 'id' => CONTENT_BLOCKS_IMAGE_ID],
+        ['block' => '6.2', 'id' => CONTENT_BLOCKS_IMAGE_ID],
+    ])
         ->and(ContentBlocks::imageIds('not a list'))->toBe([])
         ->and(ContentBlocks::imageIds(['first' => ['type' => 'image', 'attachment_id' => CONTENT_BLOCKS_IMAGE_ID]]))->toBe([]);
+});
+
+it('lists every glossary word by the path of its block, in paragraphs, callouts and list items at any depth', function (): void {
+    expect(ContentBlocks::termMarks(contentBlocksEveryKind()))->toBe([
+        ['block' => '11', 'term' => 'PhilHealth'],
+        ['block' => '13.2', 'term' => 'TWG'],
+    ])
+        ->and(ContentBlocks::termMarks([
+            ['type' => 'callout', 'tone' => 'info', 'spans' => [contentBlocksSpan('NHETE', ['term' => 'NHETE'])]],
+            ['type' => 'heading', 'level' => 1, 'text' => 'Not a mark'],
+        ]))->toBe([['block' => '1', 'term' => 'NHETE']])
+        ->and(ContentBlocks::termMarks('not a list'))->toBe([]);
 });

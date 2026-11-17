@@ -639,13 +639,14 @@ final class StructuralValidationGate
             throw PublishValidationException::noteContentInvalid($field->key, $problem);
         }
 
+        // M245: nested images too, each named by its dotted path ("3.2" inside a details block).
         $images = ContentBlocks::imageIds($content);
-        $foreign = ContentImageOwnership::foreign($formId, array_values($images));
-        foreach ($images as $index => $id) {
+        $foreign = ContentImageOwnership::foreign($formId, array_column($images, 'id'));
+        foreach ($images as ['block' => $block, 'id' => $id]) {
             if (in_array($id, $foreign, true)) {
                 throw PublishValidationException::noteContentInvalid(
                     $field->key,
-                    'block '.($index + 1).'’s image is missing, belongs to another form, or failed its virus check — upload it again',
+                    'block '.$block.'’s image is missing, belongs to another form, or failed its virus check — upload it again',
                 );
             }
         }

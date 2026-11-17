@@ -227,8 +227,9 @@ export function BhwOverview({
             <h3 className="text-xl font-semibold">Where are BHWs reported?</h3>
             <p className="text-sm text-muted">
               Explore LGU-reported headcount within {areaName}. Circles show area totals, not worker
-              locations. Use Areas and data for ranked counts and exact values. Preview choices do
-              not change the dashboard headline figures; enlarge the map to continue exploring.
+              locations. Use Areas and data for ranked counts and exact values. Select an area on
+              the map or in Areas and data to update all dashboard figures. Changing the locality
+              above also updates this map.
             </p>
             <DatasetMapCard
               key={`${selection.level}:${selection.code}`}

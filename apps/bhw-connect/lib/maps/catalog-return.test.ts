@@ -85,7 +85,7 @@ it("opens the locality dashboard while preserving the complete BHW map snapshot"
   expect(href.startsWith("/bhw?")).toBe(true);
   const params = new URLSearchParams(href.split("?")[1]);
   expect([...params.keys()]).toEqual(["location", "mapState"]);
-  expect(params.get("location")).toBe("region:07");
+  expect(params.get("location")).toBe("province:07306");
   expect(restoredBhwMapHref(params.get("mapState")!)).toBe(mapHref(choice));
   expect(bhwOverviewReturnHref(initialMapChoice("psa-popcen-2024"))).toBeNull();
 });

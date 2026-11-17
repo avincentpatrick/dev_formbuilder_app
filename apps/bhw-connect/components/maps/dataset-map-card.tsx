@@ -13,6 +13,7 @@ import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -51,7 +52,7 @@ import {
   classificationDescription,
 } from "@/lib/maps/classification";
 import { bhwMapComparisonHref } from "@/lib/maps/comparison-entry";
-import { bhwOverviewReturnHref } from "@/lib/maps/catalog-return";
+import { bhwMapLocality, bhwLocalityHref, bhwOverviewReturnHref } from "@/lib/maps/catalog-return";
 import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -84,6 +85,7 @@ export function DatasetMapCard({
   overviewPreview?: boolean;
   onChoiceChange?: (choice: MapChoice) => void;
 }) {
+  const router = useRouter();
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
   // Embedded previews do not own the page URL. Only the BHW map workspace
@@ -97,11 +99,18 @@ export function DatasetMapCard({
       const previous = latestChoice.current;
       const next = typeof action === "function" ? action(previous) : action;
       if (mapHref(previous) === mapHref(next)) return;
+      if (overviewPreview) {
+        const { code, level } = bhwMapLocality(next);
+        if (level && (code !== previous.code || level !== previous.level)) {
+          router.push(bhwLocalityHref({ mode: "psgc", level, code }), { scroll: false });
+          return;
+        }
+      }
       latestChoice.current = next;
       if (historyEnabled) window.history.pushState(null, "", withBasePath(mapHref(next)));
       updateChoice(next);
     },
-    [historyEnabled],
+    [historyEnabled, overviewPreview, router],
   );
   useEffect(() => {
     onChoiceChange?.(choice);

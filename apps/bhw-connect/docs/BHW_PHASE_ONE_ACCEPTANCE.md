@@ -285,3 +285,9 @@ historical source-null aggregates only from authorized privately supplied inputs
 if that work is requested. These are named data/operator prerequisites, not UI
 fixes or evidence that Phase 1 can be signed off. Phase 2 features already added
 on main do not waive these Phase 1 gates.
+
+A subsequent current-live emulated phone sample after successful #584 deployment
+is recorded in the linked report: five cold/warm national-map pairs, with one
+cold miss (10,328 ms against 10,000 ms); all five warm samples met 6,000 ms.
+Thus the map budget remains an observed current limitation, not only a historical
+note. This does not establish a controlled physical-device or percentile pass.

@@ -107,3 +107,34 @@ passed against that build with synthetic map fixtures, one worker, no retries.
 The full seeded-database browser run remains CI's gate. Test-only final edits
 were checked again with ESLint, Prettier and typecheck; application build inputs
 were unchanged.
+
+## Subsequent deployment and current map timing
+
+The failed #584 main job was retried once without code changes and passed.
+[Deploy 44103551895](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/44103551895)
+then successfully deployed `f005a25f` during this session. This does not invalidate
+the PNG race correction: a passing retry is not synchronization.
+
+A further desktop live check kept Map only open while wheel zoom changed Region
+VII to Cebu, then exited and downloaded a PNG successfully after the new map was
+ready. The image remains private scratch evidence.
+
+After #584 deployed, five sequential new Chromium 149.0.7827.55 mobile contexts
+(390×844, touch/mobile, 4× CPU slowdown, 150 ms latency, 1.6 Mbps download / 750 Kbps
+upload) visited the national Headcount map, then reloaded in the same context.
+Browser cache was left enabled, no request interception was installed, and server
+caches were not reset. No local build or test suite ran during the measurement.
+Time is wall-clock navigation/reload dispatch to `[data-map-state="ready"]`,
+including the DOM-content-loaded wait; failed readiness would not count as ready.
+All ten observations reached ready. This is one cloud machine/network proxy,
+not a physical handset or production percentile. Different browser, live data and
+network prevent a causal before/after comparison with the older synthetic sample.
+
+| Cache | Five observations (ms) | Median | Maximum | Existing target |
+| --- | --- | ---: | ---: | ---: |
+| Cold | 10328, 9561, 8450, 8114, 8111 | 8450 | 10328 | 10000 |
+| Warm | 4149, 4729, 4316, 3678, 3467 | 4149 | 4729 | 6000 |
+
+One of five cold observations still missed the budget. All five warm observations
+met it. Cold-map acceptance remains open; this small sample neither waives the
+miss nor rechecks the separate filter/classification and physical-device gates.

@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { ProfilingStage, ProfilingStatus } from "@/lib/db/profiling-status";
 
@@ -17,7 +18,7 @@ const STAGES = [
 ] as const;
 
 function pctLabel(pct: number | null): string {
-  return pct === null ? "—" : `${pct}%`;
+  return formatPct(pct);
 }
 
 export function FunnelBars({ status }: { status: ProfilingStatus }) {

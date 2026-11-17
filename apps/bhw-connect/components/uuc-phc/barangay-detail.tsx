@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import type { IndicatorReading, UucPhcBarangayDetail } from "@/lib/db/uuc-phc-indicators";
 
 /** One decimal at most, and no trailing ".0" — the source's precision varies from whole numbers
@@ -57,7 +58,7 @@ export function BarangayDetail({ detail }: { detail: UucPhcBarangayDetail }) {
         <span className="text-muted">
           {detail.physicalFactor === null
             ? "on the list"
-            : `${num(detail.physicalFactor)}% of puroks over an hour from care`}
+            : `${formatPct(detail.physicalFactor)} of puroks over an hour from care`}
         </span>
         {metFactors.map((f) => (
           <span
@@ -85,7 +86,7 @@ export function BarangayDetail({ detail }: { detail: UucPhcBarangayDetail }) {
             <div key={f.key} className="flex items-baseline gap-2">
               <dt className="text-muted">{f.label}</dt>
               <dd className="tabular-nums">
-                <span className={f.met ? "font-semibold" : ""}>{num(f.value)}%</span>{" "}
+                <span className={f.met ? "font-semibold" : ""}>{formatPct(f.value)}</span>{" "}
                 <span className="text-xs text-muted">of {f.threshold}% needed</span>
               </dd>
             </div>

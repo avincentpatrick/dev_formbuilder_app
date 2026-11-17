@@ -1,9 +1,10 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { formatCount } from "@/lib/format";
 import type { ProfilingStatusChild } from "@/lib/db/profiling-status";
 
 function pctLabel(pct: number | null): string {
-  return pct === null ? "—" : `${pct}%`;
+  return formatPct(pct);
 }
 
 /**

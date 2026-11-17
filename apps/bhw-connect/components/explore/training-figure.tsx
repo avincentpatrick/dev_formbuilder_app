@@ -1,9 +1,13 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { FigureView } from "@/components/charts/figure-view";
 import { ExportMenu } from "@/components/narrative/export-menu";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { TrainingRow } from "@/lib/db/indicators";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -75,7 +79,7 @@ export function TrainingFigure({
   const biggestGapRow = sortedRows[0];
   const gapCi =
     biggestGapRow && biggestGapRow.ciLow !== null && biggestGapRow.ciHigh !== null
-      ? `${biggestGapRow.ciLow}–${biggestGapRow.ciHigh}%`
+      ? `${formatPct(biggestGapRow.ciLow)}–${formatPct(biggestGapRow.ciHigh)}`
       : null;
 
   // Recency, orthogonal to coverage (E2.1): a topic can be widely trained yet
@@ -98,7 +102,7 @@ export function TrainingFigure({
       }
       headline={
         biggestGap
-          ? `"${biggestGap.label}" has the lowest coverage here, at ${biggestGap.value}%.`
+          ? `"${biggestGap.label}" has the lowest coverage here, at ${formatPct(biggestGap.value)}.`
           : "No training data available."
       }
       technicalDetails={
@@ -110,8 +114,9 @@ export function TrainingFigure({
           {gapCi && biggestGap ? (
             <>
               {" "}
-              The lowest-coverage topic&apos;s {biggestGap.value}% is a point estimate; its 95%{" "}
-              <GlossaryTerm slug="confidence_interval">confidence interval</GlossaryTerm> is {gapCi}.
+              The lowest-coverage topic&apos;s {formatPct(biggestGap.value)} is a point estimate;
+              its 95% <GlossaryTerm slug="confidence_interval">confidence interval</GlossaryTerm> is{" "}
+              {gapCi}.
             </>
           ) : null}
         </p>

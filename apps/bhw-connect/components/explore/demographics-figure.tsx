@@ -1,9 +1,13 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { FigureView } from "@/components/charts/figure-view";
 import { ExportMenu } from "@/components/narrative/export-menu";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { DemographicRow } from "@/lib/db/indicators";
 import type { DemographicDimension, GeoLevel } from "@/lib/filters/schema";
 
@@ -67,7 +71,7 @@ export function DemographicsFigure({
         isSuppressed
           ? "This breakdown is suppressed to protect individual privacy."
           : topCategory
-            ? `${topCategory.label} is the largest group, at ${topCategory.value}%.`
+            ? `${topCategory.label} is the largest group, at ${formatPct(topCategory.value)}.`
             : "No data available for this breakdown."
       }
       technicalDetails={

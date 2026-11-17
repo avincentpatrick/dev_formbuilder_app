@@ -168,3 +168,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Percentage display rule
+
+Use `lib/format.ts` for all displayed percentages. Single headline percentages use whole
+numbers; related figures, legends, charts and tables use at most one decimal, increasing to
+at most two when needed to distinguish values or avoid hiding a nonzero share or near-100 gap.
+Use `percentageFormatter(values)` for a related series. Omit trailing decimal zeroes. Keep raw
+values for calculations, sorting, filtering, geometry, data downloads and source records.
+Keep numeric count-and-percentage figures together on one line; use `StatValue` for card
+headlines so the type scales with the available width rather than wrapping or overflowing.

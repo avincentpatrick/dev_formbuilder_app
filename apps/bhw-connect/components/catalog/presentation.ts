@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import type {
   CatalogDataset,
   CatalogIndicator,
@@ -24,7 +25,7 @@ export function previewIndicators(dataset: CatalogDataset): CatalogIndicator[] {
 }
 export function formatValue(value: PublicValue, unit: string): string {
   const formatted = value.value.toLocaleString("en-PH", { maximumFractionDigits: 2 });
-  if (unit === "%" || unit.startsWith("percent")) return `${formatted}%`;
+  if (unit === "%" || unit.startsWith("percent")) return formatPct(value.value);
   const singular: Record<string, string> = {
     facilities: "facility",
     barangays: "barangay",

@@ -1,4 +1,4 @@
-import { countAndShare, shareOf } from "@/lib/format";
+import { countAndShare, shareOf, formatPct } from "@/lib/format";
 
 /**
  * Small, non-interactive presentational visuals for the home KPI cards — one
@@ -22,7 +22,11 @@ export function StackedMiniBar({
   const total = segments.reduce((sum, s) => sum + s.value, 0);
   return (
     <div>
-      <div role="img" aria-label={ariaLabel} className="flex h-3 w-full overflow-hidden rounded-full bg-surface">
+      <div
+        role="img"
+        aria-label={ariaLabel}
+        className="flex h-3 w-full overflow-hidden rounded-full bg-surface"
+      >
         {total > 0 &&
           segments.map(
             (s) =>
@@ -43,7 +47,7 @@ export function StackedMiniBar({
                 style={{ backgroundColor: s.color }}
               />
               <span>
-                {s.label} · {countAndShare(s.value, shareOf(s.value, total))}
+                {s.label} · {countAndShare(s.value, shareOf(s.value, total), "multiple")}
               </span>
             </li>
           ))}
@@ -69,8 +73,21 @@ export function Donut({
   const clamped = Math.max(0, Math.min(100, pct));
   const dash = (clamped / 100) * c;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={ariaLabel}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth={strokeWidth} />
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="var(--border)"
+        strokeWidth={strokeWidth}
+      />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -109,7 +126,7 @@ export function LadderBars({
             />
             <span className="truncate">{r.label}</span>
           </div>
-          <span className="text-xs tabular-nums text-muted">{r.pct}%</span>
+          <span className="text-xs tabular-nums text-muted">{formatPct(r.pct)}</span>
           <div className="col-span-2 h-1.5 rounded-full bg-surface">
             <div
               className="h-full rounded-full"
@@ -168,8 +185,20 @@ export function Gauge({
   const hasBand = bandMin !== undefined && bandMax !== undefined;
 
   return (
-    <svg width={size} height={height} viewBox={`0 0 ${size} ${height}`} role="img" aria-label={ariaLabel}>
-      <path d={arcPath(180, 0)} fill="none" stroke="var(--border)" strokeWidth={strokeWidth} strokeLinecap="round" />
+    <svg
+      width={size}
+      height={height}
+      viewBox={`0 0 ${size} ${height}`}
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <path
+        d={arcPath(180, 0)}
+        fill="none"
+        stroke="var(--border)"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
       {hasBand && (
         <path
           d={arcPath(angleFor(bandMin), angleFor(bandMax))}
@@ -238,7 +267,10 @@ export function DotStrip({
       {/* Key: the visual was reported as unclear — "I don't understand the
           significance of the dots" (user feedback #12). Spell out that each
           faint dot is one region and the accent tick is this area's value. */}
-      <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.7rem] text-muted" aria-hidden="true">
+      <ul
+        className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.7rem] text-muted"
+        aria-hidden="true"
+      >
         <li className="flex items-center gap-1.5">
           <span
             className="inline-block size-2 shrink-0 rounded-full opacity-60"

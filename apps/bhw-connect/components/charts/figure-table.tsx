@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { BarDatum } from "@/lib/charts/bar-chart";
-import { formatCount } from "@/lib/format";
+import { formatCount, percentageFormatter } from "@/lib/format";
 
 type SortDir = "asc" | "desc";
 type SortColumn = "count" | "percent" | "value";
@@ -74,6 +74,8 @@ export function FigureTable({
     count: valueKind === "percent" ? d.count : (d.count ?? d.value),
     percent: valueKind === "percent" ? d.value : total > 0 ? (d.value / total) * 100 : 0,
   }));
+
+  const formatPercent = percentageFormatter(rows.map((r) => r.percent));
 
   const sorted = [...rows].sort((a, b) => {
     const key = (r: (typeof rows)[number]) =>
@@ -159,7 +161,9 @@ export function FigureTable({
                   <td className="px-3 py-2 sm:px-4 sm:py-3">
                     {d.count != null ? formatCount(d.count) : "—"}
                   </td>
-                  <td className="px-3 py-2 sm:px-4 sm:py-3">{Math.round(d.percent * 10) / 10}%</td>
+                  <td className="whitespace-nowrap px-3 py-2 sm:px-4 sm:py-3">
+                    {formatPercent(d.percent)}
+                  </td>
                 </>
               )}
             </tr>

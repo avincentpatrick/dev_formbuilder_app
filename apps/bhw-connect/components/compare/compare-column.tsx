@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPct } from "@/lib/format";
+
 import Link from "next/link";
 import { useFilterState } from "@/lib/filters/use-filter-state";
 import type { GeoLevel } from "@/lib/filters/schema";
@@ -7,7 +9,10 @@ import { MIN_LEADER_N } from "@/lib/analysis/thresholds";
 import { PEER_LEVEL_PLURAL, toFigurePeer } from "@/lib/analysis/peer-labels";
 import { MAP_BASE_INDICATOR_META } from "@/lib/analysis/map-indicators";
 import { FigureCard } from "@/components/narrative/figure-card";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import { FigureTabs } from "@/components/ui/figure-tabs";
 import { DemographicsFigure } from "@/components/explore/demographics-figure";
 import { TrainingFigure } from "@/components/explore/training-figure";
@@ -104,12 +109,13 @@ function placeVsNationRows(
  * columns don't carry ancestor data (place-vs-nation only), so the sentence
  * reads "Ranks 3rd of 17 provinces on % accredited" without the "in {region}"
  * clause, still accurate and never fabricated (Risk R1). */
-function peerFor(
-  data: CompareColumnData,
-  indicatorKey: string,
-  meta: { label: string },
-) {
-  return toFigurePeer(data.peerRanks[indicatorKey] ?? null, null, PEER_LEVEL_PLURAL[data.geoLevel] ?? "", meta.label);
+function peerFor(data: CompareColumnData, indicatorKey: string, meta: { label: string }) {
+  return toFigurePeer(
+    data.peerRanks[indicatorKey] ?? null,
+    null,
+    PEER_LEVEL_PLURAL[data.geoLevel] ?? "",
+    meta.label,
+  );
 }
 
 export function CompareColumn({
@@ -193,7 +199,7 @@ export function CompareColumn({
       <p className="text-xs text-muted">
         {data.totalBhw !== null ? `${data.totalBhw.toLocaleString()} total BHWs · ` : ""}
         {data.validatedProfiles?.toLocaleString() ?? "—"} validated profiles
-        {data.coveragePct !== null ? ` (${data.coveragePct}%)` : ""}
+        {data.coveragePct !== null ? ` (${formatPct(data.coveragePct)})` : ""}
         {data.householdsPerBhw !== null
           ? ` · ${data.householdsPerBhw.toLocaleString()} households per BHW`
           : ""}
@@ -230,7 +236,9 @@ export function CompareColumn({
         >
           <p className="text-4xl font-semibold tracking-tight">
             {data.counts?.pctAccredited ?? "—"}
-            {data.counts?.pctAccredited !== null && data.counts?.pctAccredited !== undefined ? "%" : ""}
+            {data.counts?.pctAccredited !== null && data.counts?.pctAccredited !== undefined
+              ? "%"
+              : ""}
           </p>
         </FigureCard>
       )}
@@ -258,7 +266,9 @@ export function CompareColumn({
             />
           }
         >
-          <p className="text-4xl font-semibold tracking-tight">{data.counts?.avgActiveYears ?? "—"}</p>
+          <p className="text-4xl font-semibold tracking-tight">
+            {data.counts?.avgActiveYears ?? "—"}
+          </p>
         </FigureCard>
       )}
 

@@ -1,8 +1,12 @@
+import { formatPct } from "@/lib/format";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { FigureView } from "@/components/charts/figure-view";
 import { ExportMenu } from "@/components/narrative/export-menu";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import {
   HONORARIUM_SUFFICIENCY_DAILY_PHP,
   HONORARIUM_SUFFICIENCY_MONTHLY_PHP,
@@ -78,7 +82,7 @@ export function HonorariumSufficiencyFigure({
     data.medianCumulativeMonthly !== null ? Math.round(data.medianCumulativeMonthly / 30) : null;
 
   const headline =
-    `${data.pctBelowSufficiency}% of profiled BHWs here receive less than ₱${HONORARIUM_SUFFICIENCY_DAILY_PHP.toFixed(0)} per day in total honorarium` +
+    `${formatPct(data.pctBelowSufficiency, "single")} of profiled BHWs here receive less than ₱${HONORARIUM_SUFFICIENCY_DAILY_PHP.toFixed(0)} per day in total honorarium` +
     (medianDaily !== null && data.medianCumulativeMonthly !== null
       ? ` (median ₱${medianDaily}/day, ${formatPeso(data.medianCumulativeMonthly)}/month).`
       : ".");
@@ -87,7 +91,9 @@ export function HonorariumSufficiencyFigure({
     <FigureCard
       title={title}
       caption={caption}
-      exportMenu={<ExportMenu geoCode={geoCode} geoLevel={geoLevel} indicator="honorarium_sufficiency" />}
+      exportMenu={
+        <ExportMenu geoCode={geoCode} geoLevel={geoLevel} indicator="honorarium_sufficiency" />
+      }
       headline={headline}
       technicalDetails={
         <>
@@ -95,9 +101,9 @@ export function HonorariumSufficiencyFigure({
             Unlike the &ldquo;Distribution&rdquo; and &ldquo;Inequality&rdquo; tabs — which describe
             amounts only among BHWs who receive some{" "}
             <GlossaryTerm slug="honorarium">honorarium</GlossaryTerm> — this figure&apos;s
-            denominator is every profiled BHW here, including those who receive none. Each BHW&apos;s
-            honorarium is summed across every paying level (region, province, city/municipality,
-            barangay) into one{" "}
+            denominator is every profiled BHW here, including those who receive none. Each
+            BHW&apos;s honorarium is summed across every paying level (region, province,
+            city/municipality, barangay) into one{" "}
             <GlossaryTerm slug="honorarium_sufficiency">cumulative monthly total</GlossaryTerm>,
             then grouped into the bands below.
           </p>

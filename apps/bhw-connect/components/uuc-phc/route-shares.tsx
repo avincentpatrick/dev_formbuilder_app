@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { UucPhcCriteria, UucPhcRoute } from "@/lib/db/uuc-phc-criteria";
 
@@ -44,7 +45,7 @@ function RouteRow({ route }: { route: UucPhcRoute }) {
                 <span aria-hidden="true" className="text-muted">
                   ·
                 </span>{" "}
-                <span className="font-semibold">{route.sharePct}%</span>
+                <span className="font-semibold">{formatPct(route.sharePct)}</span>
               </>
             )}
           </p>
@@ -59,7 +60,7 @@ function RouteRow({ route }: { route: UucPhcRoute }) {
             ? `${route.label}: not evaluable for any listed barangay here`
             : `${route.label}: ${formatCount(route.count)} of ${formatCount(
                 route.denominator,
-              )} listed barangays${route.sharePct === null ? "" : ` (${route.sharePct}%)`}`
+              )} listed barangays${route.sharePct === null ? "" : ` (${formatPct(route.sharePct)})`}`
         }
       >
         <div className="h-full bg-accent" style={{ width: `${route.fraction * 100}%` }} />
@@ -70,7 +71,13 @@ function RouteRow({ route }: { route: UucPhcRoute }) {
   );
 }
 
-export function RouteShares({ criteria, areaLabel }: { criteria: UucPhcCriteria; areaLabel: string }) {
+export function RouteShares({
+  criteria,
+  areaLabel,
+}: {
+  criteria: UucPhcCriteria;
+  areaLabel: string;
+}) {
   if (criteria.nListed === 0) {
     return (
       <p className="text-sm text-muted">
@@ -95,7 +102,7 @@ export function RouteShares({ criteria, areaLabel }: { criteria: UucPhcCriteria;
       {criteria.shareSumPct !== null && (
         <p className="mt-4 rounded-md bg-surface px-4 py-3 text-sm">
           These four shares add up to{" "}
-          <strong className="tabular-nums">{criteria.shareSumPct}%</strong>
+          <strong className="tabular-nums">{formatPct(criteria.shareSumPct)}</strong>
           {criteria.shareSumPct > 100 ? (
             <>
               , not 100%, because a barangay can qualify on more than one route at a time. They are
@@ -105,8 +112,8 @@ export function RouteShares({ criteria, areaLabel }: { criteria: UucPhcCriteria;
             </>
           ) : (
             <>
-              . The routes still overlap in principle — a barangay can qualify on more than one —
-              so these are four independent shares of {areaLabel}&rsquo;s{" "}
+              . The routes still overlap in principle — a barangay can qualify on more than one — so
+              these are four independent shares of {areaLabel}&rsquo;s{" "}
               {formatCount(criteria.nListed)} listed barangay
               {criteria.nListed === 1 ? "" : "s"}, not four slices of it.
             </>

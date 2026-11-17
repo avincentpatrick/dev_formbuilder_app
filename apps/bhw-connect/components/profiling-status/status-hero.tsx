@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { ProfilingStatus } from "@/lib/db/profiling-status";
 
@@ -23,7 +24,7 @@ export function StatusHero({ status }: { status: ProfilingStatus }) {
           <span aria-hidden="true" className="text-muted">
             ·
           </span>{" "}
-          <span className="font-semibold text-foreground">{pct}%</span>{" "}
+          <span className="font-semibold text-foreground">{formatPct(pct, "single")}</span>{" "}
           <span className="text-muted">to go</span>
         </p>
       )}

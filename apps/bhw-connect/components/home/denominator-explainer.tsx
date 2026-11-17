@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { GlossaryTerm } from "@/components/glossary/glossary-term";
 import { formatCount } from "@/lib/format";
 
@@ -73,7 +74,7 @@ export function DenominatorExplainer({
               <dt className="text-xs">
                 {step.label}
                 {step.key === "profiled" && coveragePct !== null && (
-                  <span className="text-muted"> ({coveragePct}%)</span>
+                  <span className="text-muted"> ({formatPct(coveragePct)})</span>
                 )}
               </dt>
               <dd>

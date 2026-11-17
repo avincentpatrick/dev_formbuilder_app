@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { loadFilterState } from "@/lib/filters/codec";
 import {
@@ -613,7 +614,7 @@ export default async function ExplorePage({
                   </span>{" "}
                   <span className="text-muted">
                     <GlossaryTerm slug="validated_profile">validated profiles</GlossaryTerm>
-                    {coverage !== null ? ` (${coverage}% of registered)` : ""}
+                    {coverage !== null ? ` (${formatPct(coverage, "single")} of registered)` : ""}
                   </span>
                 </span>
                 {overview.bhwPer1000 !== null && (
@@ -953,7 +954,10 @@ export default async function ExplorePage({
               caption={caption}
               geoLevel={geo.geoLevel}
               fallbackCitymunName={figureFallbackName}
-              benchmark={{ n: figureCounts?.nTotal ?? null, note: fallbackNote(figureFallbackName) }}
+              benchmark={{
+                n: figureCounts?.nTotal ?? null,
+                note: fallbackNote(figureFallbackName),
+              }}
             />
           </PresentationSlide>
 
@@ -1012,7 +1016,10 @@ export default async function ExplorePage({
                       geoLevel={geo.geoLevel}
                       benchmark={{
                         rows: showBenchmarks
-                          ? benchmarkRowsFor(benchmarkCtx, (s) => s.counts?.anyHonorariumPct ?? null)
+                          ? benchmarkRowsFor(
+                              benchmarkCtx,
+                              (s) => s.counts?.anyHonorariumPct ?? null,
+                            )
                           : undefined,
                         format: "percent",
                         peer: toFigurePeer(

@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { ImageResponse } from "next/og";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getUucPhcCounts } from "@/lib/db/uuc-phc";
@@ -35,44 +36,41 @@ export default async function Image({ params }: { params: Promise<Params> }) {
   ]);
 
   const geoName = geo?.geoName ?? "Philippines";
-  const share = counts?.sharePct === null ? "" : ` · ${counts?.sharePct}%`;
+  const share =
+    counts?.sharePct === null ? "" : ` · ${formatPct(counts?.sharePct ?? null, "single")}`;
   const figure = counts
     ? `${counts.nListed.toLocaleString()} of ${counts.nBarangays.toLocaleString()} barangays unserved or underserved${share} · DC No. 2025-0549`
     : "2025 list of unserved and underserved communities · DC No. 2025-0549";
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: 80,
+        background: "#ffffff",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", fontSize: 26, color: "#0a6e6e", fontWeight: 600 }}>
+        UUC for PHC · 2025
+      </div>
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: 80,
-          background: "#ffffff",
-          fontFamily: "system-ui, sans-serif",
+          fontSize: 60,
+          fontWeight: 700,
+          color: "#1a1d1e",
+          marginTop: 20,
         }}
       >
-        <div style={{ display: "flex", fontSize: 26, color: "#0a6e6e", fontWeight: 600 }}>
-          UUC for PHC · 2025
-        </div>
-        <div
-          style={{
-            display: "flex",
-            fontSize: 60,
-            fontWeight: 700,
-            color: "#1a1d1e",
-            marginTop: 20,
-          }}
-        >
-          {geoName}
-        </div>
-        <div style={{ display: "flex", fontSize: 28, color: "#57616a", marginTop: 30 }}>
-          {figure}
-        </div>
+        {geoName}
       </div>
-    ),
+      <div style={{ display: "flex", fontSize: 28, color: "#57616a", marginTop: 30 }}>{figure}</div>
+    </div>,
     { ...size },
   );
 }

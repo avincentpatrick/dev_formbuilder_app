@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
@@ -69,7 +70,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       ? `${formatCount(counts.nListed)} of ${formatCount(
           counts.nBarangays,
         )} barangays in ${geo.geoName} are on the 2025 list of Unserved and Underserved Communities for Primary Health Care${
-          counts.sharePct === null ? "" : ` (${counts.sharePct}%)`
+          counts.sharePct === null ? "" : ` (${formatPct(counts.sharePct, "single")})`
         }.`
       : `2025 UUC for PHC status for ${geo.geoName}.`;
 

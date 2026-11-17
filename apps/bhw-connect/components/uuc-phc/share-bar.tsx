@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { UucPhcCounts } from "@/lib/db/uuc-phc";
 
@@ -23,7 +24,7 @@ export function ShareBar({ counts }: { counts: UucPhcCounts }) {
         className="flex h-3 w-full overflow-hidden rounded-full bg-surface"
         role="img"
         aria-label={`${formatCount(nListed)} of ${formatCount(nBarangays)} barangays on the list${
-          sharePct === null ? "" : ` (${sharePct}%)`
+          sharePct === null ? "" : ` (${formatPct(sharePct)})`
         }`}
       >
         <div className="h-full bg-accent" style={{ width: `${fraction * 100}%` }} />
@@ -34,7 +35,7 @@ export function ShareBar({ counts }: { counts: UucPhcCounts }) {
           <dt className="text-muted">On the list</dt>
           <dd className="font-semibold tabular-nums">
             {formatCount(nListed)}
-            {sharePct !== null && <span className="text-muted"> · {sharePct}%</span>}
+            {sharePct !== null && <span className="text-muted"> · {formatPct(sharePct)}</span>}
           </dd>
         </div>
         <div className="flex items-center gap-2">
@@ -45,7 +46,9 @@ export function ShareBar({ counts }: { counts: UucPhcCounts }) {
           <dt className="text-muted">Not on the list</dt>
           <dd className="font-semibold tabular-nums">
             {formatCount(notListed)}
-            {sharePct !== null && <span className="text-muted"> · {100 - sharePct}%</span>}
+            {sharePct !== null && (
+              <span className="text-muted"> · {formatPct(100 - sharePct)}</span>
+            )}
           </dd>
         </div>
       </dl>

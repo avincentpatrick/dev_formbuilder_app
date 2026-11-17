@@ -1,7 +1,11 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { FigureView } from "@/components/charts/figure-view";
-import { FigureBenchmark, type FigureBenchmarkProps } from "@/components/narrative/figure-benchmark";
+import {
+  FigureBenchmark,
+  type FigureBenchmarkProps,
+} from "@/components/narrative/figure-benchmark";
 import type { CompletenessRow } from "@/lib/db/data-quality";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -44,7 +48,10 @@ export function CompletenessFigure({
         present.
       </p>
       <p>
-        See the <Link href="/data-quality" className="underline hover:text-accent">data quality page</Link>{" "}
+        See the{" "}
+        <Link href="/data-quality" className="underline hover:text-accent">
+          data quality page
+        </Link>{" "}
         for the dataset-wide picture.
       </p>
     </>
@@ -104,7 +111,7 @@ export function CompletenessFigure({
         rows.length === 0
           ? "No completeness data available for this area."
           : worst
-            ? `${worst.label} is missing for ${worst.value}% of profiles here.`
+            ? `${worst.label} is missing for ${formatPct(worst.value)} of profiles here.`
             : `All ${rows.length} core profile fields are complete for BHWs profiled here.`
       }
       technicalDetails={

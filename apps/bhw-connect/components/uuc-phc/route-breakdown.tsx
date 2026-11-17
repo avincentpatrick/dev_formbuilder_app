@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { formatCount } from "@/lib/format";
 import { QUALIFYING_ROUTES, type UucPhcCriteriaChild } from "@/lib/db/uuc-phc-criteria";
@@ -30,7 +31,9 @@ export function RouteBreakdown({
 }) {
   if (items.length === 0) return null;
 
-  const sorted = [...items].sort((a, b) => b.nListed - a.nListed || a.geoName.localeCompare(b.geoName));
+  const sorted = [...items].sort(
+    (a, b) => b.nListed - a.nListed || a.geoName.localeCompare(b.geoName),
+  );
   const anyExcluded = sorted.some((c) => c.healthExcluded > 0);
 
   return (
@@ -72,8 +75,7 @@ export function RouteBreakdown({
                   </Link>
                   {c.healthExcluded > 0 && (
                     <span className="block text-xs text-muted">
-                      (d) evaluable for {formatCount(c.healthEvaluable)} of{" "}
-                      {formatCount(c.nListed)}
+                      (d) evaluable for {formatCount(c.healthEvaluable)} of {formatCount(c.nListed)}
                     </span>
                   )}
                 </td>
@@ -83,13 +85,16 @@ export function RouteBreakdown({
                 {c.routes.map((route) => (
                   <td key={route.key} className="py-2 pr-3 text-right tabular-nums">
                     {route.sharePct === null ? (
-                      <span className="text-muted" title="Not evaluable for any listed barangay here">
+                      <span
+                        className="text-muted"
+                        title="Not evaluable for any listed barangay here"
+                      >
                         —
                       </span>
                     ) : (
                       <>
                         {formatCount(route.count)}{" "}
-                        <span className="text-xs text-muted">{route.sharePct}%</span>
+                        <span className="text-xs text-muted">{formatPct(route.sharePct)}</span>
                       </>
                     )}
                   </td>

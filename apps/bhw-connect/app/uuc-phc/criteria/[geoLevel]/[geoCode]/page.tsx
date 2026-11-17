@@ -1,3 +1,4 @@
+import { formatPct } from "@/lib/format";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
@@ -67,7 +68,7 @@ function leadingRoute(criteria: UucPhcCriteria): string | null {
     .sort((a, b) => (b.sharePct ?? 0) - (a.sharePct ?? 0));
   const top = ranked[0];
   if (!top || top.count === 0) return null;
-  return `${formatCount(top.count)} of them on ${top.label.toLowerCase()} (${top.sharePct}%)`;
+  return `${formatCount(top.count)} of them on ${top.label.toLowerCase()} (${formatPct(top.sharePct)})`;
 }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {

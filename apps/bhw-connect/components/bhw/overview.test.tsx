@@ -189,3 +189,19 @@ it("shows both counts and shares on every national summary card", () => {
     "Count unavailable (percentage unavailable)",
   );
 });
+
+it("shows the derived honorarium count with its percentage and explains the approximation", () => {
+  const { document } = parseHTML(
+    render([
+      item("bhw.validated-profiles", "available", 1000),
+      item("bhw.any-honorarium", "available", 94.7),
+    ]),
+  );
+  const support = document.getElementById("support")!;
+  expect(support.textContent).toContain("≈947 (94.7%)");
+  expect(support.textContent).toContain("Approximate count calculated");
+  expect(support.textContent).not.toContain("Count unavailable");
+  expect(support.querySelector('svg[role="img"]')?.getAttribute("aria-label")).toContain(
+    "≈947 (94.7%)",
+  );
+});

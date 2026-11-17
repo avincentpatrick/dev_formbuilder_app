@@ -8,7 +8,7 @@ import {
   scalar,
   measureStatus,
   countAndShare,
-  shareCount,
+  shareSummary,
   shareOf,
 } from "@/lib/bhw/overview";
 import { DatasetMapCard } from "@/components/maps/dataset-map-card";
@@ -36,26 +36,35 @@ function ShareTile({
   indicator,
   label,
   population,
+  denominator,
 }: {
   indicator: CatalogIndicator | undefined;
   label: string;
   population: string;
+  denominator: number | null;
 }) {
   const value = scalar(indicator);
+  const summary = shareSummary(indicator, denominator);
   return (
     <StatTile
       label={label}
-      value={countAndShare(shareCount(indicator), value)}
+      value={summary.text}
       caption={population}
       visual={
         value !== null && value >= 0 && value <= 100 ? (
-          <Donut
-            pct={value}
-            ariaLabel={`${label}: ${countAndShare(shareCount(indicator), value)}`}
-          />
+          <Donut pct={value} ariaLabel={`${label}: ${summary.text}`} />
         ) : undefined
       }
-      context={<Status indicator={indicator} />}
+      context={
+        <>
+          {summary.estimated && (
+            <p className="mt-2 text-xs text-muted">
+              Approximate count calculated from the reported percentage and population total.
+            </p>
+          )}
+          <Status indicator={indicator} />
+        </>
+      }
     />
   );
 }
@@ -208,6 +217,7 @@ export function BhwOverview({
               />
               <ShareTile
                 indicator={get("bhw.declared-accreditation")}
+                denominator={total}
                 label="LGU-reported accreditation"
                 population="Registered and accredited / LGU-reported headcount · 2025"
               />
@@ -248,6 +258,7 @@ export function BhwOverview({
           </h2>
           <ShareTile
             indicator={get("bhw.profile-accreditation")}
+            denominator={profiles}
             label="Accreditation among validated profiles"
             population={`Accredited profiles / validated profiles · ${areaName} · 2025`}
           />
@@ -302,6 +313,7 @@ export function BhwOverview({
           </h2>
           <ShareTile
             indicator={get("bhw.any-honorarium")}
+            denominator={profiles}
             label="Receiving any honorarium"
             population={`Share of validated profiles · ${areaName} · 2025`}
           />

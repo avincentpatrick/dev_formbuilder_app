@@ -2,8 +2,15 @@ import Link from "next/link";
 import { comparisonHref } from "@/lib/bhw/comparison";
 import { bhwScopedCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import type { CatalogDataset, CatalogIndicator, CatalogSelection } from "@/lib/catalog/types";
-import { overviewMeasures, publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
-import { formatCount, formatPct } from "@/lib/format";
+import {
+  overviewMeasures,
+  publicValues,
+  scalar,
+  measureStatus,
+  countAndShare,
+  shareCount,
+  shareOf,
+} from "@/lib/bhw/overview";
 import { DatasetMapCard } from "@/components/maps/dataset-map-card";
 import { parseMapChoice } from "@/lib/maps/prototype";
 import { subjectMapHref } from "@/lib/maps/subjects";
@@ -38,11 +45,14 @@ function ShareTile({
   return (
     <StatTile
       label={label}
-      value={formatPct(value)}
+      value={countAndShare(shareCount(indicator), value)}
       caption={population}
       visual={
         value !== null && value >= 0 && value <= 100 ? (
-          <Donut pct={value} ariaLabel={`${label}: ${formatPct(value)}`} />
+          <Donut
+            pct={value}
+            ariaLabel={`${label}: ${countAndShare(shareCount(indicator), value)}`}
+          />
         ) : undefined
       }
       context={<Status indicator={indicator} />}
@@ -167,8 +177,8 @@ export function BhwOverview({
             <div className="grid gap-4 sm:grid-cols-2" data-testid="bhw-first-visual">
               <StatHero
                 label="LGU-reported BHW headcount"
-                value={formatCount(total)}
-                caption={`${areaName} · BHW Headcount 2025`}
+                value={countAndShare(total, shareOf(total, total))}
+                caption={`${areaName} · BHW Headcount 2025 · % of area headcount`}
                 registrationMix={registrationMix}
                 context={
                   <>
@@ -192,8 +202,8 @@ export function BhwOverview({
               />
               <StatTile
                 label="Validated profiles"
-                value={formatCount(profiles)}
-                caption={caption}
+                value={countAndShare(profiles, shareOf(profiles, total))}
+                caption={`${areaName} · 2025 · % of LGU-reported headcount (distinct sources)`}
                 context={<Status indicator={get("bhw.validated-profiles")} />}
               />
               <ShareTile

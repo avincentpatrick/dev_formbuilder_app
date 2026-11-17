@@ -44,3 +44,12 @@ export function formatterFor(kind: ValueFormatKind = "count"): (n: number) => st
       return (n) => n.toLocaleString();
   }
 }
+
+/** Pair a source count with its share; never reconstruct counts from rounded rates. */
+export function countAndShare(count: number | null, percent: number | null): string {
+  return `${count === null ? "Count unavailable" : formatCount(count)} (${percent === null ? "percentage unavailable" : formatPct(Math.round(percent * 100) / 100)})`;
+}
+
+export function shareOf(count: number | null, total: number | null): number | null {
+  return count !== null && total !== null && total > 0 ? (count / total) * 100 : null;
+}

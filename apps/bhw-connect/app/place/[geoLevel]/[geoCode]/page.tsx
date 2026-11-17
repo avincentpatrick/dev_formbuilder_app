@@ -1,3 +1,4 @@
+import { countAndShare } from "@/lib/format";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -286,7 +287,9 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
     );
   }
   const profileBenchmarkNote =
-    showBenchmarks && benchmarkNoteParts.length > 0 ? `${benchmarkNoteParts.join(" · ")}.` : undefined;
+    showBenchmarks && benchmarkNoteParts.length > 0
+      ? `${benchmarkNoteParts.join(" · ")}.`
+      : undefined;
 
   // Title-slide facts for presentation mode (serializable, server → client).
   const deckMeta = {
@@ -417,9 +420,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
               }
             >
               <p className="text-4xl font-semibold tracking-tight">
-                {counts?.pctAccredited !== null && counts?.pctAccredited !== undefined
-                  ? `${counts.pctAccredited}%`
-                  : "—"}
+                {countAndShare(counts?.nAccredited ?? null, counts?.pctAccredited ?? null)}
               </p>
             </FigureCard>
           </PresentationSlide>
@@ -475,8 +476,8 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
                 headline={`Each BHW here serves about ${overview.householdsPerBhw} households.`}
                 technicalDetails={
                   <p>
-                    Headcount household count divided by Total BHWs (the BHW Headcount universe). A higher
-                    figure means each BHW covers more households.
+                    Headcount household count divided by Total BHWs (the BHW Headcount universe). A
+                    higher figure means each BHW covers more households.
                   </p>
                 }
                 benchmark={

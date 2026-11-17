@@ -1,3 +1,5 @@
+import { countAndShare, shareOf } from "@/lib/format";
+
 /**
  * Small, non-interactive presentational visuals for the home KPI cards — one
  * per card, per the redesign plan. Pure SVG/CSS (no chart library needed for
@@ -41,7 +43,7 @@ export function StackedMiniBar({
                 style={{ backgroundColor: s.color }}
               />
               <span>
-                {s.label} · {s.value.toLocaleString()}
+                {s.label} · {countAndShare(s.value, shareOf(s.value, total))}
               </span>
             </li>
           ))}

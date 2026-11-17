@@ -167,3 +167,25 @@ it("keeps the national figure sections for a locality and scopes captions, map a
     "location=province%3A01028",
   );
 });
+
+it("shows both counts and shares on every national summary card", () => {
+  const accreditation = {
+    ...item("bhw.declared-accreditation", "available", 60),
+    values: [{ value: 60, numerator: 60, denominator: 100 }],
+  };
+  const { document } = parseHTML(
+    render([
+      item("bhw.total", "available", 100),
+      item("bhw.validated-profiles", "available", 80),
+      accreditation,
+    ]),
+  );
+  const workforce = document.querySelector('[data-testid="bhw-first-visual"]')!.textContent;
+  expect(workforce).toContain("100 (100%)");
+  expect(workforce).toContain("80 (80%)");
+  expect(workforce).toContain("60 (60%)");
+  expect(workforce).toContain("% of LGU-reported headcount");
+  expect(document.getElementById("support")!.textContent).toContain(
+    "Count unavailable (percentage unavailable)",
+  );
+});

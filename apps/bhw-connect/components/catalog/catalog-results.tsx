@@ -133,11 +133,7 @@ export function CatalogResults({
             <h2 className="mt-1 text-xl font-semibold">
               <Link
                 prefetch={false}
-                href={
-                  dataset.id === "bhw" && catalog.selection.mode === "all"
-                    ? bhwOverviewHref(mapState)
-                    : catalogJourneyHref(catalog.selection, dataset.id, mapState)
-                }
+                href={catalogJourneyHref(catalog.selection, dataset.id, mapState)}
                 className="underline decoration-transparent underline-offset-4 hover:decoration-current"
               >
                 {dataset.title}
@@ -196,7 +192,9 @@ export function CatalogResults({
                 href={catalogJourneyHref(catalog.selection, dataset.id, mapState)}
                 className="text-sm font-semibold text-accent underline underline-offset-4"
               >
-                View {dataset.title} indicators →
+                {dataset.id === "bhw" && catalog.selection.mode === "all"
+                  ? "Open BHW overview →"
+                  : `View ${dataset.title} indicators →`}
               </Link>
               <FullMapLink dataset={dataset} selection={catalog.selection} />
               <SourceDates dataset={dataset} />

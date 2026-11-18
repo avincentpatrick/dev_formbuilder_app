@@ -88,3 +88,12 @@ it('takes row details that are note content with no picture, within the block an
         ->toBe('a row’s details may hold at most 6000 characters of text')
         ->and(GridRules::detailsProblem('oops', strict: false))->toBe('it must be a list of blocks');
 });
+
+it('is mirrored by the builder’s row-details bounds, by value', function (): void {
+    $source = (string) file_get_contents(__DIR__.'/../../../resources/js/components/builder/grid-rules.ts');
+
+    expect(preg_match('/^\s*maxBlocks:\s*(\d+),$/m', $source, $blocks))->toBe(1)
+        ->and(preg_match('/^\s*maxCharacters:\s*(\d+),$/m', $source, $characters))->toBe(1)
+        ->and((int) $blocks[1])->toBe(GridRules::MAX_ROW_DETAIL_BLOCKS)
+        ->and((int) $characters[1])->toBe(GridRules::MAX_ROW_DETAIL_CHARACTERS);
+});

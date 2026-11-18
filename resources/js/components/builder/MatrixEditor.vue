@@ -24,7 +24,11 @@ import { asChoiceConfig, slotIsSourced, withChoiceConfig } from './grid-sources'
 import GridLayoutSelect from './GridLayoutSelect.vue';
 import GridOptionList from './GridOptionList.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
-import type { LinkableSource } from './types';
+import GridColumnRules from './GridColumnRules.vue';
+import GridRowRules from './GridRowRules.vue';
+import { rowCellEntries } from './grid-condition-cells';
+import type { ReferenceCandidate } from './reference-candidates';
+import type { ConditionCatalogue, LinkableSource, PaletteType } from './types';
 
 interface Option {
     value: string;
@@ -58,6 +62,12 @@ const props = defineProps<{
     config?: Record<string, unknown> | null;
     sources?: LinkableSource[];
     formId?: string | null;
+    /** M246: what a row's or column's condition may name — other questions, and other grids' always-asked cells. */
+    catalogue?: ConditionCatalogue | null;
+    references?: ReferenceCandidate[];
+    palette?: PaletteType[];
+    /** M246: what names each of this grid's rows and columns elsewhere, by its value. */
+    namedBy?: Map<string, string[]>;
 }>();
 const emit = defineEmits<{
     'update:rows': [value: Option[]];
@@ -118,6 +128,14 @@ function setRequired(index: number, required: boolean): void {
     });
 }
 
+/** M246: a row or column with its own settings changed, put back in place. */
+function setRow(index: number, row: Option): void {
+    emit('update:rows', props.rows.map((r, i) => (i === index ? row : r)));
+}
+function setColumn(index: number, column: Column): void {
+    emit('update:columns', props.columns.map((c, i) => (i === index ? column : c)));
+}
+
 function setOptions(index: number, options: Option[]): void {
     patchColumn(index, (column) => {
         const next: Column = { ...column, options };
@@ -156,7 +174,20 @@ const cellChoiceUsers = computed(() =>
             hint="Each row is a question."
             :options="rows"
             @update:options="emit('update:rows', $event)"
-        />
+        >
+            <template v-if="catalogue" #details="{ option, index }">
+                <GridRowRules
+                    :row="option"
+                    :index="index"
+                    :columns="columns.map((c) => ({ value: c.value, label: c.label }))"
+                    :catalogue="catalogue"
+                    :references="references"
+                    :form-id="formId ?? ''"
+                    :named-by="namedBy?.get(option.value)"
+                    @update:row="setRow(index, $event)"
+                />
+            </template>
+        </GridOptionList>
         <GridOptionList
             heading="Columns"
             singular="Column"
@@ -184,6 +215,16 @@ const cellChoiceUsers = computed(() =>
                         label="Required in every row"
                         :model-value="option.required === true"
                         @update:model-value="setRequired(index, $event)"
+                    />
+                    <GridColumnRules
+                        v-if="catalogue"
+                        :column="option"
+                        :index="index"
+                        :catalogue="catalogue"
+                        :row-cells="rowCellEntries(config, index, palette ?? [])"
+                        :references="references"
+                        :named-by="namedBy?.get(option.value)"
+                        @update:column="setColumn(index, $event)"
                     />
                     <div v-if="takesChoices(option)" :data-column-choices="index">
                         <LinkedChoicesEditor

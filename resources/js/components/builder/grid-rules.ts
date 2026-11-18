@@ -25,6 +25,15 @@ export interface GridRuleSite {
 
 export const GRID_COLUMN_RULE_KEYS = { column: 'relevant', needed: 'needed_when', required: 'required_when' } as const;
 
+/**
+ * A row's details bounds — the mirror of PHP `GridRules::MAX_ROW_DETAIL_BLOCKS` / `MAX_ROW_DETAIL_CHARACTERS`, held equal
+ * by `GridRulesTest`. The server stays the authority; the editor uses them to stop an author before a save is refused.
+ */
+export const GRID_ROW_DETAIL_LIMITS = {
+    maxBlocks: 20,
+    maxCharacters: 6000,
+};
+
 type Entry = Record<string, unknown>;
 
 const entries = (list: unknown): Entry[] =>

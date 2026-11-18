@@ -8,14 +8,19 @@
  *
  * M185 (`R-bb79aec0`, `D161`): the statements may come from a list file or another form's answers, as a Grid's rows may
  * (`MatrixEditor.vue` says how); the scale stays typed here.
+ *
+ * M246 (`grid-question-table`): a statement may be shown only when an answer calls for it, and carry details under its
+ * label ({@link GridRowRules}); a Likert grid's cells have no "Not needed" — every statement is rated on one scale.
  */
 import { computed } from 'vue';
 
 import { asChoiceConfig, slotIsSourced, withChoiceConfig } from './grid-sources';
 import GridLayoutSelect from './GridLayoutSelect.vue';
 import GridOptionList from './GridOptionList.vue';
+import GridRowRules from './GridRowRules.vue';
 import LinkedChoicesEditor from './LinkedChoicesEditor.vue';
-import type { LinkableSource } from './types';
+import type { ReferenceCandidate } from './reference-candidates';
+import type { ConditionCatalogue, LinkableSource } from './types';
 
 interface Option {
     value: string;
@@ -30,6 +35,10 @@ const props = defineProps<{
     config?: Record<string, unknown> | null;
     sources?: LinkableSource[];
     formId?: string | null;
+    /** M246: what a statement's condition may name. */
+    catalogue?: ConditionCatalogue | null;
+    references?: ReferenceCandidate[];
+    namedBy?: Map<string, string[]>;
 }>();
 const emit = defineEmits<{
     'update:rows': [value: Option[]];
@@ -42,6 +51,10 @@ const rowsSourced = computed(() => (props.config ? slotIsSourced(props.config, '
 
 function setRows(view: Record<string, unknown>): void {
     if (props.config) emit('update:config', withChoiceConfig(props.config, 'rows', view));
+}
+
+function setRow(index: number, row: Option): void {
+    emit('update:rows', props.rows.map((r, i) => (i === index ? row : r)));
 }
 </script>
 
@@ -64,7 +77,20 @@ function setRows(view: Record<string, unknown>): void {
             hint="Each row is a statement to rate."
             :options="rows"
             @update:options="emit('update:rows', $event)"
-        />
+        >
+            <template v-if="catalogue" #details="{ option, index }">
+                <GridRowRules
+                    :row="option"
+                    :index="index"
+                    :columns="[]"
+                    :catalogue="catalogue"
+                    :references="references"
+                    :form-id="formId ?? ''"
+                    :named-by="namedBy?.get(option.value)"
+                    @update:row="setRow(index, $event)"
+                />
+            </template>
+        </GridOptionList>
         <GridOptionList
             heading="Scale points"
             singular="Point"

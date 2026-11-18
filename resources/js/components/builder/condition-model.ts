@@ -28,6 +28,7 @@
  */
 
 import {
+    cellPath,
     ExpressionLexer,
     ExpressionParser,
     FunctionRegistry,
@@ -162,13 +163,19 @@ function selectedCondition(node: Node, negated: boolean): Condition | null {
     if (node.type !== 'call' || node.name !== 'selected' || node.args.length !== 2) return null;
 
     const [subject, choice] = node.args;
-    if (subject.type !== 'field' || choice.type !== 'literal') return null;
+    if (choice.type !== 'literal') return null;
+    // M246: a multiple-choice grid cell, or this row's, is named by its whole path.
+    const key = subject.type === 'field' ? subject.key : subject.type === 'cell' ? cellPath(subject) : subject.type === 'row_cell' ? `.${subject.column}` : null;
+    if (key === null) return null;
 
-    return { kind: 'selected', field: subject.key, value: String(choice.value), negated };
+    return { kind: 'selected', field: key, value: String(choice.value), negated };
 }
 
 function operandOf(node: Node): Operand | null {
     if (node.type === 'field') return { kind: 'field', key: node.key };
+    // M246: a grid cell, or this row's cell, by its whole path — never as its grid's key alone.
+    if (node.type === 'cell') return { kind: 'field', key: cellPath(node) };
+    if (node.type === 'row_cell') return { kind: 'field', key: `.${node.column}` };
     if (node.type !== 'literal') return null;
 
     return node.literalKind === 'number'
@@ -190,8 +197,13 @@ const SYMBOLS: Record<Comparator, string> = {
 /** Exactly `lexNumber`'s shape: digits, then at most one fractional part. No exponent, no sign, no bare dot. */
 const NUMBER_TEXT = /^-?[0-9]+(\.[0-9]+)?$/;
 
-/** Exactly `lexReference`'s shape, which is ASCII-only by construction on both sides of the engine. */
-const KEY_TEXT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/**
+ * Exactly `lexReference`'s shape, which is ASCII-only by construction on both sides of the engine. M246: a key may carry a
+ * grid path — `grid.row.col` (a Grid's cell), `grid.row` (a Likert row) — or be a row-relative `.col` ("this row's"),
+ * each segment `[A-Za-z0-9_][A-Za-z0-9_-]*`. A cell is modelled as a `field` operand whose key is its whole path, so a
+ * cell round-trips whole and two cells of one grid are never the same operand.
+ */
+const KEY_TEXT = /^(?:[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_][A-Za-z0-9_-]*){0,2}|\.[A-Za-z0-9_][A-Za-z0-9_-]*)$/;
 
 class Refusal extends Error {
     constructor(readonly refusal: SerializeRefusal) {

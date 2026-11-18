@@ -54,3 +54,52 @@ export function resolveRowCell(row: Record<string, unknown> | null, column: stri
 
     return leaf(row[column]);
 }
+
+/**
+ * The types a Grid column may take — the mirror of PHP `MatrixColumns::TYPES`, held equal by
+ * `MatrixColumnTypesMirrorDriftTest`. An unknown or missing type is a single choice, as PHP `MatrixColumns::type()` reads it.
+ */
+const GRID_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'long_text', 'integer', 'decimal', 'date'];
+
+type GridEntry = Record<string, unknown>;
+
+const gridEntries = (list: unknown): GridEntry[] =>
+    Array.isArray(list) ? list.filter((entry): entry is GridEntry => typeof entry === 'object' && entry !== null && !Array.isArray(entry)) : [];
+
+const entryValue = (entry: GridEntry): string => (entry.value === undefined || entry.value === null ? '' : String(entry.value));
+
+/**
+ * M246 (`R-ffd10da2`): what one grid cell is when it is shown on its own — piped into text — the mirror of PHP
+ * `MatrixColumns::cellSource()`: a Grid's cell as a question of its column's type over its column's choices, a Likert
+ * row as a Likert scale over the grid's columns. Null for a row or column the grid does not have, or a path of the
+ * wrong length for the grid's kind.
+ */
+export function cellSource(gridType: string, config: Record<string, unknown>, row: string, column: string | null): { type: string; config: Record<string, unknown> } | null {
+    if (!gridEntries(config.rows).some((entry) => entryValue(entry) === row)) {
+        return null;
+    }
+
+    const columns = gridEntries(config.columns);
+    if (gridType === 'likert_matrix') {
+        return column === null ? { type: 'likert_scale', config: { options: columns } } : null;
+    }
+
+    if (gridType !== 'matrix' || column === null) {
+        return null;
+    }
+
+    const match = columns.find((entry) => entryValue(entry) === column);
+    if (match === undefined) {
+        return null;
+    }
+
+    const type = typeof match.type === 'string' && GRID_COLUMN_TYPES.includes(match.type) ? match.type : 'single_select';
+    if (type !== 'single_select' && type !== 'multi_select') {
+        return { type, config: { options: [] } };
+    }
+
+    const own = gridEntries(match.options);
+    const sourcesOwn = (match.options_list ?? null) !== null || (match.options_source ?? null) !== null;
+
+    return { type, config: { options: own.length > 0 || sourcesOwn ? own : gridEntries(config.cells) } };
+}

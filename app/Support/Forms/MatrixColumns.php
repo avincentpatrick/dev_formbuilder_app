@@ -90,6 +90,42 @@ final class MatrixColumns
     }
 
     /**
+     * M246 (`R-ffd10da2`): what one grid cell is when it is shown on its own — piped into text — as the spreadsheet
+     * export already reads it: a Grid's cell as a question of its column's type over its column's choices, and a
+     * Likert row as a Likert scale over the grid's columns. Null for a row or column the grid does not have, or a path
+     * of the wrong length for the grid's kind (a Grid needs a column; a Likert row has none).
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{type: FieldType, config: array<string, mixed>}|null
+     */
+    public static function cellSource(FieldType $gridType, array $config, string $row, ?string $column): ?array
+    {
+        $rows = array_map(
+            static fn (mixed $entry): string => is_array($entry) ? (string) ($entry['value'] ?? '') : '',
+            (array) ($config['rows'] ?? []),
+        );
+        if (! in_array($row, $rows, true)) {
+            return null;
+        }
+
+        if ($gridType === FieldType::LikertMatrix) {
+            return $column === null ? ['type' => FieldType::LikertScale, 'config' => ['options' => self::columns($config)]] : null;
+        }
+
+        if ($gridType !== FieldType::Matrix || $column === null) {
+            return null;
+        }
+
+        foreach (self::columns($config) as $candidate) {
+            if ((string) ($candidate['value'] ?? '') === $column) {
+                return ['type' => self::type($candidate), 'config' => ['options' => self::choices($candidate, $config)]];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Whether some choice column draws from the shared `cells` — the only case in which a matrix needs them. A column
      * whose choices come from a list or a form (M185) has its own.
      *

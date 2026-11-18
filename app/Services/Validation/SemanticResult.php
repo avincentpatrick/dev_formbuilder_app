@@ -25,6 +25,7 @@ final readonly class SemanticResult
      * @param  array<string, mixed>  $effectiveAnswers  relevant answers only (nested per-instance for repeats); what Stage 4 persists
      * @param  array<string, mixed>  $computed  calculated field key => computed value (grammar v2.0)
      * @param  array<string, list<array<string, bool>>>  $repeatFieldRelevance  section key → per-instance field-relevance masks
+     * @param  array<string, array{rows: array<string, bool>, columns: array<string, bool>, cells: array<string, array<string, bool>>}>  $gridRelevance  M246: each relevant grid's asked rows, columns and (a Grid's) cells
      */
     public function __construct(
         public array $fieldRelevance,
@@ -33,6 +34,7 @@ final readonly class SemanticResult
         public array $effectiveAnswers,
         public array $computed = [],
         public array $repeatFieldRelevance = [],
+        public array $gridRelevance = [],
     ) {}
 
     public function passed(): bool

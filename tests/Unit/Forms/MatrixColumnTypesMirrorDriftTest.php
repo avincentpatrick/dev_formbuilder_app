@@ -7,9 +7,10 @@ use App\Support\Forms\MatrixColumns;
 
 /*
 |--------------------------------------------------------------------------
-| M246 — a grid column's types are written three times; this holds the copies equal.
+| M246 — a grid column's types are written four times; this holds the copies equal.
 |--------------------------------------------------------------------------
-| `MatrixColumns::TYPES` is the authority. The guest runtime (`schema-mapping.ts`'s MATRIX_COLUMN_TYPES) falls back to
+| `MatrixColumns::TYPES` is the authority. The guest runtime (`schema-mapping.ts`'s MATRIX_COLUMN_TYPES, and the piped-text
+| cell reader's GRID_COLUMN_TYPES in `grid-cells.ts`) falls back to
 | a single choice for a type it does not know, and the builder (`MatrixEditor.vue`'s COLUMN_TYPES) offers only what it
 | lists — so a copy left behind draws a long-text column as a dropdown, or never offers it. Each copy is read as text,
 | anchored on its own declaration; an unmatched pattern fails the case rather than comparing against nothing.
@@ -31,6 +32,7 @@ it('lists the same column types, in the same order, in the runtime and the build
 
     expect(matrixColumnTypesIn('resources/public-runtime/lib/schema-mapping.ts', 'const MATRIX_COLUMN_TYPES = [', "/'([a-z_]+)'/"))->toBe($authority)
         ->and(matrixColumnTypesIn('resources/js/components/builder/MatrixEditor.vue', 'const COLUMN_TYPES = [', "/value: '([a-z_]+)'/"))->toBe($authority)
+        ->and(matrixColumnTypesIn('resources/public-runtime/engine/grid-cells.ts', 'const GRID_COLUMN_TYPES = [', "/'([a-z_]+)'/"))->toBe($authority)
         ->and($authority)->toContain('long_text')
         ->and($authority)->not->toContain('yes_no');
 });

@@ -59,3 +59,9 @@ props. `StackedMiniBar` draws no proportion when the total is zero. Certificatio
 uses separate bars with the overlap warning; it is not a 100% stack. These
 observations support the existing composition requirement, independently of
 whether this new peer-position feature has deployed.
+
+The same five-scope composition check also passed at 1440 × 900: another 20
+exact-measure page comparisons, with no ordinary overflow or page errors. This
+extends the automated desktop layout sample; it is not a physical desktop-reader
+session. Current deployment/live results for this peer increment are maintained
+in [#596](https://github.com/avincentpatrick/dev_formbuilder_app/pull/596).

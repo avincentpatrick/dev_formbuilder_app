@@ -649,7 +649,6 @@ it('refuses arithmetic on a date inside sum() (M180)', function (): void {
     expect(orderingGateRefusals($this->gate, $draft))->toBe([['total', 'expression_orders_date']]);
 });
 
-
 // ── M246 (`grid-question-table`, `R-ffd10da2`): a grid's own rules, and the grid cells an expression names ──────────
 
 /** A question table with an always-asked cell (a01.keep), a conditional row, a needed-when column and a not-needed cell. */

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { missingCebuShapes } from "./helpers/missing-cebu-shapes";
 async function fixture(page: Page, empty = false) {
   await page.route("**/api/dataset-map?**", (route) => {
     const url = new URL(route.request().url());
@@ -71,6 +72,7 @@ for (const width of [390, 1440]) {
 }
 
 test("missing selected shape exports without an invented locator", async ({ page }, testInfo) => {
+  await missingCebuShapes(page);
   await page.setViewportSize({ width: 1440, height: 844 });
   await fixture(page);
   await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");

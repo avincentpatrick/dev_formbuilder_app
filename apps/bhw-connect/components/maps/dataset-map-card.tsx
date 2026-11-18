@@ -63,6 +63,7 @@ import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
 import { BOUNDARY_CREDIT } from "@/lib/maps/boundary-credit";
+import { readMapResponse } from "@/lib/maps/read-map-response";
 const loadDatasetCanvas = () => import("./dataset-canvas").then((m) => m.DatasetCanvas);
 const DatasetCanvas = dynamic(loadDatasetCanvas, {
   ssr: false,
@@ -219,7 +220,7 @@ export function DatasetMapCard({
       // The normal canvas load/error path remains responsible for user-facing failures.
     });
     const controller = new AbortController();
-    fetch(withBasePath(`/api/dataset-map?${query}`), { signal: controller.signal })
+    readMapResponse(withBasePath(`/api/dataset-map?${query}`), controller.signal)
       .then(async (response) => {
         if (!response.ok) throw new Error("Read failed");
         const data = await response.json();

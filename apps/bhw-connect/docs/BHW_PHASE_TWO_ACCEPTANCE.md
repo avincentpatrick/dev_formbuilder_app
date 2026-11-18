@@ -13,7 +13,7 @@ by owner report on iPhone/Chrome. The bounded engineering/live checks through
 
 | Requirement | Existing capability and unfinished work |
 | --- | --- |
-| Synchronized comparison maps, common breaks, phone A/B | Public comparison already validates same-level places, retains two-to-four selections and phone focus. The single map workspace has classification and geographic controls. Synchronized maps/common breaks are not integrated. |
+| Synchronized comparison maps, common breaks, phone A/B | Public comparison already validates same-level places, retains two-to-four selections and phone focus. The single map workspace has classification and geographic controls. The paired-map follow-up integrates shared measure/breaks, linked drill/parent and phone A/B with URL scope. See `BHW_PAIRED_MAPS.md`; delivery requires the PR’s checks and live evidence. Independent pan/zoom resets on phone remount/refresh. |
 | Qualification/registration composition | Overview already shows a registration mix only when all exclusive parts equal the reported total, plus certification and education charts. Phase 2 composition acceptance across places remains unverified; overlapping certification categories must not become a 100% stack. |
 | Places × training-topics heatmap | Approved topic percentages/counts already exist in the catalog and single-measure comparison. This increment adds a cross-topic matrix to that comparison. |
 | Distributions and locality position among peers | The compensation follow-up reuses the existing range chart for approved payer quantiles. A public peer-position integration with explicit peer universe, exclusions and ties remains unfinished. |

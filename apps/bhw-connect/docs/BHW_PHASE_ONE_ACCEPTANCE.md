@@ -297,8 +297,9 @@ note. This does not establish a controlled physical-device or percentile pass.
 The owner reports that the physical-phone check was on **iPhone with Chrome**,
 with everything fine **apart from the initial findings already reported**. This
 adds physical-phone feedback of no additional problems; it does not close those
-known findings. Phone model, OS/browser versions, individual tasks, reader roles
-and VoiceOver use have not been established. Desktop/representative-reader and
+known findings. The owner corrected a subsequent answer: **VoiceOver was not
+used**. Phone model, OS/browser versions, individual tasks and reader roles
+have not been established. Desktop/representative-reader and
 screen-reader acceptance remain unverified; do not infer them from “fine”.
 
 The next engineering increment removes an unused early font transfer from map
@@ -306,3 +307,26 @@ startup. Its bounded timing procedure and the rejected bounds-allocation trial
 are recorded in [DATASET_MAP_PERFORMANCE.md](DATASET_MAP_PERFORMANCE.md).
 Historical boundary/crosswalk acceptance, missing-HUC supply and Headcount
 source-license metadata remain separate prerequisites. Phase 1 is not signed off.
+
+Additional bounded live checks on the deployed `e3e1a4a7` release passed at
+390/1440 px: the existing public comparison journey explicitly chooses an
+accreditation population, changes measure, adds/replaces/removes two-to-four
+places, restores phone focus and share state, reloads and uses Back. The
+over-four request retained all choices until explicitly reduced. Mixed
+`01 accreditation` search retained the chosen profile population; indicator-only
+headcount returned national scope, and an unsupported comparison stayed explicit.
+All six selected browser cases passed. These are not representative-reader results.
+
+From the Cebu dashboard, `Alaminos` suggestions opened City of Alaminos,
+Pangasinan (`citymun:0105503`) and Alaminos, Madalag, Aklan
+(`barangay:0600410001`) with scoped headings, no captured page errors and no
+ordinary overflow at both widths. `San Jose` suggestions displayed distinct
+parent chains (including Romblon, Occidental Mindoro and Tarlac). `Cebu
+accreditation` offered both populations against named Cebu geography instead of
+silently picking one. This extends live discovery coverage; it does not independently
+validate those localities' source figures or all duplicate-name cases.
+
+The next engineering fix retains the canvas/data when switching map views;
+see [BHW_MAP_VIEW_REUSE.md](BHW_MAP_VIEW_REUSE.md). Physical VoiceOver evaluation,
+representative-reader interpretation, performance acceptance and the named data
+prerequisites remain open.

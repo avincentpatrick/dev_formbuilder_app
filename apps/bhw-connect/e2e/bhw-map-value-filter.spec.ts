@@ -164,13 +164,15 @@ test("a replacement canvas shows loading and failure instead of stale ready stat
   });
   await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
   await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
-  await page.getByLabel("BHW map view", { exact: true }).selectOption("choropleth");
+  await page
+    .getByLabel("BHW Headcount 2025 indicator", { exact: true })
+    .selectOption("bhw.registered");
   await requested;
   await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "loading");
   await expect(page.getByRole("button", { name: "Zoom in", exact: true })).toBeDisabled();
   release();
   await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "failed");
-  await page.getByLabel("BHW map view", { exact: true }).selectOption("circles");
+  await page.getByRole("button", { name: "Retry map rendering", exact: true }).click();
   await expect(page.locator("[data-map-state]")).toHaveAttribute("data-map-state", "ready");
   await expect(page.getByRole("button", { name: "Zoom in", exact: true })).toBeEnabled();
 });

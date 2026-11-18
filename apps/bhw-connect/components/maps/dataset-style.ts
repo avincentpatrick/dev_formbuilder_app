@@ -4,7 +4,7 @@ import type { MapRow } from "@/lib/maps/prototype";
 
 /** Update exploration styling without replacing geometry, workers or the user's viewport. */
 export function applyDatasetStyle(
-  map: Pick<LibreMap, "getLayer" | "setPaintProperty" | "setFilter">,
+  map: Pick<LibreMap, "getLayer" | "setPaintProperty" | "setLayoutProperty" | "setFilter">,
   rows: MapRow[],
   bins: ColorBin[],
   excludedCodes: string[],
@@ -31,8 +31,15 @@ export function applyDatasetStyle(
     view === "circles" ? "#e5e7eb" : colors,
   ]);
   map.setFilter("excluded-range", excluded);
+  // View changes are styling edits: retain the geometry, worker and camera.
+  for (const layer of ["counts", "zeros"])
+    if (map.getLayer(layer))
+      map.setLayoutProperty(layer, "visibility", view === "circles" ? "visible" : "none");
   if (map.getLayer("counts"))
     map.setFilter("counts", ["all", included, [">", ["get", "value"], 0]]);
   if (map.getLayer("zeros")) map.setFilter("zeros", ["all", included, ["==", ["get", "value"], 0]]);
-  if (map.getLayer("place-labels")) map.setFilter("place-labels", included);
+  if (map.getLayer("place-labels")) {
+    map.setFilter("place-labels", included);
+    map.setLayoutProperty("place-labels", "text-radial-offset", view === "circles" ? 1.8 : 0.4);
+  }
 }

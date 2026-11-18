@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { missingCebuShapes } from "./helpers/missing-cebu-shapes";
 
 async function regionFixture(page: Page) {
   await page.route("**/api/dataset-map?**", (route) =>
@@ -32,6 +33,7 @@ for (const width of [390, 1440]) {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await regionFixture(page);
+    await missingCebuShapes(page);
     await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
     await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
     const locator = page.locator("[data-locator-state]");
@@ -62,6 +64,36 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+  });
+}
+
+for (const width of [390, 1440]) {
+  test(`repaired Region VII locators include all three HUCs at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await regionFixture(page);
+    await page.goto("map?dataset=bhw-stepzero-2026&level=region&code=07");
+    await expect(page.locator('[data-map-state="ready"]')).toBeVisible();
+    await expect(
+      page.getByText("3 of 5 areas have no drawable shape.", { exact: false }),
+    ).toHaveCount(0);
+    const locator = page.locator("[data-locator-state]");
+    for (const code of ["07306", "07311", "07313"]) {
+      if (width < 1024)
+        await page.getByRole("button", { name: "Areas and data", exact: true }).click();
+      await page.getByLabel("BHW Headcount 2025 area", { exact: true }).selectOption(code);
+      if (width < 1024)
+        await page.getByRole("button", { name: "Map and legend", exact: true }).click();
+      await expect(locator).toHaveAttribute("data-locator-state", "ready");
+      await expect(locator.locator("svg")).toHaveCount(1);
+    }
+    if (width < 1024)
+      await page.getByRole("button", { name: "Areas and data", exact: true }).click();
+    await page.getByText(/Complete area table/).click();
+    await expect(
+      page.getByRole("row", { name: "Cebu City 50 Available", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("row", { name: /Lapu-Lapu.*Available/ })).toContainText("Not reported");
+    await expect(page.getByText(/Reported area total: 175 people/)).toBeVisible();
   });
 }
 

@@ -16,6 +16,8 @@ it("keeps selection, zero, period, source, coverage and relative-legend context 
   expect(notes).toContain("quantiles-relative-to-displayed-areas");
   expect(notes).toContain("Source: Synthetic source. Source date: 2026-09-01. License: Test license");
   expect(notes).toContain("not yet assigned for this dataset");
+  expect(notes).toContain("NAMRIA and PSA via OCHA COD-AB");
+  expect(notes).toContain("https://creativecommons.org/licenses/by/3.0/igo/");
 });
 it("retains selected published uncertainty and source notes", () => {
   const context = datasetMapExport({ ...initialMapChoice("psa-sae-poverty-2023"), selected: "01" },

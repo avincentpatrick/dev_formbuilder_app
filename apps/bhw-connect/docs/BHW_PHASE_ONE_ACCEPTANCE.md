@@ -339,3 +339,28 @@ download from the dedicated map page's initial response. See
 [BHW_MAP_STARTUP.md](BHW_MAP_STARTUP.md) for alternating cold/warm measurements,
 request reuse and limitations. Median improvement does not waive the observed
 cold-budget miss or the physical-reader/data prerequisites above.
+
+
+## Updated owner feedback and geometry work — 18 November 2026
+
+The owner subsequently reported VoiceOver working on iPhone/Chrome and confirmed
+locality search and headings, browser Back, table names/values, selected-area
+dashboard navigation, and methodology navigation/return. The owner then explicitly
+said to accept all remaining VoiceOver testing as yes. Record the VoiceOver
+checklist as **passed by owner report**, superseding the earlier “not tested”
+status; these are not independently observed sessions. Do not repeat those
+individual questions. Separate representative-reader roles, desktop evaluation
+and representative-device performance were not established by that instruction.
+
+The owner also confirmed that the displayed map boundaries match the 2025 data.
+That is owner acceptance of the map displayed before the new Cebu repair, not
+a claim that the owner inspected an unpublished replacement or all nationwide
+crosswalks. The targeted Cebu/HUC repair now has archived 2023 source, checksum,
+join and partition evidence in [CEBU_HUC_BOUNDARY_REPAIR.md](CEBU_HUC_BOUNDARY_REPAIR.md).
+Headcount source reuse terms remain “not supplied”; the Profiles CC BY 4.0
+license and boundary CC BY 3.0 IGO license do not automatically cover Headcount.
+
+PR #588's main CI subsequently passed. Its deployment and ten bounded live
+timings met the sampled budgets (cold 7,038–8,560 ms; warm 3,326–4,084 ms), with
+the isolated visibility observation and limits recorded in that PR. This does
+not establish representative physical-device percentiles or full Phase 1 signoff.

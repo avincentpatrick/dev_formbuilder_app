@@ -62,6 +62,7 @@ import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
 import { clampBarangayScope } from "@/lib/maps/barangay-support";
+import { BOUNDARY_CREDIT } from "@/lib/maps/boundary-credit";
 const loadDatasetCanvas = () => import("./dataset-canvas").then((m) => m.DatasetCanvas);
 const DatasetCanvas = dynamic(loadDatasetCanvas, {
   ssr: false,
@@ -1166,7 +1167,16 @@ export function DatasetMapCard({
       {metrics.length > 0 && (
         <p className="text-xs text-muted">
           Boundary context: existing self-hosted PSGC shapes, incomplete in some areas. Historical
-          boundary compatibility and a detailed basemap remain under review.
+          boundary compatibility and a detailed basemap remain under review. Boundaries: NAMRIA and
+          PSA via OCHA COD-AB (
+          <a className="underline" href={BOUNDARY_CREDIT.licenseUrl}>
+            {BOUNDARY_CREDIT.license}
+          </a>
+          ), adapted via{" "}
+          <a className="underline" href={BOUNDARY_CREDIT.supplier}>
+            faeldon/philippines-json-maps (MIT)
+          </a>
+          .
         </p>
       )}
       {exportError && <p role="status">{exportError}</p>}

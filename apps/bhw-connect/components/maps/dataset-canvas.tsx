@@ -2,7 +2,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapCamera } from "@/lib/maps/zoom-geography";
-import { formatCount } from "@/lib/format";
+import { formatCount, percentageFormatter } from "@/lib/format";
 import { captureMapFrame } from "@/lib/maps/png";
 import { loadMaplibre } from "./load-maplibre";
 import { geometryPositions } from "@/lib/geo/positions";
@@ -28,6 +28,7 @@ export function DatasetCanvas({
   mapOnly = false,
   onMapOnly,
   unit = "",
+  formatValueLabel,
   expanded,
   emphasis,
   compact = false,
@@ -38,6 +39,7 @@ export function DatasetCanvas({
   mapOnly?: boolean;
   onMapOnly?: () => void;
   unit?: string;
+  formatValueLabel?: (value: number) => string;
   geographyLabel?: string;
   initialCamera?: MapCamera;
   onZoomGeography?: (camera: MapCamera, direction: "in" | "out", focus: string | null) => void;
@@ -60,6 +62,10 @@ export function DatasetCanvas({
   view?: "circles" | "choropleth";
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const formatPercentage = useMemo(
+    () => percentageFormatter(rows.flatMap((row) => (row.value === null ? [] : [row.value]))),
+    [rows],
+  );
   const valueRow = selected !== dismissed ? rows.find((row) => row.code === selected) : undefined;
   const cameraOnMount = useRef(initialCamera);
   const zoomIntent = useRef(false);
@@ -505,7 +511,11 @@ export function DatasetCanvas({
             <p>
               {valueRow.value === null
                 ? "Not reported"
-                : `${formatCount(valueRow.value)} ${unit}`.trim()}
+                : formatValueLabel
+                  ? formatValueLabel(valueRow.value)
+                  : unit === "%"
+                    ? formatPercentage(valueRow.value)
+                    : `${formatCount(valueRow.value)} ${unit}`.trim()}
             </p>
           </div>
           <button

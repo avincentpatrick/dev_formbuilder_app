@@ -1,5 +1,35 @@
 [
     {
+        "version": "0.25.0",
+        "title": "Grids that work like a table of questions",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A grid row can be shown only when an earlier answer calls for it. In the form builder, open the grid's Grid tab and press Row settings under the row."
+            },
+            {
+                "kind": "new",
+                "text": "In each row, a cell can be marked “Not needed”, and a column can be needed or required only when another cell in that row says so — for example, a comment required only where the row’s answer is “Change it”. A column can also be shown only when an earlier answer calls for it. Press Column rules under the column."
+            },
+            {
+                "kind": "new",
+                "text": "Grids can have long-text columns, and a row can carry details under its label, such as a definition."
+            },
+            {
+                "kind": "new",
+                "text": "Conditions, calculations and question text can use one cell of a grid. Pick it as “Grid — Row — Column”."
+            },
+            {
+                "kind": "improved",
+                "text": "Each grid cell now shows its own message, once you leave it or try to move on, instead of one message for the whole grid."
+            },
+            {
+                "kind": "improved",
+                "text": "The paper form marks a grid row or column that is asked only sometimes, and greys out the cells a row marks “Not needed”."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

@@ -28,6 +28,18 @@ _None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the
 
 
 ## ANSWERED
+### D230 — A grid becomes a question table: what may a rule elsewhere read of it, and how does NHETE lay out its parts? **Rules elsewhere: only an always-asked cell (A). NHETE's parts: one table per indicator (A).**
+
+**Asked and answered 2026-11-18 (user decision, in chat), in the planning of `M246` (NHETE recommendation 5a).** Two questions, each put with its options and the session's recommendation.
+
+1. **A grid now has rows shown only sometimes, cells "Not needed" and per-row "Required when". When a show-when or a calculation ELSEWHERE in the form reads a grid cell, which cells may it read?**
+   - **A — only always-asked cells (chosen, the recommendation).** A rule elsewhere may name a cell only if it never hides: its row has no show-when, its column no show-when or needed-when, and it is never "Not needed". A column's own rules still read any cell to its left in the same row. Both engines decide a grid's masks after everything else is settled, so they cannot drift and nothing loops; NHETE needs nothing more.
+   - **B — any cell.** Every cell can be read, so the engines' repeat-until-settled loop must include every cell: slower on big tables, more ways for the two engines to disagree, a larger change.
+2. **NHETE's parts tables list each kept indicator's parts. How should the test form lay them out?**
+   - **A — one table per indicator (chosen, the recommendation).** 35 small tables, each shown only when its indicator is kept and headed by its name, as the module reads; row show-when is then tested by the showcase form.
+   - **B — one table per domain.** 4 tables whose rows appear for each kept indicator; tests row show-when at NHETE's size, loses the per-indicator headings.
+
+**What the answer files:** `M246` builds both and closes `grid-question-table` (`R-8410b419`) and `R-ffd10da2`. It files `grid-row-details-on-paper`, `xlsform-grid-row-details`, `grid-column-answer-limits`, `grid-column-help-text`, `grid-value-rename-carries`, `grid-answers-labelled-table`, `runtime-engine-handshake`, `automation-grid-cell-conditions` and `grid-cell-operand-judge`, each `during-testing`. No retier.
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

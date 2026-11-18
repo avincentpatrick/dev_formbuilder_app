@@ -4665,7 +4665,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the `AppServiceProvider` call site that causes it. **Latent when found and recorded as such**: nothing
   in `app/` creates or updates a `Tenant` row's name. Original filing follows.
   **`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
-  none.** `docs/piping-output-encoding-design.md:151` asserts *"zero `{!!` exists in application code
+  none.** `docs/piping-output-encoding-design.md` §5 (its Blade-shells row) asserts *"zero `{!!` exists in application code
   today"*, status "(holds)", and `:180` makes any second sink a contract change. The new
   `resources/views/vendor/mail/html/header.blade.php:31,33` carries two — `:31` interpolating blind into an
   HTML **attribute** (`alt="{!! trim($slot) !!}"`). Its premise that the slot arrived escaped does not hold:
@@ -14749,12 +14749,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   drift test and `manual.test.ts` so it cannot rot — written with the two controls `D134` builds. **Live.** Filed by `M172`.
   **Tier: early-testing.** ✅ **CLOSED BY `M187` (2026-10-25), reshaped:** a hand-written table pinned by two tests would still be a ninth copy of eight rules, so the cells are DERIVED — `app/Support/Forms/FieldReadiness.php` reads each from the rule that decides it (`isRetired()`, `EncodeFormPresenter::supports()` — one column for the web form and manual entry, which `FieldTypeMirrorDriftTest` pins equal — `PrintAnswerArea`, `OcrFieldEligibility`, `PdfFieldRole`, `isDataField()` with a grid's per-cell columns, `AnalyticsFieldEligibility`, `OperandKind::offered()`), `php artisan help:readiness` commits `resources/js/components/help/field-readiness.json`, and `tests/Feature/Help/FieldReadinessTableTest.php` holds the file equal to the derivation. Help → Builder reference → *What each type can do* draws it with `MdsDataTable` (a card per type on a phone); the Preview is a sentence under it rather than a column (it draws each question as the web form does, and its differences are `previewLimitations()`'s). Both Adv sentences link to it. Reviewed T2–T5's chapters: one stale line (Duration's "a duration will be worked out by a calculation" — `M180` built it) corrected. Mutants caught: a verdict's words changed, a rule changed without regenerating (both Pest), a row dropped on the way into the manual (Vitest). **Live** on the trunk since `M187` merged at merge point 6 (`4f321bd5`, 2026-10-26). Released at merge point 6 as PR #380 (`4f321bd5`), live on staging since 2026-10-26.
 
-- **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
+- ✅ **CLOSED BY `M246` (2026-11-18) — ****`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
   `docs/data-dictionary.md:383` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
   `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1126` tells authors so.
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M246` (2026-11-18), on its branch, held for the merge point.** `${grid.row.col}` names a Grid's cell and `${grid.row}` a Likert row, in every expression and in piped text, in both engines (`CellReferenceNode`; TS `cell`; 30 expression vectors, 9 parse errors, 11 template vectors). A rule elsewhere reads only a cell that is always asked (`D230`), which the publish gate checks by name; piped text shows any cell of an earlier grid, as its column's type. A cell is offered in the condition editor as "Grid — Row — Column" and in the "Insert a question" picker. Automations refuse one for now (`automation-grid-cell-conditions`); publish does not yet judge a cell's use by its column's type (`grid-cell-operand-judge`).
 
 - **`minor` · A grid cannot sit inside a repeatable section.**
   `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:383` records the
@@ -16302,7 +16303,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
+- ✅ **CLOSED BY `M246` (2026-11-18) — ****`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
   Found by `M237` (2026-11-14). NHETE's Stop 8 is two tables per domain, and today both become blocks of questions.
   - **The indicator table** has five answer columns, a long-text column, a cut-off cell that six rows cannot answer, and a comment required for three reasons.
   - **The parts table** has rows shown only for indicators the office keeps.
@@ -16316,6 +16317,78 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Grid cells as operands in conditions, calculations and piping is `R-ffd10da2`, already filed by `M172`. The remedy for the rest, when taken: a show-when per row, required-when and not-applicable per cell, a long-text column, and row details.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+  ✅ **CLOSED BY `M246` (2026-11-18), on its branch, held for the merge point.** A row may be shown only when an answer calls for it and carry details under its label (content blocks, no picture); a Grid row may mark cells "Not needed"; a Grid column may be shown only when an answer calls for it, and in each row be needed or required only when its row says so, reading `${.col}` to its left; `long_text` joins the column types (`GridRules`, `config` only, no migration). Both engines decide them in their grid pass and report `gridRelevance`; the screen hides what is not asked, greys "Not needed", draws each cell's own error, and the builder edits them under each row and column in the Grid tab. Paper marks a conditional row or column and greys "Not needed"; XLSForm export writes each cell's rules. NHETE's three agreement grids, four indicator tables and a parts table per indicator are drawn as grids (`NhetePlan::TABLE`, `NheteTableRouteTest`). Left open as rows of their own: row details on paper, row details in XLSForm, a long-text column's word limit, a column's help text, renaming a named row or column safely, a labelled grid in the inbox and PDF, a version check for a cached page, cells in automations, and publish judging a cell by its column's type.
+
+- **`minor` · `grid-row-details-on-paper` — A grid row's details reach the screen but not the printed blank form or the response PDF.**
+  Found by `M246` (2026-11-18). Paper and PDF print a grid's rows by their labels (`BlankFormPrintPresenter::gridRows()`); on this branch's base they print no note content at all, which #589 (`M245`, held) changes with `PrintedContent`. NHETE's indicator rows carry their definition, cut-off and research as details, so a paper respondent sees only "A01 · name".
+
+  The remedy, when taken (once #589 is on the trunk): print each row's details under its label through `PrintedContent`, and teach `PrintedFormMatcher` the new printed lines in the grid's region, as it learned a note's.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-grid-row-details` — An exported grid loses its rows' details.**
+  Found by `M246` (2026-11-18). `XlsformExporter::emitMatrix()` writes one question per cell with its rules, and nothing for a row's details; this branch's base writes a note's label only, and #580 (`M244`, held) brings `XlsformMarkdown`.
+
+  The remedy, when taken (once #580 is on the trunk): write each row's details as a note row before its cells, through `XlsformMarkdown`, with a `#meridian` marker naming the row.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `grid-column-answer-limits` — A long-text grid column has no word limit, so NHETE's 1,500-word cap on its table comments is lost.**
+  Found by `M246` (2026-11-18). #568 (`M243`, held) gives a question `min_words`/`max_words` (`AnswerLimits`, both engines); a grid column has no such setting, and a grid's cells take no rule rows. `NhetePlan`'s table layout counts it (`grid-column-word-cap`).
+
+  The remedy, when taken (once #568 is on the trunk): a column's `min_words`/`max_words` (and a choice column's at-most), read by both engines' grid pass with golden vectors, set under the column in the Grid tab, and exported as the cell's constraint.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-column-help-text` — A grid column has no help text.**
+  Found by `M246` (2026-11-18). NHETE's cut-off and coverage columns carry a hint as questions; as grid columns they have nowhere to put it (`grid-column-hint` in `NhetePlan`'s table layout).
+
+  The remedy, when taken: a column's `hint`, drawn under its header in the table and its caption in the cards, tied to its controls by `aria-describedby`, printed on paper and exported as the cells' `hint`.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `grid-value-rename-carries` — Renaming or removing a grid row or column that a rule elsewhere names leaves the rule pointing at nothing.**
+  Found by `M246` (2026-11-18). A cell is named by its row's and column's values (`${grid.row.col}`). The Grid tab says "Named by …" under a named row or column, and publish refuses the dangling cell by name, but the rename does not carry — as a key rename did not before `M242` (#545, held).
+
+  The remedy, when taken: a row or column value rename rewrites every `${grid.row…}` that names it, through `ExpressionKeyRewriter` and the template rename, on the server, as `KeyRenameCarrier` does a key.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-answers-labelled-table` — The inbox and the response PDF show a grid as one line of values, which a long-text column makes hard to read.**
+  Found by `M246` (2026-11-18). `SchemaValueFormatter::formatGrid()` writes `row: col=cell; …` by values, not labels; a comment of several sentences sits inside it.
+
+  The remedy, when taken: the inbox and the PDF draw a grid as a table of its asked cells, by labels, with each long-text cell in full.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `runtime-engine-handshake` — A respondent's cached old page, given a newer form, reads rules it does not know as if they were not there.**
+  Found by `M246` (2026-11-18). The service worker serves the page's shell and assets from cache when the network is slow or gone, and the form's schema separately; nothing checks that the engine in the cached page understands the schema. An engine from before `M246` given a form with `${grid.row.col}` stops on the reference and treats every question as shown, and ignores a grid's row and column rules. The server still refuses a wrong answer, and since `M246` shows it on its cell.
+
+  The remedy, when taken: the schema carries the engine version it needs; an older page reloads when online, or says it needs updating when offline; the sync manifest carries the same.
+
+  **Latent** — reachable only with a page cached before a release. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `automation-grid-cell-conditions` — A form automation's condition cannot read a grid cell.**
+  Found by `M246` (2026-11-18). `AutomationCondition` refuses a condition naming a cell, and its catalogue offers none, so "send an email when indicator A01 is kept" cannot be written.
+
+  The remedy, when taken: the automation catalogue offers always-asked cells as the condition editor does, and `AutomationCondition` checks a cell's grid, row and column.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-cell-operand-judge` — Publish does not judge a grid cell's use by its column's type, so `${grid.row.col} > 3` on a text column publishes and is always false.**
+  Found by `M246` (2026-11-18). `ExpressionValidationGate`'s ordering checks (`ExpressionKeyUse`, `ExpressionOperandJudge`) read a whole question's `OperandKind`; a cell is not one, so it is not judged. The builder's condition editor offers only what a cell's column type allows, so only a hand-written expression meets this.
+
+  The remedy, when taken: judge a cell as its column's type (a Likert row as a number) in the same walk.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `nhete-walk-tables` — The 49-page NHETE walk never meets a real grid, because it seeds the block-layout workbook.**
+  Found by `M246` (2026-11-18). `NheteE2eSeeder` imports the Meridian-dialect workbook, written from `NhetePlan`'s block layout (XLSForm cannot carry a grid back in), so `nhete-walk.spec.ts` checks scroll and axe on Stop 8 as blocks of questions. Real grids are checked in a browser on the showcase form (`public-runtime-axe.spec.ts`) and in the builder (`nhete-builder-block.spec.ts`), never at NHETE's scale of 42 grids and a 12-row indicator table. #589 files the same gap for note content (`nhete-walk-note-content`).
+
+  The remedy, when taken: a seeder that builds `NhetePlan::TABLE` through the services rather than a workbook, and the walk run on it at the three widths.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
 
 - **`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
   Found by `M237` (2026-11-14). `RuntimeShell.vue` caps every respondent page at 44rem, so NHETE's table, drawn true from 900 px, can never be one. Neither grid component uses `position: sticky` for its header row or first column. The explorer cannot chart a grid (`explorer-unchartable-questions`).

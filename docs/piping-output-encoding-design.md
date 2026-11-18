@@ -76,6 +76,8 @@ The classification is **total over all 31 `FieldType` cases** and, like `App\Enu
 
 > **A gap this classification must not inherit.** `isMedia()` types are **not** currently banned as expression operands — `ExpressionValidationGate` bans only `isComposite()` and `isGeo()` (`app/Services/Forms/ExpressionValidationGate.php:48-55`). Piping excludes media explicitly rather than by inheriting a ban that does not exist. Whether the *expression* gate should also ban them is a separate question, recorded in §8.
 
+> **`M246` (`grid-question-table`, `R-ffd10da2`) — a grid's CELL is a source, while the grid stays excluded.** A hole may be `${grid.row.col}` (one cell of a `matrix`) or `${grid.row}` (one row of a `likert_matrix`): the grammar's key gains up to two `.segment` parts, each `[A-Za-z0-9_][A-Za-z0-9_-]*`, and the hole's value is the whole path, so no segment shape changed. A cell is judged as its column's type (`MatrixColumns::cellSource()` — a Likert row as a `likert_scale`) by the same scope rules: the template gate gives each nameable cell of a grid whose rows are its own a source entry at the grid's position. It renders as that type's display value; a cell the grid's rules did not ask renders blank, as a pruned answer does. Unlike a condition (`D230`), piped text may show a cell that is not always asked: text never feeds back into what is asked.
+
 ### 3.2 What a hole renders to
 
 **The rendered value of a hole is exactly `SchemaValueFormatter::displayValue($type, $answer, $config)`.** Reused, never reimplemented — so a choice code renders as its author-defined label, `yes_no` as `Yes`/`No`, and a multi-select as its `'; '`-joined labels, identically in a piped label and in an export cell.

@@ -14,6 +14,8 @@ import { BenchmarkBars } from "@/components/place/benchmark";
 import { PublicCompareControls } from "./public-controls";
 import { TrainingHeatmap } from "./training-heatmap";
 import { trainingComparisonRows } from "@/lib/bhw/training-comparison";
+import { comparisonMapMeasures } from "@/lib/bhw/map-comparison";
+import { withBasePath } from "@/lib/base-path";
 
 export async function PublicComparison({
   params,
@@ -110,6 +112,44 @@ export async function PublicComparison({
       />
       {rows.length > 0 && (
         <>
+          {valid[0].geoLevel !== "barangay" &&
+            comparisonMapMeasures.some(({ metric }) => metric.id === spec.id) && (
+              <form
+                action={withBasePath("/bhw/compare-maps")}
+                className="space-y-3 rounded border border-border p-4"
+              >
+                <h2 className="text-xl font-semibold">Compare two maps with a shared legend</h2>
+                <p className="text-sm text-muted">
+                  Choose a pair from your selected places. Both maps show the same measure and
+                  period, with common color breaks and separate geographic scales.
+                </p>
+                <input type="hidden" name="measure" value={spec.id} />
+                <input type="hidden" name="geos" value={codes.join(",")} />
+                {focus && <input type="hidden" name="returnFocus" value={focus} />}
+                {mapState && <input type="hidden" name="mapState" value={mapState} />}
+                <div className="grid gap-3 md:grid-cols-2">
+                  {(["a", "b"] as const).map((side, index) => (
+                    <label key={side} className="min-w-0">
+                      Map {side.toUpperCase()}
+                      <select
+                        name={side}
+                        defaultValue={`${valid[index].geoLevel}:${valid[index].geoCode}`}
+                        className="mt-1 block w-full rounded border border-border bg-surface p-2"
+                      >
+                        {valid.map((geo) => (
+                          <option key={geo.geoCode} value={`${geo.geoLevel}:${geo.geoCode}`}>
+                            {geo.geoName} ({geo.geoCode})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <button className="min-h-11 rounded border border-border px-3 py-2">
+                  Open paired maps
+                </button>
+              </form>
+            )}
           {spec.id.startsWith("bhw.training.") && (
             <TrainingHeatmap
               key={codes.join(",")}

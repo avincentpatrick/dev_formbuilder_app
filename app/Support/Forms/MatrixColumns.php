@@ -20,11 +20,16 @@ use App\Enums\FieldType;
  */
 final class MatrixColumns
 {
-    /** The types a matrix column may take, in the order the builder offers them. */
+    /**
+     * The types a matrix column may take, in the order the builder offers them. M246 (`grid-question-table`) adds long
+     * text, the comment column a question table needs. Mirrored by `schema-mapping.ts` and `MatrixEditor.vue`, held
+     * equal by `MatrixColumnTypesMirrorDriftTest`.
+     */
     public const array TYPES = [
         FieldType::SingleSelect,
         FieldType::MultiSelect,
         FieldType::ShortText,
+        FieldType::LongText,
         FieldType::Integer,
         FieldType::Decimal,
         FieldType::Date,
@@ -114,7 +119,8 @@ final class MatrixColumns
 
     /**
      * The column list a Likert matrix keeps when a matrix becomes one: its scale is the columns themselves, so a
-     * column's own type, choices, their source (M185) and required flag have nothing to mean there.
+     * column's own type, choices, their source (M185) and required flag have nothing to mean there — nor, since M246,
+     * its show-when, needed-when and required-when, which are a question column's rules.
      *
      * @param  array<string, mixed>  $config
      * @return list<array<string, mixed>>
@@ -122,8 +128,31 @@ final class MatrixColumns
     public static function asScale(array $config): array
     {
         return array_map(
-            static fn (array $column): array => array_diff_key($column, ['type' => true, 'options' => true, 'options_list' => true, 'options_source' => true, 'required' => true]),
+            static fn (array $column): array => array_diff_key($column, [
+                'type' => true, 'options' => true, 'options_list' => true, 'options_source' => true, 'required' => true,
+                GridRules::COLUMN_RELEVANT => true, GridRules::NEEDED_WHEN => true, GridRules::REQUIRED_WHEN => true,
+            ]),
             self::columns($config),
+        );
+    }
+
+    /**
+     * M246: the rows a Likert matrix keeps when a matrix becomes one — a row's "Not needed" cells name columns a scale
+     * does not have. Its show-when and details stay: a Likert row takes both.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<array-key, mixed>|null the rows as given when they are not a list
+     */
+    public static function rowsAsScale(array $config): ?array
+    {
+        $rows = $config['rows'] ?? null;
+        if (! is_array($rows)) {
+            return null;
+        }
+
+        return array_map(
+            static fn (mixed $row): mixed => is_array($row) ? array_diff_key($row, [GridRules::NOT_NEEDED => true]) : $row,
+            $rows,
         );
     }
 

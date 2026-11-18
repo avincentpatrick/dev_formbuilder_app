@@ -73,3 +73,18 @@ it('re-points a grid rule when its question is copied or a key is renamed', func
         ->and($config['columns'][1]['needed_when'])->toBe('${.agree} = \'no\'')
         ->and($config['columns'][1]['required_when'])->toBe('${.agree} = \'no\' and ${strict_2} = 1');
 });
+
+it('takes row details that are note content with no picture, within the block and character bounds', function (): void {
+    $paragraph = static fn (string $text): array => ['type' => 'paragraph', 'spans' => [['text' => $text]]];
+
+    expect(GridRules::detailsProblem([$paragraph('About this indicator.')], strict: true))->toBeNull()
+        ->and(GridRules::detailsProblem([['type' => 'image', 'attachment_id' => '0193b6a0-0000-7000-8000-000000000001', 'alt' => 'A chart']], strict: false))
+        ->toBe('a row’s details cannot hold a picture')
+        ->and(GridRules::detailsProblem(array_fill(0, GridRules::MAX_ROW_DETAIL_BLOCKS, $paragraph('x')), strict: true))->toBeNull()
+        ->and(GridRules::detailsProblem(array_fill(0, GridRules::MAX_ROW_DETAIL_BLOCKS + 1, $paragraph('x')), strict: true))
+        ->toBe('a row’s details may hold at most 20 blocks')
+        ->and(GridRules::detailsProblem([$paragraph(str_repeat('a', 2000)), $paragraph(str_repeat('b', 2000)), $paragraph(str_repeat('c', 2000))], strict: true))->toBeNull()
+        ->and(GridRules::detailsProblem(array_fill(0, 4, $paragraph(str_repeat('d', 1600))), strict: true))
+        ->toBe('a row’s details may hold at most 6000 characters of text')
+        ->and(GridRules::detailsProblem('oops', strict: false))->toBe('it must be a list of blocks');
+});

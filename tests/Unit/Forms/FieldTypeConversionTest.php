@@ -521,6 +521,20 @@ it('drops where the cells came from on the way to a likert matrix, and keeps whe
         ->and(fieldConversionWarningCodes($plan))->not->toContain(ConversionWarning::NeedsSetup->value);
 });
 
+it('M246: drops the column rules and the "Not needed" cells on the way to a likert matrix, and keeps the row show-when and details', function (): void {
+    $details = [['type' => 'paragraph', 'spans' => [['text' => 'About r.']]]];
+    $field = makeSchemaField(['field_type' => FieldType::Matrix, 'config' => [
+        'rows' => [['value' => 'r', 'relevant' => '${a} = 1', 'not_needed' => ['c'], 'details' => $details]],
+        'columns' => [['value' => 'c', 'type' => 'long_text', 'relevant' => '${a} = 1', 'needed_when' => '${.x} = 1', 'required_when' => '${.x} = 2']],
+        'cells' => [],
+    ]]);
+    $plan = fieldConversionPlan($field, [], FieldType::LikertMatrix);
+
+    expect($plan->config['rows'])->toBe([['value' => 'r', 'relevant' => '${a} = 1', 'details' => $details]])
+        ->and($plan->config['columns'])->toBe([['value' => 'c']])
+        ->and($plan->configDropped)->toContain('rows', 'columns');
+});
+
 it('warns that a likert matrix arriving at matrix needs its cells', function (): void {
     $field = makeSchemaField(['field_type' => FieldType::LikertMatrix, 'config' => ['rows' => [['value' => 'r']], 'columns' => [['value' => 'c']]]]);
     $plan = fieldConversionPlan($field, [], FieldType::Matrix);

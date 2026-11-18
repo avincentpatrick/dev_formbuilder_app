@@ -23,11 +23,11 @@ function lastColumns(wrapper: ReturnType<typeof editor>): Record<string, unknown
 }
 
 describe('MatrixEditor — a type for every column (M183)', () => {
-    it('offers the six types a grid cell holds, and writes the choice onto that column alone', async () => {
+    it('offers the seven types a grid cell holds, long text since M246, and writes the choice onto that column alone', async () => {
         const wrapper = editor([{ value: 'c1', label: 'C1' }, { value: 'c2', label: 'C2', label_translations: { fil: 'K2' } }]);
         const select = wrapper.get('[data-column-type="1"]');
 
-        expect(select.findAll('option').map((o) => o.text())).toEqual(['Single choice', 'Multiple choice', 'Short text', 'Whole number', 'Decimal number', 'Date']);
+        expect(select.findAll('option').map((o) => o.text())).toEqual(['Single choice', 'Multiple choice', 'Short text', 'Long text', 'Whole number', 'Decimal number', 'Date']);
 
         await select.setValue('integer');
 

@@ -299,3 +299,19 @@ it('reports a grid row or column condition that names a question which becomes a
         'reference_has_no_answer@grid_rule:svc',
     ]);
 });
+
+it('M246: reports a use of a grid\'s cell, in a condition and in piped text, when the grid becomes a Likert grid', function (): void {
+    $svc = addFormField($this->draft, $this->user, 'svc', FieldType::Matrix, 1, ['config' => [
+        'rows' => [['value' => 'r1', 'label' => 'One']],
+        'columns' => [['value' => 'c1', 'label' => 'C1', 'type' => 'short_text']],
+        'cells' => [],
+    ]]);
+    addFormField($this->draft, $this->user, 'follow', FieldType::ShortText, 2, ['relevant_expression' => '${svc.r1.c1} = \'yes\'']);
+    addFormField($this->draft, $this->user, 'echo', FieldType::Note, 3, ['label' => 'You wrote ${svc.r1.c1}']);
+    addFormField($this->draft, $this->user, 'unrelated', FieldType::ShortText, 4, ['relevant_expression' => '${svc_two.r1.c1} = \'yes\'']);
+
+    expect(conversionCensusOf($this->census, $this->form, $svc, FieldType::LikertMatrix))->toBe([
+        'reference_has_no_answer@relevance:follow',
+        'template_hole_unanswerable@template:echo',
+    ]);
+});

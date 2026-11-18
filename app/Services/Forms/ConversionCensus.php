@@ -15,6 +15,7 @@ use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
+use App\Services\Expressions\Ast\CellReferenceNode;
 use App\Services\Expressions\Ast\Node;
 use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\StructuredRuleLowering;
@@ -63,7 +64,11 @@ use App\Support\Forms\GridRules;
  * ({@see ExpressionOperandJudge::temporalOrderingHolds()}), and a change reports only where the old type held and
  * the new one does not. A date to a date-time stays silent, because the two order against each other.
  *
- * @phpstan-type CensusUse array{site: string, key: string, numeric: bool, list: bool, holds_as: list<string>}
+ * ── A grid's cells (M246, `R-ffd10da2`) ─────────────────────────────────────────────────────────────────────────
+ * `${grid.row.col}` reads a Grid's cell and `${grid.row}` a Likert row. A grid that becomes the other kind, or stops
+ * being a grid, answers neither shape, so a use of its cells (`cell`) reports that it now reads nothing.
+ *
+ * @phpstan-type CensusUse array{site: string, key: string, numeric: bool, list: bool, holds_as: list<string>, cell?: bool}
  * @phpstan-type CensusImpact array{code: string, site: string, key: string, message: string}
  */
 final class ConversionCensus
@@ -177,7 +182,17 @@ final class ConversionCensus
         // The publish gate's own verdict for a hole (TemplateScopeResolver's type arm). A conversion moves
         // neither the field nor its repeat scope, so the type is the only term that can change.
         if ($use['site'] === self::TEMPLATE) {
+            // M246: a piped grid cell shows nothing once its grid changes kind.
+            if (($use['cell'] ?? false) && $from !== $to) {
+                return [ConversionImpact::TemplateHoleUnanswerable];
+            }
+
             return self::pipeable($from) && ! self::pipeable($to) ? [ConversionImpact::TemplateHoleUnanswerable] : [];
+        }
+
+        // M246: a grid's cell, read across a change of grid kind, reads nothing.
+        if (($use['cell'] ?? false) && $from !== $to) {
+            return [ConversionImpact::ReferenceHasNoAnswer];
         }
 
         // A reference to nothing subsumes every narrower judge — but it asks only whether the SOURCE had an
@@ -238,8 +253,10 @@ final class ConversionCensus
         }
 
         $use = ExpressionKeyUse::of($node, $key, $selfIsKey);
+        // M246: a cell of the grid named $key — never a FieldReferenceNode, so ExpressionKeyUse does not see it.
+        $cell = array_filter($this->parser->referencedCells($node), static fn (CellReferenceNode $c): bool => $c->key === $key) !== [];
 
-        if (! $use['present']) {
+        if (! $use['present'] && ! $cell) {
             return null;
         }
 
@@ -253,7 +270,7 @@ final class ConversionCensus
             }
         }
 
-        return ['site' => $site, 'key' => $siteKey, 'numeric' => $use['numeric'], 'list' => $use['list'], 'holds_as' => $holdsAs];
+        return ['site' => $site, 'key' => $siteKey, 'numeric' => $use['numeric'], 'list' => $use['list'], 'holds_as' => $holdsAs, 'cell' => $cell && ! $use['present']];
     }
 
     /**
@@ -291,9 +308,11 @@ final class ConversionCensus
             }
 
             foreach ($this->templates->parseLenient($text) as $segment) {
-                if ($segment['type'] === 'hole' && $segment['value'] === $key) {
+                // M246: a cell hole `${grid.row.col}` is a use of the grid named by its key.
+                $isCell = $segment['type'] === 'hole' && $segment['value'] !== $key && TemplateParser::holeParts($segment['value'])['key'] === $key;
+                if ($segment['type'] === 'hole' && ($segment['value'] === $key || $isCell)) {
                     // A hole orders nothing, so it holds as every temporal kind.
-                    return ['site' => self::TEMPLATE, 'key' => $siteKey, 'numeric' => false, 'list' => false, 'holds_as' => [OperandKind::Date->value, OperandKind::Time->value, OperandKind::Datetime->value]];
+                    return ['site' => self::TEMPLATE, 'key' => $siteKey, 'numeric' => false, 'list' => false, 'holds_as' => [OperandKind::Date->value, OperandKind::Time->value, OperandKind::Datetime->value], 'cell' => $isCell];
                 }
             }
         }

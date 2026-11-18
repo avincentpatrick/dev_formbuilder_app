@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Forms;
 
 use App\Enums\FieldType;
+use App\Rules\ContentBlocks;
 
 /**
  * M246 (`grid-question-table`) — where a grid holds expressions of its own, in one place. Every reader that walks a
@@ -38,6 +39,74 @@ final class GridRules
 
     /** The column-level rule keys, in the order a row's cells are decided. */
     public const array COLUMN_RULES = [self::COLUMN_RELEVANT, self::NEEDED_WHEN, self::REQUIRED_WHEN];
+
+    /**
+     * A row's details: at most this many content blocks, nested ones counted, and this many characters of text.
+     * Measured against NHETE's longest indicator (16 blocks, 2,624 characters) with headroom; every respondent
+     * downloads and caches every row's details, so they are bounded tighter than a note's content.
+     */
+    public const int MAX_ROW_DETAIL_BLOCKS = 20;
+
+    public const int MAX_ROW_DETAIL_CHARACTERS = 6000;
+
+    /**
+     * The first reason `$value` cannot be a row's details, or null when it can. A row's details are note content
+     * ({@see ContentBlocks}) with no picture — a guest is served a picture only from a note — and within the two
+     * bounds above. Lenient while an author edits (the FormRequest), strict at publish, as note content is.
+     */
+    public static function detailsProblem(mixed $value, bool $strict): ?string
+    {
+        $problem = ContentBlocks::problem($value, $strict);
+        if ($problem !== null || ! is_array($value)) {
+            return $problem;
+        }
+
+        $blocks = 0;
+        $characters = 0;
+        $picture = false;
+        self::measure($value, $blocks, $characters, $picture);
+
+        return match (true) {
+            $picture => 'a row’s details cannot hold a picture',
+            $blocks > self::MAX_ROW_DETAIL_BLOCKS => 'a row’s details may hold at most '.self::MAX_ROW_DETAIL_BLOCKS.' blocks',
+            $characters > self::MAX_ROW_DETAIL_CHARACTERS => 'a row’s details may hold at most '.self::MAX_ROW_DETAIL_CHARACTERS.' characters of text',
+            default => null,
+        };
+    }
+
+    /**
+     * Counts every block (nested ones too) and every character of text under a list of blocks, and notes a picture.
+     * It walks any nested `blocks` and `items`, and reads every `text` and `summary`, so a block shape added later is
+     * counted without a change here.
+     *
+     * @param  array<array-key, mixed>  $blocks
+     */
+    private static function measure(array $blocks, int &$count, int &$characters, bool &$picture): void
+    {
+        foreach ($blocks as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+            $count++;
+            $picture = $picture || ($block['type'] ?? null) === 'image';
+            self::measureText($block, $characters);
+            if (is_array($block['blocks'] ?? null)) {
+                self::measure($block['blocks'], $count, $characters, $picture);
+            }
+        }
+    }
+
+    /** @param  array<array-key, mixed>  $node */
+    private static function measureText(array $node, int &$characters): void
+    {
+        foreach ($node as $key => $value) {
+            if (($key === 'text' || $key === 'summary') && is_string($value)) {
+                $characters += mb_strlen($value);
+            } elseif (is_array($value) && $key !== 'blocks') {
+                self::measureText($value, $characters);
+            }
+        }
+    }
 
     /**
      * Every non-blank rule expression a grid's config holds, in rows-then-columns order.

@@ -14,6 +14,7 @@ use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
 use App\Rules\ContentBlocks;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\GridRules;
 use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Collection;
 
@@ -566,6 +567,7 @@ final class StructuralValidationGate
             $this->assertOptionListResolves($field, 'rows', 'rows');
         }
         $this->assertOptionListResolves($field, 'columns', 'columns');
+        $this->assertGridRowSettingsResolve($field);
 
         if ($field->field_type !== FieldType::Matrix) {
             return;
@@ -647,6 +649,48 @@ final class StructuralValidationGate
                     $field->key,
                     'block '.($index + 1).'’s image is missing, belongs to another form, or failed its virus check — upload it again',
                 );
+            }
+        }
+    }
+
+    /**
+     * M246 (`grid-question-table`) — a grid row's own settings at publish: its details are note content with no picture,
+     * strictly as a note's are, within the row-details bounds ({@see GridRules::detailsProblem()}); and on a Grid, every
+     * "Not needed" cell names one of the grid's columns. What a row's or column's condition may name is the expression
+     * gate's.
+     */
+    private function assertGridRowSettingsResolve(FormField $field): void
+    {
+        $config = (array) $field->config;
+        $columns = array_flip(array_map(
+            static fn (array $column): string => (string) ($column['value'] ?? ''),
+            MatrixColumns::columns($config),
+        ));
+
+        foreach (array_values((array) ($config['rows'] ?? [])) as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $label = 'row '.($index + 1);
+
+            if (($row[GridRules::DETAILS] ?? null) !== null) {
+                $problem = GridRules::detailsProblem($row[GridRules::DETAILS], strict: true);
+                if ($problem !== null) {
+                    throw PublishValidationException::matrixConfigInvalid($field->key, "{$label}'s details: {$problem}");
+                }
+            }
+
+            $notNeeded = $row[GridRules::NOT_NEEDED] ?? [];
+            if ($notNeeded === [] || $notNeeded === null) {
+                continue;
+            }
+            if ($field->field_type !== FieldType::Matrix || ! is_array($notNeeded)) {
+                throw PublishValidationException::matrixConfigInvalid($field->key, "{$label} marks cells “Not needed”, which only a Grid’s columns can be");
+            }
+            foreach ($notNeeded as $column) {
+                if (! is_string($column) || ! isset($columns[$column])) {
+                    throw PublishValidationException::matrixConfigInvalid($field->key, "{$label} marks a column “Not needed” that the grid does not have (".(is_string($column) ? $column : '?').')');
+                }
             }
         }
     }

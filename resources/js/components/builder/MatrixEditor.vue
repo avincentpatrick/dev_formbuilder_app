@@ -5,7 +5,7 @@
  * columns are each non-empty with distinct values. Each list is a plain `{value,label}[]` edited via the shared
  * {@link GridOptionList}; every change emits a fresh array (one debounced history entry).
  *
- * M183 (`R-5033e87e`, `D129`): each column takes its own Type (the six of `MatrixColumns::TYPES` — never Yes/No, `D140`),
+ * M183 (`R-5033e87e`, `D129`): each column takes its own Type (one of `MatrixColumns::TYPES`, long text since M246 — never Yes/No, `D140`),
  * a Required flag (its cell in every row) and, as a choice column, a list of its own; a choice column with none draws
  * on the Cell choices, and the hint under them names the columns that do. A column keeps every key it already had; a
  * column whose new type takes no choices drops its own. Both grids also take a Layout ({@link GridLayoutSelect}).
@@ -42,6 +42,7 @@ const COLUMN_TYPES = [
     { value: 'single_select', label: 'Single choice' },
     { value: 'multi_select', label: 'Multiple choice' },
     { value: 'short_text', label: 'Short text' },
+    { value: 'long_text', label: 'Long text' },
     { value: 'integer', label: 'Whole number' },
     { value: 'decimal', label: 'Decimal number' },
     { value: 'date', label: 'Date' },

@@ -325,7 +325,7 @@ function optionValues(raw: unknown): string[] {
 }
 
 /** The types a matrix column may take (M183, `R-5033e87e`; mirror of PHP `MatrixColumns::TYPES`). */
-const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'integer', 'decimal', 'date'];
+const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'long_text', 'integer', 'decimal', 'date'];
 
 /** A grid's stored column objects, skipping anything that is not one. */
 function rawColumns(field: RawField): Record<string, unknown>[] {

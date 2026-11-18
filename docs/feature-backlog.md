@@ -11365,7 +11365,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Publish refuses on the first violation only, as a message-only toast, while the warnings path beside
   it gets a proper banner.** Filed 2026-09-25 by `M110` from the same exploration, and this is the half of *"or if
   we can show what is wrong to the user so the user can correct it"* that the server owns.
-  `StructuralValidationGate.php:39-91` throws inside its `foreach`, so one mis-configured field aborts the whole
+  `StructuralValidationGate.php`'s `assertPublishable()` and `collect()` throws inside its `foreach`, so one mis-configured field aborts the whole
   transaction and the author is told about exactly one of however many problems exist.
   `FormPublishController.php:33-37` renders `PublishValidationException` — which is prose, carrying no structured
   `field` or `code` — as a transient flash toast. ⚠️ **The contrast is in the same controller:** `:42-61` flashes

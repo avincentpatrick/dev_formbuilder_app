@@ -32,3 +32,8 @@ it('re-points past the caps the strict parse enforces, because it reads lenientl
 
     expect((new TemplateParser)->rewriteKeys($template, ['a' => 'b']))->toBe(str_repeat('${b} ', 25));
 });
+
+it('M246: re-points a grid cell hole by its key and keeps its path', function (): void {
+    expect((new TemplateParser)->rewriteKeys('You kept ${g.a01.keep}; score ${lk.r1}; ${g}', ['g' => 'grid2', 'lk' => 'l']))
+        ->toBe('You kept ${grid2.a01.keep}; score ${l.r1}; ${grid2}');
+});

@@ -68,7 +68,10 @@ export type {
     GeoAnswer,
     MediaAnswer,
 } from './schema';
-export type { Node } from './ast';
+export type { Node, CellReferenceNode, RowCellReferenceNode } from './ast';
+// M246: grid cell references — what an AST names, and how a cell reads a grid's answer.
+export { cellPath, referencedCells, referencedRowColumns } from './ast';
+export { resolveCell, resolveRowCell } from './grid-cells';
 export type {
     ComparisonOperator,
     ArithmeticOperator,

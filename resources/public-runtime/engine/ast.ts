@@ -12,6 +12,13 @@ import type { ArithmeticOperator, ComparisonOperator, LiteralKind, LogicOperator
 
 export type LiteralNode = { type: 'literal'; literalKind: LiteralKind; value: number | string };
 export type FieldReferenceNode = { type: 'field'; key: string };
+/**
+ * M246: `${key.row.col}` (a Grid cell) or `${key.row}` (a Likert row, `column` null) — deliberately its own node, so a
+ * reader that matches `type === 'field'` misses a cell instead of reading it as the whole grid.
+ */
+export type CellReferenceNode = { type: 'cell'; key: string; row: string; column: string | null };
+/** M246: `${.col}` — this row's cell, inside a grid column's own rules. */
+export type RowCellReferenceNode = { type: 'row_cell'; column: string };
 export type SelfReferenceNode = { type: 'self' };
 export type ComparisonNode = { type: 'comparison'; op: ComparisonOperator; left: Node; right: Node };
 export type ArithmeticNode = { type: 'arithmetic'; op: ArithmeticOperator; left: Node; right: Node };
@@ -22,6 +29,8 @@ export type FunctionCallNode = { type: 'call'; name: string; args: Node[] };
 export type Node =
     | LiteralNode
     | FieldReferenceNode
+    | CellReferenceNode
+    | RowCellReferenceNode
     | SelfReferenceNode
     | ComparisonNode
     | ArithmeticNode
@@ -58,6 +67,8 @@ export function kind(node: Node): NodeKind {
     switch (node.type) {
         case 'literal':
         case 'field':
+        case 'cell':
+        case 'row_cell':
         case 'self':
         case 'arithmetic':
             return 'value';
@@ -77,6 +88,7 @@ export function referencedKeys(node: Node): string[] {
     const walk = (n: Node): void => {
         switch (n.type) {
             case 'field':
+            case 'cell': // M246: a cell names its grid's key
                 seen.add(n.key);
 
                 return;
@@ -102,4 +114,56 @@ export function referencedKeys(node: Node): string[] {
     walk(node);
 
     return [...seen];
+}
+
+/** The path of a cell reference as written inside its braces — `key.row.col` or `key.row` (M246). */
+export function cellPath(node: CellReferenceNode): string {
+    return node.column === null ? `${node.key}.${node.row}` : `${node.key}.${node.row}.${node.column}`;
+}
+
+function walkNodes(node: Node, visit: (n: Node) => void): void {
+    visit(node);
+    switch (node.type) {
+        case 'comparison':
+        case 'arithmetic':
+        case 'logical':
+            walkNodes(node.left, visit);
+            walkNodes(node.right, visit);
+
+            return;
+        case 'not':
+            walkNodes(node.operand, visit);
+
+            return;
+        case 'call':
+            node.args.forEach((arg) => walkNodes(arg, visit));
+
+            return;
+        default:
+            return;
+    }
+}
+
+/** M246: every distinct grid cell an AST names, in first-seen order — the mirror of `ExpressionParser::referencedCells()`. */
+export function referencedCells(node: Node): CellReferenceNode[] {
+    const cells = new Map<string, CellReferenceNode>();
+    walkNodes(node, (n) => {
+        if (n.type === 'cell' && !cells.has(cellPath(n))) {
+            cells.set(cellPath(n), n);
+        }
+    });
+
+    return [...cells.values()];
+}
+
+/** M246: every distinct column a row-relative `${.col}` names — the mirror of `ExpressionParser::referencedRowColumns()`. */
+export function referencedRowColumns(node: Node): string[] {
+    const columns: string[] = [];
+    walkNodes(node, (n) => {
+        if (n.type === 'row_cell' && !columns.includes(n.column)) {
+            columns.push(n.column);
+        }
+    });
+
+    return columns;
 }

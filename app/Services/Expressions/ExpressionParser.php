@@ -9,6 +9,7 @@ use App\Enums\ExpressionKind;
 use App\Enums\LogicOperator;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Services\Expressions\Ast\ArithmeticNode;
+use App\Services\Expressions\Ast\CellReferenceNode;
 use App\Services\Expressions\Ast\ComparisonNode;
 use App\Services\Expressions\Ast\FieldReferenceNode;
 use App\Services\Expressions\Ast\FunctionCallNode;
@@ -16,6 +17,7 @@ use App\Services\Expressions\Ast\LiteralNode;
 use App\Services\Expressions\Ast\LogicalNode;
 use App\Services\Expressions\Ast\Node;
 use App\Services\Expressions\Ast\NotNode;
+use App\Services\Expressions\Ast\RowCellReferenceNode;
 use App\Services\Expressions\Ast\SelfReferenceNode;
 
 /**
@@ -67,17 +69,28 @@ final class ExpressionParser
      * Publish-time integrity checks over an already-parsed AST (never at submission time, where an
      * unknown key → EMPTY and an unset self → EMPTY, without throwing):
      *  - every `${key}` must be a known field key of the version being published;
-     *  - a `.` self-reference is legal only in a constraint.
+     *  - a `.` self-reference is legal only in a constraint;
+     *  - M246: a cell `${key.row.col}` must name a known key (whether that key is a grid with that row and column is
+     *    the publish gate's, which knows the field types); a row-relative `${.col}` is legal only where `$rowScope`
+     *    says so — a grid column's own rules.
      *
      * @param  array<string, bool>  $knownKeys
      *
      * @throws ExpressionSyntaxException
      */
-    public function assertReferencesResolve(Node $node, array $knownKeys, ExpressionKind $kind, ?string $fieldKey = null): void
+    public function assertReferencesResolve(Node $node, array $knownKeys, ExpressionKind $kind, ?string $fieldKey = null, bool $rowScope = false): void
     {
-        if ($node instanceof FieldReferenceNode) {
+        if ($node instanceof FieldReferenceNode || $node instanceof CellReferenceNode) {
             if (! array_key_exists($node->key, $knownKeys)) {
                 throw ExpressionSyntaxException::unknownFieldReference($node->key, $fieldKey);
+            }
+
+            return;
+        }
+
+        if ($node instanceof RowCellReferenceNode) {
+            if (! $rowScope) {
+                throw ExpressionSyntaxException::rowReferenceOutsideGridColumn($node->column, $fieldKey);
             }
 
             return;
@@ -92,28 +105,28 @@ final class ExpressionParser
         }
 
         if ($node instanceof ComparisonNode || $node instanceof ArithmeticNode) {
-            $this->assertReferencesResolve($node->left, $knownKeys, $kind, $fieldKey);
-            $this->assertReferencesResolve($node->right, $knownKeys, $kind, $fieldKey);
+            $this->assertReferencesResolve($node->left, $knownKeys, $kind, $fieldKey, $rowScope);
+            $this->assertReferencesResolve($node->right, $knownKeys, $kind, $fieldKey, $rowScope);
 
             return;
         }
 
         if ($node instanceof LogicalNode) {
-            $this->assertReferencesResolve($node->left, $knownKeys, $kind, $fieldKey);
-            $this->assertReferencesResolve($node->right, $knownKeys, $kind, $fieldKey);
+            $this->assertReferencesResolve($node->left, $knownKeys, $kind, $fieldKey, $rowScope);
+            $this->assertReferencesResolve($node->right, $knownKeys, $kind, $fieldKey, $rowScope);
 
             return;
         }
 
         if ($node instanceof NotNode) {
-            $this->assertReferencesResolve($node->operand, $knownKeys, $kind, $fieldKey);
+            $this->assertReferencesResolve($node->operand, $knownKeys, $kind, $fieldKey, $rowScope);
 
             return;
         }
 
         if ($node instanceof FunctionCallNode) {
             foreach ($node->args as $arg) {
-                $this->assertReferencesResolve($arg, $knownKeys, $kind, $fieldKey);
+                $this->assertReferencesResolve($arg, $knownKeys, $kind, $fieldKey, $rowScope);
             }
         }
     }
@@ -134,10 +147,73 @@ final class ExpressionParser
         return array_keys($seen);
     }
 
+    /**
+     * M246: every distinct grid cell an AST names, in first-seen order — `${key.row.col}` and `${key.row}`. Each key is
+     * also in {@see referencedKeys()}, so what depends on what (calculation order, renames, the step graph) is unchanged.
+     *
+     * @return list<CellReferenceNode>
+     */
+    public function referencedCells(Node $node): array
+    {
+        /** @var array<string, CellReferenceNode> $cells */
+        $cells = [];
+        $this->walk($node, static function (Node $n) use (&$cells): void {
+            if ($n instanceof CellReferenceNode) {
+                $cells[$n->path()] ??= $n;
+            }
+        });
+
+        return array_values($cells);
+    }
+
+    /**
+     * M246: every distinct column a row-relative `${.col}` names, in first-seen order.
+     *
+     * @return list<string>
+     */
+    public function referencedRowColumns(Node $node): array
+    {
+        /** @var list<string> $columns */
+        $columns = [];
+        $this->walk($node, static function (Node $n) use (&$columns): void {
+            if ($n instanceof RowCellReferenceNode && ! in_array($n->column, $columns, true)) {
+                $columns[] = $n->column;
+            }
+        });
+
+        return $columns;
+    }
+
+    /** @param  callable(Node): void  $visit */
+    private function walk(Node $node, callable $visit): void
+    {
+        $visit($node);
+
+        if ($node instanceof ComparisonNode || $node instanceof ArithmeticNode || $node instanceof LogicalNode) {
+            $this->walk($node->left, $visit);
+            $this->walk($node->right, $visit);
+
+            return;
+        }
+
+        if ($node instanceof NotNode) {
+            $this->walk($node->operand, $visit);
+
+            return;
+        }
+
+        if ($node instanceof FunctionCallNode) {
+            foreach ($node->args as $arg) {
+                $this->walk($arg, $visit);
+            }
+        }
+    }
+
     /** @param  array<string, true>  $seen */
     private function collectReferences(Node $node, array &$seen): void
     {
-        if ($node instanceof FieldReferenceNode) {
+        // M246: a cell names its grid's key, so everything keyed on what an expression depends on sees the grid.
+        if ($node instanceof FieldReferenceNode || $node instanceof CellReferenceNode) {
             $seen[$node->key] = true;
 
             return;
@@ -358,6 +434,20 @@ final class ExpressionParser
             $this->advance();
 
             return new FieldReferenceNode($token->lexeme);
+        }
+
+        // M246: `key.row.col` / `key.row` — the lexer has already proved the shape, so the split cannot misread.
+        if ($token->type === TokenType::CellRef) {
+            $this->advance();
+            $parts = explode('.', $token->lexeme);
+
+            return new CellReferenceNode($parts[0], $parts[1] ?? '', $parts[2] ?? null);
+        }
+
+        if ($token->type === TokenType::RowCellRef) {
+            $this->advance();
+
+            return new RowCellReferenceNode(substr($token->lexeme, 1));
         }
 
         if ($token->type === TokenType::SelfRef) {

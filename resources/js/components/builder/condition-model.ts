@@ -59,7 +59,7 @@ export type Condition =
 
 /** Why a `Condition` could not be printed. Every arm is a real limit of grammar v2.0, not a policy. */
 export type SerializeRefusal =
-    /** The value contains BOTH `'` and `"`, and the lexer has no escape sequences (`lexer.ts:151`). */
+    /** The value contains BOTH `'` and `"`, and the lexer has no escape sequences (`lexer.ts`'s `lexString`). */
     | { reason: 'quotes'; value: string }
     /** Not finite, or its shortest decimal form needs exponent notation — which `lexNumber` cannot read. */
     | { reason: 'number'; value: number }

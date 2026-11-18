@@ -25,6 +25,23 @@ const isAlnum = (c: string): boolean => isAlpha(c) || isDigit(c);
 
 const byteLength = (s: string): number => new TextEncoder().encode(s).length;
 
+/**
+ * M246: one path segment starting at `at` — `[A-Za-z0-9_][A-Za-z0-9_-]*`, ASCII only. Returns the index just past it,
+ * or null when no segment starts there. Mirrors `ExpressionLexer::segmentEnd()`; the template parser reads it too.
+ */
+export function segmentEnd(source: string, length: number, at: number): number | null {
+    if (at >= length || !(isAlnum(source[at]) || source[at] === '_')) {
+        return null;
+    }
+
+    let j = at + 1;
+    while (j < length && (isAlnum(source[j]) || source[j] === '_' || source[j] === '-')) {
+        j++;
+    }
+
+    return j;
+}
+
 export class ExpressionLexer {
     tokenize(source: string): Token[] {
         if (byteLength(source) > MAX_EXPRESSION_LENGTH) {
@@ -168,6 +185,10 @@ export class ExpressionLexer {
         return { type: 'string', lexeme: value, position: start };
     }
 
+    /**
+     * `${key}` → field_ref; M246 adds `${key.row}` / `${key.row.col}` → cell_ref and `${.col}` → row_cell_ref, the
+     * lexeme being the whole text inside the braces. Mirrors `ExpressionLexer::lexReference()` byte for byte.
+     */
     private lexReference(source: string, length: number, state: { i: number }): Token {
         const start = state.i;
 
@@ -178,6 +199,17 @@ export class ExpressionLexer {
         const keyStart = state.i + 2;
         let j = keyStart;
 
+        // `${.col}` — a row-relative cell: exactly one segment after the dot.
+        if (j < length && source[j] === '.') {
+            const end = segmentEnd(source, length, j + 1);
+            if (end === null || end >= length || source[end] !== '}') {
+                throw ExpressionSyntaxError.malformedReference(this.rawReference(source, length, start));
+            }
+            state.i = end + 1;
+
+            return { type: 'row_cell_ref', lexeme: source.slice(keyStart, end), position: start };
+        }
+
         if (j >= length || !(isAlpha(source[j]) || source[j] === '_')) {
             throw ExpressionSyntaxError.malformedReference(this.rawReference(source, length, start));
         }
@@ -187,14 +219,25 @@ export class ExpressionLexer {
             j++;
         }
 
+        // At most two `.segment` parts after the key.
+        let segments = 0;
+        while (j < length && source[j] === '.' && segments < 2) {
+            const end = segmentEnd(source, length, j + 1);
+            if (end === null) {
+                throw ExpressionSyntaxError.malformedReference(this.rawReference(source, length, start));
+            }
+            j = end;
+            segments++;
+        }
+
         if (j >= length || source[j] !== '}') {
             throw ExpressionSyntaxError.malformedReference(this.rawReference(source, length, start));
         }
 
-        const key = source.slice(keyStart, j);
+        const text = source.slice(keyStart, j);
         state.i = j + 1; // past the closing brace
 
-        return { type: 'field_ref', lexeme: key, position: start };
+        return { type: segments === 0 ? 'field_ref' : 'cell_ref', lexeme: text, position: start };
     }
 
     private lexWord(source: string, length: number, state: { i: number }): Token {

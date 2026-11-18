@@ -19,6 +19,11 @@ it("retains complete rows, zeros, source context, selection and geometry indepen
   expect(result.selection).toEqual(choice);
   expect(result.indicator.period).toBe("September 2026");
   expect(result.source).toMatchObject({ title: data.source, date: data.date, license: data.license });
+  expect(result.geography.credit).toMatchObject({
+    attribution: expect.stringContaining("NAMRIA and PSA via OCHA COD-AB"),
+    license: "CC BY 3.0 IGO",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0/igo/",
+  });
   expect(result.legend.method).toBe("quantiles-relative-to-displayed-areas");
 });
 it("does not manufacture rates at navigation-only levels", () => {

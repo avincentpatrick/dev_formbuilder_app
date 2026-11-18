@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { missingCebuShapes } from "./helpers/missing-cebu-shapes";
 async function fixture(page: Page, empty = false) {
+  await missingCebuShapes(page);
   await page.route("**/api/dataset-map?**", (route) =>
     route.fulfill({
       json: {

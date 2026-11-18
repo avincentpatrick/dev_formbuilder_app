@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { missingCebuShapes } from "./helpers/missing-cebu-shapes";
 
 test("an empty boundary collection keeps the table usable and finishes loading", async ({
   page,
@@ -107,6 +108,7 @@ for (const width of [390, 1440]) {
 test("Region VII retains three HUCs with no shapes and scopes the return link", async ({
   page,
 }) => {
+  await missingCebuShapes(page);
   await page.route("**/api/dataset-map?**", (route) =>
     route.fulfill({
       json: {

@@ -1,4 +1,5 @@
 import { classificationDescription } from "./classification";
+import { BOUNDARY_CREDIT } from "./boundary-credit";
 import {
   hasValueFilter,
   valueFilterState,
@@ -89,6 +90,7 @@ export function datasetMapExport(
       childLevel: data.childLevel,
       boundaryVersion: definition.boundaryVersion,
       asset: data.geometryUrl,
+      credit: BOUNDARY_CREDIT,
       note: "Geometry availability does not establish historical boundary acceptance.",
     },
     legend: {

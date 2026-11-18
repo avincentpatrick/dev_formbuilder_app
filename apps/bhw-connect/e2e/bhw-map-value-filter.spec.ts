@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { missingCebuShapes } from "./helpers/missing-cebu-shapes";
 const rows = [
   { code: "07012", name: "Bohol", value: 0 },
   { code: "07022", name: "Cebu", value: 100 },
@@ -7,6 +8,7 @@ const rows = [
   { code: "07313", name: "Mandaue", value: 25 },
 ];
 async function fixture(page: Page) {
+  await missingCebuShapes(page);
   await page.route("**/api/dataset-map?**", (route) =>
     route.fulfill({
       json: {

@@ -330,3 +330,12 @@ The next engineering fix retains the canvas/data when switching map views;
 see [BHW_MAP_VIEW_REUSE.md](BHW_MAP_VIEW_REUSE.md). Physical VoiceOver evaluation,
 representative-reader interpretation, performance acceptance and the named data
 prerequisites remain open.
+
+
+## Cold-map follow-up — 18 November 2026
+
+The next bounded engineering increment starts the existing national boundary
+download from the dedicated map page's initial response. See
+[BHW_MAP_STARTUP.md](BHW_MAP_STARTUP.md) for alternating cold/warm measurements,
+request reuse and limitations. Median improvement does not waive the observed
+cold-budget miss or the physical-reader/data prerequisites above.

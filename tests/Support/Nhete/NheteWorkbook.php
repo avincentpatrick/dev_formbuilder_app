@@ -184,26 +184,71 @@ final class NheteWorkbook
     {
         $out = [];
         foreach ($content as $block) {
-            $spans = fn (): string => implode('', array_map(static function (array $s) use ($markdown): string {
-                $t = (string) $s['text'];
-                if (! $markdown) {
-                    return $t;
-                }
-                if (isset($s['link'])) {
-                    return "[{$t}]({$s['link']})";
-                }
-
-                return ($s['bold'] ?? false) ? "**{$t}**" : $t;
-            }, $block['spans'] ?? []));
-            $out[] = match ($block['type']) {
-                'heading' => $markdown ? str_repeat('#', (int) $block['level']).' '.$block['text'] : (string) $block['text'],
-                'paragraph', 'callout' => $spans(),
-                'image' => (string) $block['alt'],
-                default => '',
-            };
+            array_push($out, ...$this->blockTexts($block, $markdown));
         }
 
         return implode($markdown ? "\n\n" : "\n", array_filter($out, static fn (string $s): bool => $s !== ''));
+    }
+
+    /**
+     * One block's pieces of note text. M245: a list is one piece per item, each starting "• ", and a details block is
+     * its summary as a level-2 heading over its own blocks — exactly the pieces the plan wrote before lists and details
+     * existed, so neither workbook's bytes move for them.
+     *
+     * @param  array<string, mixed>  $block
+     * @return list<string>
+     */
+    private function blockTexts(array $block, bool $markdown): array
+    {
+        return match ($block['type']) {
+            'heading' => [$markdown ? str_repeat('#', (int) $block['level']).' '.$block['text'] : (string) $block['text']],
+            'paragraph', 'callout' => [$this->spanText($block['spans'] ?? [], $markdown)],
+            'image' => [(string) $block['alt']],
+            'list' => array_map(fn (array $item): string => $this->spanText([['text' => '• '], ...$item['spans']], $markdown), $block['items']),
+            'details' => [
+                ...$this->blockTexts(['type' => 'heading', 'level' => 2, 'text' => $block['summary']], $markdown),
+                ...array_merge(...array_map(fn (array $inner): array => $this->blockTexts($inner, $markdown), $block['blocks'] ?: [[]])),
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * A run of spans as text, or as markdown. A glossary word is its text, and spans with the same bold and link merge
+     * around a glossary word first, so a bold phrase holding one is written `**…**` once, as it was before words were marked.
+     *
+     * @param  list<array<string, mixed>>  $spans
+     */
+    private function spanText(array $spans, bool $markdown): string
+    {
+        $runs = [];
+        $afterTerm = false;
+        foreach ($spans as $s) {
+            $bold = (bool) ($s['bold'] ?? false);
+            $link = $s['link'] ?? null;
+            $term = isset($s['term']);
+            $last = array_key_last($runs);
+            // Only around a glossary word: two bold spans the plan always wrote apart stay apart.
+            if ($last !== null && ($term || $afterTerm) && $runs[$last]['bold'] === $bold && $runs[$last]['link'] === $link) {
+                $runs[$last]['text'] .= (string) $s['text'];
+                $afterTerm = $term;
+
+                continue;
+            }
+            $runs[] = ['text' => (string) $s['text'], 'bold' => $bold, 'link' => $link];
+            $afterTerm = $term;
+        }
+
+        return implode('', array_map(static function (array $r) use ($markdown): string {
+            if (! $markdown) {
+                return $r['text'];
+            }
+            if ($r['link'] !== null) {
+                return "[{$r['text']}]({$r['link']})";
+            }
+
+            return $r['bold'] ? "**{$r['text']}**" : $r['text'];
+        }, $runs));
     }
 
     /** @return list<string> pieces of at most `$max` characters, broken at a sentence or a space */

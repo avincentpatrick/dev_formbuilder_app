@@ -180,6 +180,33 @@ for (const theme of themes) {
 
         await forceTheme(page, theme);
         await assertClean(page, 'Before Your Visit (note content)');
+
+        // M245: a list, a details block that opens, and a glossary word whose meaning opens in a dialog and gives focus
+        // back to the word; then the Glossary button's whole list. Each state is scanned.
+        await expect(page.locator('[data-note-content] ul > li')).toHaveText(['Your clinic card', 'A list of the medicines you take']);
+        const toggle = page.getByRole('button', { name: 'Why we ask you to fast' });
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await expect(page.getByText('Food changes what a blood test measures')).toBeHidden();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        await expect(page.getByText('Food changes what a blood test measures')).toBeVisible();
+        await assertClean(page, 'Before Your Visit (details open)');
+
+        const word = page.locator('[data-glossary-term="BHW"]');
+        await word.click();
+        const meaning = page.getByRole('dialog', { name: 'BHW' });
+        await expect(meaning).toContainText('a trained volunteer who visits households');
+        await assertClean(page, 'Before Your Visit (glossary word open)');
+        await page.keyboard.press('Escape');
+        await expect(meaning).toHaveCount(0);
+        await expect(word).toBeFocused();
+
+        await page.getByRole('button', { name: 'Glossary', exact: true }).click();
+        const list = page.getByRole('dialog', { name: 'Glossary', exact: true });
+        await expect(list.locator('dt')).toHaveText(['BHW', 'Fasting']);
+        await assertClean(page, 'Before Your Visit (glossary list open)');
+        await page.keyboard.press('Escape');
+        await expect(list).toHaveCount(0);
     });
 }
 

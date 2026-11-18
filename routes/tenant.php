@@ -1210,8 +1210,10 @@ Route::middleware([
     Route::get('/forms/{form}/glossary', [FormController::class, 'indexGlossary'])
         ->middleware('can:update,form')
         ->name('forms.glossary.index');
+    // Throttled at a whole glossary (`Glossary::MAX_ENTRIES`) a minute, under its OWN key: a bare `throttle:N,1` counts
+    // every such route of the user together, so NHETE's 62 terms spent the picture upload's budget and it answered 429.
     Route::post('/forms/{form}/glossary', [FormController::class, 'storeGlossaryEntry'])
-        ->middleware(['can:update,form', 'throttle:60,1'])
+        ->middleware(['can:update,form', 'throttle:200,1,glossary'])
         ->name('forms.glossary.store');
     Route::patch('/forms/{form}/glossary/{entry}', [FormController::class, 'updateGlossaryEntry'])
         ->middleware('can:update,form')

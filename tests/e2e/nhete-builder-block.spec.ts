@@ -90,6 +90,30 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await expect(editor.locator('[data-block-type]')).toHaveCount(2);
         await settled(page);
 
+        // M245: the indicator's two items as a list, and "More about this indicator" as a details block whose paragraph
+        // marks a glossary word. The Content tab names the word until the glossary has it.
+        await blocks.getByRole('button', { name: 'List' }).click();
+        await editor.getByLabel('Items').fill('Piped water\nA protected well');
+        await blocks.getByRole('button', { name: 'Details' }).click();
+        const details = editor.locator('[data-block-type="details"]');
+        await details.getByLabel('Summary').fill('More about this indicator');
+        await details.getByRole('group', { name: 'Add inside block 4' }).getByRole('button', { name: 'Paragraph' }).click();
+        await details.getByLabel('Text', { exact: true }).fill('Counted by the [[I1]] survey.');
+        await expect(details.locator('[data-glossary-missing]')).toContainText('I1');
+        await settled(page);
+
+        // The glossary, under Form settings: the note's word now finds its term.
+        await page.getByRole('button', { name: 'Form settings' }).click();
+        const settingsDialog = page.getByRole('dialog', { name: 'Form settings' });
+        await settingsDialog.getByRole('group', { name: 'Settings section' }).getByRole('button', { name: 'Glossary', exact: true }).click();
+        await settingsDialog.locator('input[data-glossary-new-term], [data-glossary-new-term] input').fill('I1');
+        await settingsDialog.locator('textarea[data-glossary-new-definition], [data-glossary-new-definition] textarea').fill('Households with safe water.');
+        await settingsDialog.getByRole('button', { name: 'Add term' }).click();
+        await expect(settingsDialog.getByRole('status')).toHaveText('Added I1.');
+        await page.keyboard.press('Escape');
+        await expect(settingsDialog).toHaveCount(0);
+        await expect(details.locator('[data-glossary-missing]')).toHaveCount(0);
+
         // "Keep this indicator?" — three choices typed one by one.
         await add(page, 'Dropdown', 'Keep this indicator?', 'i1_keep');
         await configTab(page, 'Options');
@@ -132,6 +156,13 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         const comment = page.locator('[data-preview-field="i1_comment"]');
         await expect(keep).toBeVisible({ timeout: 15_000 });
         await expect(page.locator('[data-preview-field="i1_details"]')).toContainText('I1 · Households with safe water');
+        // M245: the list, the details block opening, and the marked word's meaning in a dialog.
+        const preview = page.locator('[data-preview-field="i1_details"]');
+        await expect(preview.locator('ul > li')).toHaveText(['Piped water', 'A protected well']);
+        await preview.getByRole('button', { name: 'More about this indicator' }).click();
+        await preview.locator('[data-glossary-term="I1"]').click();
+        await expect(page.getByRole('dialog', { name: 'I1' })).toContainText('Households with safe water.');
+        await page.keyboard.press('Escape');
         await expect(comment.locator('textarea')).toHaveCount(0);
         await keep.selectOption('change');
         await expect(comment.locator('textarea')).toBeVisible();
@@ -144,6 +175,9 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await openPreview(page);
         await expect(page.locator('[data-preview-field]')).toHaveCount(6, { timeout: 15_000 });
         await expect(page.locator('[data-preview-field="i1_keep"] option:not([value=""])')).toHaveText(KEEP_CHOICES.map(([, label]) => label));
+        // M245: the list, the details block and the glossary word were saved too.
+        await expect(page.locator('[data-preview-field="i1_details"] ul > li')).toHaveCount(2);
+        await expect(page.locator('[data-preview-field="i1_details"] [data-glossary-term="I1"]')).toHaveCount(1);
 
         // ── M240 (`builder-copy-section`, `D224`, `D225`) — the block copied whole, the way NHETE's 34 others would be ──
         // Tick its six questions and press Duplicate: the copies' keys count up (i1 → i2), and the copied comment answers

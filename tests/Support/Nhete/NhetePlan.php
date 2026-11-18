@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support\Nhete;
 
+use App\Support\Forms\Glossary;
 use JsonException;
 use RuntimeException;
 
@@ -21,9 +22,11 @@ use RuntimeException;
  *   - an agreement grid with a per-row comment → one choice question + one conditional comment per row (`per-row-grid`);
  *   - an indicator table row → a note (the row's details) + up to four dropdowns + a comment (`indicator-block`);
  *   - a parts table → a block of questions per part, shown by conditions (`parts-block`);
- *   - a tile → a level-2 heading + a paragraph (`tile`); a bullet list → paragraphs starting "• " (`bullets`);
- *   - "Research behind this" → always-open paragraphs with links (`research-open`);
- *   - a glossary word `[[term]]` → the bare word (`glossary-plain`), counted, never lost;
+ *   - a tile → a level-2 heading + a paragraph (`tile`);
+ *   - a glossary word in a grid row's wording → the bare word (`glossary-in-label`): a question's label can hold no
+ *     button, so the form's Glossary button covers it (M245, the user's choice);
+ *   - a glossary word marked in a form other than its term — a plural, a short form — → the bare word
+ *     (`glossary-shown-form`): a mark names its term by its own text until `[[shown|term]]` exists;
  *   - a word cap → a whole-answer pattern rule (`word-pattern`); "up to N" and "only answer" → expression rules;
  *   - a changing placeholder → a hidden calculation piped into the placeholder (`piped-placeholder`);
  *   - a note whose text pipes an answer → a label-only note, because note content blocks are not piped (`piped-note`).
@@ -43,6 +46,9 @@ final class NhetePlan
 
     /** @var array<string, int> how many elements stand in for each workaround */
     private array $workarounds = [];
+
+    /** @var array<string, true>|null the glossary's matching keys, built once from {@see Glossary()} */
+    private ?array $glossaryKeys = null;
 
     /** @param  array<string, mixed>|null  $fixture  the decoded fixture; null reads {@see self::FIXTURE} */
     public function __construct(?array $fixture = null)
@@ -93,6 +99,25 @@ final class NhetePlan
     public function indicators(): array
     {
         return array_values($this->fixture['indicators']);
+    }
+
+    /**
+     * The form's glossary (M245, `R-d0bbb7bb`): the fixture's 27 terms, then each of the 35 indicator codes defined by its
+     * name and definition — the module marks every code as a glossary word. Placeholder wording only (`D221`).
+     *
+     * @return list<array{term: string, definition: string}>
+     */
+    public function glossary(): array
+    {
+        $entries = [];
+        foreach ($this->fixture['glossary'] as [$term, $definition]) {
+            $entries[] = ['term' => self::plain((string) $term), 'definition' => self::plain((string) $definition)];
+        }
+        foreach ($this->fixture['indicators'] as $ind) {
+            $entries[] = ['term' => (string) $ind['code'], 'definition' => self::plain((string) $ind['name']).'. '.self::plain((string) $ind['definition'])];
+        }
+
+        return $entries;
     }
 
     /**
@@ -218,27 +243,29 @@ final class NhetePlan
     }
 
     /**
+     * M245: a real list block, where the module draws a bulleted list.
+     *
      * @param  list<string>  $items
      * @return list<array<string, mixed>>
      */
     private function bullets(array $items): array
     {
-        $this->count('bullets');
-
-        return array_map(fn (string $item): array => ['type' => 'paragraph', 'spans' => $this->spans('• '.$item)], $items);
+        return [['type' => 'list', 'style' => 'bulleted', 'items' => array_map(fn (string $item): array => ['spans' => $this->spans($item)], $items)]];
     }
 
     /**
      * @param  list<array{0: string, 1: string, 2: string, 3: ?string}>  $entries
      * @return list<array<string, mixed>>
      */
-    private function research(array $entries, string $title): array
+    private function research(array $entries, string $title, bool $collapsed = true): array
     {
         if ($entries === []) {
             return [];
         }
-        $this->count('research-open');
-        $blocks = [['type' => 'heading', 'level' => 2, 'text' => $title]];
+        // M245: on a screen, "Research behind this" is a details block, collapsed as the module draws it. Inside an
+        // indicator it is already inside "More about this indicator", and a details block cannot hold another, so there
+        // it stays a heading over its paragraphs.
+        $blocks = $collapsed ? [] : [['type' => 'heading', 'level' => 2, 'text' => $title]];
         foreach ($entries as [$stance, $kind, $summary, $doi]) {
             $spans = [['text' => "{$stance} · {$kind}. ", 'bold' => true], ...$this->spans($summary)];
             if ($doi !== null) {
@@ -248,26 +275,57 @@ final class NhetePlan
             $blocks[] = ['type' => 'paragraph', 'spans' => $spans];
         }
 
-        return $blocks;
+        return $collapsed ? [['type' => 'details', 'summary' => $title, 'blocks' => $blocks]] : $blocks;
     }
 
     /**
-     * `**bold**` becomes a bold span; `[[term]]` becomes the bare word (no glossary yet), counted.
+     * `**bold**` becomes a bold span; `[[term]]` becomes a glossary word (M245) when the glossary has that term, and the
+     * bare word otherwise (`glossary-shown-form`), counted, never lost.
      *
      * @return list<array<string, mixed>>
      */
     private function spans(string $text): array
     {
-        $this->countGlossary($text);
-        $text = self::unwrapGlossary($text);
         $spans = [];
         foreach (preg_split('/(\*\*[^*]+\*\*)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $piece) {
-            $spans[] = str_starts_with($piece, '**') && str_ends_with($piece, '**') && mb_strlen($piece) > 4
-                ? ['text' => mb_substr($piece, 2, -2), 'bold' => true]
-                : ['text' => $piece];
+            $bold = str_starts_with($piece, '**') && str_ends_with($piece, '**') && mb_strlen($piece) > 4;
+            array_push($spans, ...$this->termSpans($bold ? mb_substr($piece, 2, -2) : $piece, $bold));
         }
 
         return $spans === [] ? [['text' => '']] : $spans;
+    }
+
+    /**
+     * One run of text split at its `[[term]]` marks.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function termSpans(string $text, bool $bold): array
+    {
+        $spans = [];
+        foreach (preg_split('/(\[\[[^\]]+\]\])/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $piece) {
+            $span = ['text' => $piece];
+            if (preg_match('/^\[\[([^\]]+)\]\]$/u', $piece, $match) === 1) {
+                $span = ['text' => $match[1]];
+                if (isset($this->glossaryKeys()[Glossary::key($match[1])])) {
+                    $span['term'] = $match[1];
+                } else {
+                    $this->count('glossary-shown-form');
+                }
+            }
+            if ($bold) {
+                $span['bold'] = true;
+            }
+            $spans[] = $span;
+        }
+
+        return $spans;
+    }
+
+    /** @return array<string, true> */
+    private function glossaryKeys(): array
+    {
+        return $this->glossaryKeys ??= array_fill_keys(array_map(static fn (array $e): string => Glossary::key($e['term']), $this->glossary()), true);
     }
 
     // ── Questions ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -320,6 +378,7 @@ final class NhetePlan
         $out = [];
         foreach ($item['rows'] as [$row, $rowLabel, $rowText]) {
             $this->count('per-row-grid');
+            $this->countLabelGlossary("{$rowLabel} {$rowText}");
             $key = "{$grid}_{$row}";
             $out[] = $this->element($key, 'single_select', self::plain("{$rowLabel} — {$item['question']}"), [
                 'hint' => self::plain((string) $rowText),
@@ -425,21 +484,22 @@ final class NhetePlan
         if ($ind['strength'] !== null) {
             $blocks[] = $labelled((string) $t['label_strength'], (string) $ind['strength']);
         }
-        // "More about this indicator" cannot collapse yet, so it is drawn open.
-        $blocks[] = ['type' => 'heading', 'level' => 2, 'text' => self::plain((string) $t['label_more'])];
-        $blocks[] = $labelled((string) $t['label_technical'], (string) $ind['technical']);
+        // M245: "More about this indicator" is a details block, collapsed as the module draws it, holding everything after it.
+        $more = [$labelled((string) $t['label_technical'], (string) $ind['technical'])];
         foreach (['formula', 'used', 'made_of'] as $k) {
             if ($ind[$k] !== null) {
-                $blocks[] = ['type' => 'paragraph', 'spans' => $this->spans((string) $ind[$k])];
+                $more[] = ['type' => 'paragraph', 'spans' => $this->spans((string) $ind[$k])];
             }
         }
         if ($ind['plain'] !== null) {
-            $blocks[] = $labelled((string) $t['label_plain'], (string) $ind['plain']);
+            $more[] = $labelled((string) $t['label_plain'], (string) $ind['plain']);
         }
-        $blocks[] = $labelled((string) $t['label_source'], (string) $ind['source']);
-        $blocks[] = ['type' => 'callout', 'tone' => 'warning', 'spans' => $this->spans((string) $ind['watch'])];
+        $more[] = $labelled((string) $t['label_source'], (string) $ind['source']);
+        $more[] = ['type' => 'callout', 'tone' => 'warning', 'spans' => $this->spans((string) $ind['watch'])];
+        array_push($more, ...$this->research($ind['research'], (string) $t['label_research'], false));
+        $blocks[] = ['type' => 'details', 'summary' => self::plain((string) $t['label_more']), 'blocks' => $more];
 
-        return [...$blocks, ...$this->research($ind['research'], (string) $t['label_research'])];
+        return $blocks;
     }
 
     /** @return array{key: string, label: string, stop: string, relevant: string, elements: list<array<string, mixed>>} */
@@ -574,11 +634,12 @@ final class NhetePlan
         return str_replace("'", "\\'", self::plain($text));
     }
 
-    private function countGlossary(string $text): void
+    /** A glossary word in a question's wording stays the bare word: a label can hold no button (M245). */
+    private function countLabelGlossary(string $text): void
     {
         $n = preg_match_all('/\[\[[^\]]+\]\]/u', $text);
         if ($n > 0) {
-            $this->workarounds['glossary-plain'] = ($this->workarounds['glossary-plain'] ?? 0) + $n;
+            $this->workarounds['glossary-in-label'] = ($this->workarounds['glossary-in-label'] ?? 0) + $n;
         }
     }
 

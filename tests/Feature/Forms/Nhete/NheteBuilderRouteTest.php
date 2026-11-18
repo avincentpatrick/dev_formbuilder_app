@@ -11,7 +11,10 @@ use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Rules\ContentBlocks;
+use App\Services\Forms\BlankFormPrintRenderer;
 use App\Services\Forms\FormService;
+use App\Support\Forms\Glossary;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,6 +93,29 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
     );
     $version = FormVersion::query()->findOrFail($form->current_published_version_id);
     $report['snapshot_bytes'] = strlen((string) json_encode($version->schema_snapshot));
+
+    // M245 (`R-93e22765`, `R-d0bbb7bb`, the lists half of the rich-text item): NHETE's own layout. Its 3 lists are lists,
+    // its 9 research panels and 35 "More about this indicator" sections are collapsed details blocks, and 113 of its 115
+    // marked words open their meaning — publish has just checked each against the 62-term glossary. The other 2 are a
+    // plural and a short form of a term (`glossary-shown-form`), and 12 sit in grid rows' wording (`glossary-in-label`).
+    $notes = array_values(array_filter((array) $version->schema_snapshot['fields'], static fn (array $f): bool => $f['field_type'] === 'note'));
+    $walked = array_merge(...array_map(static fn (array $f): array => ContentBlocks::walk($f['config']['content'] ?? null), $notes));
+    $marks = array_merge(...array_map(static fn (array $f): array => ContentBlocks::termMarks($f['config']['content'] ?? null), $notes));
+    $report['faithful'] = [
+        'glossary' => count(Glossary::fromSnapshot($version->schema_snapshot)),
+        'lists' => count(array_filter($walked, static fn (array $w): bool => $w['block']['type'] === 'list')),
+        'details' => count(array_filter($walked, static fn (array $w): bool => $w['block']['type'] === 'details')),
+        'glossary_words' => count($marks),
+    ];
+    expect($report['faithful'])->toBe(['glossary' => 62, 'lists' => 3, 'details' => 44, 'glossary_words' => 113])
+        ->and($report['workarounds'])->not->toHaveKeys(['bullets', 'research-open', 'glossary-plain'])
+        ->and($report['workarounds'])->toMatchArray(['glossary-in-label' => 12, 'glossary-shown-form' => 2]);
+
+    // On paper (`R-c083b711`): the notes print their content, every "More about this indicator" open, and the glossary.
+    $printed = app(BlankFormPrintRenderer::class)->html($form, $version);
+    expect(substr_count($printed, '<p class="nc-summary">'.e(NhetePlan::plain((string) $plan->fixture()['texts']['label_more'])).'</p>'))->toBe(35)
+        ->and($printed)->toContain('<h2 class="gloss__title">Glossary</h2>')
+        ->and($printed)->toContain(e($plan->glossary()[0]['definition']));
 
     // ── 3. Open it to guests, with the module's thank-you text ──────────────────────────────────────────────
     $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/share", [
@@ -304,4 +330,18 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         ->and($report['export_reimport']['full_response'])->toBe(422)
         ->and(array_column($report['export_reimport']['full_response_refused_on'], 'field'))
         ->toEqualCanonicalizing(array_values(array_diff($conditional, $answeredComments)));
+
+    // ── 7. A term a note marks is removed from the next draft's glossary: publish refuses, naming the word ──────────
+    enterTenant($tenant->id, $admin->id);
+    $form = Form::query()->findOrFail($form->id);
+    $word = $marks[0]['term'];
+    $entry = collect($this->actingAs($admin)->getJson("{$host}/forms/{$form->id}/glossary")->assertOk()->json('data'))
+        ->first(static fn (array $e): bool => Glossary::key($e['term']) === Glossary::key($word));
+    $this->actingAs($admin)->deleteJson("{$host}/forms/{$form->id}/glossary/{$entry['id']}")->assertNoContent();
+    $this->actingAs($admin)->post("{$host}/forms/{$form->id}/publish");
+    enterTenant($tenant->id, $admin->id);
+
+    expect(Form::query()->findOrFail($form->id)->current_published_version_id)->toBe($version->id)
+        ->and(json_encode(session('toast') ?? session('errors')?->getBag('default')->toArray(), JSON_UNESCAPED_UNICODE))
+        ->toContain('glossary word “'.$word.'” is not in this form’s glossary');
 })->group('nhete');

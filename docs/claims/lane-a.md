@@ -16,7 +16,61 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M245`, `note-details-block`, `form-glossary`, the lists half of the rich-text table item, and `R-c083b711`: a note gains bullet and numbered lists, a "details" section collapsed by default, and glossary words that open their meaning; a form gains a glossary; paper and PDF print a note's content and end with the glossary (m245-note-lists-details-glossary)
+## Status: ACTIVE CLAIM — `M246`, `grid-question-table` and `R-ffd10da2`: a grid becomes a real question table — a row shown only when an answer calls for it, a cell "Not needed" or required only when its row says so, a column shown only when an answer calls for it, a long-text column, details under a row's label — and conditions, calculations and piped text can read a grid's cell (m246-grid-question-table)
+
+Taken 2026-11-18, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`). NHETE recommendation 5a, the NHETE plan's next item after `M245` (`~/.claude/plans/this-is-a-working-composed-ripple.md`); 5b (`grid-wide-sticky-explorer`) is not taken.
+Branch `m246-grid-question-table`, cut from origin/main at `0b80093f`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.25.0 (a feature) with its release notes.** `M242` (#545, 0.21.1), `M243` (#568, 0.22.0), `M244` (#580, 0.23.0) and `M245` (#589, 0.24.0) are held too; at the merge point they go first, and this branch then takes the trunk and keeps 0.25.0 on top. Held green for a merge point on the user's word (`D137`).
+Rows (two, one increment by `D13`'s file-overlap rule — both change the two expression lexers and the publish gate):
+- `grid-question-table` (`R-8410b419`), *"A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details."*, with the long-text column it names.
+- `R-ffd10da2`, *"A condition, a calculation or answer piping cannot read a grid cell."*
+
+The user's answers in planning (2026-11-18), recorded on this branch as `D230` (`D227` is #545's, `D228` #580's, `D229` #589's):
+- **A rule elsewhere in the form may read only an always-asked cell** — its row has no show-when, its column has no show-when and no needed-when, and its row does not mark it not needed. A column's own rules read any cell to its left in the same row (`${.col}`); piped text may name any cell.
+- **NHETE's parts become one table per indicator**, shown when that indicator is kept and headed by its name; row show-when is then tested by the showcase form, not by NHETE.
+
+### Evidence verified
+- `R-8410b419`, *"`ExpressionValidationGate` refuses a grid as a condition operand"*: **held** — `$objectValuedKeys` maps every `isComposite()` key to `grid` and `check()` throws `expressionReferencesComposite`. *"`MatrixColumns::TYPES` has no long text"*: **held** (six types). *"A grid's required flag is per column"*: **held**, or whole-grid (`processMatrix`). *"A row is a value and a plain label of at most 500 characters"*: **held** (`UpdateFieldRequest`'s matrix arm, `rows.*.label` `max:500`).
+- `R-ffd10da2`, *"`docs/data-dictionary.md:383` records that no expression may reference a grid"*: **moved** — the sentence is in the G4b block's publish-integrity bullet three lines below. *"`app/Enums/PipingEligibility.php:110` excludes it from piping"*: **held**. *"`resources/js/components/help/manual.ts:1126` tells authors so"*: **moved** — the sentence is now near line 1283 (a citation the row should not have carried; fixed by naming the sentence).
+
+### Premise verified
+- *"Grid cells as operands … is `R-ffd10da2`"* (the two rows are separate): **true but not separable** — both remedies edit both lexers, the template parser and `ExpressionValidationGate`, so `D13` takes them together.
+- The rows assume a cell can be named `${grid.row.column}`: **only for some rows.** Row and column values are any string ≤255 characters, and `GridOptionList` lets an author type "Row 1". A name segment is `[A-Za-z0-9_][A-Za-z0-9_-]*`; anything else cannot be named, and publish says so by name.
+- The rows assume a grid's rows are the author's: **false for M185's sourced rows.** A grid whose rows come from a list or another form holds `rows: []` in the draft, publish replaces them wholesale (`GridSources`), and the next draft wipes them, so per-row settings have nowhere to live and an outside cell reference could dangle after a republish. Both are refused for sourced rows; `${.col}` still works.
+- `RepeatTable::TYPES` is **its own list**, not derived from `MatrixColumns::TYPES`; only `RepeatTableTest`'s subset assertion ties them, and adding `long_text` turns it red by design (long text keeps a repeat as cards).
+- A path carried on `FieldReferenceNode` would **corrupt on save**: `condition-model.ts`'s `operandOf` and `sameOperand` read only the key, and `calculation-presets.ts` re-emits `ref(key)`, so `${g.r.c}` would round-trip to `${g}` with the self-check passing. New token and node types make every unaware reader fail safe instead.
+- XLSForm export **copies expressions verbatim** and `emitMatrix`/`emitLikertMatrix` write no `relevant`: a grid's own show-when is already dropped, and Likert rows carry no `required`.
+- A server 422 at `grid.row.col` is **never shown**: `useFormRuntime`'s `errorFor()` reads only the grid's key.
+- There is **no schema/engine version handshake**: a respondent's cached old page given a new form ignores the new rules and its lexer stops on `${g.r.c}` (`safeEvaluate` falls back to everything relevant). The server still refuses a bad answer, and with this branch shows it on the cell. Filed as its own row.
+- `KeyRenameCarrier` exists only on #545; this branch gives it one list of expression sites to read at the merge.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections:**
+1. A cell reference is a new token and node (`CellReferenceNode`, `RowCellReferenceNode`; TS `cell`/`row_cell`), its lexeme the whole reference, so renames splice `${new.r.c}` and every unaware reader fails safe.
+2. Masks are computed in `processComposites` over the settled context, not inside `settleRelevance`: with `D230`'s always-asked rule nothing outside a grid can read a masked cell, so the fixed point, its bound and H21a's tightening are untouched and the engines cannot drift.
+3. One list of expression sites (`ExpressionSites`) so section copy, the census, the step graph, the logic rail and #545's carrier see a grid's own rules.
+4. Sourced rows refuse per-row settings and outside references; unnameable values are refused by name.
+5. Row details are content blocks with no pictures (guest images are served for notes only), capped in blocks and characters.
+6. Each cell shows its own error, once left or on Next/Submit.
+
+Files:
+- **Engine (PHP):** `app/Services/Expressions/` `ExpressionLexer.php`, `ExpressionParser.php`, `ExpressionEvaluator.php`, `ExpressionKeyRewriter.php`, `TokenType.php` (or its token enum), new `Ast/CellReferenceNode.php`, `Ast/RowCellReferenceNode.php`; `app/Services/Templates/` `TemplateParser.php`, `TemplateRenderer.php`, `TemplateScopeResolver.php`, `TemplateValidationGate.php`; `app/Services/Validation/` `SemanticValidator.php`, `SemanticResult.php`, `PrunedAnswerReport.php` (wherever it lives).
+- **Forms (PHP):** `app/Support/Forms/` `MatrixColumns.php`, new `ExpressionSites.php`, `FieldTypeConversion.php`, `FieldReadiness.php`; `app/Services/Forms/` `ExpressionValidationGate.php`, `ExpressionOperandJudge.php`, `ExpressionKeyUse.php`, `StructuralValidationGate.php`, `ConversionCensus.php`, `KeyReferenceRewriter.php`, `StepGraphInspector.php`, `BlueprintValidator.php`, `BuilderPresenter.php`, `BlankFormPrintPresenter.php`; `app/Enums/` `OperandKind.php`, `PipingEligibility.php`; `app/Rules/ContentBlocks.php`; `app/Http/Requests/Forms/UpdateFieldRequest.php`; `app/Exceptions/PublishValidationException.php`; `app/Services/Submissions/` `StructuralAnswerNormalizer.php`, `EncodeFormPresenter.php`; `app/Services/Automations/AutomationCondition.php`; `app/Services/Xlsform/XlsformExporter.php`; `resources/views/pdf/blank-form.blade.php`.
+- **Engine (TS):** `resources/public-runtime/engine/` `lexer.ts`, `parser.ts`, `ast.ts`, `evaluator.ts`, `template.ts`, `template-renderer.ts`, `semantic-validator.ts`, `schema.ts`, `index.ts`.
+- **Front end:** `resources/public-runtime/` `lib/schema-mapping.ts`, `lib/types.ts`, `composables/useFormRuntime.ts`, `components/FieldControl.vue`; `resources/js/components/submissions/` `MatrixGrid.vue`, `FieldInput.vue`; `resources/js/components/builder/` `MatrixEditor.vue`, `LikertMatrixEditor.vue`, `GridOptionList.vue`, `ConfigPanel.vue`, `ConditionRow.vue`, `ConditionRows.vue`, `ConditionEditor.vue`, `condition-model.ts`, `condition-operands.ts`, `condition-describer.ts`, `reference-candidates.ts`, `calculation-presets.ts`, `CalculationEditor.vue`, `logic-rail.ts`, `ContentBlocksEditor.vue`, `preview-grid-authoring.ts`, `draft-snapshot.ts`, `types.ts`, new `expression-sites.ts`; `resources/js/components/help/` `manual.ts`, `field-readiness.json`.
+- **Tests:** the unit, feature and Vitest files beside each of the above; `tests/golden/expressions/` (new `cells.json`, `parse-errors.json`, `manifest.json`), `tests/golden/templates/` (`holes.json`, `manifest.json`), `tests/golden/validation/` (new `grid_rules.json`, `manifest.json`); `tests/fixtures/condition-serializer.json`; `tests/Unit/Forms/RepeatTableTest.php`; `tests/Support/Nhete/` (`NhetePlan.php`, `NheteBuilderDriver.php`, `NheteAnswers.php`); `tests/Feature/Forms/Nhete/` (`NheteBuilderRouteTest.php`, `NheteCopyEquivalenceTest.php`, new `NheteLayoutEquivalenceTest.php`); `database/seeders/E2eSeeder.php`; `tests/e2e/` `public-runtime-axe.spec.ts`, `nhete-builder-block.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/data-dictionary.md`, `docs/piping-output-encoding-design.md`, `docs/xlsform-interop-spec.md`, the expression grammar spec, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D230`), `PROGRESS.md` (own block only), `docs/gate-baselines.md` at close-out.
+
+Shared artefacts taken: `docs/**` above, the two `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only). `openapi.json` is not expected to move (`version.schema` is an open object, and no route is added); if it does, it is taken here.
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `D230`. No migration (every new setting is `form_fields.config` jsonb), no ADR.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the grid editor's controls and the readiness table.
+- NHETE's table layout publishes, takes the default answers, and refuses the same ten things at their cell addresses; both workbooks stay byte-identical.
+- The one most likely wrong: that the builder's existing condition and reference pickers take grid → row → column without a new component. Also at risk: axe `target-size` and the 375 px card layout with a long-text cell.
+
+## HELD — `M245`, `note-details-block`, `form-glossary`, the lists half of the rich-text table item, and `R-c083b711`: a note gains bullet and numbered lists, a "details" section collapsed by default, and glossary words that open their meaning; a form gains a glossary; paper and PDF print a note's content and end with the glossary (m245-note-lists-details-glossary) — BUILT AND HELD: PR #589, CI 44236514591 every job green with real step counts
 
 Taken 2026-11-18, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-4-rustling-ocean.md`). NHETE recommendation 4, note content and glossary, the NHETE plan's next item after `M244` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m245-note-lists-details-glossary`, cut from origin/main at `e3e1a4a7`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.24.0 (a feature) with its release notes.** `M242` (#545, 0.21.1), `M243` (#568, 0.22.0) and `M244` (#580, 0.23.0) are held too; at the merge point they go first, and this branch takes the trunk and keeps 0.24.0 on top. Held green for a merge point on the user's word (`D137`).

@@ -155,9 +155,9 @@ the preceding interaction edits. Filter timings measure browser-dispatched Apply
 to the empty-range message plus an animation frame (minimum 1900; synthetic
 counts 100–1800). Classification follows a switch to choropleth and measures
 Apply to the effective custom 25/50 legend plus a frame. These are UI response
-measurements, not final GPU paint. The hidden map's ready marker can precede the
-new renderer's work after switching view, so this classification sample includes
-possible competition with that work; it is not an isolated classification cost.
+measurements, not final GPU paint. Switching view also replaced the renderer in
+this build, so the classification sample includes possible competition with that
+work; it is not an isolated classification cost.
 
 Both builds met 10,000/6,000 ms cold/warm map targets locally. Cold medians were
 7,874/7,670 ms, while warm medians were 3,292/3,917 ms: this does **not** establish

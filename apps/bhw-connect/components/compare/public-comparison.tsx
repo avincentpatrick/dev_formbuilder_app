@@ -12,6 +12,8 @@ import { formatValue } from "@/components/catalog/presentation";
 import { SourceDates } from "@/components/catalog/catalog-results";
 import { BenchmarkBars } from "@/components/place/benchmark";
 import { PublicCompareControls } from "./public-controls";
+import { TrainingHeatmap } from "./training-heatmap";
+import { trainingComparisonRows } from "@/lib/bhw/training-comparison";
 
 export async function PublicComparison({
   params,
@@ -108,7 +110,19 @@ export async function PublicComparison({
       />
       {rows.length > 0 && (
         <>
-          <h2 className="text-xl font-semibold">{spec.label}</h2>
+          {spec.id.startsWith("bhw.training.") && (
+            <TrainingHeatmap
+              key={codes.join(",")}
+              rows={trainingComparisonRows(data.map(({ dataset }) => dataset))}
+              places={places}
+              measure={spec.id}
+              focus={focus}
+              mapState={mapState}
+            />
+          )}
+          <h2 id="comparison-measure" className="scroll-mt-20 text-xl font-semibold">
+            {spec.label}
+          </h2>
           <p>{measureDefinition(rows[0].indicator)}</p>
           {!spec.categoryColumn && (
             <BenchmarkBars

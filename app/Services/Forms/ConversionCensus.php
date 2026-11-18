@@ -20,6 +20,7 @@ use App\Services\Expressions\ExpressionParser;
 use App\Services\Expressions\StructuredRuleLowering;
 use App\Services\Templates\TemplateParser;
 use App\Support\Forms\FieldTypeConversion;
+use App\Support\Forms\GridRules;
 
 /**
  * What converting one field does to the REST of its draft (Increment M122) — the cross-field half of a
@@ -97,6 +98,11 @@ final class ConversionCensus
         foreach ($fields as $other) {
             $uses[] = $this->expressionUse('relevance', $other->key, $other->relevant_expression, $key, false, $typeByKey);
             $uses[] = $this->expressionUse('formula', $other->key, $this->formulaOf($other), $key, false, $typeByKey);
+
+            // M246: a grid's own rules — a row's or column's condition — are uses of the keys they name.
+            foreach (GridRules::sites($other->field_type, $other->config) as $site) {
+                $uses[] = $this->expressionUse('grid_rule', $other->key, $site['expression'], $key, false, $typeByKey);
+            }
 
             if ($other->id !== $field->id) {
                 $uses[] = $this->templateUse($other->key, [

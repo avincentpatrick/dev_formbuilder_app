@@ -283,3 +283,19 @@ it('blames the change only for what it breaks: silent beside a text question, on
 
     expect(conversionCensusOf($this->census, $this->form, $visit, FieldType::Time))->toBe([]);
 });
+
+// ── M246: a grid's own rules ────────────────────────────────────────────────────────────────────────────
+
+it('reports a grid row or column condition that names a question which becomes a note', function (): void {
+    $age = addFormField($this->draft, $this->user, 'age', FieldType::Integer, 1);
+    addFormField($this->draft, $this->user, 'svc', FieldType::Matrix, 2, ['config' => [
+        'rows' => [['value' => 'r1', 'label' => 'One', 'relevant' => '${age} < 18']],
+        'columns' => [['value' => 'c1', 'label' => 'C1'], ['value' => 'c2', 'label' => 'C2', 'needed_when' => '${.c1} = \'x\' and ${age} > 3']],
+        'cells' => [['value' => 'x', 'label' => 'X']],
+    ]]);
+
+    // One entry per (code, site, key): both of the grid's rules are the same site on the same question.
+    expect(conversionCensusOf($this->census, $this->form, $age, FieldType::Note))->toBe([
+        'reference_has_no_answer@grid_rule:svc',
+    ]);
+});

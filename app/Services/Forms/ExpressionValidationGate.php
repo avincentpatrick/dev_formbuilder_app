@@ -263,6 +263,11 @@ final class ExpressionValidationGate
             $keyById[$field->id] = $field->key;
             $sites[] = ['owner' => $field->key, 'expression' => $field->relevant_expression, 'self' => null];
             $sites[] = ['owner' => $field->key, 'expression' => $this->calculateFormula($field), 'self' => null];
+
+            // M246: a grid's own rules — read through the model, so that no import line moves a line this file is cited by.
+            foreach ($field->gridRuleSites() as $gridSite) {
+                $sites[] = ['owner' => $field->key, 'expression' => $gridSite['expression'], 'self' => null];
+            }
         }
 
         foreach ($sections as $section) {

@@ -2193,7 +2193,7 @@ export interface ConversionWarningItem {
     message: string;
 }
 
-/** `site` is one of `relevance`, `section_relevance`, `formula`, `constraint`, `rule`, `template`. */
+/** `site` is one of `relevance`, `section_relevance`, `formula`, `constraint`, `rule`, `grid_rule` (M246), `template`. */
 export interface ConversionCensusEntry {
     code: string;
     site: string;

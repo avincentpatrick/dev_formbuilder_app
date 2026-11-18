@@ -112,3 +112,66 @@ recorded here, not attempted. Do not retry request overlap without a change in w
 transferred. The probe now accepts `MEASURE_STUB_API=<ms>` for a machine with no database and
 `MEASURE_CHROMIUM=<path>` for a pre-installed browser; the report states when the API was
 stubbed. Production hosting and real-handset checks remain outstanding.
+
+## Phase 1 follow-up — 18 November 2026
+
+The current live trace still showed renderer download and main-thread work on
+the cold path. It also showed both Geist Sans and Geist Mono being preloaded,
+although the map does not use monospace text. The layout now keeps the installed
+Geist Mono face, weights and fallbacks but sets `preload: false`; pages using
+monospace text can still load it on demand. The ordinary map requests only Sans,
+saving a measured 71,668-byte cold transfer (including the resource timing
+header allowance). No boundary, data, renderer, disclosure or CSP change is included.
+
+A separate trial replaced repeated coordinate-array/bounds allocation with one
+exact bounds scan. Extent regression tests passed, but alternating control/trial
+measurements did not demonstrate an end-to-end improvement, so it was reverted
+before this change. Cold medians were 7,484/7,938 ms and warm medians 3,205/3,748 ms;
+the trial's cold maximum was 9,672 ms versus control 8,123 ms. These observations
+do not prove the bounds algorithm caused the difference; they do not justify
+shipping it as a readiness fix either.
+
+The comparison uses isolated prefixed standalone builds, a synthetic HTTP proxy
+with 18 national rows and the actual committed national geometry. Browser request
+interception is not used, preserving HTTP caching. Chromium at 390×844 with touch,
+4× CPU slowdown, 150 ms latency, 1.6 Mbps down and 750 Kbps up; five fresh contexts
+per build, each cold then warm, alternating build order between pairs. No other
+local build or browser/test suite runs during measurement. Server caches are not
+reset. This shared cloud host and synthetic source are not physical-device or
+production-percentile evidence.
+
+| Build / metric | Cold observations (ms) | Warm observations (ms) |
+| --- | --- | --- |
+| Control map ready | 7750, 8427, 7874, 7744, 8686 | 3231, 3747, 3183, 3292, 3513 |
+| On-demand font map ready | 7724, 8088, 7335, 7670, 7621 | 3917, 3396, 3115, 4066, 5576 |
+| Control filter | 78.0, 126.8, 76.8, 126.0, 76.8 | 88.5, 87.5, 71.5, 76.7, 74.6 |
+| On-demand font filter | 80.9, 122.2, 72.2, 81.6, 89.4 | 135.3, 75.1, 110.5, 101.7, 78.6 |
+| Control classification | 74.3, 57.7, 41.2, 60.0, 77.6 | 54.9, 278.5, 60.9, 38.5, 71.3 |
+| On-demand font classification | 57.5, 46.8, 62.2, 72.2, 358.2 | 57.1, 51.3, 59.7, 83.7, 364.7 |
+
+Ready means navigation start to the drawable map's ready marker, initially
+circles. Warm repeats navigate to the original URL in the same context after
+the preceding interaction edits. Filter timings measure browser-dispatched Apply
+to the empty-range message plus an animation frame (minimum 1900; synthetic
+counts 100–1800). Classification follows a switch to choropleth and measures
+Apply to the effective custom 25/50 legend plus a frame. These are UI response
+measurements, not final GPU paint. The hidden map's ready marker can precede the
+new renderer's work after switching view, so this classification sample includes
+possible competition with that work; it is not an isolated classification cost.
+
+Both builds met 10,000/6,000 ms cold/warm map targets locally. Cold medians were
+7,874/7,670 ms, while warm medians were 3,292/3,917 ms: this does **not** establish
+a consistent end-to-end speedup. The demonstrated improvement is the unused
+transfer removed in every cold candidate run. Filters met 300 ms; the candidate's
+last cold and warm classifications exceeded it. Keep interaction performance
+open and investigate separately. An earlier harness attempt incorrectly waited
+for a hidden phone canvas to become visible and is excluded, not an app failure.
+
+Validation: npm ci, lint (the existing deliberate base-path-fixture warning),
+typecheck, 2,029 unit tests with 55 database-dependent skips, migration lint,
+prefixed no-data build and standalone extractor verification passed. All 15
+targeted browser cases passed: classification, count filtering, map-only values,
+PNG legends/missing-shape export and renderer loading/failure. At 390/1440 px the
+map requested one font, had no page errors/ordinary overflow, and an explicitly
+inserted monospace probe loaded the same font on demand successfully. Seeded
+database/full browser CI and deployed verification remain separate checks.

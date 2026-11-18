@@ -648,3 +648,97 @@ it('refuses arithmetic on a date inside sum() (M180)', function (): void {
 
     expect(orderingGateRefusals($this->gate, $draft))->toBe([['total', 'expression_orders_date']]);
 });
+
+
+// ── M246 (`grid-question-table`, `R-ffd10da2`): a grid's own rules, and the grid cells an expression names ──────────
+
+/** A question table with an always-asked cell (a01.keep), a conditional row, a needed-when column and a not-needed cell. */
+function gridGateDraft(object $test): FormVersion
+{
+    $form = $test->forms->create($test->tenant, $test->user, 'Survey');
+    $draft = $form->draftVersion;
+    addFormField($draft, $test->user, 'gate', FieldType::ShortText, 1);
+    addFormField($draft, $test->user, 'mx', FieldType::Matrix, 2, ['config' => [
+        'rows' => [
+            ['value' => 'a01', 'label' => 'A01'],
+            ['value' => 'b03', 'label' => 'B03', 'not_needed' => ['cut']],
+            ['value' => 'c09', 'label' => 'C09', 'relevant' => '${gate} = "yes"'],
+        ],
+        'columns' => [
+            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'short_text'],
+            ['value' => 'keep', 'label' => 'Keep', 'type' => 'short_text'],
+            ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text', 'needed_when' => '${.cut} != ""', 'required_when' => '${.keep} = "close"'],
+            ['value' => 'n', 'label' => 'N', 'type' => 'integer'],
+        ],
+        'cells' => [],
+    ]]);
+    addFormField($draft, $test->user, 'lk', FieldType::LikertMatrix, 3, ['config' => [
+        'rows' => [['value' => 'r1', 'label' => 'Clean']],
+        'columns' => [['value' => '1', 'label' => 'Low'], ['value' => '2', 'label' => 'High']],
+    ]]);
+
+    return $draft;
+}
+
+it('M246: publishes a condition, a formula and piped text that read always-asked grid cells', function (): void {
+    $draft = gridGateDraft($this);
+    addFormField($draft, $this->user, 'follow', FieldType::ShortText, 4, [
+        'label' => 'You kept ${mx.a01.keep}',
+        'relevant_expression' => '${mx.a01.keep} = "close" and ${lk.r1} > 1 and ${mx.b03.keep} != ""',
+    ]);
+    addFormField($draft, $this->user, 'double', FieldType::Calculated, 5, ['config' => ['calculated_formula' => '${mx.a01.n} * 2']]);
+
+    $published = $this->publisher->publish($draft->form->refresh(), $this->user);
+
+    expect($published->status)->toBe(FormVersionStatus::Published);
+});
+
+it('M246: refuses each cell a rule elsewhere cannot read, saying why', function (string $expression, string $why): void {
+    $draft = gridGateDraft($this);
+    addFormField($draft, $this->user, 'follow', FieldType::ShortText, 4, ['relevant_expression' => $expression]);
+
+    expect(orderingGateRefusals($this->gate, $draft))->toContain(['follow', 'grid_cell_reference_invalid'])
+        ->and(implode(' ', orderingGateMessages($this->gate, $draft)))->toContain($why);
+})->with([
+    'not a grid' => ['${gate.a.b} = "x"', '“gate” is not a grid'],
+    'unknown row' => ['${mx.z99.keep} = "x"', 'the grid has no row “z99”'],
+    'unknown column' => ['${mx.a01.nope} = "x"', 'the grid has no column “nope”'],
+    'a Grid row, not a cell' => ['${mx.a01} = "x"', 'name its row and its column'],
+    'a Likert row with a column' => ['${lk.r1.x} = "x"', 'name only the row'],
+    'a row shown only sometimes' => ['${mx.c09.keep} = "x"', 'its row is shown only sometimes'],
+    'a column not asked in every row' => ['${mx.a01.comment} = "x"', 'its column is not asked in every row'],
+    'a cell its row marks not needed' => ['${mx.b03.cut} = "x"', 'its row marks it “Not needed”'],
+]);
+
+it('M246: refuses a cell in a default value, its own grid named by full path, and this row\'s cell to the right', function (): void {
+    $draft = gridGateDraft($this);
+    addFormField($draft, $this->user, 'early', FieldType::ShortText, 4, ['default_value' => '${mx.a01.keep}', 'default_value_is_expression' => true]);
+    $grid = $draft->fields()->where('key', 'mx')->firstOrFail();
+    $config = $grid->config;
+    $config['rows'][0]['relevant'] = '${mx.b03.keep} = "x"';
+    $config['columns'][0]['needed_when'] = '${.keep} = "x"';
+    $grid->update(['config' => $config]);
+
+    $messages = implode(' ', orderingGateMessages($this->gate, $draft));
+
+    expect($messages)->toContain('a default value is worked out before anything is answered')
+        ->and($messages)->toContain('a grid’s own rules read its cells as “This row’s …” instead')
+        ->and($messages)->toContain('a column’s rules can only read this row’s cells to its left');
+});
+
+it('M246: checks a grid\'s own rules as expressions, and still refuses a whole grid named as a value', function (): void {
+    $draft = gridGateDraft($this);
+    $grid = $draft->fields()->where('key', 'mx')->firstOrFail();
+    $config = $grid->config;
+    $config['rows'][1]['relevant'] = '${ghost} = "x"';
+    $config['columns'][1]['relevant'] = '${.cut} = "x"';
+    $grid->update(['config' => $config]);
+    addFormField($draft, $this->user, 'whole', FieldType::ShortText, 4, ['relevant_expression' => '${mx} != ""']);
+
+    // A refusal's code is the parser's own slug, as for any expression.
+    expect(orderingGateRefusals($this->gate, $draft))->toContain(
+        ['mx', 'unknown_field_reference'],
+        ['mx', 'row_reference_outside_grid_column'],
+        ['whole', 'expression_references_composite'],
+    );
+});

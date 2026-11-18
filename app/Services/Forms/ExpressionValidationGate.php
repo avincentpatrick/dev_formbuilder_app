@@ -106,7 +106,7 @@ final class ExpressionValidationGate
             $violations[] = $this->capture(fn () => $this->assertRuleValue($validation->rule_type, (string) ($validation->rule_value ?? ''), $ownerKey));
         }
 
-        $violations = array_values(array_filter([...$violations, ...$this->orderingViolations($version), ...$this->calculationCycleViolations($fields)]));
+        $violations = array_values(array_filter([...$violations, ...$this->orderingViolations($version), ...$this->calculationCycleViolations($fields), ...$this->gridViolations($version)]));
 
         if ($violations !== []) {
             throw PublishValidationException::several($violations);
@@ -141,7 +141,7 @@ final class ExpressionValidationGate
      * @param  array<string, bool>  $knownKeys
      * @param  array<string, 'grid'|'geo'>  $objectValuedKeys  object-valued field keys forbidden as operands (grid G4b / geo G5b1)
      */
-    private function check(?string $expression, array $knownKeys, array $objectValuedKeys, ExpressionKind $kind, string $ownerKey): void
+    private function check(?string $expression, array $knownKeys, array $objectValuedKeys, ExpressionKind $kind, string $ownerKey, bool $rowScope = false): void
     {
         if ($expression === null || trim($expression) === '') {
             return; // blank = no expression
@@ -149,7 +149,7 @@ final class ExpressionValidationGate
 
         try {
             $ast = $this->parser->parse($expression);
-            $this->parser->assertReferencesResolve($ast, $knownKeys, $kind, $ownerKey);
+            $this->parser->assertReferencesResolve($ast, $knownKeys, $kind, $ownerKey, $rowScope);
         } catch (ExpressionSyntaxException $exception) {
             throw PublishValidationException::expressionInvalid($exception->fieldKey() ?? $ownerKey, $exception->slug());
         }
@@ -157,7 +157,7 @@ final class ExpressionValidationGate
         // A grid (G4b) or geo (G5b1) value is object-shaped and has no valid scalar use — reject any
         // reference rather than let it silently coerce to false (and drift between the engines).
         if ($objectValuedKeys !== []) {
-            foreach ($this->parser->referencedKeys($ast) as $key) {
+            foreach ($this->parser->referencedFieldKeys($ast) as $key) {
                 $kindOfKey = $objectValuedKeys[$key] ?? null;
                 if ($kindOfKey === 'geo') {
                     throw PublishValidationException::expressionReferencesGeo($ownerKey, $key);
@@ -406,5 +406,198 @@ final class ExpressionValidationGate
         } catch (ExpressionSyntaxException) {
             return [];
         }
+    }
+
+    /**
+     * M246 (`grid-question-table`, `R-ffd10da2`) — a grid's own rules, and every grid cell any expression names.
+     *
+     * A grid's row and column conditions are expressions like any other, so each is checked as one ({@see check()}), its
+     * per-row rules with `${.col}` allowed. Then every cell named anywhere — a question's or a section's condition, a
+     * formula, a custom check, a grid's own rule — must be one the grid has, and (`D230`) one that is ALWAYS ASKED: its
+     * row has no show-when, its column no show-when or needed-when, its row does not mark it "Not needed", and the grid's
+     * rows are its own rather than copied in from a list or a form. A grid's own rules name their own row's cells as
+     * `${.col}`, only a column to the left; never their own grid by its full path. A Default value's formula is worked out
+     * before anything is answered, so it names no cell at all.
+     *
+     * ⚠️ APPENDED, AND FOLDED INTO THE EXISTING `$violations` LINE, ON PURPOSE — this file is cited by line.
+     *
+     * @return list<PublishValidationException>
+     */
+    private function gridViolations(FormVersion $version): array
+    {
+        $fields = $version->fields()->get();
+        $sections = $version->sections()->get();
+        $validations = $version->validations()->get();
+
+        $knownKeys = [];
+        $objectValuedKeys = [];
+        $fieldByKey = [];
+        $keyById = [];
+        foreach ($fields as $field) {
+            $knownKeys[$field->key] = true;
+            $fieldByKey[$field->key] = $field;
+            $keyById[$field->id] = $field->key;
+            if ($field->field_type->isComposite()) {
+                $objectValuedKeys[$field->key] = 'grid';
+            } elseif ($field->field_type->isGeo()) {
+                $objectValuedKeys[$field->key] = 'geo';
+            }
+        }
+        foreach ($sections as $section) {
+            $knownKeys[$section->key] = true;
+        }
+
+        /** @var list<array{owner: string, expression: ?string, grid: ?FormField, column: ?int, cells: bool}> $sites */
+        $sites = [];
+        $violations = [];
+        foreach ($fields as $field) {
+            $sites[] = ['owner' => $field->key, 'expression' => $field->relevant_expression, 'grid' => null, 'column' => null, 'cells' => true];
+            $sites[] = ['owner' => $field->key, 'expression' => $this->calculateFormula($field), 'grid' => null, 'column' => null, 'cells' => true];
+            if ($field->default_value_is_expression === true) {
+                $sites[] = ['owner' => $field->key, 'expression' => is_string($field->default_value) ? $field->default_value : null, 'grid' => null, 'column' => null, 'cells' => false];
+            }
+
+            $columnIndex = [];
+            foreach (self::gridColumns($field) as $index => $column) {
+                $columnIndex[(string) ($column['value'] ?? '')] ??= $index;
+            }
+            foreach ($field->gridRuleSites() as $site) {
+                $rowScope = $site['row_scope'];
+                $violations[] = $this->capture(fn () => $this->check($site['expression'], $knownKeys, $objectValuedKeys, ExpressionKind::Relevant, $field->key, $rowScope));
+                $sites[] = [
+                    'owner' => $field->key,
+                    'expression' => $site['expression'],
+                    'grid' => $field,
+                    'column' => $rowScope ? ($columnIndex[(string) $site['column']] ?? null) : null,
+                    'cells' => true,
+                ];
+            }
+        }
+        foreach ($sections as $section) {
+            $sites[] = ['owner' => $section->key, 'expression' => $section->relevant_expression, 'grid' => null, 'column' => null, 'cells' => true];
+        }
+        foreach ($validations as $validation) {
+            $owner = $keyById[$validation->form_field_id] ?? null;
+            if ($owner !== null) {
+                $sites[] = ['owner' => $owner, 'expression' => $validation->expression, 'grid' => null, 'column' => null, 'cells' => true];
+            }
+        }
+
+        foreach ($sites as $site) {
+            if ($site['expression'] === null || trim($site['expression']) === '') {
+                continue;
+            }
+            try {
+                $ast = $this->parser->parse($site['expression']);
+            } catch (ExpressionSyntaxException) {
+                continue; // check() has refused it already
+            }
+
+            foreach ($this->parser->referencedCells($ast) as $cell) {
+                $reason = $this->cellProblem($cell, $site, $fieldByKey);
+                if ($reason !== null) {
+                    $violations[] = PublishValidationException::gridCellReference($site['owner'], $cell->path(), $reason);
+                }
+            }
+
+            foreach ($this->parser->referencedRowColumns($ast) as $column) {
+                $grid = $site['grid'];
+                $columns = $grid === null ? [] : array_map(
+                    static fn (array $c): string => (string) ($c['value'] ?? ''),
+                    self::gridColumns($grid),
+                );
+                $at = array_search($column, $columns, true);
+                if ($site['column'] !== null && ($at === false || $at >= $site['column'])) {
+                    $violations[] = PublishValidationException::gridCellReference($site['owner'], '.'.$column, $at === false
+                        ? 'the grid has no such column'
+                        : 'a column’s rules can only read this row’s cells to its left, which are decided first');
+                }
+            }
+        }
+
+        return array_values(array_filter($violations));
+    }
+
+    /**
+     * Why a cell cannot be named here, or null when it can. `$cell` is the parser's cell node, typed loosely so that no
+     * import line moves a line this file is cited by.
+     *
+     * @param  object{key: string, row: string, column: ?string}  $cell
+     * @param  array{owner: string, expression: ?string, grid: ?FormField, column: ?int, cells: bool}  $site
+     * @param  array<string, FormField>  $fieldByKey
+     */
+    private function cellProblem(object $cell, array $site, array $fieldByKey): ?string
+    {
+        if (! $site['cells']) {
+            return 'a default value is worked out before anything is answered, so it cannot read a grid cell';
+        }
+
+        $grid = $fieldByKey[$cell->key] ?? null;
+        if ($grid === null || ! $grid->field_type->isComposite()) {
+            return '“'.$cell->key.'” is not a grid';
+        }
+        if ($site['grid'] !== null && $site['grid']->key === $grid->key) {
+            return 'a grid’s own rules read its cells as “This row’s …” instead';
+        }
+
+        $config = (array) $grid->config;
+        if (($config['rows_list'] ?? null) !== null || ($config['rows_source'] ?? null) !== null) {
+            return 'that grid’s rows come from a list or another form, so they can change when it is published again';
+        }
+        if ($grid->field_type === FieldType::Matrix && $cell->column === null) {
+            return 'a grid’s answer is a cell, so name its row and its column';
+        }
+        if ($grid->field_type === FieldType::LikertMatrix && $cell->column !== null) {
+            return 'a Likert grid’s answer is one score per row, so name only the row';
+        }
+
+        $row = null;
+        foreach ((array) ($config['rows'] ?? []) as $candidate) {
+            if (is_array($candidate) && (string) ($candidate['value'] ?? '') === $cell->row) {
+                $row = $candidate;
+                break;
+            }
+        }
+        if ($row === null) {
+            return 'the grid has no row “'.$cell->row.'”';
+        }
+        if (is_string($row['relevant'] ?? null) && trim($row['relevant']) !== '') {
+            return 'its row is shown only sometimes, and a rule elsewhere may read only a cell that is always asked';
+        }
+        if ($cell->column === null) {
+            return null;
+        }
+
+        $column = null;
+        foreach (self::gridColumns($grid) as $candidate) {
+            if ((string) ($candidate['value'] ?? '') === $cell->column) {
+                $column = $candidate;
+                break;
+            }
+        }
+        if ($column === null) {
+            return 'the grid has no column “'.$cell->column.'”';
+        }
+        foreach (['relevant', 'needed_when'] as $rule) {
+            if (is_string($column[$rule] ?? null) && trim($column[$rule]) !== '') {
+                return 'its column is not asked in every row, and a rule elsewhere may read only a cell that is always asked';
+            }
+        }
+        if (in_array($cell->column, (array) ($row['not_needed'] ?? []), true)) {
+            return 'its row marks it “Not needed”, and a rule elsewhere may read only a cell that is always asked';
+        }
+
+        return null;
+    }
+
+    /**
+     * A grid's column objects, in order — read here rather than through `MatrixColumns`, so that no import line moves a
+     * line this file is cited by.
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private static function gridColumns(FormField $grid): array
+    {
+        return array_values(array_filter((array) (((array) $grid->config)['columns'] ?? []), is_array(...)));
     }
 }

@@ -148,6 +148,25 @@ final class ExpressionParser
     }
 
     /**
+     * M246: every distinct key an AST names as a WHOLE question — `${key}`, never a cell's grid. The publish gate refuses a
+     * bare reference to a grid through this, while a cell `${grid.row.col}` is judged on its own.
+     *
+     * @return list<string>
+     */
+    public function referencedFieldKeys(Node $node): array
+    {
+        /** @var list<string> $keys */
+        $keys = [];
+        $this->walk($node, static function (Node $n) use (&$keys): void {
+            if ($n instanceof FieldReferenceNode && ! in_array($n->key, $keys, true)) {
+                $keys[] = $n->key;
+            }
+        });
+
+        return $keys;
+    }
+
+    /**
      * M246: every distinct grid cell an AST names, in first-seen order — `${key.row.col}` and `${key.row}`. Each key is
      * also in {@see referencedKeys()}, so what depends on what (calculation order, renames, the step graph) is unchanged.
      *

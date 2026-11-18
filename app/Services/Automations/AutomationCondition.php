@@ -61,9 +61,16 @@ final class AutomationCondition
         }
 
         try {
-            $this->parser->assertReferencesResolve($this->parser->parse($condition), $known, ExpressionKind::Relevant);
+            $ast = $this->parser->parse($condition);
+            $this->parser->assertReferencesResolve($ast, $known, ExpressionKind::Relevant);
         } catch (ExpressionException $e) {
             throw ValidationException::withMessages(['condition' => ['This condition can’t be used: '.$e->getMessage()]]);
+        }
+
+        // M246 (`R-ffd10da2`): a grid cell is not offered to an automation yet (`automation-grid-cell-conditions`), and a
+        // typed one is refused rather than left to read a row or column that may be renamed away.
+        if ($this->parser->referencedCells($ast) !== []) {
+            throw ValidationException::withMessages(['condition' => ['This condition can’t be used: an automation cannot read a grid’s cell yet.']]);
         }
 
         return $condition;

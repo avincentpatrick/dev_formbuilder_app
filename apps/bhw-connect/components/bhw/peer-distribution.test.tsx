@@ -33,8 +33,8 @@ it("shows an all-zero distribution, ties, locality/peer scope and exact accessib
   const html = render();
   expect(html).toContain('role="img"');
   expect(html).toContain("2 places share this rank");
-  expect(html).toContain("one province");
-  expect(html).toContain("1st of 2 provinces in Synthetic region");
+  expect(html).toContain("one province-level area");
+  expect(html).toContain("1st of 2 province-level areas in Synthetic region");
   expect(html).toContain('aria-label="Peer ranks and exact values"');
   expect(html).not.toContain("NaN");
 });

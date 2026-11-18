@@ -34,7 +34,7 @@ for (const width of [390, 1440]) {
     };
     await openData();
     const peers = page.getByRole("region", { name: "Locality position among peers", exact: true });
-    await expect(peers).toContainText("3 of 5 listed provinces are eligible");
+    await expect(peers).toContainText("3 of 5 listed province-level areas are eligible");
     await expect(peers).toContainText(
       "1 without a usable public value, 1 flagged as small samples, 0 outside",
     );
@@ -42,7 +42,7 @@ for (const width of [390, 1440]) {
     await expect(ranks.getByRole("row")).toHaveCount(4);
     await ranks.getByRole("button", { name: "Cebu City (07306)", exact: true }).click();
     await expect(peers.getByRole("status")).toContainText(
-      "Cebu City ranks 1st of 3 provinces in Synthetic Region VII",
+      "Cebu City ranks 1st of 3 province-level areas in Synthetic Region VII",
     );
     await expect(peers.getByRole("status")).toContainText("2 places share this rank");
     await expect(page).toHaveURL(/selected=07306/);
@@ -58,7 +58,7 @@ for (const width of [390, 1440]) {
     await page.getByText("Filter workforce counts", { exact: true }).click();
     await page.getByLabel("Minimum count", { exact: true }).fill("60");
     await page.getByRole("button", { name: "Apply count range", exact: true }).click();
-    await expect(peers).toContainText("0 of 5 listed provinces are eligible");
+    await expect(peers).toContainText("0 of 5 listed province-level areas are eligible");
     await expect(peers.getByRole("status")).toContainText("outside the chosen value range");
     await expect(peers.getByRole("img")).toHaveCount(0);
     await page.getByText("Filter workforce counts", { exact: true }).click();

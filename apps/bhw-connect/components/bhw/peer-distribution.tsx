@@ -9,7 +9,7 @@ import type { CountRange } from "@/lib/maps/value-filter";
 
 const labels = {
   region: ["region", "regions"],
-  province: ["province", "provinces"],
+  province: ["province-level area", "province-level areas"],
   citymun: ["city/municipality", "cities/municipalities"],
   barangay: ["barangay", "barangays"],
 } as const;
@@ -54,6 +54,11 @@ export function BhwPeerDistribution({
       <p className="text-sm">
         {label} · {period} · {unit} · {plural} within {data.area}
       </p>
+      {data.childLevel === "province" && (
+        <p className="text-sm text-muted">
+          Province-level areas include separately reported cities where supplied by the source.
+        </p>
+      )}
       {!peers.validUniverse || data.valueSupport === "navigation-only" ? (
         <p role="status">
           A comparable peer universe is unavailable for this view. No ranks or distribution are

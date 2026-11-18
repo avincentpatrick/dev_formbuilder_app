@@ -14,9 +14,10 @@ namespace App\Services\Expressions;
  *  - a list of strings (a multiple-choice column) — returned as the list, as a multi_select field's value is;
  *  - anything else (an object: a path that stopped at a Grid's row) — Absent.
  *
- * ⚠️ PHP cannot tell `{"0": …, "1": …}` from `[…, …]` after json_decode, so a row object whose column values are
- * exactly 0..n-1 would read as a list here and as Absent in TS. Publish refuses a two-part path into a Grid (and a
- * three-part path into a Likert grid), so that shape is never evaluated from a published form; no vector uses it.
+ * PHP cannot tell `{"0": …, "1": …}` from `[…, …]` after json_decode — a grid whose rows are named 0 and 1 arrives as
+ * a list — so a list is read here as the map of its indexes, which is what it is to PHP, and TS reads an array the same
+ * way (a canonical index is an entry; "01" and an array's own `length` are not). The golden vectors in `cells.json`
+ * hold the two engines to it.
  */
 final class GridCells
 {

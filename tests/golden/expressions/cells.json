@@ -28,5 +28,8 @@
   {"name":"row_cell_missing_column_is_blank","grammar_version":"2.0","expression":"${.cut} = ''","context":{"answers":{},"row":{"keep":"yes"}},"expected":true},
   {"name":"row_cell_multiple_choice_is_a_list","grammar_version":"2.0","expression":"selected(${.tags}, 'b')","context":{"answers":{},"row":{"tags":["a","b"]}},"expected":true},
   {"name":"row_cell_beside_an_outside_answer","grammar_version":"2.0","expression":"${.keep} = 'close' or ${region} = 'ncr'","context":{"answers":{"region":"ncr"},"row":{"keep":"yes"}},"expected":true},
-  {"name":"row_cell_named_constructor_is_absent","grammar_version":"2.0","expression":"${.constructor}","context":{"answers":{},"row":{"keep":"yes"}},"eval":"value","expected":null}
+  {"name":"row_cell_named_constructor_is_absent","grammar_version":"2.0","expression":"${.constructor}","context":{"answers":{},"row":{"keep":"yes"}},"eval":"value","expected":null},
+  {"name":"cell_inherited_length_of_a_list_row_is_absent","grammar_version":"2.0","expression":"${g.r.length}","context":{"answers":{"g":{"r":["x","y"]}}},"eval":"value","expected":null,"note":"An array's length is INHERITED: own properties only, as PHP's array_key_exists reads it — a TS walk that read `in` would return 2."},
+  {"name":"cell_rows_named_by_index_arrive_as_a_list_and_still_read","grammar_version":"2.0","expression":"${g.1.q}","context":{"answers":{"g":[{"q":"x"},{"q":"y"}]}},"eval":"value","expected":"y","note":"PHP's json_decode makes {\"0\":…,\"1\":…} a list, so rows named 0 and 1 must read through a list in both engines."},
+  {"name":"cell_a_list_index_is_canonical","grammar_version":"2.0","expression":"${g.01.q}","context":{"answers":{"g":[{"q":"x"},{"q":"y"}]}},"eval":"value","expected":null,"note":"\"01\" is not an index: PHP keeps it a string key, which a list never has."}
 ]

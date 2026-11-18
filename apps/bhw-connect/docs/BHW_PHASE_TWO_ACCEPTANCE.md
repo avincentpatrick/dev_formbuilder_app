@@ -16,8 +16,8 @@ by owner report on iPhone/Chrome. The bounded engineering/live checks through
 | Synchronized comparison maps, common breaks, phone A/B | Public comparison already validates same-level places, retains two-to-four selections and phone focus. The single map workspace has classification and geographic controls. Synchronized maps/common breaks are not integrated. |
 | Qualification/registration composition | Overview already shows a registration mix only when all exclusive parts equal the reported total, plus certification and education charts. Phase 2 composition acceptance across places remains unverified; overlapping certification categories must not become a 100% stack. |
 | Places × training-topics heatmap | Approved topic percentages/counts already exist in the catalog and single-measure comparison. This increment adds a cross-topic matrix to that comparison. |
-| Distributions and locality position among peers | Existing Explore distributions and legacy peer components are candidates for reuse. A public comparison integration with explicit peer universe, exclusions and ties remains unfinished. |
-| Dedicated compensation story | Overview already includes receipt, payer amounts, combined-payment highlights and exact measures. Dedicated receipt → payer → amount navigation and complete population/distribution acceptance still need reconciliation. This is not evidence that every amount is available. |
+| Distributions and locality position among peers | The compensation follow-up reuses the existing range chart for approved payer quantiles. A public peer-position integration with explicit peer universe, exclusions and ties remains unfinished. |
+| Dedicated compensation story | Overview already includes receipt, payer amounts, combined-payment highlights and exact measures. The follow-up connects receipt → payer amounts → combined populations and adds a public distribution chart/table; see `BHW_COMPENSATION_DISTRIBUTION.md`. Delivery evidence belongs in its PR. This is not evidence that every amount is available. |
 
 ## Training comparison increment
 

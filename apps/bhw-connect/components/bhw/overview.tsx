@@ -158,17 +158,17 @@ export function BhwOverview({
             aria-label="BHW analysis"
             className="flex max-w-full gap-3 overflow-x-auto whitespace-nowrap pb-2 text-sm underline underline-offset-4 md:flex-wrap md:whitespace-normal"
           >
-            <Link href="#workforce">Workforce distribution</Link>
-            <Link href="#qualifications">Qualifications and training</Link>
-            <Link href="#demographics">Demographics</Link>
-            <Link href="#service-history">Service history and workload</Link>
-            <Link href="#training-topics">Training topics and recency</Link>
-            <Link href="#support">Support and compensation</Link>
+            <a href="#workforce">Workforce distribution</a>
+            <a href="#qualifications">Qualifications and training</a>
+            <a href="#demographics">Demographics</a>
+            <a href="#service-history">Service history and workload</a>
+            <a href="#training-topics">Training topics and recency</a>
+            <a href="#support">Support and compensation</a>
             <Link href={compareHref}>Compare places</Link>
             <Link href={previousMapHref ?? mapHref}>
               Map explorer{previousMapHref ? " · previous settings" : ""}
             </Link>
-            <Link href="#methodology">Data and methodology</Link>
+            <a href="#methodology">Data and methodology</a>
           </nav>
         </div>
         <section
@@ -346,40 +346,52 @@ export function BhwOverview({
           <h2 id="support-heading" className="text-2xl font-semibold">
             Support and compensation
           </h2>
-          <ShareTile
-            indicator={get("bhw.any-honorarium")}
-            denominator={profiles}
-            label="Receiving any honorarium"
-            population={`Share of validated profiles · ${areaName} · 2025`}
-          />
-          <PresentationSlide id="honorarium" title="Honorarium receipt">
-            <FigureCard
-              title="Honorarium receipt by paying level"
-              caption={caption}
-              headline="Payers overlap. Receipt does not establish the amount paid or whether it is sufficient."
-            >
-              {payerData.length > 0 && (
-                <FigureView
-                  data={payerData}
-                  title="Honorarium receipt by paying level"
-                  caption={caption}
-                  xLabel="% of validated profiles"
-                  yLabel="Paying level"
-                  valueSuffix="%"
-                />
-              )}
-              <ul className="mt-3 space-y-2 text-sm">
-                {payers
-                  .filter((i) => scalar(i) === null)
-                  .map((indicator, index) => (
-                    <li key={indicator?.id ?? index}>
-                      <strong>{indicator?.label ?? "Paying level"}</strong>
-                      <Status indicator={indicator} />
-                    </li>
-                  ))}
-              </ul>
-            </FigureCard>
-          </PresentationSlide>
+          <p>
+            Follow the payment story for {areaName}: who reports receiving an allowance, which
+            government levels pay, and how the recorded amounts vary. These are 2025 profile
+            records, not current payroll or a legal pay standard.
+          </p>
+          <nav aria-label="Compensation story" className="flex flex-wrap gap-4 text-sm underline">
+            <a href="#payer-receipt">1. Receipt and paying levels</a>
+            <a href="#honorarium-amounts">2. Amounts among each payer’s recipients</a>
+            <a href="#combined-honorarium">3. Combined amounts and their population</a>
+          </nav>
+          <div id="payer-receipt" className="scroll-mt-20 space-y-4">
+            <ShareTile
+              indicator={get("bhw.any-honorarium")}
+              denominator={profiles}
+              label="Receiving any honorarium"
+              population={`Share of validated profiles · ${areaName} · 2025`}
+            />
+            <PresentationSlide id="honorarium" title="Honorarium receipt">
+              <FigureCard
+                title="Honorarium receipt by paying level"
+                caption={caption}
+                headline="Payers overlap. Receipt does not establish the amount paid or whether it is sufficient."
+              >
+                {payerData.length > 0 && (
+                  <FigureView
+                    data={payerData}
+                    title="Honorarium receipt by paying level"
+                    caption={caption}
+                    xLabel="% of validated profiles"
+                    yLabel="Paying level"
+                    valueSuffix="%"
+                  />
+                )}
+                <ul className="mt-3 space-y-2 text-sm">
+                  {payers
+                    .filter((i) => scalar(i) === null)
+                    .map((indicator, index) => (
+                      <li key={indicator?.id ?? index}>
+                        <strong>{indicator?.label ?? "Paying level"}</strong>
+                        <Status indicator={indicator} />
+                      </li>
+                    ))}
+                </ul>
+              </FigureCard>
+            </PresentationSlide>
+          </div>
           <BhwAnalysisSection
             dataset={dataset}
             level={selection.level}

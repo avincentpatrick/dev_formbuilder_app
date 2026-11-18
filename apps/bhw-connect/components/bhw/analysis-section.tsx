@@ -7,6 +7,7 @@ import { measureDefinition } from "@/lib/catalog/measure-notes";
 import { formatValue } from "@/components/catalog/presentation";
 import { FigureView } from "@/components/charts/figure-view";
 import type { GeoLevel } from "@/lib/filters/schema";
+import { BhwHonorariumDistribution } from "./honorarium-distribution";
 
 type Props = {
   dataset: CatalogDataset;
@@ -166,7 +167,10 @@ export function BhwAnalysisSection({
         </p>
       )}
       {id === "honorarium-amounts" && (
-        <PayerAmounts dataset={props.dataset} areaName={props.areaName} />
+        <>
+          <PayerAmounts dataset={props.dataset} areaName={props.areaName} />
+          <BhwHonorariumDistribution dataset={props.dataset} areaName={props.areaName} />
+        </>
       )}
       {id === "combined-honorarium" && (
         <HonorariumHighlights dataset={props.dataset} areaName={props.areaName} />

@@ -58,6 +58,7 @@ import { ClassificationControls } from "./classification-controls";
 import { ValueFilterControls } from "./value-filter-controls";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { RankedMapBars } from "./ranked-map-bars";
+import { BhwPeerDistribution } from "@/components/bhw/peer-distribution";
 import { NationalMapLocator } from "./national-map-locator";
 import { SizeLegend } from "./size-legend";
 import { mapView, supportsCircles } from "@/lib/maps/symbols";
@@ -1064,6 +1065,17 @@ export function DatasetMapCard({
                         </p>
                       )}
                     </div>
+                  )}
+                  {workspace && !overviewPreview && metric && (
+                    <BhwPeerDistribution
+                      data={data}
+                      unit={metric.unit}
+                      label={metric.label}
+                      period={metric.period}
+                      selected={selected?.code ?? null}
+                      range={choice}
+                      onSelect={(code) => setChoice((current) => ({ ...current, selected: code }))}
+                    />
                   )}
                   {workspace && supportsCircles(choice) && metric && (
                     <RankedMapBars

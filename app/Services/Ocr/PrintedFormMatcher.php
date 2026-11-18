@@ -9,6 +9,7 @@ use App\Enums\PrintAnswerArea;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Forms\BlankFormPrintPresenter;
+use App\Support\Forms\Glossary;
 use App\Support\Forms\PrintedContent;
 
 /**
@@ -186,7 +187,9 @@ final class PrintedFormMatcher
                     $this->addStatic($static, $row['label'] ?? null);
                     if ($rows !== []) {
                         $trailing[count($rows) - 1] ??= [];
-                        foreach (PrintedContent::lines((array) ($row['content'] ?? [])) as $line) {
+                        /** @var list<array<string, mixed>> $content `PrintedContent::blocks()`, as the presenter wrote it */
+                        $content = array_values(array_filter((array) ($row['content'] ?? []), is_array(...)));
+                        foreach (PrintedContent::lines($content) as $line) {
                             $this->addStatic($trailing[count($rows) - 1], $line);
                         }
                     }
@@ -200,7 +203,7 @@ final class PrintedFormMatcher
         // so this is a second guard rather than the first: should a layout ever run it on, it is the last question's.
         if ($rows !== []) {
             $trailing[count($rows) - 1] ??= [];
-            foreach (PrintedContent::glossaryLines((array) ($model['glossary'] ?? [])) as $line) {
+            foreach (PrintedContent::glossaryLines(Glossary::fromSnapshot(['glossary' => $model['glossary'] ?? null])) as $line) {
                 $this->addStatic($trailing[count($rows) - 1], $line);
             }
         }

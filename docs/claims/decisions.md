@@ -24,10 +24,24 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D229`, the last filed on this branch, was asked and answered on 2026-11-17 in the planning of `M245` (`D227` is #545's and `D228` is #580's, each recorded on its own branch). A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+
+### D229 — A note's content and a form's glossary reach paper, and glossary words are marked — how? **Paper: print the content and a glossary page (A). Words: the author marks each one, and a Glossary button on every page lists them all (A).**
+
+**Asked and answered 2026-11-17 (user decision, in chat), in the planning of `M245` (NHETE recommendation 4).** Two questions, each put with its options and the session's recommendation.
+
+1. **Paper and PDF printed a note's label alone, never its content (`R-c083b711`), and the new rows asked for details printed open and definitions on paper.**
+   - **A — print the content and a glossary page (chosen, the recommendation).** Paper shows what the screen shows, details open, ending with a Glossary page; the scan reader learns the new printed text.
+   - **B — leave paper as it is.** Details and the glossary never reach paper; `R-c083b711` stays open.
+2. **How does a respondent open a glossary word's meaning?** A question's label is drawn inside its `<label for>`, which may hold no button, so a label's words cannot be marked in any option.
+   - **A — the author marks words (chosen, the recommendation).** `[[word]]` in a note's text; only marked words open their meaning. A Glossary button on every page lists every term, which covers a question's words.
+   - **B — automatic in notes.** Every use of a term in note text opens it, nothing to mark; frequent terms light up everywhere.
+   - **C — the Glossary button only.** No word opens in place.
+
+**What the answer files:** `M245` builds both and closes `R-c083b711`, `note-details-block` (`R-93e22765`) and `form-glossary` (`R-d0bbb7bb`); `form-glossary`'s *"marked in … labels"* is answered by the button, not built. It files `xlsform-note-lists-details-glossary`, `nhete-walk-note-content` and `glossary-inflected-forms`, each `during-testing`. No retier.
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

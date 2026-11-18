@@ -36,7 +36,7 @@ Several of these are **real XLSForm round-trip import failures today** — a Kob
 | Slider / range (bounded numeric) field type | should | 2 | XLSForm `range` type; a Kobo form using it fails import |
 | Ranking / ordering (drag-to-rank) field type | should | 2 | XLSForm `rank` type; standard survey question with no workaround |
 | Rating / star scale field type | should | 2 | Distinct from `likert_scale`'s radio rows; expected on CSAT/feedback forms |
-| Rich-text / media content block (headings, lists, inline image/video, dividers) | should | 2 (basic) → 3 (rich media) | For consent language with links, branded intros — beyond plain `note` |
+| Rich-text / media content block (headings, lists, inline image/video, dividers) | should | 2 (basic) → 3 (rich media) | For consent language with links, branded intros — beyond plain `note`. **Headings, paragraphs, callouts, dividers and images shipped M125–M130; bulleted and numbered lists, and collapsible details, shipped `M245`. Inline video is what remains.** |
 | Image / picture choice (per-option images) | should | 3 | Fillout-style polish + low-literacy accessibility aid |
 | Currency / money field type | should | 3 | Value tied to Phase-3 embedded payments/order forms |
 | NPS field type | nice | 3 | Composite over a rating field (0–10 + segmentation + −100..+100) |
@@ -13017,13 +13017,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   for the guest page through its own warm-up and corrects both sentences, but a client of the sync API still
   receives nothing. **Live.** Filed by `M130`. **Tier: during-testing.**
 
-- **`minor` · The printed blank form shows a note's label, while every screen now shows its content blocks.** Found
+- ✅ **CLOSED BY `M245` (2026-11-18) — ****`minor` · The printed blank form shows a note's label, while every screen now shows its content blocks.** Found
   by `M130` while verifying `R-c9f50df2`. `D69` makes a note's label author-only once it has blocks, and `M130`
   renders the blocks on the guest page, the encode page and the builder preview; the printed blank form and the
   response PDF still print the label, pinned by `NoteContentSurfacesTest`. A keyer transcribing paper sees one
   thing on the sheet and another on the screen, and a respondent filling paper never sees the content. The remedy
   is to print the blocks, or to decide that paper keeps the label. **Live.**
   Filed by `M130`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M245` (2026-11-18), on its branch, held for the merge point.** The user chose to print the blocks (`D229`). `App\Support\Forms\PrintedContent` lays out a note's content for the blank form and the response PDF, in place of its label as on screen: headings, paragraphs, callouts, lists with ASCII markers, a link's address after its words, a picture as its description, and a details block open. Both end with the form's glossary. `PrintedFormMatcher` knows each note's printed lines as printed text in the region they land in, and only there (`docs/ocr-pipeline-design.md` §2.5.13); `NoteContentSurfacesTest`'s two pins flipped.
 
 - **`nit` · `docs/api-specification.md` says the guest API allows 100 requests a minute per IP; the configured
   default is 60.** Found by `M130`. Its rate-limit table against `config/guest.php`'s `submit_per_ip` default.
@@ -16288,19 +16289,45 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `note-details-block` — A note has no collapsible "details" block, so long optional reading is always open.**
+- ✅ **CLOSED BY `M245` (2026-11-18) — ****`minor` · `note-details-block` — A note has no collapsible "details" block, so long optional reading is always open.**
   Found by `M237` (2026-11-14). NHETE keeps each indicator's formula, sources, watch-outs and "Research behind this" under a collapsed *More about this indicator*. Today all 35 are drawn open (`NhetePlan`'s `research-open` count is 30). `ContentBlocks` holds heading, paragraph, callout, divider and image only. Bullet lists are the table item *"Rich-text / media content block (headings, lists, …)"* at the top of this file.
 
   The remedy, when taken: a `details` block with a summary line and its own blocks, collapsed by default and printed open on paper and PDF.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M245` (2026-11-18), on its branch, held for the merge point.** Built as the remedy says: `{type: details, summary, blocks}`, one level deep, its blocks counted toward the note's 50, drawn by the new `MdsDisclosure` (DSR §3.7c) and printed open (`R-c083b711`, closed beside it). Every reader of note content recurses into it: the publish gate's image check, the guest image route, the offline warm-up and the screen-reader summary. Bullet and numbered lists shipped with it (the table item at the top of this file). NHETE's 9 research panels and 35 "More about this indicator" sections are now 44 collapsed details blocks (`NheteBuilderRouteTest`).
 
-- **`minor` · `form-glossary` — A form has no glossary, so a term cannot open its definition where it is used.**
+- ✅ **CLOSED BY `M245` (2026-11-18) — ****`minor` · `form-glossary` — A form has no glossary, so a term cannot open its definition where it is used.**
   Found by `M237` (2026-11-14). NHETE marks 27 terms and all 35 indicator codes as glossary words, 115 uses in all (`NhetePlan`'s `glossary-plain` count). Today they are plain text, and the definitions would have to sit on a screen of their own. Nothing in `app/` or the respondent app holds a glossary, and the design system's `Tooltip` is used by neither.
 
   The remedy, when taken: a per-form glossary (term, definition), terms marked in note content and labels, a pop-up in the respondent app, and plain definitions on paper, PDF and exports.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M245` (2026-11-18), on its branch, held for the merge point.** A form's glossary is a draft-versioned table (`form_version_glossary_entries`), edited under Form settings → Glossary and frozen into each published snapshot. A note's word marked `[[word]]` opens its meaning in a dialog; a Glossary button on the guest page, the encode page and the version view lists every term; paper and the PDF end with them. Two corrections, by the user's design in planning (`D229`):
+  - **Labels are not marked.** A question's label is drawn inside its `<label for>`, which may hold no button, so the Glossary button covers a question's words. NHETE's 12 markers in grid rows stay plain (`glossary-in-label`).
+  - **Exports carry nothing yet.** The XLSForm exporter on this branch's base writes a note's label only; the glossary's export and import is its own row, `xlsform-note-lists-details-glossary`, for once #580 is on the trunk.
+  The row's premise was off in the same-shape fixture: its placeholder scramble had broken 6 of the 7 non-code term links. Four were repaired by their letter shape; the other two are a plural and a short form of an existing term in the real module, which a mark by exact text cannot reach (`glossary-inflected-forms`). NHETE now publishes with a 62-term glossary and 113 marked words, all resolving.
+
+- **`minor` · `xlsform-note-lists-details-glossary` — XLSForm carries no list, details block or glossary: an exported note loses them, and an imported markdown list becomes "• " paragraphs.**
+  Found by `M245` (2026-11-18). This branch's base exports a note's label only. #580 (`M244`, held) exports content as markdown and imports it back, but `XlsformMarkdown` knows no `list` or `details` block and drops both, and its import writes a markdown list as paragraphs starting "• " because no list block existed. Nothing in XLSForm holds a glossary, and a `[[word]]` mark is not ODK markdown.
+
+  The remedy, when taken (once #580 is on the trunk): `toMarkdown()` writes a list as markdown and a details block as its summary and blocks, with a `#meridian` marker so it re-imports collapsed; the import reads a markdown list as a list block; the glossary travels on a sheet of its own (or `#meridian` rows), and a mark as `[[word]]` in the label's markdown. ⚠️ When this branch takes the trunk after #580, `NheteBuilderRouteTest`'s export → re-import shape check needs `toMarkdown()` and `plainText()` to know both blocks at once — the minimum lands in that merge (the claim says so); the rest is this row.
+
+  **Not live** — a request. Filed by `M245`. **Tier: during-testing.**
+
+- **`minor` · `nhete-walk-note-content` — The 49-page NHETE walk never meets a list, a details block or a glossary word, because it seeds the plain Meridian workbook.**
+  Found by `M245` (2026-11-18). `NheteE2eSeeder` imports the Meridian-dialect workbook, whose notes are plain text (`NheteWorkbook::noteText()`), so `nhete-walk.spec.ts` checks scroll and axe on pages with no disclosures and no glossary words. They are checked in a browser only on "Before Your Visit" (`public-runtime-axe.spec.ts`) and in the builder (`nhete-builder-block.spec.ts`), never at NHETE's scale of 44 disclosures and 113 words.
+
+  The remedy, when taken: seed NHETE through the builder plan's content (or an export that carries it, once `xlsform-note-lists-details-glossary` lands) and have the walk open a details block and a glossary word on the indicator pages, with axe in each state.
+
+  **Not live** — a request. Filed by `M245`. **Tier: during-testing.**
+
+- **`nit` · `glossary-inflected-forms` — A glossary word must be written exactly as its term, so a plural or a short form cannot be marked.**
+  Found by `M245` (2026-11-18). A mark names its term by its own text (`ContentBlocks`' span `term`). The real NHETE marks a plural of one term and a short form of another, once each, so those two stay plain text in the fixture (`NhetePlan`'s `glossary-shown-form` count is 2).
+
+  The remedy, when taken: `[[shown|term]]` — the span keeps `text` and names a different `term`. `ContentBlocks` refuses a `|` in a term today precisely so this can be added without changing what any stored mark means; the change is relaxing "term equals its text", the editor syntax, and `NhetePlan`.
+
+  **Not live** — a request. Filed by `M245`. **Tier: during-testing.**
 
 - **`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
   Found by `M237` (2026-11-14). NHETE's Stop 8 is two tables per domain, and today both become blocks of questions.

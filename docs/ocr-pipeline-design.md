@@ -95,7 +95,7 @@ Classified per field type by `App\Enums\PrintAnswerArea`, a total `default`-less
 | `choices` | `single_select`, `multi_select`, `dropdown`, `yes_no`, `likert_scale` | each option with a 14pt drawn box, the options SIDE BY SIDE and wrapping between them |
 | `grid` | `matrix`, `likert_matrix` | a real table, `config.rows` down, `config.columns` across, a 12pt box per cell |
 | `signature_line` | `signature` | a 30pt ruled line at 60% width |
-| `prose` | `note` | the text, no answer area |
+| `prose` | `note` | the note's content blocks, or its label when it has none (§2.5.13); no answer area |
 | `unavailable` | `geopoint`, `geotrace`, `geoshape`, `file_upload`, `image_capture`, `audio_capture`, `video_capture` | the label, then *"Not collected on paper - record this in the app."*, and **no writing area** |
 | `page_break` | `page_break` | a hard `page-break-before` |
 | `omitted` | `hidden`, `calculated` | nothing at all |
@@ -199,6 +199,16 @@ The user checked layout 3 on the development machine and passed it with one comm
 - **`LAYOUT` is 4**, and a layout-3 sheet is refused. No field paper existed, so the bump refuses nothing anyone holds.
 
 **The fixture went first a third time.** The paper changed (presenter, partial, stylesheet) and the typesetter learned to print each gap's separator, with a `gap_reads` option for what a recognizer reads there instead; the OCR suite then measured ten red: four existing matcher cases (dates and times stopped reading), three new ones, the two bake-off cases that write a date, and the review page's `Layout 3` wording. The tilt case stayed green, because both readings failed alike, and so did the blank comb, because a line of separators normalises to nothing and is taken as printed text. Then four deliberate defects through `scripts/mutate.php`, each caught: the selector back to the bare `.comb__gap` (only the geometry case, on the border and width — the separator still printed), separators kept (six matcher cases), the length check removed (only the November case), and separators dropped for a cascade too (only the hyphen case). A real render, rasterised, showed `[][] / [][] / [][][][]`, `[][] : [][]`, `[][][] : [][]` and a cascade's blank gaps under a running head reading `Layout 4`.
+
+### 2.5.13 A note's content on paper, and the glossary page (M245, `R-c083b711`)
+
+Until `M245` the paper printed a note's LABEL while every screen showed its content blocks (`D69`), so a keyer saw one thing and the screen another. Now the paper prints the content in place of the label, from `App\Support\Forms\PrintedContent`: headings, paragraphs and callouts as text with bold and italic kept, a link as its words with its address in brackets, a list with `-` or `1.` markers (ASCII: the fonts are WinAnsi), a details block OPEN with its summary bold, and a picture as *"Picture: "* and its description (the paper carries no images, §2.5.5). A form with a glossary ends with a **Glossary** page of its own, after the footer: each term, a hyphen, its meaning. A note's glossary word prints as plain text.
+
+**No `LAYOUT` bump.** No answer area moved and no question's anchor changed; a note only takes more lines than its label did.
+
+**The matcher knows what each note prints, in the region it lands in.** A printed line the matcher does not know is read as the nearest question's answer (§2.5.7), so `PrintedFormMatcher` takes each note's `PrintedContent::lines()` as printed text — but ONLY for the region the note falls in: the question before it, and every question after it that was not found, up to the next that was. The labels, hints and footer stay one list for the whole form, as before. Scoping is the difference between a note and those: a form's notes can hold thousands of words, and one global list would blank a real one-word answer — `WATER` — anywhere a note's paragraph happens to end with that word (`PrintedFormMatcherTest`'s M245 case writes exactly that, in another question's box). A list item is known with and without its marker, because a scan may read the marker on the item's line or not. The glossary page starts a page of its own, which no region reaches (§2.5.7's regions never cross a page); its lines are given to the last question all the same, as a second guard. A sheet printed before `M245` carries the note's label, which stays known everywhere.
+
+**The fixture went first a fourth time.** `PrintedPageTypesetter` prints a note's content as the paper does (each list item once, with its marker) before the reader changed.
 
 ---
 

@@ -742,7 +742,7 @@ class E2eSeeder extends Seeder
                     'label' => 'Your name',
                 ]);
                 // M245 (`R-d0bbb7bb`): the glossary the note's marked word opens, and the Glossary button lists.
-                FormGlossaryService::writeAll($guide->refresh()->draftVersion, [
+                FormGlossaryService::writeAll($guide->refresh()->draftVersion()->firstOrFail(), [
                     ['term' => 'BHW', 'definition' => 'A barangay health worker: a trained volunteer who visits households in the barangay.'],
                     ['term' => 'Fasting', 'definition' => 'Eating nothing, and drinking only water, for a set time.'],
                 ]);

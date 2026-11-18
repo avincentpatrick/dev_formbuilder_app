@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.24.0",
+        "title": "Lists, sections that open, and a glossary for your form",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Lists in a note: on a note's Content tab, add a List and type one item to a line. Choose a bulleted list or a numbered one."
+            },
+            {
+                "kind": "new",
+                "text": "Details in a note: add a Details block, give it a summary line, and put text, lists or pictures inside it. Respondents see the summary and tap it to read the rest."
+            },
+            {
+                "kind": "new",
+                "text": "A glossary for your form: in Form settings, open Glossary and add each term with its meaning. In a note, mark a word as [[word]] (or select it and press Glossary word), and respondents tap it to read its meaning. A Glossary button on every page lists all the terms. Respondents see a change after you publish."
+            },
+            {
+                "kind": "improved",
+                "text": "The printed form and a response's PDF now show what a note says, not just its name: headings, text, lists, and every Details section opened out. Both end with the form's glossary. A scanned paper copy still reads correctly."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

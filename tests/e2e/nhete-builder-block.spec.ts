@@ -41,7 +41,9 @@ async function configTab(page: Page, name: string): Promise<void> {
  */
 async function add(page: Page, type: string, label: string, key: string, format?: { group: string; option: string }): Promise<void> {
     await showBuilderPane(page, 'fields');
-    await page.locator('.palette').getByRole('button', { name: type, exact: true }).click();
+    // An advanced type's palette button carries an "Adv" badge inside its name ("Matrix (grid) Adv").
+    const name = new RegExp(`^${type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( Adv)?$`);
+    await page.locator('.palette').getByRole('button', { name }).click();
     await settled(page);
 
     // Adding selects the new question, so the config panel is already on it.

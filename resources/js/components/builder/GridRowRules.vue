@@ -138,8 +138,14 @@ function toggleNotNeeded(column: string, checked: boolean): void {
     min-width: 0;
 }
 
-.grid-row-rules__legend {
+/* The full-width break belongs to the ticks' wrapping row only. On the details heading, inside a column, a 100% basis is
+   a HEIGHT: wherever the config pane's height is definite (tablet) the heading grew to fill its section and pushed the
+   details editor out over the next row. */
+.grid-row-rules__ticks > .grid-row-rules__legend {
     flex: 1 0 100%;
+}
+
+.grid-row-rules__legend {
     margin: 0 0 var(--mds-space-1);
     padding: 0;
     font-family: var(--mds-font-family-body);

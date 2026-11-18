@@ -11,6 +11,7 @@ use App\Models\FormVersion;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\BlankFormPrintRenderer;
+use App\Services\Forms\FormGlossaryService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
 use App\Services\Submissions\SubmissionPdfRenderer;
@@ -75,6 +76,21 @@ function printableForm(Tenant $tenant, User $user, string $title = 'Household Su
     addFormField($draft, $user, 'where', FieldType::Geopoint, 5, ['form_section_id' => $section->id]);
     addFormField($draft, $user, 'sign_here', FieldType::Signature, 6, ['form_section_id' => $section->id]);
     addFormField($draft, $user, 'internal_ref', FieldType::Hidden, 7);
+    // M245 (`R-c083b711`, `R-d0bbb7bb`): a note with every kind of content and a glossary, so every case below — the
+    // WinAnsi round trip above all — also covers what the two new partials print. ASCII only, like the rest.
+    addFormField($draft, $user, 'about', FieldType::Note, 8, ['label' => 'About this survey', 'config' => ['content' => [
+        ['type' => 'heading', 'level' => 1, 'text' => 'About this survey'],
+        ['type' => 'paragraph', 'spans' => [
+            ['text' => 'Ask the '], ['text' => 'TWG', 'term' => 'TWG', 'bold' => true], ['text' => ' or read '],
+            ['text' => 'the guide', 'link' => 'https://example.org/guide'], ['text' => '.', 'italic' => true],
+        ]],
+        ['type' => 'callout', 'tone' => 'info', 'spans' => [['text' => 'Takes ten minutes.']]],
+        ['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [['text' => 'Water']]], ['spans' => [['text' => 'ID card']]]]],
+        ['type' => 'list', 'style' => 'numbered', 'items' => [['spans' => [['text' => 'Sign in']]]]],
+        ['type' => 'divider'],
+        ['type' => 'details', 'summary' => 'More about the survey', 'blocks' => [['type' => 'paragraph', 'spans' => [['text' => 'It runs every year.']]]]],
+    ]]]);
+    FormGlossaryService::writeAll($draft, [['term' => 'TWG', 'definition' => 'The technical working group.']]);
 
     $published = app(PublishService::class)->publish($form->refresh(), $user);
 
@@ -218,6 +234,44 @@ it('escapes every tenant-authored string on the page, not only some of them', fu
     // Form title (x2 — the running head repeats it), section heading, field label, hint, option
     // label. Nothing anywhere renders it live.
     expect(substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'))->toBeGreaterThanOrEqual(6)
+        ->and($html)->not->toContain('<script>alert(1)</script>');
+});
+
+it('prints a note’s content in place of its label, details open, and the glossary on a page of its own after the footer (M245)', function (): void {
+    [$form, $version] = printableForm($this->tenant, $this->user);
+    $html = $this->renderer->html($form, $version);
+
+    $footer = strpos($html, 'This is a blank copy of every question');
+    $glossary = strpos($html, '<h2 class="gloss__title">Glossary</h2>');
+
+    expect($html)->toContain('<p class="nc-summary">More about the survey</p>')
+        ->and($html)->toContain('It runs every year.')
+        ->and($html)->toContain('<td class="nc-list__mark">-</td>')
+        ->and($html)->toContain('<td class="nc-list__mark">1.</td>')
+        ->and($html)->toContain(' (https://example.org/guide)')
+        ->and($html)->toContain('The technical working group.')
+        ->and($footer)->toBeInt()
+        ->and($glossary)->toBeInt()
+        ->and($glossary > $footer)->toBeTrue()
+        ->and(substr_count($html, 'About this survey'))->toBe(1);
+});
+
+it('escapes a payload in a note’s content and in the glossary, as everywhere else (M245)', function (): void {
+    $payload = '<script>alert(1)</script>';
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Payloads');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'q1', FieldType::ShortText, 0);
+    addFormField($draft, $this->user, 'n1', FieldType::Note, 1, ['config' => ['content' => [
+        ['type' => 'paragraph', 'spans' => [['text' => $payload]]],
+        ['type' => 'list', 'style' => 'bulleted', 'items' => [['spans' => [['text' => $payload]]]]],
+        ['type' => 'details', 'summary' => $payload, 'blocks' => [['type' => 'paragraph', 'spans' => [['text' => $payload]]]]],
+    ]]]);
+    FormGlossaryService::writeAll($draft, [['term' => 'X', 'definition' => $payload]]);
+    $published = app(PublishService::class)->publish($form->refresh(), $this->user);
+
+    $html = $this->renderer->html($form->refresh(), $published);
+
+    expect(substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'))->toBe(5)
         ->and($html)->not->toContain('<script>alert(1)</script>');
 });
 

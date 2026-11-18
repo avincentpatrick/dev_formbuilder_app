@@ -120,6 +120,9 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #00000
 .q__hint { margin: 0 0 3pt 0; font-size: 8pt; color: #333333; }
 .q__note { margin: 0; font-size: 8.5pt; color: #333333; font-style: italic; }
 
+/* M245 (`R-c083b711`): a note's content blocks, printed in place of its label (`_note-content-styles`). */
+.q__content { margin: 0 0 2pt 0; }
+
 /* NOT `.q__note`, though the two started identical. A note is prose the respondent is meant to READ
    (a consent paragraph, an instruction); this is an apology for a missing answer area. Sharing a
    class would have made them indistinguishable on the page and welded the two together the first

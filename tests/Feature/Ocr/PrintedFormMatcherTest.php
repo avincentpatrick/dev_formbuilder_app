@@ -738,3 +738,28 @@ it('matches a longer line to printed text only on whole words (R-5d7128da)', fun
 
     expect($fields['notes'])->toMatchArray(['state' => 'read', 'value' => 'HIS FORM']);
 });
+
+it('reads a note printed after a question as printed text, never as that question’s answer (M245, R-c083b711)', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->user, 'Noted');
+    $draft = $form->draftVersion;
+    addFormField($draft, $this->user, 'first_name', FieldType::ShortText, 1, ['label' => 'First name']);
+    addFormField($draft, $this->user, 'drink', FieldType::ShortText, 2, ['label' => 'Usual drink']);
+    addFormField($draft, $this->user, 'about', FieldType::Note, 3, ['label' => 'About the visit', 'config' => ['content' => [
+        ['type' => 'paragraph', 'spans' => [['text' => 'Bring enough clean water']]],
+        ['type' => 'list', 'style' => 'numbered', 'items' => [['spans' => [['text' => 'Wear a mask']]], ['spans' => [['text' => 'Fast overnight']]]]],
+        ['type' => 'details', 'summary' => 'More about this visit', 'blocks' => [['type' => 'paragraph', 'spans' => [['text' => 'Read the clinic leaflet']]]]],
+    ]]]);
+    addFormField($draft, $this->user, 'city', FieldType::ShortText, 4, ['label' => 'City']);
+    $version = app(PublishService::class)->publish($form->refresh(), $this->user);
+    $form = $form->refresh();
+    $model = app(BlankFormPrintPresenter::class)->present($form, $version);
+
+    // "WATER" is the note's last word too. The note lands in `drink`'s region, so it is printed text THERE only: the same
+    // word written in `first_name`'s box is an answer.
+    $page = PrintedPageTypesetter::fromModel($model, ['first_name' => 'WATER', 'drink' => 'TEA', 'city' => 'MANILA'])->page();
+    $fields = $this->matcher->match($form, $version, [$page])['fields'];
+
+    expect($fields['drink'])->toMatchArray(['state' => 'read', 'value' => 'TEA'])
+        ->and($fields['first_name'])->toMatchArray(['state' => 'read', 'value' => 'WATER'])
+        ->and($fields['city'])->toMatchArray(['state' => 'read', 'value' => 'MANILA']);
+});

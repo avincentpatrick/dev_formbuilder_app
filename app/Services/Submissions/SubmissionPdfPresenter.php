@@ -14,12 +14,14 @@ use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Forms\FormGlossaryService;
 use App\Services\Templates\TemplateRenderer;
 use App\Services\Templates\TemplateSources;
 use App\Services\Validation\SemanticResult;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\FieldVisibility;
 use App\Support\Forms\LocaleVariant;
+use App\Support\Forms\PrintedContent;
 use App\Support\Forms\RepeatTable;
 use App\Support\Submissions\SubmissionReference;
 use Illuminate\Support\Collection;
@@ -134,6 +136,9 @@ final class SubmissionPdfPresenter
                 'finalized_at' => $submission->finalized_at?->toIso8601String(),
             ],
             'blocks' => $version === null ? [] : $this->answerBlocks($version, $answers, $locale, $this->replay($version, $answers, $submission, $locale)),
+            // M245 (`R-d0bbb7bb`): the glossary of the version the respondent answered, after the answers. Read from its
+            // own rows, which the version froze, rather than by loading the whole snapshot for one key.
+            'glossary' => $version === null ? [] : FormGlossaryService::snapshotOf($version->id),
         ];
     }
 
@@ -321,7 +326,7 @@ final class SubmissionPdfPresenter
      * @param  array<string, mixed>  $answers  already scoped to one repeat instance where applicable
      * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
      * @param  array<string, bool>  $mask
-     * @return list<array{key: string, label: string, value: string, role: string, image: string|null}>
+     * @return list<array{key: string, label: string, value: string, role: string, image: string|null, content: list<array<string, mixed>>}>
      */
     private function fieldRows(Collection $fields, array $answers, array $sources, ?string $locale, array $mask): array
     {
@@ -345,6 +350,9 @@ final class SubmissionPdfPresenter
                     : $this->blankable($this->formatter->displayValue($field->field_type, $answers[$field->key] ?? null, $field->config ?? [], $locale)),
                 'role' => $role->value,
                 'image' => $field->field_type === FieldType::Signature ? $this->signatureImage($answers[$field->key] ?? null) : null,
+                // M245 (`R-c083b711`): a note's content blocks, printed in place of its label as the respondent saw them
+                // (`D69`), details open. Empty for every other row.
+                'content' => $role === PdfFieldRole::Prose ? PrintedContent::blocks(($field->config ?? [])['content'] ?? null) : [],
             ];
         }
 

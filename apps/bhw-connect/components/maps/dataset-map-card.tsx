@@ -190,6 +190,7 @@ export function DatasetMapCard({
   const query = mapHref({
     ...choice,
     selected: null,
+    view: undefined,
     valueMin: undefined,
     valueMax: undefined,
     classification: undefined,
@@ -198,7 +199,7 @@ export function DatasetMapCard({
   }).split("?")[1];
   const key = `${query}&retry=${retry}`;
   const classificationKey = `${choice.classification}:${choice.classCount}:${choice.classBreaks?.join(",")}`;
-  const exportVersion = `${key}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}:${classificationKey}`;
+  const exportVersion = `${key}:${choice.view ?? "default"}:${choice.selected ?? ""}:${choice.valueMin ?? ""}:${choice.valueMax ?? ""}:${classificationKey}`;
   const currentExportVersion = useRef(exportVersion);
   useEffect(() => {
     currentExportVersion.current = exportVersion;

@@ -6,6 +6,7 @@ import { DISTRICT_MAP_SLUG, parseDistrictView } from "@/lib/maps/district-view";
 import { MAP_SUBJECTS, subjectMapHref, subjectOfRelease } from "@/lib/maps/subjects";
 import type { CatalogId } from "@/lib/catalog/types";
 import { DatasetMapBackLink } from "@/components/maps/dataset-map-back-link";
+import { withBasePath } from "@/lib/base-path";
 export const metadata: Metadata = { title: "Dataset maps" };
 export default async function MapPage({
   searchParams,
@@ -24,6 +25,16 @@ export default async function MapPage({
     <div
       className={`mx-auto w-full ${subject?.id === "bhw" ? "max-w-screen-2xl space-y-2 px-3 py-2" : "max-w-6xl space-y-6 px-4 py-8"}`}
     >
+      {/* This page already requests a national map. Fetch its existing boundary asset
+          before hydration/data, with the same credentials mode as the canvas fetch. */}
+      {subject?.id === "bhw" && choice?.level === "national" && (
+        <link
+          rel="preload"
+          as="fetch"
+          href={withBasePath("/geo/regions.json")}
+          crossOrigin="anonymous"
+        />
+      )}
       <div
         className={
           subject?.id === "bhw" ? "flex flex-wrap items-center justify-between gap-2" : "space-y-6"

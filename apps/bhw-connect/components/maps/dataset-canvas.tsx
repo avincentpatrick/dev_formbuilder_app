@@ -97,8 +97,8 @@ export function DatasetCanvas({
   const emphasisKey = emphasis?.join(",") ?? "";
   // A new renderer must not inherit the previous canvas's ready/error status.
   const renderVersion = useMemo(
-    () => ({ url, rows, emphasisKey, view, labels }),
-    [url, rows, emphasisKey, view, labels],
+    () => ({ url, rows, emphasisKey, labels }),
+    [url, rows, emphasisKey, labels],
   );
   const [renderResult, setRenderResult] = useState<{
     version: typeof renderVersion;
@@ -250,38 +250,38 @@ export function DatasetCanvas({
             filter: ["==", "geo_code", selectedRef.current ?? ""],
             paint: { "line-color": "#111827", "line-width": 3 },
           });
-          if (view === "circles") {
-            map.addSource("symbols", {
-              type: "geojson",
-              data: { type: "FeatureCollection", features: points },
-            });
-            map.addLayer({
-              id: "counts",
-              type: "circle",
-              source: "symbols",
-              filter: [">", "value", 0],
-              layout: { "circle-sort-key": ["-", 0, ["get", "value"]] },
-              paint: {
-                "circle-radius": ["get", "radius"],
-                "circle-color": "#0c747b",
-                "circle-opacity": 0.85,
-                "circle-stroke-width": 1,
-                "circle-stroke-color": "white",
-              },
-            });
-            map.addLayer({
-              id: "zeros",
-              type: "circle",
-              source: "symbols",
-              filter: ["==", "value", 0],
-              paint: {
-                "circle-radius": 3,
-                "circle-opacity": 0,
-                "circle-stroke-width": 2,
-                "circle-stroke-color": "#0c747b",
-              },
-            });
-          }
+          // Keep both views ready; switching visibility must not refetch or refit.
+          map.addSource("symbols", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: points },
+          });
+          map.addLayer({
+            id: "counts",
+            type: "circle",
+            source: "symbols",
+            filter: [">", "value", 0],
+            layout: { visibility: "none", "circle-sort-key": ["-", 0, ["get", "value"]] },
+            paint: {
+              "circle-radius": ["get", "radius"],
+              "circle-color": "#0c747b",
+              "circle-opacity": 0.85,
+              "circle-stroke-width": 1,
+              "circle-stroke-color": "white",
+            },
+          });
+          map.addLayer({
+            id: "zeros",
+            type: "circle",
+            source: "symbols",
+            filter: ["==", "value", 0],
+            layout: { visibility: "none" },
+            paint: {
+              "circle-radius": 3,
+              "circle-opacity": 0,
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#0c747b",
+            },
+          });
           if (labels) {
             map.addSource("place-names", {
               type: "geojson",
@@ -298,7 +298,7 @@ export function DatasetCanvas({
                 "text-max-width": 10,
                 "text-padding": 4,
                 "text-variable-anchor": ["top", "bottom", "left", "right"],
-                "text-radial-offset": view === "circles" ? 1.8 : 0.4,
+                "text-radial-offset": 0.4,
                 "text-allow-overlap": false,
               },
               paint: {
@@ -380,7 +380,7 @@ export function DatasetCanvas({
           });
           map.on("click", (e) => {
             const symbolCode =
-              view === "circles"
+              display.current.view === "circles"
                 ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
                     ?.properties?.geo_code
                 : undefined;
@@ -413,7 +413,7 @@ export function DatasetCanvas({
       mapRef.current = null;
       resetView.current = null;
     };
-  }, [url, rows, emphasisKey, view, labels, renderVersion]);
+  }, [url, rows, emphasisKey, labels, renderVersion]);
   return (
     <div data-map-canvas className={mapOnly ? "relative h-full w-full" : "relative"}>
       <div

@@ -69,6 +69,11 @@ Prediction:
 - The builder-built NHETE publishes with 3 lists, 44 details blocks, a 62-entry glossary and 115 marked words, all resolving; the Meridian and Kobo workbooks stay byte-identical.
 - The one most likely wrong: that matching a word to its term ignoring case and spacing is enough for the real NHETE. The two markers with no matching shape may be inflected forms (plurals), which would need `[[shown|term]]`.
 
+**Claim extended (2026-11-18), the order breached for two of the three files, said rather than smoothed.**
+- `app/Http/Controllers/Tenant/FormController.php` — edited BEFORE this extension. The glossary's four actions sit there, beside the automations, instead of a new `FormGlossaryController`: a new controller is a new `use` line in `routes/tenant.php`, which shifts every line a document cites (the routes file says so).
+- `resources/js/Pages/forms/VersionView.vue` — edited BEFORE this extension. A published version's read-only view gets the version's glossary and the Glossary button, as the guest and encode pages do.
+- `docs/adr/0011-analytics-substrate.md` — not yet edited. Its citation of `StructuralValidationGate.php:45-47` had already drifted onto a docblock on the trunk, and this branch's two imports moved a blank line onto line 45, so `citation-liveness-lint` refuses it. The fix cites the check by its name rather than a line.
+
 ## HELD — `M244`, `xlsform-import-long-label` and seven more: a Kobo or ODK workbook imports its long and formatted notes, its formulas, "required when", its language and its pictures' names, and our own export keeps note content and "Required when…" (m244-kobo-import-hardening) — BUILT AND HELD: PR #580, CI 44039244826 every job green with real step counts
 
 Taken 2026-11-17, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-3-nifty-parrot.md`). NHETE recommendation 3, harden Kobo import, the NHETE plan's next item after `M243` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).

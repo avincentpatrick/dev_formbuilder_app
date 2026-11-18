@@ -4,7 +4,7 @@ import { Suspense } from "react";
 // Geist from the `geist` package (next/font/local underneath), not next/font/google: a build on
 // the testing box or in CI must not depend on reaching Google at build time.
 import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import localFont from "next/font/local";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
@@ -15,6 +15,27 @@ import { PageViewLogger } from "@/components/analytics/page-view-logger";
 import { NoFlashScript } from "@/components/settings/no-flash-script";
 import { SettingsProvider } from "@/components/settings/settings-provider";
 import { SITE_URL } from "@/lib/site-url";
+
+// Keep the installed Geist font and fallbacks, but fetch this secondary face only
+// when a page uses it. Preloading it competes with the map's renderer on phones.
+const GeistMono = localFont({
+  src: "../node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2",
+  variable: "--font-geist-mono",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Roboto Mono",
+    "Menlo",
+    "Monaco",
+    "Liberation Mono",
+    "DejaVu Sans Mono",
+    "Courier New",
+    "monospace",
+  ],
+  weight: "100 900",
+});
 
 export const metadata: Metadata = {
   // Origin AND base path: Next joins a relative metadata URL onto metadataBase's path, and adds no

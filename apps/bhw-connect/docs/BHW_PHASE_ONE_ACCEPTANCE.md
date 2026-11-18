@@ -291,3 +291,18 @@ is recorded in the linked report: five cold/warm national-map pairs, with one
 cold miss (10,328 ms against 10,000 ms); all five warm samples met 6,000 ms.
 Thus the map budget remains an observed current limitation, not only a historical
 note. This does not establish a controlled physical-device or percentile pass.
+
+## Physical-phone feedback and next increment — 2026-11-18
+
+The owner reports that the physical-phone check was on **iPhone with Chrome**,
+with everything fine **apart from the initial findings already reported**. This
+adds physical-phone feedback of no additional problems; it does not close those
+known findings. Phone model, OS/browser versions, individual tasks, reader roles
+and VoiceOver use have not been established. Desktop/representative-reader and
+screen-reader acceptance remain unverified; do not infer them from “fine”.
+
+The next engineering increment removes an unused early font transfer from map
+startup. Its bounded timing procedure and the rejected bounds-allocation trial
+are recorded in [DATASET_MAP_PERFORMANCE.md](DATASET_MAP_PERFORMANCE.md).
+Historical boundary/crosswalk acceptance, missing-HUC supply and Headcount
+source-license metadata remain separate prerequisites. Phase 1 is not signed off.

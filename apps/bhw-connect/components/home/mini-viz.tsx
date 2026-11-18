@@ -232,13 +232,21 @@ export function DotStrip({
   points,
   marker,
   ariaLabel,
+  pointLabel = "region",
+  pointPlural = "regions",
+  markerLabel = "this area",
+  formatValue = (value: number) => value.toLocaleString(),
 }: {
   points: number[];
-  marker: number;
+  marker: number | null;
+  pointLabel?: string;
+  pointPlural?: string;
+  markerLabel?: string;
+  formatValue?: (value: number) => string;
   ariaLabel: string;
 }) {
-  const max = Math.max(...points, marker);
-  if (max <= 0) return null;
+  if (!points.length) return null;
+  const max = Math.max(...points, marker ?? 0) || 1;
   const left = (v: number) => `${(100 * v) / max}%`;
   const lowest = Math.min(...points);
   const highest = Math.max(...points);
@@ -253,15 +261,17 @@ export function DotStrip({
             style={{ left: left(v), backgroundColor: "var(--seq-3)" }}
           />
         ))}
-        <span
-          className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ left: left(marker), backgroundColor: "var(--accent)" }}
-        />
+        {marker !== null && (
+          <span
+            className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: left(marker), backgroundColor: "var(--accent)" }}
+          />
+        )}
       </div>
       <div className="mt-0.5 flex justify-between text-[0.7rem] text-muted" aria-hidden="true">
         <span>0</span>
         <span>
-          regions {lowest.toLocaleString()}–{highest.toLocaleString()}
+          {pointPlural} {formatValue(lowest)}–{formatValue(highest)}
         </span>
       </div>
       {/* Key: the visual was reported as unclear — "I don't understand the
@@ -276,15 +286,17 @@ export function DotStrip({
             className="inline-block size-2 shrink-0 rounded-full opacity-60"
             style={{ backgroundColor: "var(--seq-3)" }}
           />
-          <span>each dot = one region</span>
+          <span>each dot = one {pointLabel}</span>
         </li>
-        <li className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3 w-1 shrink-0 rounded-full"
-            style={{ backgroundColor: "var(--accent)" }}
-          />
-          <span>this area</span>
-        </li>
+        {marker !== null && (
+          <li className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-1 shrink-0 rounded-full"
+              style={{ backgroundColor: "var(--accent)" }}
+            />
+            <span>{markerLabel}</span>
+          </li>
+        )}
       </ul>
     </div>
   );

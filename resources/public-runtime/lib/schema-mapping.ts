@@ -283,7 +283,7 @@ export interface ResolvedMatrixColumn {
 export function resolveMatrix(
     matrix: RenderMatrix | null,
     locale: string,
-): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked' } | null {
+): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked'; rowDetails?: Record<string, unknown[]> } | null {
     if (matrix === null) {
         return null;
     }
@@ -297,7 +297,8 @@ export function resolveMatrix(
         ...(column.type !== undefined ? { type: column.type, options: resolve(column.options ?? []), required: column.required === true } : {}),
     }));
 
-    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout };
+    // M246: row details are note content, shown in the form's base language as a note's is (`D70`).
+    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout, ...(matrix.rowDetails !== undefined ? { rowDetails: matrix.rowDetails } : {}) };
 }
 
 /** A `config.<key>` option-value list (as strings) the engine grid membership check reads. */
@@ -446,11 +447,22 @@ function buildMatrix(field: RawField): RenderMatrix | null {
             return [{ ...pair, type, options, required: column.required === true }];
         });
 
+    // M246: a row's details, only for a row that has any.
+    const rowDetails: Record<string, unknown[]> = {};
+    for (const row of Array.isArray(field.config?.rows) ? (field.config.rows as unknown[]) : []) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) continue;
+        const entry = row as Record<string, unknown>;
+        if (entry.value !== undefined && entry.value !== null && Array.isArray(entry.details) && entry.details.length > 0) {
+            rowDetails[String(entry.value)] = entry.details as unknown[];
+        }
+    }
+
     return {
         rows: configOptionPairs(field, 'rows'),
         columns,
         cells,
         layout: field.config?.layout === 'stacked' ? 'stacked' : 'table',
+        ...(Object.keys(rowDetails).length > 0 ? { rowDetails } : {}),
     };
 }
 /** Read a `config.<key>` value coerced to a finite number, or null. */

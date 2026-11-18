@@ -82,6 +82,9 @@ const value = computed<AnswerValue>(() => {
 function onUpdate(next: AnswerValue): void {
     runtime.setAnswer(props.field.key, next);
 }
+
+// M246: a grid shows each cell's own error, and its whole-grid line only for a refusal that is not a cell's.
+const isGrid = computed<boolean>(() => props.field.fieldType === 'matrix' || props.field.fieldType === 'likert_matrix');
 </script>
 
 <template>
@@ -89,7 +92,10 @@ function onUpdate(next: AnswerValue): void {
         :field="encodeField"
         :model-value="value"
         :required-marker="marker"
-        :error="runtime.errorFor(field.key)"
+        :error="isGrid ? runtime.gridErrorFor(field.key) : runtime.errorFor(field.key)"
+        :grid-relevance="isGrid ? runtime.gridRelevanceFor(field.key) : null"
+        :cell-errors="isGrid ? runtime.cellErrorsFor(field.key) : undefined"
         @update:model-value="onUpdate"
+        @cell-touched="(path: string) => runtime.markTouched(`${field.key}.${path}`)"
     />
 </template>

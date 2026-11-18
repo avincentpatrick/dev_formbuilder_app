@@ -25,12 +25,22 @@
  * header WORDS carry the ids the controls are named by, in a span of their own, so a button beside them never joins a
  * control's name; and in the cards the header row, otherwise hidden, is drawn as a strip of the columns' names so each
  * can be renamed there. A grid whose rows come from a list or a form says so instead of offering to add or rename them.
+ *
+ * M246 (`grid-question-table`): the grid's own rules, as the engine decided them (`relevance`): a row or column not asked
+ * is not drawn, and a cell not asked reads "Not needed" in place of its control. A long-text column is a text area. A
+ * row's details — note content — sit under its label; such a row's header is a `td` with the row-header role, because a
+ * `th` may not hold a heading. Each cell carries its own error (`cellErrors`, keyed `row.col`, or `row` on a Likert
+ * grid) and tells the host when it is left (`cellTouched`), so an error shows on the cell the person just answered, not
+ * on every cell of a 35-row table at once; the whole-grid line then counts them. The builder's Preview shows every row
+ * and column, so a hidden one can still be renamed there.
  */
-import { MdsButton, MdsCheckbox, MdsIconButton, MdsNumberInput, MdsSelect, MdsTextInput } from '@meridian/design-system';
+import { MdsButton, MdsCheckbox, MdsIconButton, MdsNumberInput, MdsSelect, MdsTextarea, MdsTextInput } from '@meridian/design-system';
 import { computed, inject, useId } from 'vue';
 
-import type { AnswerValue, EncodeField, MatrixColumn, MatrixOption, RequiredMarker } from './FieldInput.vue';
+import type { AnswerValue, EncodeField, GridRelevanceView, MatrixColumn, MatrixOption, RequiredMarker } from './FieldInput.vue';
 import { GridAuthoringKey, type GridEdit } from './grid-authoring';
+import NoteContent from './NoteContent.vue';
+import type { ContentBlock } from './note-content';
 
 const props = defineProps<{
     field: EncodeField;
@@ -38,8 +48,10 @@ const props = defineProps<{
     modelValue: AnswerValue;
     error?: string;
     requiredMarker?: RequiredMarker;
+    relevance?: GridRelevanceView | null;
+    cellErrors?: Record<string, string>;
 }>();
-const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue]; cellTouched: [path: string] }>();
 
 const marker = computed<RequiredMarker>(() => props.requiredMarker ?? (props.field.required ? 'required' : 'none'));
 const showRequiredMarker = computed<boolean>(() => marker.value === 'required');
@@ -74,7 +86,7 @@ const rowId = (i: number): string => `${uid}-row-${i}`;
 const colId = (j: number): string => `${uid}-col-${j}`;
 const nameFor = (i: number, j: number): string => `${rowId(i)} ${colId(j)}`;
 const describedby = computed<string | undefined>(() => {
-    const ids = [props.field.hint ? hintId : null, props.error ? errorId : null].filter((id): id is string => id !== null);
+    const ids = [props.field.hint ? hintId : null, props.error || Object.keys(props.cellErrors ?? {}).length > 0 ? errorId : null].filter((id): id is string => id !== null);
     return ids.length > 0 ? ids.join(' ') : undefined;
 });
 const invalid = computed<boolean>(() => Boolean(props.error));
@@ -161,6 +173,50 @@ function toggleChoice(rowValue: string, colValue: string, choice: string, checke
 function selectOptions(column: MatrixColumn): MatrixOption[] {
     return [{ value: '', label: 'Select…' }, ...choicesOf(column)];
 }
+
+// ── M246: the grid's own rules, as the engine decided them ──────────────────────────────────────────────────────
+// The Preview shows every row and column, asked or not, so the author can still see and rename a hidden one.
+const showAll = computed<boolean>(() => authoring !== null || props.relevance === null || props.relevance === undefined);
+const visibleRows = computed<MatrixOption[]>(() => (showAll.value ? rows.value : rows.value.filter((row) => props.relevance?.rows[row.value] !== false)));
+const visibleColumns = computed<MatrixColumn[]>(() =>
+    showAll.value ? columns.value : columns.value.filter((column) => props.relevance?.columns[column.value] !== false),
+);
+/** Every row hidden: the grid stays a question, but there is nothing in it to answer. */
+const nothingToAnswer = computed<boolean>(() => rows.value.length > 0 && visibleRows.value.length === 0);
+
+function cellNeeded(rowValue: string, colValue: string): boolean {
+    return props.relevance?.cells[rowValue]?.[colValue] !== false;
+}
+
+function rowDetailsOf(rowValue: string): ContentBlock[] | null {
+    const details = props.field.matrix?.rowDetails?.[rowValue];
+
+    return Array.isArray(details) && details.length > 0 ? (details as ContentBlock[]) : null;
+}
+
+const cellPathOf = (rowValue: string, colValue: string | null): string => (colValue === null ? rowValue : `${rowValue}.${colValue}`);
+const cellErrorOf = (rowValue: string, colValue: string | null): string | undefined => props.cellErrors?.[cellPathOf(rowValue, colValue)];
+const cellErrorId = (i: number, j: number | null): string => (j === null ? `${uid}-err-${i}` : `${uid}-err-${i}-${j}`);
+const cellErrorCount = computed<number>(() => Object.keys(props.cellErrors ?? {}).length);
+const errorLine = computed<string | undefined>(() =>
+    cellErrorCount.value > 0
+        ? cellErrorCount.value === 1
+            ? '1 answer in this grid needs your attention.'
+            : `${cellErrorCount.value} answers in this grid need your attention.`
+        : props.error,
+);
+
+/** A control's invalid state and description: its own cell's error first, else the grid's own. */
+function cellInvalid(rowValue: string, colValue: string | null): boolean {
+    return invalid.value || cellErrorOf(rowValue, colValue) !== undefined;
+}
+function cellDescribedby(i: number, j: number | null, rowValue: string, colValue: string | null): string | undefined {
+    return cellErrorOf(rowValue, colValue) !== undefined ? cellErrorId(i, j) : controlDescribedby.value;
+}
+
+function onCellLeft(rowValue: string, colValue: string | null): void {
+    emit('cellTouched', cellPathOf(rowValue, colValue));
+}
 </script>
 
 <template>
@@ -177,13 +233,14 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
         </legend>
         <p v-if="field.hint" :id="hintId" class="mds-grid__help">{{ field.hint }}</p>
 
-        <div class="mds-grid__frame">
+        <p v-if="nothingToAnswer && !authoring" class="mds-grid__help" data-grid-nothing>Nothing in this grid applies to you.</p>
+        <div v-else class="mds-grid__frame">
             <div class="mds-grid__scroll">
                 <table class="mds-grid__table" :style="{ '--matrix-grid-columns': String(Math.max(columns.length, 1)) }">
                     <thead class="mds-grid__head">
                         <tr>
                             <td class="mds-grid__corner"></td>
-                            <th v-for="(col, j) in columns" :key="col.value" scope="col" class="mds-grid__col">
+                            <th v-for="(col, j) in visibleColumns" :key="col.value" scope="col" class="mds-grid__col">
                                 <component
                                     :is="authoring.editor"
                                     v-if="authoring && isEditing('columns', col.value)"
@@ -205,8 +262,13 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(row, i) in rows" :key="row.value" class="mds-grid__row">
-                            <th scope="row" class="mds-grid__row-label">
+                        <tr v-for="(row, i) in visibleRows" :key="row.value" class="mds-grid__row">
+                            <component
+                                :is="rowDetailsOf(row.value) ? 'td' : 'th'"
+                                :scope="rowDetailsOf(row.value) ? undefined : 'row'"
+                                :role="rowDetailsOf(row.value) ? 'rowheader' : undefined"
+                                class="mds-grid__row-label"
+                            >
                                 <component
                                     :is="authoring.editor"
                                     v-if="authoring && rowsEditable && isEditing('rows', row.value)"
@@ -224,8 +286,21 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                     :data-grid-rename-row="row.value"
                                     @click="authoring?.open(edit('rows', row.value))"
                                 />
-                            </th>
-                            <td v-for="(col, j) in columns" :key="col.value" class="mds-grid__cell">
+                                <!-- M246: the row's details, under its label. -->
+                                <div v-if="rowDetailsOf(row.value)" class="mds-grid__details" data-grid-row-details>
+                                    <NoteContent :blocks="rowDetailsOf(row.value) ?? []" />
+                                </div>
+                                <p v-if="kind === 'likert-matrix' && cellErrorOf(row.value, null)" :id="cellErrorId(i, null)" class="mds-grid__cell-error" data-grid-cell-error>
+                                    {{ cellErrorOf(row.value, null) }}
+                                </p>
+                            </component>
+                            <td
+                                v-for="(col, j) in visibleColumns"
+                                :key="col.value"
+                                class="mds-grid__cell"
+                                :class="{ 'mds-grid__cell--not-needed': kind === 'matrix' && !cellNeeded(row.value, col.value) }"
+                                @focusout="onCellLeft(row.value, kind === 'likert-matrix' ? null : col.value)"
+                            >
                                 <!-- likert_matrix: one radio per point; the row's points are one native group. -->
                                 <label v-if="kind === 'likert-matrix'" class="mds-grid__point">
                                     <input
@@ -235,12 +310,18 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                         :value="col.value"
                                         :checked="likertValue[row.value] === col.value"
                                         :aria-labelledby="nameFor(i, j)"
-                                        :aria-invalid="invalid || undefined"
-                                        :aria-describedby="controlDescribedby"
+                                        :aria-invalid="cellInvalid(row.value, null) || undefined"
+                                        :aria-describedby="cellDescribedby(i, null, row.value, null)"
                                         @change="setRow(row.value, col.value)"
                                     />
                                     <span class="mds-grid__caption" aria-hidden="true">{{ col.label }}</span>
                                 </label>
+
+                                <!-- M246: a cell its row or its column's rule does not ask. -->
+                                <template v-else-if="!cellNeeded(row.value, col.value)">
+                                    <span class="mds-grid__caption" aria-hidden="true">{{ col.label }}</span>
+                                    <span class="mds-grid__not-needed" data-grid-not-needed>Not needed</span>
+                                </template>
 
                                 <!-- matrix: a control by the column's type, its header repeated over it as a card. -->
                                 <template v-else>
@@ -256,8 +337,8 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                             :key="choice.value"
                                             :label="choice.label"
                                             :model-value="cellList(row.value, col.value).includes(choice.value)"
-                                            :invalid="invalid"
-                                            :describedby="controlDescribedby"
+                                            :invalid="cellInvalid(row.value, col.value)"
+                                            :describedby="cellDescribedby(i, j, row.value, col.value)"
                                             @update:model-value="toggleChoice(row.value, col.value, choice.value, $event)"
                                         />
                                     </div>
@@ -266,8 +347,8 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                         :model-value="cellNumber(row.value, col.value)"
                                         :step="typeOf(col) === 'integer' ? 1 : undefined"
                                         :aria-labelledby="nameFor(i, j)"
-                                        :invalid="invalid"
-                                        :describedby="controlDescribedby"
+                                        :invalid="cellInvalid(row.value, col.value)"
+                                        :describedby="cellDescribedby(i, j, row.value, col.value)"
                                         @update:model-value="setCell(row.value, col.value, $event)"
                                     />
                                     <MdsTextInput
@@ -275,8 +356,18 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                         :type="typeOf(col) === 'date' ? 'date' : 'text'"
                                         :model-value="cellText(row.value, col.value)"
                                         :aria-labelledby="nameFor(i, j)"
-                                        :invalid="invalid"
-                                        :describedby="controlDescribedby"
+                                        :invalid="cellInvalid(row.value, col.value)"
+                                        :describedby="cellDescribedby(i, j, row.value, col.value)"
+                                        @update:model-value="setCell(row.value, col.value, $event)"
+                                    />
+                                    <!-- M246: a long-text column — a text area that grows with what is written. -->
+                                    <MdsTextarea
+                                        v-else-if="typeOf(col) === 'long_text'"
+                                        :model-value="cellText(row.value, col.value)"
+                                        autosize
+                                        :aria-labelledby="nameFor(i, j)"
+                                        :invalid="cellInvalid(row.value, col.value)"
+                                        :describedby="cellDescribedby(i, j, row.value, col.value)"
                                         @update:model-value="setCell(row.value, col.value, $event)"
                                     />
                                     <MdsSelect
@@ -284,10 +375,13 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
                                         :model-value="cellText(row.value, col.value)"
                                         :options="selectOptions(col)"
                                         :aria-labelledby="nameFor(i, j)"
-                                        :invalid="invalid"
-                                        :describedby="controlDescribedby"
+                                        :invalid="cellInvalid(row.value, col.value)"
+                                        :describedby="cellDescribedby(i, j, row.value, col.value)"
                                         @update:model-value="setCell(row.value, col.value, $event)"
                                     />
+                                    <p v-if="cellErrorOf(row.value, col.value)" :id="cellErrorId(i, j)" class="mds-grid__cell-error" data-grid-cell-error>
+                                        {{ cellErrorOf(row.value, col.value) }}
+                                    </p>
                                 </template>
                             </td>
                         </tr>
@@ -307,14 +401,14 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
         </div>
 
         <div :id="errorId" class="mds-grid__error" aria-live="polite">
-            <template v-if="error">
+            <template v-if="errorLine">
                 <svg class="mds-grid__error-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                     <path
                         fill="currentColor"
                         d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.9 3.6h1.8l-.2 5h-1.4l-.2-5zM8 12.4a1 1 0 110-2 1 1 0 010 2z"
                     />
                 </svg>
-                <span>{{ error }}</span>
+                <span>{{ errorLine }}</span>
             </template>
         </div>
     </fieldset>
@@ -638,6 +732,32 @@ function selectOptions(column: MatrixColumn): MatrixOption[] {
         border-bottom: 1px solid var(--mds-color-border-default);
         border-radius: 0;
     }
+}
+
+/* M246: a cell its rules do not ask, a cell's own error, and a row's details under its label. */
+.mds-grid__not-needed {
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-sm-font-size);
+    line-height: var(--mds-type-body-sm-line-height);
+    font-style: italic;
+    color: var(--mds-color-text-secondary);
+}
+
+.mds-grid__cell--not-needed {
+    background-color: var(--mds-color-bg-sunken);
+}
+
+.mds-grid__cell-error {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-caption-font-size);
+    line-height: var(--mds-type-caption-line-height);
+    color: var(--mds-color-danger-text);
+}
+
+.mds-grid__details {
+    margin-top: var(--mds-space-1);
+    font-weight: var(--mds-font-weight-regular);
 }
 
 .mds-grid__error {

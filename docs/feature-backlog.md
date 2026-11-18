@@ -14595,7 +14595,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M183` (2026-10-22) — ****`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
   `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
   `:118-135` lays one card per row with a labelled select per column; the same component serves the public form, the encode page
-  and the preview (`resources/js/components/submissions/FieldInput.vue:269-270`). Only the printed PDF draws a table
+  and the preview (`resources/js/components/submissions/FieldInput.vue`'s grid controls). Only the printed PDF draws a table
   (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
   `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
   48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
@@ -15048,7 +15048,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M183` (2026-10-22) — ****`minor` · A Likert matrix is drawn as stacked cards that repeat the scale in every row, and a Likert scale as loose chips; neither looks like a Likert scale.**
   The user (2026-10-16): *"the likert matrix doesnt look like likert matrix, make a deep research on how kobo make the likert
-  matrix"*. `resources/js/components/submissions/MatrixGrid.vue:94` draws each statement as its own card with the scale's words
+  matrix"*. `resources/js/components/submissions/MatrixGrid.vue` draws each statement as its own card with the scale's words
   repeated beside its radios (no `<table>`, by the docblock at `:9`); `resources/js/components/submissions/FieldInput.vue:267` sends
   a Likert scale to the chip-row control. KoboToolbox's Rating question is one grid — a header row of scale words over equal-width
   columns, a statement column about a third wide, one centred radio per cell (Enketo's `label` / `list-nolabel` table) — and its

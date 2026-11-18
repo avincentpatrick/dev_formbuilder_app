@@ -272,6 +272,11 @@ export interface RenderMatrix {
     cells: RenderOption[];
     /** M183 (`R-1c1d7266`): `stacked` draws cards at every width; `table` (the default) a table wherever one fits. */
     layout: 'table' | 'stacked';
+    /**
+     * M246 (`grid-question-table`): a row's details — note content drawn under its label — keyed by row value. Optional
+     * because a manifest cached before M246 has none.
+     */
+    rowDetails?: Record<string, unknown[]>;
 }
 
 /**

@@ -10,8 +10,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { computed } from 'vue';
 import ContentBlocksEditor from './ContentBlocksEditor.vue';
 import type { ContentBlock } from './content-blocks';
+import { ContentGlossaryKey } from '@/components/submissions/note-content';
 
 const FORM_ID = '0192e2e0-0000-7000-8000-00000000f001';
 const IMAGE_ID = '0192e2e0-0000-7000-8000-00000000c0de';
@@ -169,7 +171,92 @@ describe('composing', () => {
 
         expect(button(wrapper, 'Heading').attributes('disabled')).toBeDefined();
         expect(wrapper.find('input[type="file"]').attributes('disabled')).toBeDefined();
-        expect(wrapper.text()).toContain('A note can hold at most 50 blocks.');
+        expect(wrapper.text()).toContain('A note can hold at most 50 blocks, counting those inside a details block.');
+    });
+
+    it('counts the blocks inside a details block toward the fifty, inside it and outside it (M245)', () => {
+        const wrapper = mountControlled([
+            ...Array.from({ length: 48 }, (): ContentBlock => ({ type: 'divider' })),
+            { type: 'details', summary: 'More', blocks: [{ type: 'divider' }] },
+        ]);
+
+        expect(button(wrapper, 'Heading').attributes('disabled')).toBeDefined();
+        expect(wrapper.findAll('[role="group"]').filter((group) => group.attributes('aria-label') === 'Add inside block 49')).toHaveLength(1);
+        expect(
+            wrapper
+                .get('[aria-label="Add inside block 49"]')
+                .findAll('button')
+                .every((b) => b.attributes('disabled') !== undefined),
+        ).toBe(true);
+    });
+});
+
+describe('lists, details and glossary words (M245)', () => {
+    it('adds a list and a details block in their empty shapes', async () => {
+        const wrapper = mountControlled();
+
+        await button(wrapper, 'List').trigger('click');
+        await button(wrapper, 'Details').trigger('click');
+
+        expect(blocksOf(wrapper)).toEqual([
+            { type: 'list', style: 'bulleted', items: [] },
+            { type: 'details', summary: null, blocks: [] },
+        ]);
+    });
+
+    it('reads a list one item to a line, skipping blank lines, and keeps what was typed', async () => {
+        const wrapper = mountControlled([{ type: 'list', style: 'bulleted', items: [] }]);
+        const textarea = wrapper.get('textarea');
+
+        await textarea.setValue('First **bold**\n\nSecond [[TWG]]\n');
+
+        expect(blocksOf(wrapper)).toEqual([
+            {
+                type: 'list',
+                style: 'bulleted',
+                items: [{ spans: [{ text: 'First ' }, { text: 'bold', bold: true }] }, { spans: [{ text: 'Second ' }, { text: 'TWG', term: 'TWG' }] }],
+            },
+        ]);
+        expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('First **bold**\n\nSecond [[TWG]]\n');
+
+        await wrapper.get('select').setValue('numbered');
+        expect((blocksOf(wrapper)[0] as { style: string }).style).toBe('numbered');
+    });
+
+    it('edits a details block’s summary and its own blocks in a nested editor with no Details button', async () => {
+        const wrapper = mountControlled([{ type: 'details', summary: null, blocks: [] }]);
+
+        await wrapper.get('input[type="text"]').setValue('More about this indicator');
+        const inside = wrapper.get('[aria-label="Add inside block 1"]');
+        expect(inside.findAll('button').map((b) => b.text())).not.toContain('Details');
+        await inside.findAll('button').find((b) => b.text() === 'Paragraph')!.trigger('click');
+        await wrapper.get('textarea').setValue('Read the paper.');
+
+        expect(blocksOf(wrapper)).toEqual([
+            { type: 'details', summary: 'More about this indicator', blocks: [{ type: 'paragraph', spans: [{ text: 'Read the paper.' }] }] },
+        ]);
+        expect(wrapper.text()).toContain('Block 1.1: Paragraph');
+        expect(wrapper.findAll('[aria-label="Add a block"]')).toHaveLength(1);
+    });
+
+    it('wraps the selection as a glossary word, and names a word the glossary does not have yet', async () => {
+        const wrapper = mountControlled([{ type: 'paragraph', spans: [{ text: 'Ask the TWG.' }] }]);
+        const textarea = wrapper.get('textarea').element as HTMLTextAreaElement;
+        textarea.setSelectionRange(8, 11);
+
+        await button(wrapper, 'Glossary word').trigger('click');
+
+        expect(blocksOf(wrapper)).toEqual([{ type: 'paragraph', spans: [{ text: 'Ask the ' }, { text: 'TWG', term: 'TWG' }, { text: '.' }] }]);
+        expect(wrapper.get('[data-glossary-missing]').text()).toContain("Not in this form's glossary yet: TWG.");
+    });
+
+    it('says nothing about a word the glossary has', () => {
+        const wrapper = mount(ContentBlocksEditor, {
+            props: { blocks: [{ type: 'paragraph', spans: [{ text: 'TWG', term: 'TWG' }] }], formId: FORM_ID },
+            global: { provide: { [ContentGlossaryKey as symbol]: computed(() => [{ term: 'twg', definition: 'x' }]) } },
+        });
+
+        expect(wrapper.find('[data-glossary-missing]').exists()).toBe(false);
     });
 });
 

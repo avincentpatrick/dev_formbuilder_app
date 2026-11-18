@@ -14,6 +14,7 @@
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import FormSettingsSections from '@/components/forms/FormSettingsSections.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ShareProps } from '@/components/forms/types';
+import type { GlossaryRow } from '@/components/forms/glossary';
 import type { ReferenceCandidate } from './reference-candidates';
 
 const props = defineProps<{
@@ -36,7 +37,8 @@ const props = defineProps<{
     confirmationReferences?: ReferenceCandidate[];
 }>();
 
-const emit = defineEmits<{ 'update:open': [value: boolean] }>();
+// M245: the draft's glossary changed in its section, passed up so the builder's preview shows the new meanings.
+const emit = defineEmits<{ 'update:open': [value: boolean]; 'glossary-changed': [rows: GlossaryRow[]] }>();
 </script>
 
 <template>
@@ -58,6 +60,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
             :reference-files="props.referenceFiles"
             :automations="props.automations"
             :data-sharing="props.dataSharing" :confirmation-references="props.confirmationReferences"
+            @glossary-changed="emit('glossary-changed', $event)"
         />
 
         <template #actions>

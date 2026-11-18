@@ -40,6 +40,27 @@ describe('content images on the guest page', () => {
         expect(contentImagesIn(schema)).toEqual(['b', 'a']);
     });
 
+    it('collects an image a details block holds, one level down, in reading order (M245)', () => {
+        const schema = schemaResponse({
+            fields: [
+                field({
+                    key: 'intro',
+                    field_type: 'note',
+                    sequence: 1,
+                    config: {
+                        content: [
+                            { type: 'image', attachment_id: 'top', alt: 'x' },
+                            { type: 'details', summary: 'More', blocks: [{ type: 'divider' }, { type: 'image', attachment_id: 'inside', alt: 'y' }, 'junk'] },
+                            { type: 'details', summary: 'Empty', blocks: 'not a list' },
+                        ],
+                    },
+                }),
+            ],
+        });
+
+        expect(contentImagesIn(schema)).toEqual(['top', 'inside']);
+    });
+
     it('requests only the images not already cached, one at a time', async () => {
         const images = ['cached', 'fresh', 'fresh-2'].map((id) => ({ type: 'image', attachment_id: id }));
         const schema = schemaResponse({ fields: [field({ key: 'intro', field_type: 'note', sequence: 1, config: { content: images } })] });

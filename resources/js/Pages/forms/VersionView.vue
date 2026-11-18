@@ -10,11 +10,14 @@
  *
  * Built in the shared shell (the default `AppLayout`) from the design system's components, like every page.
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, provide, ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { MdsAlert, MdsBreadcrumb, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import PreviewRuntime from '@/components/builder/PreviewRuntime.vue';
+import { glossaryEntries } from '@/components/builder/glossary';
+import GlossaryButton from '@/components/submissions/GlossaryButton.vue';
+import { ContentGlossaryKey } from '@/components/submissions/note-content';
 import { applyPreviewChoices, fetchPreviewChoices, previewChoicesUrl, type PreviewChoices } from '@/components/builder/preview-choices';
 import { hasChoiceLists } from '../../../public-runtime/lib/choice-lists';
 import { hasLinkedChoices } from '../../../public-runtime/lib/linked-choices';
@@ -39,6 +42,10 @@ onMounted(async () => {
 const schema = computed(() => (choices.value === null ? props.schema : applyPreviewChoices(props.schema, choices.value)));
 const model = computed(() => buildRenderModel(schema.value));
 
+// M245 (`R-d0bbb7bb`): this version's own glossary, frozen with it, for its notes' marked words and the Glossary button.
+const glossary = computed(() => glossaryEntries(props.schema.version.schema.glossary));
+provide(ContentGlossaryKey, glossary);
+
 const published = computed(() =>
     props.version.published_at === null
         ? ''
@@ -53,6 +60,9 @@ const published = computed(() =>
         <PageHeader :title="`${schema.form.title} — version ${version.version_number}`" icon="forms">
             <template #breadcrumbs>
                 <MdsBreadcrumb :items="crumbs" :link-component="Link" />
+            </template>
+            <template v-if="glossary.length > 0" #actions>
+                <GlossaryButton />
             </template>
         </PageHeader>
 

@@ -5,11 +5,14 @@
  * every leaf a plain string. An author still needs bold, italic and links, so the textarea speaks a small
  * syntax that exists only in the editor and is parsed into spans before anything is saved:
  *
- *   **bold**   __italic__   `code`   [link text](https://…)   and a backslash before * _ ` [ ] ( ) \ for the
- *   character itself. A delimiter with no partner is just text.
+ *   **bold**   __italic__   `code`   [link text](https://…)   [[glossary word]]   and a backslash before
+ *   * _ ` [ ] ( ) \ for the character itself. A delimiter with no partner is just text.
  *
  * Marks nest in one canonical order, link ⊃ bold ⊃ italic ⊃ code, which is the order the serializer writes and
- * the only order the parser opens.
+ * the only order the parser opens. A glossary word (M245, `R-d0bbb7bb`) sits where code does, innermost: its
+ * brackets hold plain text, never a link or code, and `[[` is read before a link's `[`. Brackets that do not make a
+ * term — empty, edge spaces, a line break, a `|`, or longer than a term may be — are text, exactly as before, so no
+ * stored text changes meaning: a literal `[[` already serializes escaped.
  *
  * ── THE ROUND TRIP IS IDENTITY, BY CONSTRUCTION ───────────────────────────────────────────────────────
  * `parseMarkup(serializeSpans(S))` equals `normalizeSpans(S)` for every span list. The serializer first writes
@@ -35,9 +38,10 @@ interface Marks {
     italic: boolean;
     code: boolean;
     link: string | null;
+    term: string | null;
 }
 
-const NO_MARKS: Marks = { bold: false, italic: false, code: false, link: null };
+const NO_MARKS: Marks = { bold: false, italic: false, code: false, link: null, term: null };
 
 function spanOf(text: string, marks: Marks): ContentSpan {
     const span: ContentSpan = { text };
@@ -53,6 +57,9 @@ function spanOf(text: string, marks: Marks): ContentSpan {
     if (marks.link !== null && marks.link !== '') {
         span.link = marks.link;
     }
+    if (marks.term !== null && marks.term !== '') {
+        span.term = marks.term;
+    }
     return span;
 }
 
@@ -62,11 +69,13 @@ function marksOf(span: ContentSpan): Marks {
         italic: span.italic === true,
         code: span.code === true,
         link: typeof span.link === 'string' && span.link !== '' ? span.link : null,
+        term: typeof span.term === 'string' && span.term !== '' ? span.term : null,
     };
 }
 
+/** Whether two runs may merge: the same marks, and neither a glossary word, which is always a run of its own. */
 function sameMarks(a: Marks, b: Marks): boolean {
-    return a.bold === b.bold && a.italic === b.italic && a.code === b.code && a.link === b.link;
+    return a.term === null && b.term === null && a.bold === b.bold && a.italic === b.italic && a.code === b.code && a.link === b.link;
 }
 
 /** Length in code points — what the server's `mb_strlen` counts, and never a split through a surrogate pair. */
@@ -161,6 +170,17 @@ function parseInto(s: string, marks: Marks, out: ContentSpan[]): void {
             }
         }
 
+        if (s.startsWith('[[', i) && marks.link === null && !marks.code) {
+            const close = findClose(s, i + 2, ']]', true);
+            const term = close > i + 2 ? unescape(s.slice(i + 2, close)) : '';
+            if (isTerm(term)) {
+                flush();
+                out.push(spanOf(term, { ...marks, term }));
+                i = close + 2;
+                continue;
+            }
+        }
+
         if (c === '[' && marks.link === null && !marks.bold && !marks.italic && !marks.code) {
             const link = matchLink(s, i);
             if (link !== null) {
@@ -229,6 +249,13 @@ function matchLink(s: string, start: number): { text: string; url: string; end: 
     return null;
 }
 
+/** What `ContentBlocks` takes as a glossary word's term: 1 to `maxTermLength` code points, no edge space, no line break or control character, no `|`. */
+export function isTerm(text: string): boolean {
+    const length = codePoints(text).length;
+    // eslint-disable-next-line no-control-regex
+    return length > 0 && length <= CONTENT_LIMITS.maxTermLength && text === text.trim() && !/[\u0000-\u001f\u007f|]/u.test(text);
+}
+
 function unescape(s: string): string {
     let out = '';
     for (let i = 0; i < s.length; i += 1) {
@@ -251,7 +278,7 @@ const ESCAPE_URL: Encoder = (text) => text.replace(/[\\()]/g, (character) => `\\
 
 function write(span: ContentSpan, text: Encoder, code: Encoder, url: Encoder): string {
     const body = span.text ?? '';
-    let out = span.code === true ? `\`${code(body)}\`` : text(body);
+    let out = typeof span.term === 'string' && span.term !== '' ? `[[${text(body)}]]` : span.code === true ? `\`${code(body)}\`` : text(body);
     if (span.italic === true) {
         out = `__${out}__`;
     }

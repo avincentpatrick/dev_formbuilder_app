@@ -111,6 +111,9 @@ final class BuilderPresenter
             // M186 (`R-70c7673a`) — the built-in Philippine places this server holds (the quarter, each level's count), or
             // null before a deploy has copied them in. Optional on the client: without it the Levels tab offers no preset.
             'psgc' => $this->psgc->summary(),
+            // M245 (`R-d0bbb7bb`) — the draft's glossary, so the preview opens a marked word's meaning and the Content tab
+            // names a word no term matches. Optional on the client: a fixture without it has no glossary.
+            'glossary' => $form->draft_version_id === null ? [] : FormGlossaryService::snapshotOf($form->draft_version_id),
         ];
     }
 

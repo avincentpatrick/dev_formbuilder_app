@@ -8,7 +8,7 @@
  * selector (a fully keyboard-operable path). Rendered full-bleed by AppLayout (forms/Builder is a fluid
  * page). Publishing/versioning stays on the existing Inertia endpoints.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     MdsAlert,
@@ -35,8 +35,15 @@ import { shortLabel } from '@/components/builder/label-text';
 import type { BuilderPageProps } from '@/components/builder/types';
 import { referenceCandidates } from '@/components/builder/reference-candidates';
 import { useEntitlements } from '@/composables/useEntitlements';
+import { glossaryEntries, type GlossaryEntry } from '@/components/builder/glossary';
+import { ContentGlossaryKey } from '@/components/submissions/note-content';
 
 const props = defineProps<BuilderPageProps>();
+
+// M245 (`R-d0bbb7bb`): the draft's glossary, for the preview's marked words and the Content tab's "not in the glossary"
+// note. Updated in place when the Glossary section changes it, so the preview never waits for a reload.
+const glossary = ref<GlossaryEntry[]>(glossaryEntries(props.glossary));
+provide(ContentGlossaryKey, glossary);
 // M172 (`R-81756e95`): a page Back or Forward restored holds the props of its FIRST visit — see `history-restore.ts`. It
 // re-visits the server at once, and until the fresh page arrives its store is given no draft, so it writes nothing.
 const restoredFromHistory = takeHistoryRestore();
@@ -724,6 +731,7 @@ function submitImport(): void {
             :timezones="timezones"
             :share="share"
             :save-resume-available="feature('save_and_resume')" :ocr-scanning="ocr_scanning" :reference-files="reference_files" :automations="automations" :data-sharing="data_sharing" :confirmation-references="confirmationReferences"
+            @glossary-changed="glossary = glossaryEntries($event)"
         />
 
         <MdsModal :open="importOpen" title="Import XLSForm" @close="importOpen = false">

@@ -1,7 +1,16 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import NoteContent from './NoteContent.vue';
-import { ContentHeadingBaseKey, ContentImageRetryKey, ContentImageUrlKey, renderableBlocks, withAttempt, type ContentBlock } from './note-content';
+import { computed } from 'vue';
+import {
+    ContentGlossaryKey,
+    ContentHeadingBaseKey,
+    ContentImageRetryKey,
+    ContentImageUrlKey,
+    renderableBlocks,
+    withAttempt,
+    type ContentBlock,
+} from './note-content';
 
 /**
  * M130 (`R-c9f50df2`) — a note's content blocks as a respondent sees them, with no raw-HTML sink anywhere.
@@ -150,5 +159,80 @@ describe('NoteContent', () => {
         const blocks: ContentBlock[] = [];
 
         expect(mount(NoteContent, { props: { blocks } }).find('[data-note-content]').text()).toBe('');
+    });
+
+    // ── M245: lists, details blocks and glossary words ─────────────────────────────────────────────────────
+
+    it('draws a bulleted list and a numbered one, each item formatted', () => {
+        const wrapper = render([
+            { type: 'list', style: 'bulleted', items: [{ spans: [{ text: 'Bring your ' }, { text: 'card', bold: true }] }, { spans: [{ text: 'Wear a mask' }] }] },
+            { type: 'list', style: 'numbered', items: [{ spans: [{ text: 'First' }] }] },
+        ]);
+
+        expect(wrapper.findAll('ul > li').map((li) => li.text())).toEqual(['Bring your card', 'Wear a mask']);
+        expect(wrapper.find('ul strong').text()).toBe('card');
+        expect(wrapper.findAll('ol > li').map((li) => li.text())).toEqual(['First']);
+    });
+
+    it('draws a details block collapsed, with its own blocks inside, and opens it on a click', async () => {
+        const wrapper = mount(NoteContent, {
+            props: {
+                blocks: renderableBlocks([
+                    { type: 'details', summary: 'More about this indicator', blocks: [{ type: 'paragraph', spans: [{ text: 'The formula.' }] }] },
+                ]),
+            },
+            attachTo: document.body,
+        });
+        const toggle = wrapper.get('[data-block-details] button');
+
+        expect(toggle.text()).toBe('More about this indicator');
+        expect(toggle.attributes('aria-expanded')).toBe('false');
+        expect(wrapper.findAll('[data-note-content]')).toHaveLength(1);
+
+        await toggle.trigger('click');
+        expect(toggle.attributes('aria-expanded')).toBe('true');
+        expect(wrapper.get(`#${toggle.attributes('aria-controls')}`).text()).toContain('The formula.');
+        wrapper.unmount();
+    });
+
+    it('names a details block with no summary yet, so its button is never empty', () => {
+        const wrapper = render([{ type: 'details', summary: '  ', blocks: [] }]);
+
+        expect(wrapper.get('[data-block-details] button').text()).toBe('Details');
+    });
+
+    it('opens a marked word’s meaning in a dialog, and draws a word the glossary lacks as text', async () => {
+        const glossary = computed(() => [{ term: 'TWG', definition: 'The technical working group.' }]);
+        const wrapper = mount(NoteContent, {
+            props: {
+                blocks: renderableBlocks([
+                    { type: 'paragraph', spans: [{ text: 'Ask the ' }, { text: 'twg', term: 'twg', bold: true }, { text: ' or ' }, { text: 'BHW', term: 'BHW' }, { text: '.' }] },
+                ]),
+            },
+            global: { provide: { [ContentGlossaryKey as symbol]: glossary } },
+            attachTo: document.body,
+        });
+
+        const term = wrapper.get('[data-glossary-term]');
+        expect(term.element.tagName).toBe('BUTTON');
+        expect(term.attributes('type')).toBe('button');
+        expect(term.attributes('aria-haspopup')).toBe('dialog');
+        expect(term.text()).toBe('twg (glossary)');
+        expect(term.find('strong').text()).toBe('twg');
+        expect(wrapper.findAll('[data-glossary-term]')).toHaveLength(1);
+        expect(wrapper.text()).toContain('BHW');
+
+        await term.trigger('click');
+        const dialog = document.body.querySelector('[role="dialog"]');
+        expect(dialog?.textContent).toContain('TWG');
+        expect(dialog?.textContent).toContain('The technical working group.');
+        wrapper.unmount();
+    });
+
+    it('draws every marked word as text where nothing provides a glossary', () => {
+        const wrapper = render([{ type: 'paragraph', spans: [{ text: 'TWG', term: 'TWG' }] }]);
+
+        expect(wrapper.find('[data-glossary-term]').exists()).toBe(false);
+        expect(wrapper.text()).toBe('TWG');
     });
 });

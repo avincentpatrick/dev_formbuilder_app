@@ -2,7 +2,9 @@
 /**
  * The form's banner: title (h1), the language switcher (UX §6, hidden for single-locale forms) and the ambient autosave
  * indicator (UX §5.1). M132's reference-file list left it in M138 (`D92`): respondents are not shown a form's files.
+ * M245: the Glossary button, beside the language switcher, on every step of a form that has a glossary.
  */
+import GlossaryButton from '@/components/submissions/GlossaryButton.vue';
 import LanguageSwitcher from './LanguageSwitcher.vue';
 import SavedIndicator from './SavedIndicator.vue';
 
@@ -18,7 +20,10 @@ defineProps<{
     <header class="form-header">
         <div class="form-header__row">
             <h1 class="form-header__title">{{ title }}</h1>
-            <LanguageSwitcher />
+            <div class="form-header__tools">
+                <GlossaryButton />
+                <LanguageSwitcher />
+            </div>
         </div>
         <p v-if="description" class="form-header__desc">{{ description }}</p>
         <SavedIndicator :saving="saving" :saved-at="savedAt" />
@@ -39,6 +44,13 @@ defineProps<{
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--mds-space-4);
+    flex-wrap: wrap;
+}
+
+.form-header__tools {
+    display: flex;
+    align-items: center;
+    gap: var(--mds-space-2);
     flex-wrap: wrap;
 }
 

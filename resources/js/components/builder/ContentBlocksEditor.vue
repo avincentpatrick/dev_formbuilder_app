@@ -28,24 +28,48 @@
  * the phone camera, and `MdsFormField` still gives it its label, help and error region.
  *
  * No `v-html` anywhere: every leaf renders as text.
+ *
+ * ── M245: LISTS, DETAILS AND GLOSSARY WORDS ──────────────────────────────────────────────────────────────
+ * A list is one textarea, one item to a line, speaking the same syntax. A details block is a summary line over THIS
+ * editor again, `nested`: one level down, without a Details button of its own (the shape allows one level), its
+ * blocks counted against the note's one limit of `maxBlocks`. A glossary word is `[[word]]`, written by the "Glossary
+ * word" button; a word whose term the form's glossary lacks is named under its block, but never stops a save — publish
+ * is where it is refused, so an author may mark first and define later.
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { MdsButton, MdsFormField, MdsIconButton, MdsSelect, MdsTextarea, MdsTextInput } from '@meridian/design-system';
 import {
     CALLOUT_TONES,
     CONTENT_LIMITS,
+    countBlocks,
+    LIST_STYLES,
     uploadContentImage,
     type CalloutTone,
     type ContentBlock,
     type ContentBlockType,
+    type ContentInnerBlock,
+    type ContentListItem,
+    type ContentListStyle,
     type ContentSpan,
 } from './content-blocks';
 import { linkLooksSafe, normalizeSpans, parseMarkup, serializeSpans } from './content-markup';
+import { findEntry, type GlossaryEntry } from './glossary';
+import { ContentGlossaryKey } from '@/components/submissions/note-content';
 
-const props = defineProps<{
-    blocks: ContentBlock[];
-    formId: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        blocks: ContentBlock[];
+        formId: string;
+        /** Inside a details block (M245): no notices, no Details button, and the parent's limit. */
+        nested?: boolean;
+        /** Prefixes every id and block number, so a nested editor's controls stay unique and say where they are. */
+        idPrefix?: string;
+        numberPrefix?: string;
+        /** A nested editor's limit is the whole note's, which its parent counts. */
+        atCapacity?: boolean;
+    }>(),
+    { nested: false, idPrefix: '', numberPrefix: '', atCapacity: false },
+);
 
 const emit = defineEmits<{ 'update:blocks': [blocks: ContentBlock[]] }>();
 
@@ -55,7 +79,12 @@ const TYPE_LABELS: Record<ContentBlockType, string> = {
     callout: 'Callout',
     divider: 'Divider',
     image: 'Image',
+    list: 'List',
+    details: 'Details',
 };
+
+const STYLE_LABELS: Record<ContentListStyle, string> = { bulleted: 'Bulleted list', numbered: 'Numbered list' };
+const styleOptions = LIST_STYLES.map((style) => ({ value: style, label: STYLE_LABELS[style] }));
 
 const TONE_LABELS: Record<CalloutTone, string> = { info: 'Information', success: 'Success', warning: 'Warning', danger: 'Danger' };
 
@@ -67,14 +96,31 @@ const levelOptions = [
 
 const LINK_NOTE = 'A link must start with https://, http://, mailto: or tel: — until it does, it is saved as plain text.';
 
-const atLimit = computed(() => props.blocks.length >= CONTENT_LIMITS.maxBlocks);
+const atLimit = computed(() => (props.nested ? props.atCapacity : countBlocks(props.blocks) >= CONTENT_LIMITS.maxBlocks));
+
+const glossary = inject(
+    ContentGlossaryKey,
+    computed<readonly GlossaryEntry[]>(() => []),
+);
+
+/** The block's marked words whose term the form's glossary does not have yet, each once. */
+function missingTerms(block: ContentBlock): string[] {
+    const runs = block.type === 'paragraph' || block.type === 'callout' ? [block.spans] : block.type === 'list' ? block.items.map((item) => item.spans) : [];
+    const missing: string[] = [];
+    for (const span of runs.flat()) {
+        if (typeof span.term === 'string' && findEntry(glossary.value, span.term) === null && !missing.includes(span.term)) {
+            missing.push(span.term);
+        }
+    }
+    return missing;
+}
 
 function copyBlocks(): ContentBlock[] {
     return props.blocks.map((block) => ({ ...block })) as ContentBlock[];
 }
 
 // ── Text: the per-block cache the header describes ─────────────────────────────────────────────────────
-/** What each paragraph's or callout's textarea holds, by block position. */
+/** What each paragraph's, callout's or list's textarea holds, by block position. */
 const drafts = ref<Record<number, string>>({});
 /** Blocks whose typed text held a link that was kept as plain text, by block position. */
 const linkNotes = ref<Record<number, boolean>>({});
@@ -94,8 +140,26 @@ function spansFrom(text: string): { spans: ContentSpan[]; demoted: boolean } {
     return { spans: normalizeSpans(spans), demoted };
 }
 
-function sameSpans(a: ContentSpan[], b: ContentSpan[]): boolean {
+function sameSpans(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** A list's textarea: one item to a line, blank lines skipped, so pressing Enter for the next item changes nothing yet. */
+function itemsFrom(text: string): { items: ContentListItem[]; demoted: boolean } {
+    let demoted = false;
+    const items = text
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .map((line) => {
+            const parsed = spansFrom(line);
+            demoted = demoted || parsed.demoted;
+            return { spans: parsed.spans };
+        });
+    return { items, demoted };
+}
+
+function serializeItems(items: ContentListItem[]): string {
+    return items.map((item) => serializeSpans(item.spans)).join('\n');
 }
 
 watch(
@@ -103,11 +167,12 @@ watch(
     (blocks) => {
         const next: Record<number, string> = {};
         blocks.forEach((block, index) => {
-            if (block.type !== 'paragraph' && block.type !== 'callout') {
-                return;
-            }
             const typed = drafts.value[index];
-            next[index] = typed !== undefined && sameSpans(spansFrom(typed).spans, block.spans) ? typed : serializeSpans(block.spans);
+            if (block.type === 'paragraph' || block.type === 'callout') {
+                next[index] = typed !== undefined && sameSpans(spansFrom(typed).spans, block.spans) ? typed : serializeSpans(block.spans);
+            } else if (block.type === 'list') {
+                next[index] = typed !== undefined && sameSpans(itemsFrom(typed).items, block.items) ? typed : serializeItems(block.items);
+            }
         });
         drafts.value = next;
     },
@@ -129,6 +194,13 @@ function replaceBlock(index: number, block: ContentBlock): void {
 
 function onText(index: number, value: string): void {
     const block = props.blocks[index];
+    if (block?.type === 'list') {
+        drafts.value = { ...drafts.value, [index]: value };
+        const { items, demoted } = itemsFrom(value);
+        linkNotes.value = { ...linkNotes.value, [index]: demoted };
+        replaceBlock(index, { ...block, items });
+        return;
+    }
     if (block === undefined || (block.type !== 'paragraph' && block.type !== 'callout')) {
         return;
     }
@@ -136,6 +208,29 @@ function onText(index: number, value: string): void {
     const { spans, demoted } = spansFrom(value);
     linkNotes.value = { ...linkNotes.value, [index]: demoted };
     replaceBlock(index, { ...block, spans });
+}
+
+function onStyle(index: number, value: string): void {
+    const block = props.blocks[index];
+    const style = LIST_STYLES.find((candidate) => candidate === value);
+    if (block?.type === 'list' && style !== undefined) {
+        replaceBlock(index, { ...block, style });
+    }
+}
+
+function onSummary(index: number, value: string): void {
+    const block = props.blocks[index];
+    if (block?.type === 'details') {
+        replaceBlock(index, { ...block, summary: value === '' ? null : value });
+    }
+}
+
+/** A details block's own blocks changed, in the nested editor below it. */
+function onInner(index: number, inner: ContentBlock[]): void {
+    const block = props.blocks[index];
+    if (block?.type === 'details') {
+        replaceBlock(index, { ...block, blocks: inner.filter((child): child is ContentInnerBlock => child.type !== 'details') });
+    }
 }
 
 function onHeadingText(index: number, value: string): void {
@@ -168,7 +263,7 @@ function onAlt(index: number, value: string): void {
 }
 
 function add(type: Exclude<ContentBlockType, 'image'>): void {
-    if (atLimit.value) {
+    if (atLimit.value || (type === 'details' && props.nested)) {
         return;
     }
     const block: ContentBlock =
@@ -178,7 +273,11 @@ function add(type: Exclude<ContentBlockType, 'image'>): void {
               ? { type: 'callout', tone: 'info', spans: [] }
               : type === 'divider'
                 ? { type: 'divider' }
-                : { type: 'paragraph', spans: [] };
+                : type === 'list'
+                  ? { type: 'list', style: 'bulleted', items: [] }
+                  : type === 'details'
+                    ? { type: 'details', summary: null, blocks: [] }
+                    : { type: 'paragraph', spans: [] };
     emit('update:blocks', [...copyBlocks(), block]);
 }
 
@@ -212,14 +311,15 @@ function bindTextarea(index: number, component: unknown): void {
 }
 
 /** Wrap the selection in the syntax for `kind`, then select what the author most likely types next. */
-async function format(index: number, kind: 'bold' | 'italic' | 'link'): Promise<void> {
+async function format(index: number, kind: 'bold' | 'italic' | 'link' | 'term'): Promise<void> {
     const element = textareas.get(index);
     const current = drafts.value[index] ?? '';
     const start = element?.selectionStart ?? current.length;
     const end = element?.selectionEnd ?? current.length;
-    const selected = current.slice(start, end) || (kind === 'link' ? 'link text' : 'text');
+    const selected = current.slice(start, end) || (kind === 'link' ? 'link text' : kind === 'term' ? 'word' : 'text');
 
-    const [before, after] = kind === 'bold' ? ['**', '**'] : kind === 'italic' ? ['__', '__'] : ['[', '](https://)'];
+    const [before, after] =
+        kind === 'bold' ? ['**', '**'] : kind === 'italic' ? ['__', '__'] : kind === 'term' ? ['[[', ']]'] : ['[', '](https://)'];
     onText(index, current.slice(0, start) + before + selected + after + current.slice(end));
 
     await nextTick();
@@ -301,43 +401,51 @@ async function onImageChosen(event: Event): Promise<void> {
     }
 }
 
+/** A block's number as an author reads it: "3", or "3.2" inside the third block's details. */
+function blockNumber(index: number): string {
+    return `${props.numberPrefix}${index + 1}`;
+}
+
 function blockLabel(index: number, block: ContentBlock): string {
-    return `Block ${index + 1}: ${TYPE_LABELS[block.type]}`;
+    return `Block ${blockNumber(index)}: ${TYPE_LABELS[block.type]}`;
 }
 </script>
 
 <template>
     <div class="cbe">
         <!-- Two facts an author needs before composing anything, so both are there from first paint. -->
-        <p class="cbe__notice" data-content-notice="replaces-label">
-            Respondents see this content in place of the note's label.
-        </p>
-        <p class="cbe__hint">Shown in the form's default language only.</p>
+        <template v-if="!nested">
+            <p class="cbe__notice" data-content-notice="replaces-label">
+                Respondents see this content in place of the note's label.
+            </p>
+            <p class="cbe__hint">Shown in the form's default language only.</p>
+        </template>
 
-        <p v-if="blocks.length === 0" class="cbe__hint" data-content-empty>This note has no content yet. Add a block below.</p>
+        <p v-if="blocks.length === 0 && !nested" class="cbe__hint" data-content-empty>This note has no content yet. Add a block below.</p>
+        <p v-else-if="blocks.length === 0" class="cbe__hint" data-content-empty>Nothing inside yet. Add a block below.</p>
 
         <ol v-else class="cbe__list">
             <li v-for="(block, index) in blocks" :key="index" class="cbe__block" :data-block-type="block.type">
                 <div class="cbe__block-head">
-                    <p :id="`cbe-block-${index}`" class="cbe__block-label">{{ blockLabel(index, block) }}</p>
-                    <div class="cbe__actions" role="group" :aria-labelledby="`cbe-block-${index}`">
+                    <p :id="`${idPrefix}cbe-block-${index}`" class="cbe__block-label">{{ blockLabel(index, block) }}</p>
+                    <div class="cbe__actions" role="group" :aria-labelledby="`${idPrefix}cbe-block-${index}`">
                         <MdsIconButton
                             icon="chevron-up"
-                            :label="`Move block ${index + 1} up`"
+                            :label="`Move block ${blockNumber(index)} up`"
                             size="sm"
                             :disabled="index === 0"
                             @click="move(index, -1)"
                         />
                         <MdsIconButton
                             icon="chevron-down"
-                            :label="`Move block ${index + 1} down`"
+                            :label="`Move block ${blockNumber(index)} down`"
                             size="sm"
                             :disabled="index === blocks.length - 1"
                             @click="move(index, 1)"
                         />
                         <MdsIconButton
                             icon="trash"
-                            :label="`Remove block ${index + 1}`"
+                            :label="`Remove block ${blockNumber(index)}`"
                             variant="danger"
                             size="sm"
                             @click="remove(index)"
@@ -361,19 +469,27 @@ function blockLabel(index: number, block: ContentBlock): string {
                     </MdsFormField>
                 </template>
 
-                <template v-else-if="block.type === 'paragraph' || block.type === 'callout'">
+                <template v-else-if="block.type === 'paragraph' || block.type === 'callout' || block.type === 'list'">
                     <MdsFormField v-if="block.type === 'callout'" v-slot="{ id }" label="Kind of callout">
                         <MdsSelect :id="id" :model-value="block.tone" :options="toneOptions" @update:model-value="onTone(index, $event)" />
                     </MdsFormField>
-                    <div class="cbe__actions" role="group" :aria-label="`Format block ${index + 1}`">
+                    <MdsFormField v-if="block.type === 'list'" v-slot="{ id }" label="Style">
+                        <MdsSelect :id="id" :model-value="block.style" :options="styleOptions" @update:model-value="onStyle(index, $event)" />
+                    </MdsFormField>
+                    <div class="cbe__actions" role="group" :aria-label="`Format block ${blockNumber(index)}`">
                         <MdsButton size="sm" variant="secondary" @click="format(index, 'bold')">Bold</MdsButton>
                         <MdsButton size="sm" variant="secondary" @click="format(index, 'italic')">Italic</MdsButton>
                         <MdsButton size="sm" variant="secondary" @click="format(index, 'link')">Link</MdsButton>
+                        <MdsButton size="sm" variant="secondary" @click="format(index, 'term')">Glossary word</MdsButton>
                     </div>
                     <MdsFormField
                         v-slot="{ id, describedby, invalid }"
-                        label="Text"
-                        help="**bold**, __italic__ and [link text](https://…) — or select text and use the buttons above."
+                        :label="block.type === 'list' ? 'Items' : 'Text'"
+                        :help="
+                            block.type === 'list'
+                                ? 'One item to a line. **bold**, __italic__, [link text](https://…) and [[glossary word]] work in each.'
+                                : '**bold**, __italic__, [link text](https://…) and [[glossary word]] — or select text and use the buttons above.'
+                        "
                         :error="linkNotes[index] ? LINK_NOTE : undefined"
                     >
                         <MdsTextarea
@@ -386,6 +502,38 @@ function blockLabel(index: number, block: ContentBlock): string {
                             @update:model-value="onText(index, $event)"
                         />
                     </MdsFormField>
+                    <p v-if="missingTerms(block).length > 0" class="cbe__hint" data-glossary-missing>
+                        Not in this form's glossary yet: {{ missingTerms(block).join(', ') }}. Add
+                        {{ missingTerms(block).length === 1 ? 'it' : 'them' }} under Form settings → Glossary before you
+                        publish.
+                    </p>
+                </template>
+
+                <template v-else-if="block.type === 'details'">
+                    <MdsFormField
+                        v-slot="{ id, describedby, invalid }"
+                        label="Summary"
+                        help="Always shown. Respondents open it to read what is inside; paper and PDF print it open."
+                    >
+                        <MdsTextInput
+                            :id="id"
+                            :model-value="block.summary ?? ''"
+                            :maxlength="CONTENT_LIMITS.maxHeadingLength"
+                            :describedby="describedby"
+                            :invalid="invalid"
+                            @update:model-value="onSummary(index, $event)"
+                        />
+                    </MdsFormField>
+                    <ContentBlocksEditor
+                        :blocks="block.blocks"
+                        :form-id="formId"
+                        nested
+                        :id-prefix="`${idPrefix}d${index}-`"
+                        :number-prefix="`${blockNumber(index)}.`"
+                        :at-capacity="atLimit"
+                        class="cbe__nested"
+                        @update:blocks="onInner(index, $event)"
+                    />
                 </template>
 
                 <p v-else-if="block.type === 'divider'" class="cbe__hint">A line across the page.</p>
@@ -422,11 +570,14 @@ function blockLabel(index: number, block: ContentBlock): string {
             </li>
         </ol>
 
-        <div class="cbe__actions" role="group" aria-label="Add a block">
+        <!-- A nested editor's group is "Add inside block N", never "Add a block": the outer group is found by that name. -->
+        <div class="cbe__actions" role="group" :aria-label="nested ? `Add inside block ${numberPrefix.replace(/\.$/, '')}` : 'Add a block'">
             <MdsButton size="sm" variant="secondary" icon-left="plus" :disabled="atLimit" @click="add('heading')">Heading</MdsButton>
             <MdsButton size="sm" variant="secondary" icon-left="plus" :disabled="atLimit" @click="add('paragraph')">Paragraph</MdsButton>
             <MdsButton size="sm" variant="secondary" icon-left="plus" :disabled="atLimit" @click="add('callout')">Callout</MdsButton>
             <MdsButton size="sm" variant="secondary" icon-left="plus" :disabled="atLimit" @click="add('divider')">Divider</MdsButton>
+            <MdsButton size="sm" variant="secondary" icon-left="list" :disabled="atLimit" @click="add('list')">List</MdsButton>
+            <MdsButton v-if="!nested" size="sm" variant="secondary" icon-left="plus" :disabled="atLimit" @click="add('details')">Details</MdsButton>
         </div>
 
         <MdsFormField
@@ -447,7 +598,9 @@ function blockLabel(index: number, block: ContentBlock): string {
             />
         </MdsFormField>
         <p v-if="uploading" class="cbe__hint" role="status">Uploading the image…</p>
-        <p v-if="atLimit" class="cbe__hint">A note can hold at most {{ CONTENT_LIMITS.maxBlocks }} blocks.</p>
+        <p v-if="atLimit && !nested" class="cbe__hint">
+            A note can hold at most {{ CONTENT_LIMITS.maxBlocks }} blocks, counting those inside a details block.
+        </p>
     </div>
 </template>
 
@@ -513,6 +666,12 @@ function blockLabel(index: number, block: ContentBlock): string {
     flex-wrap: wrap;
     align-items: center;
     gap: var(--mds-space-2);
+}
+
+/* A details block's own blocks, set in from the summary so their place reads at a glance. */
+.cbe__nested {
+    padding-inline-start: var(--mds-space-3);
+    border-inline-start: 2px solid var(--mds-color-border-default);
 }
 
 .cbe__image {

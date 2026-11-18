@@ -46,7 +46,8 @@ export function contentImageCacheKey(absoluteUrl: string): string {
 
 /**
  * Every content image the version's notes name, once each, in form order — an image block with a non-empty
- * string `attachment_id`, the same rule `note-content.ts`'s `renderableBlocks()` draws by. Read here rather than
+ * string `attachment_id`, at the top level or inside a details block (M245), the same rule `note-content.ts`'s
+ * `renderableBlocks()` draws by. Read here rather than
  * imported from there because `sw.ts` imports this module and is type-checked against the worker library, where
  * the builder modules that file reaches (which touch `document`) do not compile.
  */
@@ -67,9 +68,22 @@ export function contentImagesIn(schema: SchemaResponse): string[] {
             if (typeof block !== 'object' || block === null) {
                 continue;
             }
-            const { type, attachment_id: id } = block as { type?: unknown; attachment_id?: unknown };
+            const { type, attachment_id: id, blocks: inner } = block as { type?: unknown; attachment_id?: unknown; blocks?: unknown };
             if (type === 'image' && typeof id === 'string' && id !== '' && !ids.includes(id)) {
                 ids.push(id);
+            }
+            // M245 (`R-93e22765`): a details block holds blocks of its own, one level down. Written inline, like the rest
+            // of this walk, for the worker-library reason above.
+            if (type === 'details' && Array.isArray(inner)) {
+                for (const child of inner) {
+                    if (typeof child !== 'object' || child === null) {
+                        continue;
+                    }
+                    const { type: childType, attachment_id: childId } = child as { type?: unknown; attachment_id?: unknown };
+                    if (childType === 'image' && typeof childId === 'string' && childId !== '' && !ids.includes(childId)) {
+                        ids.push(childId);
+                    }
+                }
             }
         }
     }

@@ -30,13 +30,16 @@
  * field binds to `answers[sectionKey][i][fieldKey]` and its 422 keys `answers.<sectionKey>[i].<fieldKey>`; a
  * min/max count failure keys the bare `answers.<sectionKey>`.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsAlert, MdsBreadcrumb, MdsButton, MdsCard, type BreadcrumbItem } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import { createServerAutosave } from '@/composables/useServerAutosave';
 import { sendSettingsRequest } from '@/components/forms/reference-files';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
+import GlossaryButton from '@/components/submissions/GlossaryButton.vue';
+import { ContentGlossaryKey } from '@/components/submissions/note-content';
+import { glossaryEntries } from '@/components/builder/glossary';
 import RepeatTableFrame, { type RepeatTableColumn } from '@/components/submissions/RepeatTableFrame.vue';
 import { drawsAsTable } from '@/components/submissions/repeat-table';
 import ScanPages from '@/components/ocr/ScanPages.vue';
@@ -179,6 +182,13 @@ const props = defineProps<{
      */
     choice_lists_url?: string | null;
 }>();
+
+// M245 (`R-d0bbb7bb`): the version's glossary, for a note's marked words and the header's Glossary button. The keyer
+// reads the same meanings the respondent was shown.
+provide(
+    ContentGlossaryKey,
+    computed(() => glossaryEntries(props.version.schema.glossary)),
+);
 
 /**
  * Increment I9c. Read this instead of `editing !== null` at each site so the three modes stay one question
@@ -1254,6 +1264,8 @@ function onConflictKeydown(event: KeyboardEvent): void {
                      kept in step with the trail by hand. `v-if` rather than a fallback URL — a reader the
                      destination refuses is offered no Cancel at all, which is the whole point of the sweep. -->
                 <Link v-if="cancel_url" :href="cancel_url" class="encode__cancel">Cancel</Link>
+                <!-- M245: the form's glossary, when it has one — nothing otherwise. -->
+                <GlossaryButton />
             </template>
         </PageHeader>
 

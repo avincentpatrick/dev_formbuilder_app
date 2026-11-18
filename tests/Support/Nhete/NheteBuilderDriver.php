@@ -271,7 +271,8 @@ final class NheteBuilderDriver
      */
     private function payload(array $e, string $version): array
     {
-        $config = [];
+        // M246: a grid's settings — its rows and their details, its columns and their rules — as the Grid tab saves them.
+        $config = is_array($e['config'] ?? null) ? $e['config'] : [];
         if ($e['options'] !== []) {
             $config['options'] = array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1]], $e['options']);
         }

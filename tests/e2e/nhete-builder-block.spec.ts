@@ -207,3 +207,71 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await archive(page, formId);
     }
 });
+
+/*
+ * M246 (`grid-question-table`) — the same indicator as ONE ROW of a question table, clicked into being in the Grid tab:
+ * a long-text comment column required only where its row's cut-off says "change" (Column rules, "Edit as text" with
+ * this row's `${.cut}`), a second row whose cut-off is "Not needed" (Row settings), and details under the first row's
+ * label. The Preview then shows the comment asked where the cut-off says so, "Not needed" in the second row, and the
+ * details; a reload keeps the rules.
+ */
+test('Builder — a NHETE question table clicked into being: a comment column required by its row, a cell not needed, a row with details', async ({ page }, info) => {
+    test.setTimeout(300_000);
+    const formId = await createForm(page, `NHETE question table ${info.project.name} ${Date.now()}`);
+
+    try {
+        await add(page, 'Matrix (grid)', 'Indicators', 'ind');
+        await configTab(page, 'Grid');
+        const config = page.locator('.config');
+
+        // Two rows, two columns, and the cut-off's two choices.
+        for (const name of ['Add row', 'Add row']) await config.getByRole('button', { name, exact: true }).first().click();
+        await config.getByRole('textbox', { name: 'Row 1 value' }).fill('a01');
+        await config.getByRole('textbox', { name: 'Row 1 label' }).fill('A01 Visits');
+        await config.getByRole('textbox', { name: 'Row 2 value' }).fill('b03');
+        await config.getByRole('textbox', { name: 'Row 2 label' }).fill('B03 Coverage');
+        for (let i = 0; i < 2; i++) await config.getByRole('button', { name: 'Add column', exact: true }).click();
+        await config.getByRole('textbox', { name: 'Column 1 value' }).fill('cut');
+        await config.getByRole('textbox', { name: 'Column 1 label' }).fill('Cut-off');
+        await config.getByRole('textbox', { name: 'Column 2 value' }).fill('why');
+        await config.getByRole('textbox', { name: 'Column 2 label' }).fill('Why');
+        await config.locator('[data-column-type="1"]').selectOption('long_text');
+        for (let i = 0; i < 2; i++) await config.getByRole('button', { name: 'Add choice', exact: true }).last().click();
+        await config.getByRole('textbox', { name: 'Choice 1 value' }).last().fill('change');
+        await config.getByRole('textbox', { name: 'Choice 1 label' }).last().fill('Change it');
+        await config.getByRole('textbox', { name: 'Choice 2 value' }).last().fill('use');
+        await config.getByRole('textbox', { name: 'Choice 2 label' }).last().fill('Use it');
+        await settled(page);
+
+        // The comment's rule: required in each row whose cut-off is "change", written as text with "This row's".
+        await config.locator('[data-grid-column-settings="1"]').click();
+        const required = config.getByRole('group', { name: 'In each row, this cell is required when…' });
+        await required.getByRole('button', { name: 'Edit as text' }).click();
+        await required.getByLabel('Condition expression').fill("${.cut} = 'change'");
+        // B03 has no cut-off: its row marks that cell "Not needed".
+        await config.locator('[data-grid-row-settings="1"]').click();
+        await config.locator('[data-grid-not-needed-ticks="1"]').getByText('Cut-off', { exact: true }).click();
+        // A01 carries details under its label.
+        await config.locator('[data-grid-row-settings="0"]').click();
+        await config.locator('[data-grid-row-rules="0"]').getByRole('button', { name: 'Paragraph', exact: true }).click();
+        await config.locator('[data-grid-row-rules="0"]').getByRole('textbox').last().fill('Clinic visits per 1,000 people each year.');
+        await settled(page);
+
+        await openPreview(page);
+        const preview = page.locator('[data-builder-preview]');
+        await expect(preview.getByText('Clinic visits per 1,000 people each year.')).toBeVisible();
+        await expect(preview.locator('[data-grid-not-needed]').first()).toBeVisible();
+        await preview.getByRole('combobox', { name: 'A01 Visits Cut-off', exact: true }).selectOption('change');
+        await expect(preview.getByRole('textbox', { name: 'A01 Visits Why', exact: true })).toBeVisible();
+
+        await page.reload({ waitUntil: 'networkidle' });
+        await structure(page);
+        await page.locator('.canvas__field-main').first().click();
+        await configTab(page, 'Grid');
+        await expect(page.locator('[data-grid-column-settings="1"]')).toContainText('required only sometimes');
+        await expect(page.locator('[data-grid-row-settings="1"]')).toContainText('1 not needed');
+        await expect(page.locator('[data-grid-row-settings="0"]')).toContainText('has details');
+    } finally {
+        await archive(page, formId);
+    }
+});

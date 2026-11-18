@@ -555,7 +555,8 @@ class E2eSeeder extends Seeder
                     ],
                 ]);
                 // Likert matrix (Increment G4b): one radio group per row over a shared 1–5 scale.
-                $sb->addField($showcase, $owner, FieldType::LikertMatrix, $showSection->id)->update([
+                $likertRating = $sb->addField($showcase, $owner, FieldType::LikertMatrix, $showSection->id);
+                $likertRating->update([
                     'label' => 'Rate each aspect of your visit',
                     'config' => [
                         'rows' => [
@@ -596,6 +597,28 @@ class E2eSeeder extends Seeder
                             ['value' => 'limited', 'label' => 'Limited'],
                             ['value' => 'closed', 'label' => 'Closed'],
                         ],
+                    ],
+                ]);
+                // M246 (`grid-question-table`): a question table — a row shown only when the Likert grid's Cleanliness is
+                // rated Excellent, a cut-off cell "Not needed" in one row, a long-text column needed and required only
+                // where its row's cut-off says "Change it", and details under a row's label. The public-runtime scan
+                // reveals the row, opens the comment and leaves it blank, so it meets each of them.
+                $sb->addField($showcase, $owner, FieldType::Matrix, $showSection->id)->update([
+                    'label' => 'Indicators to review',
+                    'config' => [
+                        'rows' => [
+                            ['value' => 'a01', 'label' => 'A01 Visits', 'details' => [['type' => 'paragraph', 'spans' => [['text' => 'Clinic visits per 1,000 people each year.']]]]],
+                            ['value' => 'b03', 'label' => 'B03 Coverage', 'not_needed' => ['cut']],
+                            ['value' => 'c09', 'label' => 'C09 Follow-up', 'relevant' => '${'.$likertRating->key.'.cleanliness} = \'5\''],
+                        ],
+                        'columns' => [
+                            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'single_select', 'options' => [
+                                ['value' => 'use', 'label' => 'Use it'],
+                                ['value' => 'change', 'label' => 'Change it'],
+                            ]],
+                            ['value' => 'why', 'label' => 'Why', 'type' => 'long_text', 'needed_when' => "\${.cut} = 'change'", 'required_when' => "\${.cut} = 'change'"],
+                        ],
+                        'cells' => [],
                     ],
                 ]);
                 // Geo (Increment G5b2): a point (with altitude + accuracy target), a trace, and a shape. All

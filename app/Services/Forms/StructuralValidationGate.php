@@ -681,7 +681,7 @@ final class StructuralValidationGate
             }
 
             $notNeeded = $row[GridRules::NOT_NEEDED] ?? [];
-            if ($notNeeded === [] || $notNeeded === null) {
+            if ($notNeeded === []) {
                 continue;
             }
             if ($field->field_type !== FieldType::Matrix || ! is_array($notNeeded)) {

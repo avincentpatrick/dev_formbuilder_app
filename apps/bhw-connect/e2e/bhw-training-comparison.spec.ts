@@ -22,6 +22,7 @@ for (const width of [390, 1440]) {
     await expect(topic).toHaveAttribute("href", /geos=01%2C02%2C03%2C04&focus=02/);
     await topic.click();
     await expect(page).toHaveURL(/measure=bhw.training.dengue&geos=01%2C02%2C03%2C04&focus=02/);
+    await expect(page.getByRole("heading", { name: "Dengue", exact: true })).toBeInViewport();
     await page.reload();
     await expect(matrix).toBeVisible();
     await expect(page).toHaveURL(/measure=bhw.training.dengue&geos=01%2C02%2C03%2C04&focus=02/);

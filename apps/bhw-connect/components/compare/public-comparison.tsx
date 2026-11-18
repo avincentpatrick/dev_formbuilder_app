@@ -120,7 +120,9 @@ export async function PublicComparison({
               mapState={mapState}
             />
           )}
-          <h2 className="text-xl font-semibold">{spec.label}</h2>
+          <h2 id="comparison-measure" className="scroll-mt-20 text-xl font-semibold">
+            {spec.label}
+          </h2>
           <p>{measureDefinition(rows[0].indicator)}</p>
           {!spec.categoryColumn && (
             <BenchmarkBars

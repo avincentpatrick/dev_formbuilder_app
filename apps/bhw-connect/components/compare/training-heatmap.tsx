@@ -87,12 +87,12 @@ export function TrainingHeatmap({
                   <Link
                     className="underline"
                     aria-current={row.id === measure ? "page" : undefined}
-                    href={comparisonHref(
+                    href={`${comparisonHref(
                       row.id,
                       places.map((p) => p.geoCode),
                       focus,
                       mapState,
-                    )}
+                    )}#comparison-measure`}
                   >
                     {row.label}
                   </Link>

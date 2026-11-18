@@ -74,6 +74,23 @@ it("retains zero and unequal denominators without averaging percentages", async 
   expect(html).toContain("Denominator: 20");
   expect(html).not.toContain("25%");
 });
+it("adds the training matrix from the same reads without exposing rejected topic payloads", async () => {
+  const id = "bhw.training.basic_life_support";
+  vi.mocked(getPublicDataset).mockImplementation(async (_, selection) => {
+    const first = selection.mode === "psgc" && selection.code === "01";
+    const data = fixture(id, first ? "available" : "suppressed", first ? 0 : 987654);
+    data.indicators[0].unit = "%";
+    return data;
+  });
+  const html = await render(id);
+  expect(html).toContain("Training across selected places");
+  expect(html).toContain("0%");
+  expect(html).toContain("Topics overlap");
+  expect(html).toContain("Withheld across locations");
+  expect(html).not.toContain("987654");
+  expect(html).not.toContain("PRIVATE_SENTINEL");
+  expect(getPublicDataset).toHaveBeenCalledTimes(2);
+});
 it("does not read figures for excess, unverifiable or mixed-level places", async () => {
   const excess = await render("bhw.total", "01,02,03,04,05");
   expect(excess).toContain("at most four");

@@ -1,5 +1,6 @@
 "use client";
 import "maplibre-gl/dist/maplibre-gl.css";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MapCamera } from "@/lib/maps/zoom-geography";
 import { formatCount, percentageFormatter } from "@/lib/format";
@@ -25,7 +26,11 @@ export function DatasetCanvas({
   onZoomGeography,
   initialCamera,
   geographyLabel,
+  metricLabel,
   mapOnly = false,
+  tableOpen = false,
+  onToggleTable,
+  localityHref,
   onMapOnly,
   unit = "",
   formatValueLabel,
@@ -37,10 +42,14 @@ export function DatasetCanvas({
   view = "choropleth",
 }: {
   mapOnly?: boolean;
+  tableOpen?: boolean;
+  onToggleTable?: () => void;
+  localityHref?: (code: string) => string | null;
   onMapOnly?: () => void;
   unit?: string;
   formatValueLabel?: (value: number) => string;
   geographyLabel?: string;
+  metricLabel?: string;
   initialCamera?: MapCamera;
   onZoomGeography?: (camera: MapCamera, direction: "in" | "out", focus: string | null) => void;
   url: string;
@@ -66,7 +75,24 @@ export function DatasetCanvas({
     () => percentageFormatter(rows.flatMap((row) => (row.value === null ? [] : [row.value]))),
     [rows],
   );
-  const valueRow = selected !== dismissed ? rows.find((row) => row.code === selected) : undefined;
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [visibleCodes, setVisibleCodes] = useState<string[]>([]);
+  const activeCode = mapOnly ? (pinned ?? hovered) : selected;
+  const valueRow =
+    activeCode !== dismissed ? rows.find((row) => row.code === activeCode) : undefined;
+  const visibleSet = new Set(visibleCodes);
+  const excludedSet = new Set(excludedCodes);
+  const visibleRows = rows.filter((row) => visibleSet.has(row.code) && !excludedSet.has(row.code));
+  const formatValue = (value: number | null) =>
+    value === null
+      ? "Not reported"
+      : formatValueLabel
+        ? formatValueLabel(value)
+        : unit === "%"
+          ? formatPercentage(value)
+          : `${formatCount(value)} ${unit}`.trim();
+  const profileHref = mapOnly && pinned && localityHref ? localityHref(pinned) : null;
   const cameraOnMount = useRef(initialCamera);
   const zoomIntent = useRef(false);
   const container = useRef<HTMLDivElement>(null);
@@ -91,14 +117,14 @@ export function DatasetCanvas({
   }, []);
 
   const resetView = useRef<(() => void) | null>(null);
-  const selectedRef = useRef(selected);
+  const selectedRef = useRef(activeCode);
   useEffect(() => {
-    selectedRef.current = selected;
+    selectedRef.current = activeCode;
     if (mapRef.current?.getLayer("selection"))
-      mapRef.current.setFilter("selection", ["==", "geo_code", selected ?? ""]);
-  }, [selected]);
+      mapRef.current.setFilter("selection", ["==", "geo_code", activeCode ?? ""]);
+  }, [activeCode]);
 
-  const callbacks = useRef({ onSelect, onGeometry, onCapture, onZoomGeography });
+  const callbacks = useRef({ onSelect, onGeometry, onCapture, onZoomGeography, mapOnly });
   const excludedKey = excludedCodes.join(",");
   const emphasisKey = emphasis?.join(",") ?? "";
   // A new renderer must not inherit the previous canvas's ready/error status.
@@ -121,11 +147,13 @@ export function DatasetCanvas({
     callbacks.current = {
       onSelect: (code: string) => {
         setDismissed(null);
-        onSelect(code);
+        if (mapOnly) setPinned(code);
+        else onSelect(code);
       },
       onGeometry,
       onCapture,
       onZoomGeography,
+      mapOnly,
     };
   });
   const display = useRef({ rows, bins, excludedKey, view });
@@ -384,22 +412,51 @@ export function DatasetCanvas({
               callbacks.current.onCapture(codes.length ? () => captureMapFrame(readyMap) : null);
             }
           });
-          map.on("click", (e) => {
+          const updateVisible = () => {
+            if (!map || disposed || !callbacks.current.mapOnly) return;
+            const codes = [
+              ...new Set(
+                map
+                  .queryRenderedFeatures({ layers: ["fill"] })
+                  .map((feature) => feature.properties?.geo_code)
+                  .filter((code): code is string => typeof code === "string"),
+              ),
+            ].sort();
+            setVisibleCodes((previous) =>
+              previous.join(",") === codes.join(",") ? previous : codes,
+            );
+          };
+          map.on("idle", updateVisible);
+          const hitCode = (point: import("maplibre-gl").Point) => {
             const symbolCode =
               display.current.view === "circles"
-                ? map?.queryRenderedFeatures(e.point, { layers: ["counts", "zeros"] })[0]
-                    ?.properties?.geo_code
+                ? map?.queryRenderedFeatures(point, { layers: ["counts", "zeros"] })[0]?.properties
+                    ?.geo_code
                 : undefined;
             const labelCode = labels
-              ? map?.queryRenderedFeatures(e.point, { layers: ["place-labels"] })[0]?.properties
+              ? map?.queryRenderedFeatures(point, { layers: ["place-labels"] })[0]?.properties
                   ?.geo_code
               : undefined;
             const code =
               symbolCode ??
               labelCode ??
-              map?.queryRenderedFeatures(e.point, { layers: ["fill"] })[0]?.properties?.geo_code;
-            if (typeof code === "string") callbacks.current.onSelect(code);
+              map?.queryRenderedFeatures(point, { layers: ["fill"] })[0]?.properties?.geo_code;
+            return typeof code === "string" &&
+              (!callbacks.current.mapOnly || !display.current.excludedKey.split(",").includes(code))
+              ? code
+              : null;
+          };
+          map.on("click", (event) => {
+            const code = hitCode(event.point);
+            if (code) callbacks.current.onSelect(code);
           });
+          map.on("mousemove", (event) => {
+            if (!callbacks.current.mapOnly || map?.isMoving()) return;
+            const code = hitCode(event.point);
+            setHovered(code);
+            if (map) map.getCanvas().style.cursor = code ? "pointer" : "";
+          });
+          map.getCanvas().addEventListener("mouseleave", () => setHovered(null));
         });
       } catch {
         if (!disposed) {
@@ -421,7 +478,10 @@ export function DatasetCanvas({
     };
   }, [url, rows, emphasisKey, labels, renderVersion]);
   return (
-    <div data-map-canvas className={mapOnly ? "relative h-full w-full" : "relative"}>
+    <div
+      data-map-canvas
+      className={mapOnly ? "relative flex h-full w-full flex-col lg:flex-row" : "relative"}
+    >
       <div
         aria-label="Map viewport controls"
         role="group"
@@ -477,56 +537,121 @@ export function DatasetCanvas({
           </button>
         )}
       </div>
-      <div
-        aria-hidden="true"
-        data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
-        ref={container}
-        className={[
-          ready ? "maplibregl-map" : "",
-          mapOnly
-            ? "h-full w-full"
-            : compact
-              ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
-              : expanded
-                ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
-                : "h-64 w-full rounded-lg border border-border",
-        ].join(" ")}
-      />
-      {geographyLabel && ready && !mapOnly && (
-        <p
-          className="pointer-events-none absolute bottom-2 right-2 rounded bg-background px-2 py-1 text-xs"
-          aria-live="polite"
-        >
-          {geographyLabel}
-        </p>
-      )}
-      {valueRow && ready && (
+      <div className={mapOnly ? "relative min-h-0 min-w-0 flex-1" : "relative"}>
         <div
-          role="status"
-          aria-label="Selected map value"
-          className="absolute bottom-10 left-2 right-2 z-20 flex items-start justify-between gap-3 rounded-lg border border-border bg-background p-3 text-left text-sm shadow-lg"
-        >
-          <div>
-            <strong>{valueRow.name}</strong>
-            <p>
-              {valueRow.value === null
-                ? "Not reported"
-                : formatValueLabel
-                  ? formatValueLabel(valueRow.value)
-                  : unit === "%"
-                    ? formatPercentage(valueRow.value)
-                    : `${formatCount(valueRow.value)} ${unit}`.trim()}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="min-h-11 min-w-11 rounded border border-border px-2"
-            aria-label="Close map value"
-            onClick={() => setDismissed(valueRow.code)}
+          aria-hidden="true"
+          data-map-state={failed ? "failed" : ready ? "ready" : "loading"}
+          ref={container}
+          className={[
+            ready ? "maplibregl-map" : "",
+            mapOnly
+              ? "h-full w-full"
+              : compact
+                ? "h-[60svh] min-h-80 w-full rounded-lg border border-border lg:h-[55vh]"
+                : expanded
+                  ? "h-[55vh] min-h-64 w-full rounded-lg border border-border"
+                  : "h-64 w-full rounded-lg border border-border",
+          ].join(" ")}
+        />
+        {geographyLabel && ready && !mapOnly && (
+          <p
+            className="pointer-events-none absolute bottom-2 right-2 rounded bg-background px-2 py-1 text-xs"
+            aria-live="polite"
           >
-            ×
-          </button>
-        </div>
+            {geographyLabel}
+          </p>
+        )}
+        {valueRow && ready && (
+          <div
+            role="status"
+            aria-label="Selected map value"
+            className="absolute bottom-10 left-2 right-2 z-20 flex items-start justify-between gap-3 rounded-lg border border-border bg-background p-3 text-left text-sm shadow-lg"
+          >
+            <div>
+              <strong>{valueRow.name}</strong>
+              <p>{formatValue(valueRow.value)}</p>
+              {profileHref && (
+                <Link href={profileHref} className="mt-2 inline-block underline">
+                  Open locality profile
+                </Link>
+              )}
+            </div>
+            <button
+              type="button"
+              className="min-h-11 min-w-11 rounded border border-border px-2"
+              aria-label="Close map value"
+              onClick={() => {
+                setDismissed(valueRow.code);
+                if (mapOnly) {
+                  setPinned(null);
+                  setHovered(null);
+                }
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
+      {mapOnly && onToggleTable && (
+        <button
+          type="button"
+          aria-expanded={tableOpen}
+          onClick={onToggleTable}
+          className="absolute left-2 top-2 z-30 min-h-11 rounded border border-border bg-background px-3 text-sm"
+        >
+          {tableOpen ? "Hide table" : "Show table"}
+        </button>
+      )}
+      {mapOnly && tableOpen && (
+        <section
+          aria-label="Localities in view"
+          className="h-[40dvh] shrink-0 overflow-auto border-t border-border bg-background p-3 lg:h-full lg:w-80 lg:border-l lg:border-t-0 lg:pt-16"
+          tabIndex={0}
+        >
+          <h2 className="font-semibold">
+            {geographyLabel?.replace(" figures", "") ?? "Localities"} in view ·{" "}
+            {ready ? visibleRows.length : "…"}
+          </h2>
+          <p className="mb-2 text-xs text-muted">
+            Updates when you pan or zoom. Values are for each whole locality.
+          </p>
+          {!ready ? (
+            <p>Loading map values…</p>
+          ) : visibleRows.length === 0 ? (
+            <p>No matching localities in view.</p>
+          ) : (
+            <table className="w-full text-left text-sm">
+              {metricLabel && <caption className="text-left">{metricLabel}</caption>}
+              <thead>
+                <tr>
+                  <th scope="col">Locality</th>
+                  <th scope="col">Value{unit ? ` (${unit})` : ""}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row) => (
+                  <tr key={row.code} className={pinned === row.code ? "bg-surface" : ""}>
+                    <th scope="row" className="font-normal">
+                      <button
+                        type="button"
+                        className="min-h-11 text-left underline"
+                        aria-pressed={pinned === row.code}
+                        onClick={() => {
+                          setDismissed(null);
+                          setPinned(row.code);
+                        }}
+                      >
+                        {row.name}
+                      </button>
+                    </th>
+                    <td className="whitespace-nowrap">{formatValue(row.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
       )}
       {!ready && !failed && (
         <p

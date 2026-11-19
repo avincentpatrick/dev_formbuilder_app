@@ -90,6 +90,8 @@ export function DatasetMapCard({
   onChoiceChange?: (choice: MapChoice) => void;
 }) {
   const router = useRouter();
+  const [mapOnly, setMapOnly] = useState(false);
+  const [mapTableOpen, setMapTableOpen] = useState(false);
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
   // Embedded previews do not own the page URL. Only the BHW map workspace
@@ -103,7 +105,7 @@ export function DatasetMapCard({
       const previous = latestChoice.current;
       const next = typeof action === "function" ? action(previous) : action;
       if (mapHref(previous) === mapHref(next)) return;
-      if (overviewPreview) {
+      if (overviewPreview && !mapOnly) {
         const { code, level } = bhwMapLocality(next);
         if (level && (code !== previous.code || level !== previous.level)) {
           router.push(bhwLocalityHref({ mode: "psgc", level, code }), { scroll: false });
@@ -114,7 +116,7 @@ export function DatasetMapCard({
       if (historyEnabled) window.history.pushState(null, "", withBasePath(mapHref(next)));
       updateChoice(next);
     },
-    [historyEnabled, overviewPreview, router],
+    [historyEnabled, overviewPreview, router, mapOnly],
   );
   useEffect(() => {
     onChoiceChange?.(choice);
@@ -151,10 +153,10 @@ export function DatasetMapCard({
   const [retry, setRetry] = useState(0);
   const [renderAttempt, setRenderAttempt] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [mapOnly, setMapOnly] = useState(false);
   const active = useMapActivity((visible || mapOnly) && metrics.length > 0);
   const mapDialog = useRef<HTMLDialogElement>(null);
   const mapFocusReturn = useRef<HTMLElement | null>(null);
+  const mapScrollReturn = useRef({ left: 0, top: 0 });
   const exitMapOnly = () => {
     mapDialog.current?.close();
     mapDialog.current?.show();
@@ -163,10 +165,12 @@ export function DatasetMapCard({
       const target = mapFocusReturn.current?.isConnected
         ? mapFocusReturn.current
         : mapDialog.current?.querySelector<HTMLElement>("[data-map-only-trigger]");
-      target?.focus();
+      window.scrollTo({ ...mapScrollReturn.current, behavior: "instant" });
+      target?.focus({ preventScroll: true });
     });
   };
   const enterMapOnly = () => {
+    mapScrollReturn.current = { left: window.scrollX, top: window.scrollY };
     mapFocusReturn.current = document.activeElement as HTMLElement;
     mapDialog.current?.close();
     mapDialog.current?.showModal();
@@ -208,11 +212,11 @@ export function DatasetMapCard({
     currentExportVersion.current = exportVersion;
   }, [exportVersion]);
   useEffect(() => {
-    if (expanded || !ref.current) return;
+    if (expanded || mapOnly || !ref.current) return;
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [expanded]);
+  }, [expanded, mapOnly]);
   useEffect(() => {
     if (!active || result?.key === key) return;
     // A visible card with a lease may load renderer code alongside its aggregate request.
@@ -665,8 +669,16 @@ export function DatasetMapCard({
                     <DatasetCanvas
                       key={`${key}:render=${renderAttempt}`}
                       mapOnly={mapOnly}
+                      tableOpen={mapTableOpen}
+                      onToggleTable={() => setMapTableOpen((open) => !open)}
+                      localityHref={
+                        bhw
+                          ? (code) => bhwOverviewReturnHref({ ...choice, selected: code })
+                          : undefined
+                      }
                       onMapOnly={workspace ? enterMapOnly : undefined}
                       unit={metric?.unit}
+                      metricLabel={[metric?.label, metric?.period].filter(Boolean).join(" · ")}
                       geographyLabel={
                         workspace
                           ? `${data.childLevel === "citymun" ? "City/municipality" : data.childLevel.charAt(0).toUpperCase() + data.childLevel.slice(1)} figures`

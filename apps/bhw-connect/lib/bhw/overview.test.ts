@@ -133,3 +133,34 @@ it("estimates missing numerators from the matching population and labels them ap
   }
   expect(shareSummary(indicator("share", 94.7)).estimated).toBe(false);
 });
+
+it("clarifies confirmed demographic labels without changing source observations or publication states", () => {
+  const source = {
+    ...indicator("bhw.demographics.education", 0),
+    values: [
+      { label: "Elementary Level", value: 0 },
+      { label: "High School Level", value: 2 },
+      { label: "College Level", value: 3 },
+      { label: "College Graduate", value: 4 },
+      { label: "constructor", value: 5 },
+    ],
+  };
+  const before = structuredClone(source);
+  expect(publicValues(source).map((v) => v.label)).toEqual([
+    "Attended elementary school but did not graduate",
+    "Attended high school but did not graduate",
+    "Attended college but did not graduate",
+    "College Graduate",
+    "constructor",
+  ]);
+  expect(publicValues(source).map((v) => v.value)).toEqual([0, 2, 3, 4, 5]);
+  expect(source).toEqual(before);
+  const blood = {
+    ...indicator("bhw.demographics.bloodtype", 2),
+    values: [{ label: "U", value: 2 }],
+  };
+  expect(publicValues(blood)[0].label).toBe("Unknown");
+  expect(publicValues({ ...blood, id: "bhw.demographics.ip_status" })[0].label).toBe("U");
+  expect(publicValues({ ...blood, state: "suppressed" })).toEqual([]);
+  expect(publicValues({ ...source, state: "failed" })).toEqual([]);
+});

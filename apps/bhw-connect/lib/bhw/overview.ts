@@ -1,3 +1,4 @@
+import { demographicLabel } from "./demographic-labels";
 import { orderedCategoryValues } from "./category-order";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { countAndShare } from "@/lib/format";
@@ -8,7 +9,10 @@ import { hasAvailableValue } from "@/lib/catalog/summary";
  * reach charts, accessibility labels, tables or presentation mode. */
 export function publicValues(indicator: CatalogIndicator | undefined) {
   return indicator && hasAvailableValue(indicator.state)
-    ? orderedCategoryValues(indicator.id, indicator.values)
+    ? orderedCategoryValues(indicator.id, indicator.values).map((value) => {
+        const label = demographicLabel(indicator.id, value.label);
+        return label === value.label ? value : { ...value, label };
+      })
     : [];
 }
 export function scalar(indicator: CatalogIndicator | undefined): number | null {

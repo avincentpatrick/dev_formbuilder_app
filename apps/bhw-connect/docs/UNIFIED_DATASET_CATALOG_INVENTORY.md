@@ -299,10 +299,12 @@ Evidence checked: `lib/catalog/definitions.ts`, `lib/catalog/measure-notes.ts`,
 Public aggregate policy is `BHW_AGGREGATE_PUBLICATION.md`; do not restore the older
 blanket suppression assumption from historical documents.
 
-**Source clarification still required:** the available source transformation does
-not establish a user-facing dictionary for every blood-type code (including U),
-education category containing “Level”, or IP response code. Keep the exact source
-labels and an interpretation caveat. Do not translate these into unknown,
-incomplete schooling, or a yes/no response without the source owner's dictionary.
-Program acronyms in course titles also retain their source wording where their
-precise course meaning has not been verified. No such dictionary was fabricated.
+**Owner confirmation, 19 November 2026:** blood-type U means Unknown.
+Elementary Level, High School Level and College Level mean the person attended
+that stage but did not graduate. Display those meanings and retain the original
+source labels in explanatory details; do not change stored values or other
+categories. This confirmation resolves the earlier uncertainty for these labels.
+
+Other unexplained IP response codes and program acronyms retain their original
+wording until their precise meaning is verified. Do not infer a yes/no response
+from an unexplained IP code. Representative-reader acceptance remains open.

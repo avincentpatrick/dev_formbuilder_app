@@ -27,7 +27,7 @@ Reuse: server-rendered overview/analysis components, native details/summary, exi
 
 | Existing phase | Implementation disposition | Remaining evidence |
 | --- | --- | --- |
-| 0: source definitions | Expanded-family inventory audited against catalog and aggregate contracts; source populations explained consistently. | Source-owner dictionary for ambiguous blood, education and IP codes and unverified course abbreviations. Original labels retained. |
+| 0: source definitions | Expanded-family inventory audited against catalog and aggregate contracts; source populations explained consistently. | Blood-type U and education Level meanings confirmed by the owner on 19 November; display wording updated. Other unexplained IP codes and course abbreviations retain original labels. |
 | 1: overview clarity | Duplicate education removed; accreditation duplication disclosed; age/sex prioritized; extra characteristics grouped; plain search/map wording and access explanation supplied. Headline counts and percentages preserved. | Representative-reader comprehension. |
 | 1: chart accessibility | Natural age/year/band ordering, wrapped labels, plain axes, retained full tables and keyboard controls. Existing centralized percentage precision retained. | Existing owner-deferred physical-device performance; broader assistive-technology evaluation is not inferred from browser tests. |
 | 2: training | 44 searchable topic/year pairs replace 88 entries; original labels, independent statuses and all destinations retained. Delivered comparison matrix reused. | Confirm unverified program terminology with source owner. |
@@ -170,3 +170,13 @@ physical-device performance and Headcount reuse metadata remain governed by the
 Phase 2/3 acceptance records. Localization is outside the accepted English-only
 scope. Source dictionary confirmation and representative-reader evaluation require
 external evidence; neither can be substituted with automated tests.
+
+## Confirmed blood-type and education wording
+
+On 19 November 2026 the owner confirmed that blood-type U means Unknown, and
+Elementary Level, High School Level and College Level mean attendance without
+graduating from that stage. The overview, exact-data pages and comparison details
+use these plain display labels. Original source wording remains in explanatory
+details. Numeric values, source records, unavailable/withheld handling and other
+categories are unchanged. These two source questions are resolved; representative-
+reader comprehension and other unverified source codes remain open.

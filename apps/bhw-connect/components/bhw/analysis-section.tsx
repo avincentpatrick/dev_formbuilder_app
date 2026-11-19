@@ -157,8 +157,8 @@ export function BhwAnalysisSection({
           </summary>
           <p className="my-3 text-sm text-muted">
             Civil status, Indigenous Peoples identification and blood type use the categories
-            recorded in the source. Unexplained codes retain their original wording; do not infer
-            their meaning.
+            recorded in the source. Blood-type “U” is shown as “Unknown”. Other unexplained codes
+            retain their original wording; do not infer their meaning.
           </p>
           <div className="grid gap-4 md:grid-cols-2">{renderItems(secondary)}</div>
         </details>

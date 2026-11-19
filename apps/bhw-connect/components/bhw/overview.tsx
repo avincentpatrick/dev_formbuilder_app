@@ -1,3 +1,4 @@
+import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { contextHref } from "@/lib/bhw/context";
 import { initialMapChoice } from "@/lib/maps/prototype";
 import { BhwAnalysisSection } from "./analysis-section";
@@ -345,6 +346,10 @@ export function BhwOverview({
                 />
               ) : null}
               <Status indicator={education} />
+              <details className="mt-3 text-sm text-muted">
+                <summary className="cursor-pointer">Original education labels explained</summary>
+                <p className="mt-2">{demographicSourceNote("bhw.demographics.education")}</p>
+              </details>
               <div className="mt-3 flex flex-wrap gap-4 text-sm underline">
                 <Link
                   href={bhwMeasureHref(

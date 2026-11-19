@@ -1,3 +1,4 @@
+import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { CATALOG } from "./definitions";
 import type { CatalogIndicator } from "./types";
 
@@ -90,7 +91,7 @@ export function measureDefinition(indicator: CatalogIndicator): string {
     case "agg_certification":
       return "The percentage of all checked profiles with this training or certification recorded. Training and certification are separate measures; a worker can appear in more than one.";
     case "agg_demographics":
-      return "Counts of checked profiles in each recorded category. Categories may not add up to the profile total when source information is missing. All stored category counts are shown, including zero. Values missing from the source stay unavailable; they are not treated as zero.";
+      return `Counts of checked profiles in each recorded category. Categories may not add up to the profile total when source information is missing. All stored category counts are shown, including zero. Values missing from the source stay unavailable; they are not treated as zero. ${demographicSourceNote(indicator.id)}`.trim();
     case "agg_honorarium":
       return "The percentage of all checked profiles recorded as receiving an allowance from this government source. A worker may receive allowances from several sources, so do not add these percentages. A receipt record does not establish the amount paid.";
     case "agg_nhfr_counts":

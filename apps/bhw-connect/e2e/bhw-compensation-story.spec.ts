@@ -11,6 +11,7 @@ for (const width of [390, 1440]) {
     await story.getByRole("link", { name: "2. Amounts among each payer’s recipients" }).click();
     await expect(page).toHaveURL(/location=region(:|%3A)01#honorarium-amounts/);
     const chartValues = page.getByText("Values used in this chart", { exact: true });
+    await expect(chartValues).toBeVisible();
     await chartValues.focus();
     await page.keyboard.press("Enter");
     const table = page.getByRole("region", {
@@ -27,6 +28,7 @@ for (const width of [390, 1440]) {
     await page.reload();
     await expect(page).toHaveURL(/location=region(:|%3A)01#honorarium-amounts/);
     await expect(table).not.toBeVisible();
+    await expect(chartValues).toBeVisible();
     await chartValues.focus();
     await page.keyboard.press("Enter");
     await expect(table).toBeVisible();

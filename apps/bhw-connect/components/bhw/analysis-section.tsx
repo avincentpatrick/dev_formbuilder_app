@@ -1,3 +1,5 @@
+import { trainingOverviewRows } from "@/lib/bhw/training-overview";
+import { TrainingTable } from "./training-table";
 import { categoryAxis } from "@/lib/bhw/category-order";
 import Link from "next/link";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
@@ -166,7 +168,18 @@ export function BhwAnalysisSection({
   const items = props.dataset.indicators.filter(
     (i) => !exclude.includes(i.id) && prefixes.some((prefix) => i.id.startsWith(prefix)),
   );
-  const measureList = (
+  const trainingRows =
+    id === "training-topics"
+      ? trainingOverviewRows(props.dataset).map((row) => ({
+          ...row,
+          href: bhwMeasureHref(row.id, props.level, props.code, props.mapState),
+          yearHref: bhwMeasureHref(row.yearId, props.level, props.code, props.mapState),
+          compareHref: comparisonHref(row.id, [props.code], undefined, props.mapState),
+        }))
+      : null;
+  const measureList = trainingRows ? (
+    <TrainingTable rows={trainingRows} />
+  ) : (
     <div className="grid gap-4 md:grid-cols-2">
       {items.map((item) => (
         <details key={item.id} className="rounded-lg border border-border p-3">
@@ -207,7 +220,7 @@ export function BhwAnalysisSection({
       {detailsLabel ? (
         <details className="rounded-lg border border-border p-4">
           <summary className="cursor-pointer font-medium">
-            {detailsLabel} ({items.length})
+            {detailsLabel} ({trainingRows ? `${trainingRows.length} topics` : items.length})
           </summary>
           <div className="mt-4">{measureList}</div>
         </details>

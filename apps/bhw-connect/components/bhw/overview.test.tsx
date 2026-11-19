@@ -353,3 +353,29 @@ it("prioritizes age and sex without losing secondary demographics or their desti
   expect(secondary.querySelector('a[href*="indicator=bhw.demographics.bloodtype"]')).not.toBeNull();
   expect(secondary.textContent).not.toContain("bhw.demographics.age_band");
 });
+
+it("shows clarified demographic labels and retains original wording in explanations", () => {
+  const { document } = parseHTML(
+    render([
+      {
+        ...item("bhw.demographics.education", "available", 2),
+        values: [{ label: "College Level", value: 2 }],
+      },
+      {
+        ...item("bhw.demographics.bloodtype", "available", 3),
+        values: [
+          { label: "U", value: 3 },
+          { label: "A", value: 4 },
+        ],
+      },
+    ]),
+  );
+  expect(document.querySelector("#qualifications [data-chart]")?.textContent).toContain(
+    "Attended college but did not graduate",
+  );
+  expect(document.querySelector("#qualifications details")?.textContent).toContain("College Level");
+  expect(document.querySelector("#demographics [data-chart]")?.textContent).toContain("Unknown");
+  expect(document.getElementById("demographics")?.textContent).toContain(
+    "original source code “U”",
+  );
+});

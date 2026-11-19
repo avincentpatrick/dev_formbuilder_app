@@ -7,11 +7,13 @@ export function ContextReview({
   choice,
   label,
   unit,
+  contextValue = number,
 }: {
   rows: ContextRow[];
   choice: ContextChoice;
   label: string;
   unit: string;
+  contextValue?: (v: number) => string;
 }) {
   const review = contextReview(rows);
   const lists = [
@@ -26,14 +28,14 @@ export function ContextReview({
       title: "Check reported zero headcounts",
       rows: review.zeros,
       reason: (r: ContextRow) =>
-        `The source records zero BHWs and ${number(r.context!)} ${unit}. Confirm the report before interpreting workforce presence.`,
+        `The source records zero BHWs; ${label}: ${contextValue(r.context!)}${unit === "%" ? "" : ` ${unit}`}. Confirm the report before interpreting workforce presence.`,
       empty: "No eligible place reports zero headcount.",
     },
     {
       title: "Compare lower headcount with larger context",
       rows: review.contrasts,
       reason: (r: ContextRow) =>
-        `${number(r.headcount!)} BHWs is below the paired-place median ${number(review.headMedian!)}; ${number(r.context!)} ${unit} is above the paired-place median ${number(review.contextMedian!)}.`,
+        `${number(r.headcount!)} BHWs is below the paired-place median ${number(review.headMedian!)}; ${label}: ${contextValue(r.context!)}${unit === "%" ? "" : ` ${unit}`} is above the paired-place median ${contextValue(review.contextMedian!)}.`,
       empty:
         review.eligibleCount < 4
           ? "At least four paired places are required for this exploratory comparison."
@@ -41,7 +43,7 @@ export function ContextReview({
     },
   ];
   return (
-    <section aria-label="Places for closer examination" className="space-y-4">
+    <section id="context-review" aria-label="Places for closer examination" className="space-y-4">
       <h2 className="text-xl font-semibold">Places for closer examination</h2>
       <p>
         These lists explain checks to make, not where staff must be added. They use the current

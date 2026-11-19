@@ -112,3 +112,56 @@ Regression evidence includes incompatible year sources/units, rejected year
 payloads independent of valid zero coverage, alias search, sorting, all-topic
 retention, keyboard expansion, empty searches and phone table scrolling. Browser
 verification distinguishes unavailable-data UI from populated source verification.
+
+## Follow-up: concise summaries and consistent terminology
+
+- Replace repetitive mean/median payer charts with the existing distribution chart
+  and a compact 24-cell statistics table. The chart's exact values remain in a
+  disclosure; each independently public statistic remains accessible even if the
+  complete distribution cannot be plotted. Keep exact/comparison links and statuses.
+- Lead workload with the median and an ordered, compatible public middle-half
+  range. Keep service years, cohort series and technical statistics in details.
+  Move the combined-payment percentile ratio out of the default headline.
+- Prioritize age and sex; group other demographic characteristics. Keep education
+  only under qualifications. Disclose the repeated headcount accreditation share.
+- Wrap long chart labels within their gutters, allowing extra row height; preserve
+  full source labels in scales, tables, tooltips and downloads. Use plain map/search
+  labels and explain approved-user access beside the AI entry point.
+- Reconcile glossary wording with the distinct headcount/profile populations,
+  applicable publication policy, historical payment reference and area ratios.
+  Preserve the existing source, period and geographic-context contracts.
+
+The expanded-family source audit is recorded in
+`UNIFIED_DATASET_CATALOG_INVENTORY.md`. Unverified source codes retain their original
+labels. Source notes are already in a named disclosure; critical population,
+missing-value and interpretation notes stay beside their figures.
+
+## Completion checklist and human acceptance
+
+Implementation evidence is recorded per PR. Software verification does not close
+representative-reader acceptance. Before claiming the interface works for every
+level of reader, use the following short protocol with a general reader, a BHW/LGU
+reader and an analyst; include a phone user and a keyboard/screen-reader user.
+Do not record personal details or production data in this public repository.
+
+1. Find a place's workforce count. Explain why its checked-profile count can differ.
+   Expected: two sources/populations; no addition or assumed person matching.
+2. Find one training topic, its percentage and recorded year. Explain what the year
+   does and does not mean. Expected: median among trained profiles with a year;
+   neither everyone trained that year nor proof of current skills.
+3. Compare payer amounts. Explain median versus average and whether the four payer
+   medians can be added. Expected: middle versus arithmetic mean; do not add them.
+4. Interpret no-positive-payment and the historical reference. Expected: missing
+   is not proof of non-payment; the reference is not a legal minimum or enough pay.
+5. Explain the household middle-half range, its excluded records and the separate
+   area ratio. Expected: positive individual assignments; not visits or staffing need.
+6. Find a full source label, an unavailable value, exact data and comparison links;
+   return to the chosen locality/map. Record confusion, assistance and navigation
+   failures before asking the reader to suggest wording.
+
+Status: this protocol is prepared, **not performed**. Correct observed confusion
+before adopting a generalized readability standard. Existing owner-deferred
+physical-device performance and Headcount reuse metadata remain governed by the
+Phase 2/3 acceptance records. Localization is outside the accepted English-only
+scope. Source dictionary confirmation and representative-reader evaluation require
+external evidence; neither can be substituted with automated tests.

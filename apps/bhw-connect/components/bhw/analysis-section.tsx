@@ -1,5 +1,7 @@
 import { trainingOverviewRows } from "@/lib/bhw/training-overview";
 import { TrainingTable } from "./training-table";
+import { WorkloadSummary } from "./workload-summary";
+import { PayerStatistics } from "./payer-statistics";
 import { categoryAxis } from "@/lib/bhw/category-order";
 import Link from "next/link";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
@@ -63,7 +65,6 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
   const get = (id: string) => dataset.indicators.find((i) => i.id === id);
   const median = scalar(get("bhw.combined-honorarium.median"));
   const none = scalar(get("bhw.combined-honorarium.none"));
-  const ratio = scalar(get("bhw.honorarium-inequality.ratio"));
   const formatMoney = (value: number) => formatValue({ value }, "PHP/month");
   return (
     <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
@@ -80,14 +81,7 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
           Missing amount records do not confirm non-payment.
         </p>
       )}
-      {ratio !== null && (
-        <p>
-          Among recipients, the 90th-percentile combined amount is{" "}
-          {ratio.toLocaleString("en-PH", { maximumFractionDigits: 2 })} times the 10th-percentile
-          amount.
-        </p>
-      )}
-      {median === null && none === null && ratio === null && (
+      {median === null && none === null && (
         <p>
           Payment insights are unavailable for this location. Check individual measure statuses
           below.
@@ -97,53 +91,6 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
         BHW Profiles 2025. These records describe reported allowances, not current payroll or a
         legal pay standard.
       </p>
-    </div>
-  );
-}
-
-function PayerAmounts({ dataset, areaName }: Pick<Props, "dataset" | "areaName">) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {["mean", "median"].map((stat) => {
-        const data = ["region", "province", "citymun", "barangay"].flatMap((payer) => {
-          const value = scalar(
-            dataset.indicators.find((i) => i.id === `bhw.honorarium-amount.${payer}.${stat}`),
-          );
-          return value === null
-            ? []
-            : [
-                {
-                  label:
-                    payer === "citymun"
-                      ? "City/municipality"
-                      : payer[0].toUpperCase() + payer.slice(1),
-                  value,
-                },
-              ];
-        });
-        const title = `${stat === "mean" ? "Average" : "Median"} monthly honorarium by paying level`;
-        return (
-          <article key={stat} className="space-y-3 rounded-lg border border-border p-4">
-            <h3 className="text-lg font-semibold">{title}</h3>
-            {data.length ? (
-              <FigureView
-                data={data}
-                title={title}
-                caption={`${areaName} · recipients at each payer level · 2025`}
-                xLabel="PHP/month"
-                yLabel="Paying level"
-                valueFormat="peso"
-              />
-            ) : (
-              <p>No public amount observations are available here.</p>
-            )}
-            <p className="text-sm text-muted">
-              Recipients at each payer level; averages and medians cannot be added across levels.
-              Missing or withheld payers are omitted; see their statuses below.
-            </p>
-          </article>
-        );
-      })}
     </div>
   );
 }
@@ -177,23 +124,45 @@ export function BhwAnalysisSection({
           compareHref: comparisonHref(row.id, [props.code], undefined, props.mapState),
         }))
       : null;
+  const renderItems = (list: CatalogIndicator[]) =>
+    list.map((item) => (
+      <details key={item.id} className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer font-medium">
+          {item.label}
+          {publicValues(item).length === 1
+            ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
+            : ""}
+        </summary>
+        <div className="mt-3">
+          <Measure {...props} item={item} />
+        </div>
+      </details>
+    ));
+  const mainDemographics = ["bhw.demographics.sex", "bhw.demographics.age_band"];
+  const secondary =
+    id === "demographics" ? items.filter((i) => !mainDemographics.includes(i.id)) : [];
+  const primary =
+    id === "demographics" ? items.filter((i) => mainDemographics.includes(i.id)) : items;
   const measureList = trainingRows ? (
     <TrainingTable rows={trainingRows} />
+  ) : id === "honorarium-amounts" ? (
+    <PayerStatistics {...props} />
   ) : (
     <div className="grid gap-4 md:grid-cols-2">
-      {items.map((item) => (
-        <details key={item.id} className="rounded-lg border border-border p-3">
+      {renderItems(primary)}
+      {secondary.length > 0 && (
+        <details className="rounded-lg border border-border p-3 md:col-span-2">
           <summary className="cursor-pointer font-medium">
-            {item.label}
-            {publicValues(item).length === 1
-              ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
-              : ""}
+            More recorded characteristics ({secondary.length})
           </summary>
-          <div className="mt-3">
-            <Measure {...props} item={item} />
-          </div>
+          <p className="my-3 text-sm text-muted">
+            Civil status, Indigenous Peoples identification and blood type use the categories
+            recorded in the source. Unexplained codes retain their original wording; do not infer
+            their meaning.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">{renderItems(secondary)}</div>
         </details>
-      ))}
+      )}
     </div>
   );
   return (
@@ -210,10 +179,10 @@ export function BhwAnalysisSection({
       )}
       {id === "honorarium-amounts" && (
         <>
-          <PayerAmounts dataset={props.dataset} areaName={props.areaName} />
           <BhwHonorariumDistribution dataset={props.dataset} areaName={props.areaName} />
         </>
       )}
+      {id === "service-history" && <WorkloadSummary dataset={props.dataset} />}
       {id === "combined-honorarium" && (
         <HonorariumHighlights dataset={props.dataset} areaName={props.areaName} />
       )}

@@ -23,7 +23,7 @@ for (const width of [390, 1440]) {
       });
     });
     await page.goto("bhw");
-    const input = page.getByRole("combobox", { name: "Search BHW places and indicators" });
+    const input = page.getByRole("combobox", { name: "Search BHW places and topics" });
     await input.fill("man");
     const option = page.getByRole("option", { name: /Manila.*Metro Manila/ });
     await expect(option).toBeVisible();
@@ -54,7 +54,7 @@ test("partial indicator suggestions use the existing definitions and retain map 
   await page.goto(
     `bhw?${new URLSearchParams({ mapState: "dataset=bhw-stepzero-2026&level=region&code=01" })}`,
   );
-  const input = page.getByRole("combobox", { name: "Search BHW places and indicators" });
+  const input = page.getByRole("combobox", { name: "Search BHW places and topics" });
   await input.fill("headc");
   const option = page
     .getByRole("listbox", { name: "BHW search suggestions" })
@@ -80,7 +80,7 @@ test("late suggestions cannot replace a newer query", async ({ page }) => {
       .catch(() => {});
   });
   await page.goto("bhw");
-  const input = page.getByRole("combobox", { name: "Search BHW places and indicators" });
+  const input = page.getByRole("combobox", { name: "Search BHW places and topics" });
   const old = page.waitForRequest((request) => request.url().includes("q=Old+place"));
   await input.fill("Old place");
   await old;

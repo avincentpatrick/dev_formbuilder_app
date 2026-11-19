@@ -71,7 +71,7 @@ function SearchForm({ query = "", compact = false, mapState }: Props) {
     >
       {snapshot && <input type="hidden" name="mapState" value={snapshot} />}
       <label htmlFor={`${id}-search`} className="block font-medium">
-        Search BHW places and indicators
+        Search BHW places and topics
       </label>
       <div className="flex gap-2">
         <input
@@ -165,8 +165,8 @@ function SearchForm({ query = "", compact = false, mapState }: Props) {
       )}
       <p id={`${id}-help`} className="text-sm text-muted">
         {compact
-          ? "Place, PSGC code, or indicator."
-          : "Try a place name or PSGC code, “headcount”, “Cebu accreditation”, or “Compare Cebu and Bohol accreditation”. Choose among matching places and measures before opening a figure."}
+          ? "Place, topic, or official place code (PSGC)."
+          : "Try a place name, “headcount”, “Cebu accreditation”, or “Compare Cebu and Bohol accreditation”. Choose a matching place and topic to open its figures. Official place codes (PSGC) also work."}
       </p>
     </Form>
   );

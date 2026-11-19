@@ -35,3 +35,13 @@ it("uses the chart sequence in the default table and retains ranked defaults els
     read(true).document.querySelector('button[aria-label="Restore year order"]'),
   ).not.toBeNull();
 });
+
+it("wraps long labels within the plot gutter while keeping the full category key", () => {
+  const label = "A long education category with an original source definition";
+  const spec = horizontalBarSpec([{ label, value: 2 }], { width: 390 });
+  const format = spec.y?.tickFormat as (label: string) => string;
+  const wrapped = format(label);
+  expect(wrapped).toContain("\n");
+  expect(wrapped.replaceAll("\n", " ")).toBe(label);
+  expect(spec.height).toBeGreaterThan(80);
+});

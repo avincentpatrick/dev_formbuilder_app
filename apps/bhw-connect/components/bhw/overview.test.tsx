@@ -82,8 +82,10 @@ it("starts with figures and provides named purpose anchors before methodology", 
 
 it("routes every overview comparison entry through the public headcount contract", () => {
   const { document } = parseHTML(render([item("bhw.total", "available", 0)]));
-  const links = [...document.querySelectorAll('a[href^="/compare"]')].filter((link) =>
-    link.textContent?.trim().startsWith("Compare places"),
+  const links = [...document.querySelectorAll('a[href^="/compare"]')].filter(
+    (link) =>
+      link.textContent?.trim().startsWith("Compare places") &&
+      link.getAttribute("href")?.includes("measure=bhw.total"),
   );
   expect(links).toHaveLength(2);
   for (const link of links) expect(link.getAttribute("href")).toBe("/compare?measure=bhw.total");
@@ -106,8 +108,10 @@ it("resumes the validated map from navigation while retaining a fresh national h
   );
   expect(explorer?.getAttribute("href")).toBe(previous);
   expect(explorer?.textContent).toContain("previous settings");
-  const comparisons = [...document.querySelectorAll("a")].filter((a) =>
-    a.textContent?.trim().startsWith("Compare places"),
+  const comparisons = [...document.querySelectorAll("a")].filter(
+    (a) =>
+      a.textContent?.trim().startsWith("Compare places") &&
+      a.getAttribute("href")?.includes("measure=bhw.total"),
   );
   expect(comparisons).toHaveLength(2);
   for (const link of comparisons) {
@@ -300,4 +304,52 @@ it("connects ordered age values to the chart sequence and descriptive axis", () 
     "40-49",
     "60+",
   ]);
+});
+
+it("keeps payer statistics accessible independently when a complete distribution cannot be plotted", () => {
+  const { document } = parseHTML(
+    render([
+      { ...item("bhw.honorarium-amount.region.median", "available", 1250), unit: "PHP/month" },
+      { ...item("bhw.honorarium-amount.region.mean", "suppressed", 999888), unit: "PHP/month" },
+    ]),
+  );
+  const table = document.querySelector("#honorarium-amounts > details table")!;
+  expect(table.querySelectorAll("tbody tr")).toHaveLength(4);
+  expect(table.textContent).toContain("1,250");
+  expect(table.textContent).toContain("Withheld");
+  expect(table.textContent).not.toContain("999888");
+  expect(table.querySelectorAll('a[href*="indicator=bhw.honorarium-amount."]')).toHaveLength(24);
+  expect(table.querySelectorAll('a[href*="measure=bhw.honorarium-amount."]')).toHaveLength(24);
+});
+
+it("shows the workload middle half only for compatible, ordered public values", () => {
+  const workload = (stat: string, value: number) => ({
+    ...item(`bhw.workload.${stat}`, "available", value),
+    unit: "households",
+  });
+  const valid = [workload("p25", 20), workload("median", 40), workload("p75", 80)];
+  expect(render(valid)).toContain("The middle half runs from 20 households to 80 households");
+  expect(render([valid[0], valid[1], { ...valid[2], state: "suppressed" }])).not.toContain(
+    "The middle half runs",
+  );
+  expect(render([valid[0], valid[1], workload("p75", 10)])).not.toContain("The middle half runs");
+  expect(render([valid[0], valid[1], { ...valid[2], sourceSlug: "unaccepted" }])).not.toContain(
+    "The middle half runs",
+  );
+});
+
+it("prioritizes age and sex without losing secondary demographics or their destinations", () => {
+  const { document } = parseHTML(
+    render([
+      item("bhw.demographics.age_band", "available", 10),
+      item("bhw.demographics.bloodtype", "available", 15),
+    ]),
+  );
+  const section = document.getElementById("demographics")!;
+  const secondary = Array.from(section.querySelectorAll("details")).find((d) =>
+    d.querySelector("summary")?.textContent?.includes("More recorded characteristics"),
+  )!;
+  expect(secondary.hasAttribute("open")).toBe(false);
+  expect(secondary.querySelector('a[href*="indicator=bhw.demographics.bloodtype"]')).not.toBeNull();
+  expect(secondary.textContent).not.toContain("bhw.demographics.age_band");
 });

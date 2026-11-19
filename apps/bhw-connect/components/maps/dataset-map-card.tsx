@@ -504,9 +504,9 @@ export function DatasetMapCard({
                   }
                 >
                   {supportsCircles(choice) && (
-                    <option value="circles">Proportional circles — count by area</option>
+                    <option value="circles">Circles sized by area count</option>
                   )}
-                  <option value="choropleth">Choropleth — color by value</option>
+                  <option value="choropleth">Areas colored by value</option>
                 </select>
                 {!supportsCircles(choice) && (
                   <span className="text-muted">
@@ -933,7 +933,7 @@ export function DatasetMapCard({
                     />
                   )}
                   <label className="block text-sm">
-                    Search areas by name or PSGC code
+                    Search areas by name or official place code (PSGC)
                     <input
                       type="search"
                       maxLength={100}

@@ -1,5 +1,6 @@
 "use client";
 
+import { RelationshipScatter } from "./relationship-scatter";
 import { useCallback, useMemo } from "react";
 import { useFilterState } from "@/lib/filters/use-filter-state";
 import { FigureCard } from "@/components/narrative/figure-card";
@@ -13,7 +14,11 @@ import {
 } from "@/lib/analysis/map-indicators";
 import { describeCorrelation, MIN_CORRELATION_N } from "@/lib/analysis/correlation";
 import { logEvent } from "@/lib/usage/log-client";
-import { REL_EXTERNAL_INDICATORS, type RelAxisIndicator, type GeoLevel } from "@/lib/filters/schema";
+import {
+  REL_EXTERNAL_INDICATORS,
+  type RelAxisIndicator,
+  type GeoLevel,
+} from "@/lib/filters/schema";
 import { withBasePath } from "@/lib/base-path";
 
 /** One child geo with all axis values, for the scatter (E1.4 / E4.4). `povertyIncidence` is the
@@ -55,21 +60,6 @@ function isExternal(indicator: RelAxisIndicator): boolean {
   return (REL_EXTERNAL_INDICATORS as readonly string[]).includes(indicator);
 }
 
-// Fixed drawing coordinate system; the SVG scales to its container via viewBox.
-const W = 480;
-const H = 340;
-const M = { top: 16, right: 16, bottom: 46, left: 56 };
-const PLOT_W = W - M.left - M.right;
-const PLOT_H = H - M.top - M.bottom;
-
-function niceDomain(values: number[]): [number, number] {
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  if (lo === hi) return [lo - 1, hi + 1];
-  const pad = (hi - lo) * 0.06;
-  return [lo - pad, hi + pad];
-}
-
 export function RelationshipFigure({
   points,
   childLevel,
@@ -100,7 +90,9 @@ export function RelationshipFigure({
   // where at least one child has a value — but always keep a currently-selected external axis in
   // the list so a stale permalink's <select> still shows its choice (the scatter then degrades to
   // "not enough data"). The map's own indicator switcher never lists these.
-  const hasExternalData = points.some((p) => REL_EXTERNAL_INDICATORS.some((k) => pick(p, k) !== null));
+  const hasExternalData = points.some((p) =>
+    REL_EXTERNAL_INDICATORS.some((k) => pick(p, k) !== null),
+  );
   const axisOptions = REL_AXIS_OPTIONS.filter(
     (o) => !o.external || hasExternalData || o.value === relX || o.value === relY,
   );
@@ -115,7 +107,9 @@ export function RelationshipFigure({
     () =>
       points
         .map((p) => ({ p, x: pick(p, relX), y: pick(p, relY) }))
-        .filter((d): d is { p: RelationshipPoint; x: number; y: number } => d.x !== null && d.y !== null),
+        .filter(
+          (d): d is { p: RelationshipPoint; x: number; y: number } => d.x !== null && d.y !== null,
+        ),
     [points, relX, relY],
   );
 
@@ -142,13 +136,6 @@ export function RelationshipFigure({
     return `Places with a higher ${xMeta.headlinePhrase} tend to have a ${yDir} ${yMeta.headlinePhrase} — a ${desc.strength} link.${tail}`;
   }, [desc, xMeta, yMeta, childPlural]);
 
-  const xDomain = plotted.length > 0 ? niceDomain(plotted.map((d) => d.x)) : ([0, 1] as [number, number]);
-  const yDomain = plotted.length > 0 ? niceDomain(plotted.map((d) => d.y)) : ([0, 1] as [number, number]);
-  const xScale = (v: number) =>
-    M.left + (xDomain[1] === xDomain[0] ? PLOT_W / 2 : ((v - xDomain[0]) / (xDomain[1] - xDomain[0])) * PLOT_W);
-  const yScale = (v: number) =>
-    M.top + (yDomain[1] === yDomain[0] ? PLOT_H / 2 : (1 - (v - yDomain[0]) / (yDomain[1] - yDomain[0])) * PLOT_H);
-
   const maxN = Math.max(1, ...plotted.map((d) => d.p.nTotal ?? 0));
   const radius = (n: number | null) => {
     if (!n || maxN <= 0) return 3.5;
@@ -172,12 +159,17 @@ export function RelationshipFigure({
               at least {MIN_LEADER_N} profiled BHWs.{" "}
             </>
           ) : (
-            <>Needs at least {MIN_CORRELATION_N} {childPlural} with enough profiled BHWs. </>
+            <>
+              Needs at least {MIN_CORRELATION_N} {childPlural} with enough profiled BHWs.{" "}
+            </>
           )}
           Hollow points have fewer than {MIN_LEADER_N} profiled BHWs and are excluded from the
           correlation. This is a place-level comparison (ecological), not a statement about
           individual BHWs — see{" "}
-          <a href={withBasePath("/methodology#relationships")} className="underline hover:text-accent">
+          <a
+            href={withBasePath("/methodology#relationships")}
+            className="underline hover:text-accent"
+          >
             methodology
           </a>
           .
@@ -217,74 +209,22 @@ export function RelationshipFigure({
         </div>
 
         {plotted.length > 0 ? (
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="w-full"
-            style={{ height: "auto" }}
-            aria-label={`Scatter plot: each point is a ${childLevelLabelPlural.toLowerCase().replace(/s$/, "")}. Horizontal axis ${xMeta.axisLabel}, vertical axis ${yMeta.axisLabel}. Points link to each place's page.`}
-          >
-            {/* Axes. */}
-            <line x1={M.left} y1={M.top} x2={M.left} y2={M.top + PLOT_H} stroke="var(--border)" />
-            <line
-              x1={M.left}
-              y1={M.top + PLOT_H}
-              x2={M.left + PLOT_W}
-              y2={M.top + PLOT_H}
-              stroke="var(--border)"
-            />
-            {/* Axis end ticks. */}
-            <text x={M.left} y={H - 26} fontSize="11" fill="var(--muted)" textAnchor="start">
-              {xf(xDomain[0])}
-            </text>
-            <text x={M.left + PLOT_W} y={H - 26} fontSize="11" fill="var(--muted)" textAnchor="end">
-              {xf(xDomain[1])}
-            </text>
-            <text x={M.left - 6} y={M.top + PLOT_H} fontSize="11" fill="var(--muted)" textAnchor="end">
-              {yf(yDomain[0])}
-            </text>
-            <text x={M.left - 6} y={M.top + 8} fontSize="11" fill="var(--muted)" textAnchor="end">
-              {yf(yDomain[1])}
-            </text>
-            {/* Axis titles. */}
-            <text
-              x={M.left + PLOT_W / 2}
-              y={H - 8}
-              fontSize="12"
-              fontWeight="600"
-              fill="var(--foreground)"
-              textAnchor="middle"
-            >
-              {xMeta.axisLabel}
-            </text>
-            <text
-              transform={`translate(14 ${M.top + PLOT_H / 2}) rotate(-90)`}
-              fontSize="12"
-              fontWeight="600"
-              fill="var(--foreground)"
-              textAnchor="middle"
-            >
-              {yMeta.axisLabel}
-            </text>
-            {/* Points. */}
-            {plotted.map((d) => {
-              const smallN = d.p.nTotal !== null && d.p.nTotal < MIN_LEADER_N;
-              const label = `${d.p.geoName}: ${xMeta.label} ${xf(d.x)}, ${yMeta.label} ${yf(d.y)}${d.p.nTotal !== null ? ` (${d.p.nTotal.toLocaleString()} profiled)` : ""}. Open place page.`;
-              return (
-                <a key={d.p.geoCode} href={withBasePath(`/place/${childLevel}/${d.p.geoCode}`)} aria-label={label}>
-                  <title>{label}</title>
-                  <circle
-                    cx={xScale(d.x)}
-                    cy={yScale(d.y)}
-                    r={radius(d.p.nTotal)}
-                    fill={smallN ? "transparent" : "var(--seq-4)"}
-                    stroke={smallN ? "var(--muted)" : "var(--seq-5)"}
-                    strokeWidth={smallN ? 1 : 1}
-                    fillOpacity={smallN ? 1 : 0.75}
-                  />
-                </a>
-              );
-            })}
-          </svg>
+          <RelationshipScatter
+            xLabel={xMeta.axisLabel}
+            yLabel={yMeta.axisLabel}
+            xFormat={xf}
+            yFormat={yf}
+            ariaLabel={`Scatter plot: each point is a ${childLevelLabelPlural.toLowerCase().replace(/s$/, "")}. Horizontal axis ${xMeta.axisLabel}, vertical axis ${yMeta.axisLabel}. Points link to each place's page.`}
+            points={plotted.map(({ p, x, y }) => ({
+              code: p.geoCode,
+              x,
+              y,
+              radius: radius(p.nTotal),
+              hollow: p.nTotal !== null && p.nTotal < MIN_LEADER_N,
+              href: withBasePath(`/place/${childLevel}/${p.geoCode}`),
+              label: `${p.geoName}: ${xMeta.label} ${xf(x)}, ${yMeta.label} ${yf(y)}${p.nTotal !== null ? ` (${p.nTotal.toLocaleString()} profiled)` : ""}. Open place page.`,
+            }))}
+          />
         ) : (
           <p className="text-sm text-muted">
             Not enough {childPlural} have data for both indicators to plot a relationship.

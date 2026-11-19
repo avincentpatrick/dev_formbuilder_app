@@ -31,6 +31,7 @@ export function RelationshipScatter({
   yFormat,
   ariaLabel,
   nonNegative = false,
+  xMaximum,
 }: {
   points: ScatterPoint[];
   xLabel: string;
@@ -39,6 +40,7 @@ export function RelationshipScatter({
   yFormat: (v: number) => string;
   ariaLabel: string;
   nonNegative?: boolean;
+  xMaximum?: number;
 }) {
   const xd = niceDomain(points.length ? points.map((p) => p.x) : [0, 1]);
   const yd = niceDomain(points.length ? points.map((p) => p.y) : [0, 1]);
@@ -46,6 +48,7 @@ export function RelationshipScatter({
     xd[0] = Math.max(0, xd[0]);
     yd[0] = Math.max(0, yd[0]);
   }
+  if (xMaximum !== undefined) xd[1] = Math.min(xMaximum, xd[1]);
   const xs = (v: number) => M.left + ((v - xd[0]) / (xd[1] - xd[0])) * PLOT_W;
   const ys = (v: number) => M.top + (1 - (v - yd[0]) / (yd[1] - yd[0])) * PLOT_H;
   return (

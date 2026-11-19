@@ -1,8 +1,19 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { percentageFormatter } from "@/lib/format";
+import { ContextBivariate } from "./context-bivariate";
 import { ContextReview } from "./context-review";
-import { useEffect, useState } from "react";
-import { contextHref, contextLabels, joinContext, type ContextChoice } from "@/lib/bhw/context";
+import { useEffect, useMemo, useState } from "react";
+import {
+  contextHref,
+  contextLabels,
+  contextDefinitions,
+  contextIds,
+  contextSupported,
+  joinContext,
+  type ContextChoice,
+} from "@/lib/bhw/context";
 import { mapHref, type MapPayload } from "@/lib/maps/prototype";
 import { readMapResponse } from "@/lib/maps/read-map-response";
 import { withBasePath } from "@/lib/base-path";
@@ -14,17 +25,19 @@ import { describeCorrelation } from "@/lib/analysis/correlation";
 const number = (v: number) => v.toLocaleString("en", { maximumFractionDigits: 1 });
 type Read = { key: string; head: MapPayload; context: MapPayload } | { key: string; error: string };
 export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }) {
+  const router = useRouter();
   const { map, context } = choice;
+  const meta = contextDefinitions[context];
   const { level, code } = map;
   const key = `${level}:${code}:${context}`;
   const [read, setRead] = useState<Read | null>(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    const get = async (indicator: string) => {
+    const get = async (indicator: string, dataset = "bhw-stepzero-2026", period = "2025") => {
       const q = mapHref({
-        dataset: "bhw-stepzero-2026",
-        period: "2025",
+        dataset,
+        period,
         level,
         code,
         selected: null,
@@ -41,10 +54,10 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
         );
       return data as MapPayload;
     };
-    Promise.all([get("bhw.total"), get(`stepzero.${context}`)])
+    Promise.all([get("bhw.total"), get(meta.indicator, meta.dataset, meta.period)])
       .then(([head, value]) => {
         if (controller.signal.aborted) return;
-        if (!joinContext(head, value, { level }))
+        if (!joinContext(head, value, { level, code }, context))
           throw new Error(
             "The source date or geographic records do not match. No relationship is shown.",
           );
@@ -56,10 +69,15 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
       });
     return () => controller.abort();
     // Selection changes do not refetch the same geographic observations.
-  }, [key, level, code, context, retry]);
+  }, [key, level, code, context, meta, retry]);
   const current = read?.key === key ? read : null;
-  const rows =
-    current && !("error" in current) ? joinContext(current.head, current.context, map) : null;
+  const rows = useMemo(
+    () =>
+      current && !("error" in current)
+        ? joinContext(current.head, current.context, { level, code }, context)
+        : null,
+    [current, level, code, context],
+  );
   const data = current && !("error" in current) ? current.head : null;
   const plotted = (rows ?? []).filter((r) => r.eligible);
   const selected = rows?.find((r) => r.code === map.selected);
@@ -70,7 +88,15 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
     barangay: "barangays",
   };
   const label = contextLabels[context];
-  const unit = context === "population" ? "people" : "households";
+  const unit = meta.unit;
+  const percent = percentageFormatter(
+    (rows ?? []).flatMap((r) =>
+      [r.context, r.ciLow ?? null, r.ciHigh ?? null].filter((v): v is number => v !== null),
+    ),
+  );
+  const contextValue = (v: number) => (unit === "%" ? percent(v) : number(v));
+  const suffix = unit === "%" ? "" : ` ${unit}`;
+  const periodLabel = meta.external ? `BHW 2025 · context ${meta.period}` : "2025";
   const correlation = describeCorrelation(plotted.map((r) => [r.context!, r.headcount!]));
   const selectedHref = (code: string) =>
     contextHref({ ...choice, map: { ...map, selected: code } });
@@ -85,25 +111,61 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
         >
           Return to this area’s dashboard
         </Link>
+        <nav aria-label="Context sections" className="flex flex-wrap gap-4 text-sm underline">
+          <a href="#context-review">Places for closer examination</a>
+          <a href="#context-values">Exact values</a>
+          <a href="#context-methodology">Sources and matching</a>
+        </nav>
       </header>
       <nav aria-label="Context measure" className="flex flex-wrap gap-4">
-        {(["households", "population"] as const).map((value) => (
+        {contextIds
+          .filter((id) => contextSupported(id, map))
+          .map((value) => (
+            <Link
+              key={value}
+              aria-current={context === value ? "page" : undefined}
+              className="underline"
+              href={contextHref({
+                ...choice,
+                context: value,
+                view: contextDefinitions[value].external ? undefined : choice.view,
+              })}
+            >
+              {contextLabels[value]}
+            </Link>
+          ))}
+      </nav>
+      <nav aria-label="Context view" className="flex flex-wrap gap-4">
+        <Link
+          className="underline"
+          aria-current={!choice.view ? "page" : undefined}
+          href={contextHref({ ...choice, view: undefined })}
+        >
+          Scatter and exact values
+        </Link>
+        {!meta.external && (
           <Link
-            key={value}
-            aria-current={context === value ? "page" : undefined}
             className="underline"
-            href={contextHref({ ...choice, context: value })}
+            aria-current={choice.view === "bivariate" ? "page" : undefined}
+            href={contextHref({ ...choice, view: "bivariate" })}
           >
-            {contextLabels[value]}
+            Two-variable map
           </Link>
-        ))}
+        )}
       </nav>
       <p className="text-sm">
-        Both axes use the accepted BHW Headcount 2025 release: LGU-reported BHWs and its source{" "}
-        {context}. These are place totals, not individual workloads, validated-profile counts or a
-        staffing-need score. Larger places can have larger counts on both axes. Association does not
-        establish causation.
+        {meta.external
+          ? `BHW headcount is from 2025; ${meta.label.toLowerCase()} is from ${meta.period}. This compares different dated observations in the accepted reporting geography, not same-year conditions or change over time.`
+          : `Both axes use BHW Headcount 2025: LGU-reported BHWs and its source ${context}.`}{" "}
+        These observations do not establish individual workloads, staffing need or causation.{" "}
+        {unit !== "%" && "Larger places can have larger counts on both axes."}
       </p>
+      {map.level !== "province" && (
+        <p className="text-sm text-muted">
+          Poverty context is available only for municipal peers in a supported province view. PSA
+          population has no barangay context. External contexts open in the scatter view.
+        </p>
+      )}
       {!current ? (
         <p role="status">Loading compatible public observations…</p>
       ) : "error" in current ? (
@@ -122,43 +184,55 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
       ) : null}
       {data && rows && (
         <>
-          <h2 className="text-xl font-semibold">{data.area} · 2025</h2>
+          <h2 className="text-xl font-semibold">
+            {data.area} · {periodLabel}
+          </h2>
           <nav aria-label="Context geography" className="flex flex-wrap gap-3">
-            {data.navigation?.parents.map((parent) => (
-              <Link
-                key={parent.code}
-                className="underline"
-                href={contextHref({
-                  ...choice,
-                  map: { ...map, level: parent.level, code: parent.code, selected: null },
-                })}
-              >
-                {parent.name}
-              </Link>
-            ))}
+            {data.navigation?.parents
+              .filter((parent) => contextSupported(context, parent))
+              .map((parent) => (
+                <Link
+                  key={parent.code}
+                  className="underline"
+                  href={contextHref({
+                    ...choice,
+                    map: { ...map, level: parent.level, code: parent.code, selected: null },
+                  })}
+                >
+                  {parent.name}
+                </Link>
+              ))}
           </nav>
-          <p>
-            {plotted.length} of {rows.length} listed {childLabels[data.childLevel]} have both usable
-            values. {rows.filter((r) => r.headcount === null).length} lack usable headcount;{" "}
-            {rows.filter((r) => r.headcount !== null && r.context === null).length} more lack usable
-            context. Missing and source-flagged small samples are excluded, not zero. Zero values
-            remain. Missing map shapes do not exclude a place.
-          </p>
           <FigureCard
             title={`BHW headcount and ${label.toLowerCase()}`}
-            caption={`${data.area} · 2025 · ${plotted.length} paired geographic observations`}
+            caption={`${data.area} · ${periodLabel} · ${plotted.length} paired geographic observations`}
             headline={
               correlation.kind === "described"
                 ? `Spearman rank association: ${number(correlation.rho)} across ${correlation.n} places. This is not a causal finding.`
                 : "No association summary: fewer than ten paired places or one axis has no variation."
             }
           >
-            {plotted.length ? (
+            {choice.view === "bivariate" ? (
+              <ContextBivariate
+                key={key}
+                rows={rows}
+                data={data}
+                label={label}
+                unit={unit}
+                selected={map.selected}
+                onSelect={(code) => router.push(selectedHref(code), { scroll: false })}
+                onRetry={() => {
+                  setRead(null);
+                  setRetry((n) => n + 1);
+                }}
+              />
+            ) : plotted.length ? (
               <RelationshipScatter
                 nonNegative
                 xLabel={`${label} (${unit})`}
                 yLabel="BHW headcount (people)"
-                xFormat={number}
+                xFormat={contextValue}
+                xMaximum={unit === "%" ? 100 : undefined}
                 yFormat={number}
                 ariaLabel={`BHW headcount against ${label.toLowerCase()} in ${data.area}. Each point opens locality details below.`}
                 points={plotted.map((r) => ({
@@ -166,13 +240,20 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
                   x: r.context!,
                   y: r.headcount!,
                   href: withBasePath(selectedHref(r.code)),
-                  label: `${r.name}: ${number(r.headcount!)} BHWs; ${number(r.context!)} ${unit}. Inspect locality.`,
+                  label: `${r.name}: ${number(r.headcount!)} BHWs; ${contextValue(r.context!)}${suffix}. Inspect locality.`,
                 }))}
               />
             ) : (
               <p>No paired observations to plot. This does not mean zero.</p>
             )}
           </FigureCard>
+          <p>
+            {plotted.length} of {rows.length} listed {childLabels[data.childLevel]} have both usable
+            values. {rows.filter((r) => r.headcount === null).length} lack usable headcount;{" "}
+            {rows.filter((r) => r.headcount !== null && r.context === null).length} more lack usable
+            context. Missing and source-flagged small samples are excluded, not zero. Zero values
+            remain. Missing map shapes do not exclude a place.
+          </p>
           <section
             aria-label="Selected locality"
             className="space-y-2 rounded border border-border p-3"
@@ -183,8 +264,9 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
                 <p>
                   Headcount:{" "}
                   {selected.headcount === null ? "Unavailable" : number(selected.headcount)} people.{" "}
-                  {label}: {selected.context === null ? "Unavailable" : number(selected.context)}{" "}
-                  {unit}.
+                  {label}:{" "}
+                  {selected.context === null ? "Unavailable" : contextValue(selected.context)}{" "}
+                  {unit === "%" ? "" : unit}.
                 </p>
                 <Link
                   className="inline-block min-h-11 underline"
@@ -197,7 +279,8 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
                   Open full locality dashboard
                 </Link>
                 {data.childLevel !== "barangay" &&
-                  (data.childLevel !== "citymun" || data.barangayDrill) && (
+                  (data.childLevel !== "citymun" || data.barangayDrill) &&
+                  contextSupported(context, { level: data.childLevel, code: selected.code }) && (
                     <Link
                       className="ml-4 inline-block min-h-11 underline"
                       href={contextHref({
@@ -222,9 +305,16 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
               </p>
             )}
           </section>
-          <ContextReview rows={rows} choice={choice} label={label} unit={unit} />
+          <ContextReview
+            rows={rows}
+            choice={choice}
+            label={label}
+            unit={unit}
+            contextValue={contextValue}
+          />
           <div
             role="region"
+            id="context-values"
             aria-label="Context exact values"
             tabIndex={0}
             className="max-h-96 overflow-auto rounded border border-border"
@@ -262,7 +352,17 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
                       {r.headcount === null ? "Unavailable" : number(r.headcount)}
                     </td>
                     <td className="p-2">
-                      {r.context === null ? "Unavailable" : number(r.context)}
+                      {r.context === null ? "Unavailable" : contextValue(r.context)}
+                      {unit === "%" && (
+                        <span className="block text-xs">
+                          {r.ciLow !== null &&
+                          r.ciLow !== undefined &&
+                          r.ciHigh !== null &&
+                          r.ciHigh !== undefined
+                            ? `90% CI: ${contextValue(r.ciLow)} to ${contextValue(r.ciHigh)}`
+                            : "90% CI unavailable"}
+                        </span>
+                      )}
                     </td>
                     <td className="p-2">{r.eligible ? "Yes" : "No — incomplete or flagged"}</td>
                   </tr>
@@ -276,16 +376,27 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
             className="space-y-2 text-sm"
           >
             <h2 className="font-semibold">Sources and matching</h2>
+            <p>{meta.note}</p>
             <p>
-              {data.source} · source date: {data.date}. Both axes use the same accepted release and
-              reporting geography. Joins require identical geographic codes, names, levels and
-              returned child-area rosters; no fuzzy or spatial match is used. This describes the
-              returned source geography, not certified nationwide historical boundaries.
+              Headcount: {data.source} · source date: {data.date} · people · 2025. Reuse terms:{" "}
+              {data.license ?? "Not supplied by source metadata"}.
             </p>
             <p>
-              Reuse terms: {data.license ?? "Not supplied by source metadata"}. Missing values are
-              never filled from national figures, PSA population or another release. No ratios,
-              averages of local rates or changes over time are inferred.
+              Context: {current && !("error" in current) ? current.context.source : ""} · source
+              date: {meta.date} · {unit} · {meta.period}. Reuse terms:{" "}
+              {current && !("error" in current)
+                ? (current.context.license ?? "Not supplied by source metadata")
+                : "Unavailable"}
+              .
+            </p>
+            <p>
+              {meta.external
+                ? "The accepted ingestion reconciles the external source to the reporting geography; this view joins the canonical records, without repeating name matching."
+                : "Both axes use the same accepted release and reporting geography."}{" "}
+              Joins require identical codes, names, levels and returned child-area rosters. Missing
+              values are never filled from another source, parent or national figure. This does not
+              certify nationwide historical boundaries. No ratio, average of local rates or change
+              over time is inferred.
             </p>
             <Link
               className="underline"

@@ -27,10 +27,13 @@ export function FigureView({
   yLabel,
   valueSuffix,
   valueFormat,
+  preserveOrder = false,
   hoveredGeoCode,
   onHoverGeoCode,
 }: {
   data: BarDatum[];
+  /** Use the supplied category sequence in chart and default table view. */
+  preserveOrder?: boolean;
   /** Modal title. */
   title: string;
   /** WPSAR-style Person/Place/Time line shown in the enlarged modal —
@@ -85,6 +88,7 @@ export function FigureView({
       {mode === "chart" ? (
         <BarChartClient
           data={data}
+          preserveOrder={preserveOrder}
           xLabel={xLabel}
           yLabel={yLabel}
           valueSuffix={suffix}
@@ -94,6 +98,7 @@ export function FigureView({
       ) : (
         <FigureTable
           data={data}
+          preserveOrder={preserveOrder}
           labelHeader={yLabel ?? "Category"}
           valueHeader={xLabel ?? "Value"}
           valueFormatter={tableFormat}
@@ -112,6 +117,7 @@ export function FigureView({
           <div className="flex flex-1 items-center justify-center">
             <BarChartClient
               data={data}
+              preserveOrder={preserveOrder}
               xLabel={xLabel}
               yLabel={yLabel}
               valueSuffix={suffix}
@@ -123,6 +129,7 @@ export function FigureView({
         ) : (
           <FigureTable
             data={data}
+            preserveOrder={preserveOrder}
             labelHeader={yLabel ?? "Category"}
             valueHeader={xLabel ?? "Value"}
             valueFormatter={tableFormat}

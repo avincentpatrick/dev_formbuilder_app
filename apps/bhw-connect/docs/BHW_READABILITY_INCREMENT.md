@@ -64,3 +64,28 @@ This edits interpretation text only. It does not change labels, source records,
 calculations, acceptance rules or data access. No production values are copied into
 this record. Existing local full checks and bounded rendered-page verification are
 reported with the implementing PR; representative-reader evaluation remains open.
+
+## Follow-up: natural category order
+
+After #602, address the chart-order finding within the same analytics backlog.
+Age bands run youngest to oldest; cohort years run chronologically; combined
+payment bands run from the source's no-positive-payment band through its highest
+amount band. Only existing public observations are sorted, without changing
+values, inventing missing categories or recovering withheld cells. Unknown source
+labels remain visible after recognized categories. The original observations are
+not mutated.
+
+Reuse `publicValues` at the presentation boundary so overview, exact-value pages
+and comparison details agree. Pass an explicit input-order option through the
+existing FigureView, BarChartClient and shared horizontal bar spec for ordered
+measures only. Both inline and enlarged charts retain the same category sequence.
+Their tables start in that sequence, retain numeric sorting and provide a category
+header button to restore the original order. Other charts/tables keep their
+existing descending-value defaults. Name the relevant axes Age group, Year and
+Monthly allowance band instead of Category.
+
+Verification covers unequal values that would otherwise reorder categories,
+real zero, omitted categories, unknown labels, immutable inputs, rejected payloads,
+actual Plot scale order and table defaults. Required full checks and browser
+interaction evidence belong in the implementing PR. This does not establish a
+historical workforce series or change the existing cohort interpretation.

@@ -18,6 +18,8 @@ export type BarDatum = {
 export function horizontalBarSpec(
   data: BarDatum[],
   options: {
+    /** Keep supplied category order instead of ranking by value. */
+    preserveOrder?: boolean;
     xLabel?: string;
     yLabel?: string;
     valueSuffix?: string;
@@ -76,6 +78,7 @@ export function horizontalBarSpec(
     y: {
       label: options.yLabel ?? null,
       labelAnchor: "top",
+      ...(options.preserveOrder ? { domain: data.map((d) => d.label) } : {}),
       // Compact labels are display-only; full names remain in tables, ARIA and tips.
       ...(compact && data.some((d) => d.shortLabel)
         ? {
@@ -86,7 +89,13 @@ export function horizontalBarSpec(
     marks: [
       // Base bars render slightly dimmed; the pointerY overlay below brings
       // the hovered row back to full opacity so it visually pops.
-      Plot.barX(data, { y: "label", x: "value", fill, fillOpacity: 0.85, sort: { y: "-x" } }),
+      Plot.barX(data, {
+        y: "label",
+        x: "value",
+        fill,
+        fillOpacity: 0.85,
+        ...(options.preserveOrder ? {} : { sort: { y: "-x" } }),
+      }),
       Plot.barX(data, Plot.pointerY({ y: "label", x: "value", fill, fillOpacity: 1 })),
       Plot.text(data, {
         y: "label",
@@ -97,7 +106,7 @@ export function horizontalBarSpec(
         // Themed text — follows the container's CSS color so value labels stay
         // readable in dark mode (styleAxisTitles enforces the same on all text).
         fill: "currentColor",
-        sort: { y: "-x" },
+        ...(options.preserveOrder ? {} : { sort: { y: "-x" } }),
       }),
       Plot.tip(
         data,

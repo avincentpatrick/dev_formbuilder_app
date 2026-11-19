@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PovertyOverview } from "./poverty-overview";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
 import type { CatalogDataset, PublicCatalog } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
@@ -271,11 +272,14 @@ export function CatalogDetails({
   catalog,
   dataset,
   mapState,
+  locationName = "Selected location",
 }: {
   catalog: PublicCatalog;
   dataset: CatalogDataset;
   mapState?: string;
+  locationName?: string;
 }) {
+  const DetailContainer = dataset.id === "poverty" ? "details" : "div";
   const available = dataset.indicators.filter((i) => hasAvailableValue(i.state));
   const missing = dataset.indicators.filter((i) => !hasAvailableValue(i.state));
   return (
@@ -288,11 +292,22 @@ export function CatalogDetails({
         ← All datasets for this selection
       </Link>
       <div>
-        <h2 className="text-2xl font-semibold">{dataset.title} indicators</h2>
-        <p className="mt-2 text-muted">
-          {dataset.availableIndicators} of {dataset.totalIndicators} indicators available
-        </p>
+        <h2 className="text-2xl font-semibold">
+          {dataset.id === "poverty" ? "Poverty in 2023" : `${dataset.title} indicators`}
+        </h2>
+        {dataset.id !== "poverty" && (
+          <p className="mt-2 text-muted">
+            {dataset.availableIndicators} of {dataset.totalIndicators} indicators available
+          </p>
+        )}
       </div>
+      {dataset.id === "poverty" && (
+        <PovertyOverview
+          dataset={dataset}
+          selection={catalog.selection}
+          locationName={locationName}
+        />
+      )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {dataset.detailHref && (
         <Link
@@ -308,126 +323,133 @@ export function CatalogDetails({
           Open existing {dataset.title} dashboard →
         </Link>
       )}
-      {catalog.selection.mode === "all" && (
-        <p className="rounded-lg border border-border bg-surface p-4 text-sm">
-          This is an availability summary, not a national data table. Choose a location above for
-          its figures.
-        </p>
-      )}
-      {available.length > 0 ? (
-        <div
-          className="overflow-x-auto rounded-lg border border-border"
-          role="region"
-          aria-label="Scrollable indicator table"
-          tabIndex={0}
-        >
-          <table className="w-full text-left text-sm">
-            <caption className="sr-only">
-              Available {dataset.title} measures for the selected scope
-            </caption>
-            <thead className="bg-surface">
-              <tr>
-                <th scope="col" className="p-3">
-                  Indicator
-                </th>
-                <th scope="col" className="p-3">
-                  Value
-                </th>
-                <th scope="col" className="p-3">
-                  Source and coverage
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {available.map((indicator) => (
-                <tr key={indicator.id} className="border-t border-border align-top">
-                  <th scope="row" className="min-w-40 p-3 font-medium">
-                    {indicator.label}
-                    <p className="mt-2 text-xs font-normal text-muted">
-                      {measureDefinition(indicator)}
-                    </p>
-                    {derivationNote(indicator) && (
-                      <p className="mt-2 text-xs font-normal text-muted">
-                        {derivationNote(indicator)}
-                      </p>
-                    )}
-                  </th>
-                  <td className="min-w-40 p-3">
-                    {indicator.values.length ? (
-                      <ul className="space-y-2">
-                        {indicator.values.map((value, index) => (
-                          <li key={index}>
-                            {value.label && `${value.label}: `}
-                            {formatValue(value, indicator.unit)}
-                            {value.numerator != null && (
-                              <span className="block text-xs text-muted">
-                                Numerator: {value.numerator.toLocaleString("en-PH")}
-                              </span>
-                            )}
-                            {value.denominator != null && (
-                              <span className="block text-xs text-muted">
-                                Denominator: {value.denominator.toLocaleString("en-PH")}
-                              </span>
-                            )}
-                            {value.ciLow != null && value.ciHigh != null && (
-                              <span className="block text-xs text-muted">
-                                {dataset.id === "poverty"
-                                  ? "90% confidence interval"
-                                  : "Confidence interval"}
-                                : {value.ciLow}–{value.ciHigh}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      "Available in reported locations"
-                    )}
-                  </td>
-                  <td className="min-w-48 p-3 text-xs text-muted">
-                    {dataset.sources.find((s) => s.slug === indicator.sourceSlug)?.sourceName ??
-                      "Source details unavailable"}
-                    <p className="mt-2">
-                      Reported area records:{" "}
-                      {indicator.reportedAreaRecords?.toLocaleString("en-PH") ?? "Unknown"}.
-                      Overlapping geographic levels are not additive.
-                    </p>
-                    {isPartialTotal(dataset, indicator) && (
-                      <p className="font-medium">Partial total</p>
-                    )}
-                    {indicator.coverage && (
-                      <p className="mt-2">
-                        {indicator.coverage.label}:{" "}
-                        {indicator.coverage.covered.toLocaleString("en-PH")} of{" "}
-                        {indicator.coverage.total.toLocaleString("en-PH")}
-                      </p>
-                    )}
-                    {indicator.reason && <p className="mt-2">{indicator.reason}</p>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p role="status">{omissionReason(dataset, catalog.selection)}</p>
-      )}
-      {missing.length > 0 && (
-        <details className="rounded-lg border border-border p-4">
-          <summary className="cursor-pointer text-sm font-medium">
-            {missing.length} indicators unavailable or withheld
+      <DetailContainer className="space-y-4">
+        {dataset.id === "poverty" && (
+          <summary className="cursor-pointer rounded border border-border p-4 font-medium">
+            Exact data, availability and sources
           </summary>
-          <ul className="mt-3 space-y-3 text-sm">
-            {missing.map((indicator) => (
-              <li key={indicator.id}>
-                <strong>{indicator.label}</strong> · {indicator.state}: {indicator.reason}
-                <p className="mt-1 text-muted">{measureDefinition(indicator)}</p>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      <SourceDates dataset={dataset} />
+        )}
+        {catalog.selection.mode === "all" && (
+          <p className="rounded-lg border border-border bg-surface p-4 text-sm">
+            This is an availability summary, not a national data table. Choose a location above for
+            its figures.
+          </p>
+        )}
+        {available.length > 0 ? (
+          <div
+            className="overflow-x-auto rounded-lg border border-border"
+            role="region"
+            aria-label="Scrollable indicator table"
+            tabIndex={0}
+          >
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">
+                Available {dataset.title} measures for the selected scope
+              </caption>
+              <thead className="bg-surface">
+                <tr>
+                  <th scope="col" className="p-3">
+                    Indicator
+                  </th>
+                  <th scope="col" className="p-3">
+                    Value
+                  </th>
+                  <th scope="col" className="p-3">
+                    Source and coverage
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {available.map((indicator) => (
+                  <tr key={indicator.id} className="border-t border-border align-top">
+                    <th scope="row" className="min-w-40 p-3 font-medium">
+                      {indicator.label}
+                      <p className="mt-2 text-xs font-normal text-muted">
+                        {measureDefinition(indicator)}
+                      </p>
+                      {derivationNote(indicator) && (
+                        <p className="mt-2 text-xs font-normal text-muted">
+                          {derivationNote(indicator)}
+                        </p>
+                      )}
+                    </th>
+                    <td className="min-w-40 p-3">
+                      {indicator.values.length ? (
+                        <ul className="space-y-2">
+                          {indicator.values.map((value, index) => (
+                            <li key={index}>
+                              {value.label && `${value.label}: `}
+                              {formatValue(value, indicator.unit)}
+                              {value.numerator != null && (
+                                <span className="block text-xs text-muted">
+                                  Numerator: {value.numerator.toLocaleString("en-PH")}
+                                </span>
+                              )}
+                              {value.denominator != null && (
+                                <span className="block text-xs text-muted">
+                                  Denominator: {value.denominator.toLocaleString("en-PH")}
+                                </span>
+                              )}
+                              {value.ciLow != null && value.ciHigh != null && (
+                                <span className="block text-xs text-muted">
+                                  {dataset.id === "poverty"
+                                    ? "90% confidence interval"
+                                    : "Confidence interval"}
+                                  : {value.ciLow}–{value.ciHigh}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        "Available in reported locations"
+                      )}
+                    </td>
+                    <td className="min-w-48 p-3 text-xs text-muted">
+                      {dataset.sources.find((s) => s.slug === indicator.sourceSlug)?.sourceName ??
+                        "Source details unavailable"}
+                      <p className="mt-2">
+                        Reported area records:{" "}
+                        {indicator.reportedAreaRecords?.toLocaleString("en-PH") ?? "Unknown"}.
+                        Overlapping geographic levels are not additive.
+                      </p>
+                      {isPartialTotal(dataset, indicator) && (
+                        <p className="font-medium">Partial total</p>
+                      )}
+                      {indicator.coverage && (
+                        <p className="mt-2">
+                          {indicator.coverage.label}:{" "}
+                          {indicator.coverage.covered.toLocaleString("en-PH")} of{" "}
+                          {indicator.coverage.total.toLocaleString("en-PH")}
+                        </p>
+                      )}
+                      {indicator.reason && <p className="mt-2">{indicator.reason}</p>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p role="status">{omissionReason(dataset, catalog.selection)}</p>
+        )}
+        {missing.length > 0 && (
+          <details className="rounded-lg border border-border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              {missing.length} indicators unavailable or withheld
+            </summary>
+            <ul className="mt-3 space-y-3 text-sm">
+              {missing.map((indicator) => (
+                <li key={indicator.id}>
+                  <strong>{indicator.label}</strong> · {indicator.state}: {indicator.reason}
+                  <p className="mt-1 text-muted">{measureDefinition(indicator)}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <SourceDates dataset={dataset} />
+      </DetailContainer>
     </section>
   );
 }

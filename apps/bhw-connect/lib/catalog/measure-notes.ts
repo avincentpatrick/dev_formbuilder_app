@@ -1,3 +1,4 @@
+import { POVERTY_DEFINITION, POVERTY_SCOPE, POVERTY_UNCERTAINTY } from "./poverty-reading";
 import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { CATALOG } from "./definitions";
 import type { CatalogIndicator } from "./types";
@@ -40,8 +41,7 @@ const definitions: Record<string, string> = {
     "Listed barangays qualifying through recorded health criteria. Denominator: health-evaluable listed barangays; unusable provincial benchmarks are excluded.",
   "population.residents":
     "PSA POPCEN 2024 resident population in accepted matched census rows. Higher-level totals sum matched municipalities and may be partial; Manila retains its published province-node figure.",
-  "poverty.incidence":
-    "PSA 2023 small-area estimate of the percentage of people below the poverty threshold. The published 90% confidence interval describes estimate uncertainty. No higher-level or district rate is inferred.",
+  "poverty.incidence": `${POVERTY_DEFINITION} ${POVERTY_UNCERTAINTY} ${POVERTY_SCOPE}`,
 };
 const specs = new Map(CATALOG.flatMap((d) => d.indicators.map((s) => [s.id, s] as const)));
 

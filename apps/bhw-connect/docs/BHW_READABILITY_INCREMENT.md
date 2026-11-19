@@ -89,3 +89,26 @@ real zero, omitted categories, unknown labels, immutable inputs, rejected payloa
 actual Plot scale order and table defaults. Required full checks and browser
 interaction evidence belong in the implementing PR. This does not establish a
 historical workforce series or change the existing cohort interpretation.
+
+## Follow-up: searchable training overview
+
+Replace the 88 separate topic/year entries with one 44-topic table behind the
+existing training disclosure. Pair the approved percentage with its separately
+validated median training year by topic key. Reuse the delivered training matrix's
+safe coverage/count/base preparation, without introducing a new database read.
+Search accepts both simpler display labels and original source labels; original
+wording remains expandable. Topic and year exact-data links and comparison links
+retain the selected locality and map-return snapshot. The separate multi-place
+training matrix remains available and unchanged.
+
+The table explains the two populations, topic overlap and the limits of recorded
+training. Sort by topic or descending coverage, preserving zero before unavailable
+values. All 44 topics remain accessible, including unsupported and missing ones.
+Technical program titles and disease names are retained where simplifying them
+would require an unverified interpretation of course content. No training record
+is reclassified as current competence or current certification.
+
+Regression evidence includes incompatible year sources/units, rejected year
+payloads independent of valid zero coverage, alias search, sorting, all-topic
+retention, keyboard expansion, empty searches and phone table scrolling. Browser
+verification distinguishes unavailable-data UI from populated source verification.

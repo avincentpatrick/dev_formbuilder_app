@@ -260,7 +260,7 @@ it("shows education once while retaining its exact and comparison destinations",
 it("groups long lists without losing exact links, unavailable statuses or exposing withheld values", () => {
   const { document } = parseHTML(
     render([
-      item("bhw.training.basic_life_support", "available", 0),
+      { ...item("bhw.training.basic_life_support", "available", 0), unit: "%" },
       item("bhw.training-recency.basic_life_support", "unavailable", 111111),
       item("bhw.honorarium-amount.region.mean", "suppressed", 222222),
     ]),
@@ -276,7 +276,7 @@ it("groups long lists without losing exact links, unavailable statuses or exposi
     expect(group.querySelector(`a[href*="measure=${id}"]`)).not.toBeNull();
   }
   const training = document.getElementById("training-topics")!;
-  expect(training.textContent).toContain(" · 0");
+  expect(training.textContent).toContain("0%");
   expect(training.textContent).not.toContain("111111");
   expect(document.getElementById("honorarium-amounts")!.textContent).not.toContain("222222");
   expect(training.querySelector("article h3")).toBeNull();

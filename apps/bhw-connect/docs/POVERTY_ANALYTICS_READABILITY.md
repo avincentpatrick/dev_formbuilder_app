@@ -96,3 +96,11 @@ Expanded-detail axe scans reported no WCAG A/AA violations, page errors or ordin
 horizontal overflow. Long locality names and phone/desktop screenshots were
 inspected. No live source values/screenshots are committed. Seeded CI, actual
 deployment and bounded live verification are still pending at this snapshot.
+
+Delivery: [PR #608](https://github.com/avincentpatrick/dev_formbuilder_app/pull/608).
+First seeded CI run passed 178 browser cases / one skip but failed the existing
+all-card smoke test, which expected the Poverty exact table to be visible without
+opening its new disclosure. Updated that journey to open the named disclosure
+while retaining all table, definition and accepted-source assertions. The generic
+availability-detail journey also opens it after refresh. Targeted local browser
+checks use the final standalone candidate; final required CI remains authoritative.

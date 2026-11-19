@@ -64,8 +64,8 @@ presence is not permission to label a mixed-year join as same-year change.
 
 | Item | Required next evidence/action |
 | --- | --- |
-| Explainable review lists | Implement transparent named criteria using the same eligible universe, show why each locality appears, separate missing reporting from low recorded headcount, avoid a composite need score; verify phone/desktop navigation and exact values. |
-| Multi-indicator locality inspection | Connect the same-source relationship details to the existing scoped qualification/support dashboard; verify its scope and return journey, and add supporting same-source indicators where useful. |
+| Explainable review lists | Implemented follow-up: separate reporting gaps, reported zero headcounts and below-median headcount with above-median context. Uses at least four eligible pairs for the contrast, raw values, strict inequalities and alphabetical order; overlapping lists are not a score. Checks and delivery evidence belong in its PR. |
+| Multi-indicator locality inspection | Relationship details reuse the full locality dashboard for workforce, qualifications and support. Follow-up browser checks cover the selected province, section presence and Back to its relationship/list context. No profile/headcount ratio or duplicate reader is added. Live evidence must verify actual deployed behavior. |
 | Other contextual sources | Before enabling PSA population/poverty or NHFR facility relationships, document accepted release, observation dates, source geographic vintage, changes/crosswalk and treatment of unmatched codes. The code owner can audit existing ingestion contracts; missing evidence or source inputs require the established authorized data-supply process. Do not infer comparability from code equality alone. |
 | Bivariate map | Requires a justified pair, joint classification/legend, same matched universe and a readable phone/non-color alternative. Evaluate against the actual relationship use case; no unsupported bivariate claim is made by this scatter increment. |
 | Worker density/point maps | No approved individual-location dataset is supplied by these aggregate APIs. Requires authorized appropriately de-identified locations, geographic accuracy, disclosure rules and a defensible density denominator; aggregate centroids are not worker locations. |
@@ -83,3 +83,26 @@ activation, context switching, refresh/Back, failure/retry and invalid scope.
 Live checks must repeat bounded source consistency and navigation after the
 actual release SHA is observed. No main workflow may be displaced to accelerate
 this work.
+
+## Delivery ledger
+
+- [#598](https://github.com/avincentpatrick/dev_formbuilder_app/pull/598): same-source
+  scatter/table/navigation and source audit. Required CI 44445978798 passed with
+  2,122 seeded unit tests / 13 skipped and 167 browser cases / one skipped. Merged
+  `6793a0b2` on 19 November. Consult the PR's delivery note for actual release and
+  live observations; a merge is not evidence that it is deployed.
+- The review-list follow-up adds no data requests. It uses the chart's joined rows
+  and gives every listed place an explicit reason and locality link. Zero and
+  unavailable groups are distinct. Equal-to-median values are not flagged, and a
+  small peer universe does not generate a comparative list. Nothing here measures
+  workload, quality, staffing need or priority.
+
+The later source review found existing reconciliation contracts in
+`POPULATION_RECONCILIATION.md`, `POVERTY_SAE.md`, `ingestion/ingest_population.py`
+and `ingestion/build_poverty.py`. These document canonical reporting geography,
+NIR remapping and residuals, so external context is not wholly blocked by lack of
+a join contract. A separate increment should evaluate those accepted inputs with
+explicit differing observation dates, residual exclusions and no parent fallback.
+The historical documents' legacy fallback descriptions do not authorize a fallback
+in the new public relationship view. Poverty back-estimates for 2018/2021/2023
+exist, but they do not create comparable BHW workforce history.

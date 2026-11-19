@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ContextReview } from "./context-review";
 import { useEffect, useState } from "react";
 import { contextHref, contextLabels, joinContext, type ContextChoice } from "@/lib/bhw/context";
 import { mapHref, type MapPayload } from "@/lib/maps/prototype";
@@ -221,6 +222,7 @@ export function ContextWorkspace({ initial: choice }: { initial: ContextChoice }
               </p>
             )}
           </section>
+          <ContextReview rows={rows} choice={choice} label={label} unit={unit} />
           <div
             role="region"
             aria-label="Context exact values"

@@ -27,8 +27,7 @@ function Measure({
   const values = publicValues(item);
   const chart = values.length > 1 && item.unit !== "calendar year";
   return (
-    <article className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-lg font-semibold">{item.label}</h3>
+    <article aria-label={item.label} className="space-y-3">
       <p className="text-xs text-muted">{areaName} · BHW Profiles 2025 · validated profiles</p>
       {chart ? (
         <FigureView
@@ -49,7 +48,7 @@ function Measure({
       {values.length > 0 && item.reason && <p className="text-sm text-muted">{item.reason}</p>}
       <p className="text-sm text-muted">{measureDefinition(item)}</p>
       <div className="flex flex-wrap gap-4 text-sm underline">
-        <Link href={bhwMeasureHref(item.id, level, code, mapState)}>View exact values</Link>
+        <Link href={bhwMeasureHref(item.id, level, code, mapState)}>Full data and definition</Link>
         <Link href={comparisonHref(item.id, [code], undefined, mapState)}>Compare places</Link>
       </div>
     </article>
@@ -150,16 +149,44 @@ export function BhwAnalysisSection({
   title,
   id,
   prefixes,
+  exclude = [],
+  detailsLabel,
+  description,
   ...props
-}: Props & { title: string; id: string; prefixes: string[] }) {
-  const items = props.dataset.indicators.filter((i) =>
-    prefixes.some((prefix) => i.id.startsWith(prefix)),
+}: Props & {
+  title: string;
+  id: string;
+  prefixes: string[];
+  exclude?: string[];
+  detailsLabel?: string;
+  description?: string;
+}) {
+  const items = props.dataset.indicators.filter(
+    (i) => !exclude.includes(i.id) && prefixes.some((prefix) => i.id.startsWith(prefix)),
+  );
+  const measureList = (
+    <div className="grid gap-4 md:grid-cols-2">
+      {items.map((item) => (
+        <details key={item.id} className="rounded-lg border border-border p-3">
+          <summary className="cursor-pointer font-medium">
+            {item.label}
+            {publicValues(item).length === 1
+              ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
+              : ""}
+          </summary>
+          <div className="mt-3">
+            <Measure {...props} item={item} />
+          </div>
+        </details>
+      ))}
+    </div>
   );
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className="scroll-mt-20 space-y-4">
       <h2 id={`${id}-heading`} className="text-2xl font-semibold">
         {title}
       </h2>
+      {description && <p className="text-sm text-muted">{description}</p>}
       {props.level === "barangay" && (
         <p className="text-sm text-muted">
           Some analyses are available only from city/municipality to national level. Unsupported
@@ -175,21 +202,16 @@ export function BhwAnalysisSection({
       {id === "combined-honorarium" && (
         <HonorariumHighlights dataset={props.dataset} areaName={props.areaName} />
       )}
-      <div className="grid gap-4 md:grid-cols-2">
-        {items.map((item) => (
-          <details key={item.id} className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer font-medium">
-              {item.label}
-              {publicValues(item).length === 1
-                ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
-                : ""}
-            </summary>
-            <div className="mt-3">
-              <Measure {...props} item={item} />
-            </div>
-          </details>
-        ))}
-      </div>
+      {detailsLabel ? (
+        <details className="rounded-lg border border-border p-4">
+          <summary className="cursor-pointer font-medium">
+            {detailsLabel} ({items.length})
+          </summary>
+          <div className="mt-4">{measureList}</div>
+        </details>
+      ) : (
+        measureList
+      )}
     </section>
   );
 }

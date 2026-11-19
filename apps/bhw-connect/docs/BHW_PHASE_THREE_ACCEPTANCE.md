@@ -4,6 +4,12 @@
 multi-indicator locality profiles and explainable review lists. Implementation,
 required checks, actual deployment and bounded live observations are separate
 stages. This document does not claim completion before those stages pass.
+The current delivery notes in [#598](https://github.com/avincentpatrick/dev_formbuilder_app/pull/598),
+[#599](https://github.com/avincentpatrick/dev_formbuilder_app/pull/599) and
+[#600](https://github.com/avincentpatrick/dev_formbuilder_app/pull/600) record actual
+release SHAs, checks and live observations. The final Phase 3 reconciliation in
+#600 supersedes implementation-only status snapshots below; pending or failed
+checks are never treated as passed.
 
 ## First increment: same-source relationships
 
@@ -108,7 +114,7 @@ The historical documents' legacy fallback descriptions do not authorize a fallba
 in the new public relationship view. Poverty back-estimates for 2018/2021/2023
 exist, but they do not create comparable BHW workforce history.
 
-## Audited context and joint-map follow-up
+## Audited context and joint-map follow-up — #600
 
 The context-options follow-up implements the documented source matching instead
 of declaring all external context unavailable. Headcount remains the accepted

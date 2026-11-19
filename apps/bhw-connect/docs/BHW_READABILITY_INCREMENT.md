@@ -41,3 +41,26 @@ Reuse: server-rendered overview/analysis components, native details/summary, exi
 Regression checks cover one education display with retained destinations, closed detail groups with accessible exact/comparison links, zero and withheld values, and existing scope/map state behavior. Required lint, types, full unit suite, migration lint and prefixed build are run for the application changes. Browser checks must exercise opening/closing groups with keyboard at phone and desktop widths. Record actual outcomes in the PR; do not infer physical-device acceptance or live release from local checks.
 
 This increment does not close an analytics phase or finish the entire readability backlog. Continue with the remaining rows above against the latest main and open PRs.
+
+## Follow-up: explain measures in ordinary language
+
+Continues the same backlog after #601. Reuse `measureDefinition`, so overview details,
+exact-measure pages and comparison descriptions receive consistent wording.
+
+- Explain median, mean, percentile thresholds, minimum/maximum, Gini and the payment
+  ratio alongside the affected measure. Percentile descriptions acknowledge ties.
+- Explain the workload population (positive recorded assignments only), the
+  all-profile combined-payment population, and the positive-total population used
+  for inequality separately. Do not silently use one denominator for all three.
+- Check against the existing aggregate definitions: the busiest group uses rank
+  below 0.10, so ties can include more than exactly a tenth of workers. Cohorts
+  describe the 2025 profiles, not today's workforce or a historical time series.
+- Replace database-oriented missing-value wording and arithmetic-only percentage
+  definitions with plain explanations. Preserve missing-versus-zero, overlapping
+  sources/topics, monthly conversion, historical reference and non-current-payroll
+  qualifications.
+
+This edits interpretation text only. It does not change labels, source records,
+calculations, acceptance rules or data access. No production values are copied into
+this record. Existing local full checks and bounded rendered-page verification are
+reported with the implementing PR; representative-reader evaluation remains open.

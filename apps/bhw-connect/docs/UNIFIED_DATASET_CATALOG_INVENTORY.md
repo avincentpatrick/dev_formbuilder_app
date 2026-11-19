@@ -271,3 +271,38 @@ coverage, and test error/zero/null/partial/suppressed cases before any overview 
 Validation for this documentation increment is recorded in the plan's progress entry. No new
 runtime tests or schema changes are needed for the inventory itself. End-to-end catalog claims
 remain reserved for Increment 7.
+
+## BHW readability audit: expanded inventory (19 November 2026)
+
+The initial inventory above is historical. The expanded BHW catalog now includes
+these families; `lib/catalog/definitions.ts` remains the executable inventory.
+The readability work reuses its accepted releases and geographic capabilities.
+
+| Family (all members reviewed) | Population / interpretation | Presentation decision |
+| --- | --- | --- |
+| Headcount, registration split, declared accreditation | LGU-reported workers; registered-only and registered-and-accredited are separate buckets | Keep total and split; move repeated accreditation share into a disclosure. No person matching to profiles. |
+| Checked profiles and profile accreditation | Checked individual profiles, distinct from headcount | Keep profile count and clarify the cross-source ratio; never add the populations. |
+| Six demographic dimensions | Recorded categories among checked profiles; missing categories are not zero | Age and sex first; education once in qualifications; civil status, IP and blood type under additional characteristics. Full source categories remain accessible. |
+| Three qualification/training/certification measures | All checked profiles; training and certification are separate, overlapping records | Keep separate, with plain definitions and full chart/table labels. |
+| 44 training percentages and 44 median years | Percentages: all checked profiles. Years: trained profiles with a usable year for that topic | One searchable table with paired but independently validated cells. Original labels remain searchable and visible. Recorded training is not proof of current competence. |
+| Four payer-receipt percentages | All checked profiles; sources overlap | Plain government names. Do not sum percentages or infer paid amounts from receipt. |
+| Six amount statistics for each of four payers | Available monthly amount records among that payer's recipients | One 24-cell statistics table, retaining each exact/comparison link and status. Reuse the complete-quantile chart; no imputed endpoints. |
+| Combined median, no-positive share, historical-reference share and bands | All checked profiles, including those without a positive recorded amount | Median and no-positive share lead; other values remain in details. Missing does not confirm non-payment. Reference is not a legal or living-cost standard. |
+| Gini, percentile ratio, p10 and p90 | Profiles with a positive combined recorded amount | Advanced details with explanations, not overview headlines. |
+| Seven assigned-household statistics | Positive recorded assignments; excludes zero and missing | Median and a validated p25–p75 summary lead. Remaining statistics stay in details. Not actual visits or an area-wide staffing-need ratio. |
+| Average active years and three joining-year series | Usable years in the 2025 profiles | Explain exclusions and chronological display. Cohorts are not past workforce totals or retention rates. |
+| Delivered comparisons, context, peers and relationships | Existing source-specific populations and eligible peer universes | Preserve contracts and limitations; association is not causation, and a low count alone does not demonstrate a shortage. |
+
+Evidence checked: `lib/catalog/definitions.ts`, `lib/catalog/measure-notes.ts`,
+`lib/bhw/training-comparison.ts`, `lib/bhw/honorarium-distribution.ts`,
+`ingestion/build_aggregates.sql` and the existing Phase 2/3 acceptance records.
+Public aggregate policy is `BHW_AGGREGATE_PUBLICATION.md`; do not restore the older
+blanket suppression assumption from historical documents.
+
+**Source clarification still required:** the available source transformation does
+not establish a user-facing dictionary for every blood-type code (including U),
+education category containing “Level”, or IP response code. Keep the exact source
+labels and an interpretation caveat. Do not translate these into unknown,
+incomplete schooling, or a yes/no response without the source owner's dictionary.
+Program acronyms in course titles also retain their source wording where their
+precise course meaning has not been verified. No such dictionary was fabricated.

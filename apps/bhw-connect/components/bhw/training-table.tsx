@@ -47,6 +47,9 @@ export function TrainingTable({ rows }: { rows: Row[] }) {
         year uses profiles recorded as trained in that topic, with a recorded year. Missing records
         do not prove that a worker has never been trained.
       </p>
+      <p className="text-xs text-muted">
+        Scroll sideways to see the recorded year beside each topic.
+      </p>
       <div
         role="region"
         aria-label="Training topics table, scroll horizontally for all columns"

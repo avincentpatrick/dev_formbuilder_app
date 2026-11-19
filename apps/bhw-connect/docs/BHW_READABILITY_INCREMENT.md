@@ -23,18 +23,23 @@ Question: can readers reach the main story without scanning every detailed train
 
 Reuse: server-rendered overview/analysis components, native details/summary, existing chart and distribution components, approved catalog observations and existing URL builders. No new hooks, requests, dependencies, routes, migrations or analytics calculations. Native disclosure changes visibility; it is not claimed as a bundle-size or data-loading optimization.
 
-## Remaining assessment work within existing phases
+## Assessment disposition within existing phases
 
-| Existing phase              | Assessment follow-up / disposition                                                                                                                                                                                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0: source definitions       | Extend the existing inventory to the expanded measures; verify source meanings for registration/accreditation, education-level categories, blood-type codes and Indigenous Peoples categories before renaming them.                                                             |
-| 1: overview clarity         | This increment starts duplicate removal and grouping. Still review headline order, repeated accreditation presentation, demographic priority, source-note length, plain navigation/search labels and approved-user messaging. Preserve counts and data access.                  |
-| 1: chart accessibility      | Check clipped labels, axis wording, number precision, age/year/payment-band ordering, keyboard/table alternatives and mobile layouts. Do not change calculation precision while formatting.                                                                                     |
-| 2: training                 | Reuse the delivered comparison matrix. Consolidate overview topic percentages and training years into a searchable table; review all 44 labels, acronyms and questionnaire wording. Preserve overlap and recorded-training limitations.                                         |
-| 2: compensation             | Reuse delivered distributions. Review average/median presentation, source terminology, combined-total population notes, missing-versus-zero labels, historical-reference explanation, and advanced percentile/Gini placement. No new adequacy or legal-standard interpretation. |
-| 2: workload/service history | Explain median and middle-half ranges; distinguish assigned-household distribution from aggregate context ratios. Review chronological cohort display and explain why it is not historical workforce size.                                                                      |
-| 3: interpretation           | Preserve delivered context contracts. Review wording for association, reporting gaps, peer universes and historical payment references; do not introduce a staffing-need score or unsupported causal claims.                                                                    |
-| 4: reusable standard        | Evaluate overview/detail comprehension with general readers, BHW/LGU readers and analysts before generalizing. Localization remains a separately scoped follow-up.                                                                                                              |
+| Existing phase | Implementation disposition | Remaining evidence |
+| --- | --- | --- |
+| 0: source definitions | Expanded-family inventory audited against catalog and aggregate contracts; source populations explained consistently. | Source-owner dictionary for ambiguous blood, education and IP codes and unverified course abbreviations. Original labels retained. |
+| 1: overview clarity | Duplicate education removed; accreditation duplication disclosed; age/sex prioritized; extra characteristics grouped; plain search/map wording and access explanation supplied. Headline counts and percentages preserved. | Representative-reader comprehension. |
+| 1: chart accessibility | Natural age/year/band ordering, wrapped labels, plain axes, retained full tables and keyboard controls. Existing centralized percentage precision retained. | Existing owner-deferred physical-device performance; broader assistive-technology evaluation is not inferred from browser tests. |
+| 2: training | 44 searchable topic/year pairs replace 88 entries; original labels, independent statuses and all destinations retained. Delivered comparison matrix reused. | Confirm unverified program terminology with source owner. |
+| 2: compensation | Existing distribution reused; 24 statistics consolidated; average/median explained; advanced ratios grouped; missing/zero and historical-reference caveats retained. | Reader interpretation of receipt versus amount, payer overlap and reference values. |
+| 2: workload/service history | Median and validated middle half lead; technical values remain accessible; chronological cohorts explicitly describe 2025 profiles. | Reader distinction between assignments and aggregate area ratios. |
+| 3: interpretation | Existing context/peer/relationship contracts preserved; glossary reconciled with their population and causal limitations. | Existing acceptance records remain authoritative; Headcount reuse metadata stays owner-deferred. |
+| 4: reusable standard | A concrete comprehension protocol is prepared below. | Run it with general, BHW/LGU and analyst readers before claiming acceptance or generalizing. Localization remains separately scoped. |
+
+These are implementation dispositions, not a claim that every change is deployed
+or that human acceptance has passed. Use each PR's checks and release evidence for
+delivery status. The implementation closes the actionable software checklist;
+source clarification and reader acceptance remain explicitly open.
 
 ## Verification and completion boundary
 
@@ -112,3 +117,56 @@ Regression evidence includes incompatible year sources/units, rejected year
 payloads independent of valid zero coverage, alias search, sorting, all-topic
 retention, keyboard expansion, empty searches and phone table scrolling. Browser
 verification distinguishes unavailable-data UI from populated source verification.
+
+## Follow-up: concise summaries and consistent terminology
+
+- Replace repetitive mean/median payer charts with the existing distribution chart
+  and a compact 24-cell statistics table. The chart's exact values remain in a
+  disclosure; each independently public statistic remains accessible even if the
+  complete distribution cannot be plotted. Keep exact/comparison links and statuses.
+- Lead workload with the median and an ordered, compatible public middle-half
+  range. Keep service years, cohort series and technical statistics in details.
+  Move the combined-payment percentile ratio out of the default headline.
+- Prioritize age and sex; group other demographic characteristics. Keep education
+  only under qualifications. Disclose the repeated headcount accreditation share.
+- Wrap long chart labels within their gutters, allowing extra row height; preserve
+  full source labels in scales, tables, tooltips and downloads. Use plain map/search
+  labels and explain approved-user access beside the AI entry point.
+- Reconcile glossary wording with the distinct headcount/profile populations,
+  applicable publication policy, historical payment reference and area ratios.
+  Preserve the existing source, period and geographic-context contracts.
+
+The expanded-family source audit is recorded in
+`UNIFIED_DATASET_CATALOG_INVENTORY.md`. Unverified source codes retain their original
+labels. Source notes are already in a named disclosure; critical population,
+missing-value and interpretation notes stay beside their figures.
+
+## Completion checklist and human acceptance
+
+Implementation evidence is recorded per PR. Software verification does not close
+representative-reader acceptance. Before claiming the interface works for every
+level of reader, use the following short protocol with a general reader, a BHW/LGU
+reader and an analyst; include a phone user and a keyboard/screen-reader user.
+Do not record personal details or production data in this public repository.
+
+1. Find a place's workforce count. Explain why its checked-profile count can differ.
+   Expected: two sources/populations; no addition or assumed person matching.
+2. Find one training topic, its percentage and recorded year. Explain what the year
+   does and does not mean. Expected: median among trained profiles with a year;
+   neither everyone trained that year nor proof of current skills.
+3. Compare payer amounts. Explain median versus average and whether the four payer
+   medians can be added. Expected: middle versus arithmetic mean; do not add them.
+4. Interpret no-positive-payment and the historical reference. Expected: missing
+   is not proof of non-payment; the reference is not a legal minimum or enough pay.
+5. Explain the household middle-half range, its excluded records and the separate
+   area ratio. Expected: positive individual assignments; not visits or staffing need.
+6. Find a full source label, an unavailable value, exact data and comparison links;
+   return to the chosen locality/map. Record confusion, assistance and navigation
+   failures before asking the reader to suggest wording.
+
+Status: this protocol is prepared, **not performed**. Correct observed confusion
+before adopting a generalized readability standard. Existing owner-deferred
+physical-device performance and Headcount reuse metadata remain governed by the
+Phase 2/3 acceptance records. Localization is outside the accepted English-only
+scope. Source dictionary confirmation and representative-reader evaluation require
+external evidence; neither can be substituted with automated tests.

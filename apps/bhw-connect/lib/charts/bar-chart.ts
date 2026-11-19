@@ -54,7 +54,29 @@ export function horizontalBarSpec(
   // cap it so a narrow plot still leaves usable room for the bars. The per-char
   // factor tracks the slightly larger tick font set via `style.fontSize` below.
   const marginLeft = Math.min(compact ? 136 : 210, Math.max(60, longestLabel * 8 + 16));
-  const barHeight = Math.min(options.barHeight ?? 32, compact ? 40 : 200);
+  // Wrap display labels within the gutter. Full source labels still key the scale.
+  const maxChars = Math.max(8, Math.floor((marginLeft - 16) / 7));
+  const displayLabels = new Map(
+    data.map((d) => {
+      const text = compact ? (d.shortLabel ?? d.label) : d.label;
+      const words = text.split(/\s+/);
+      const lines: string[] = [""];
+      for (const word of words) {
+        const chunks = word.match(new RegExp(`.{1,${maxChars}}`, "g")) ?? [word];
+        for (const chunk of chunks) {
+          const last = lines.length - 1;
+          if (lines[last] && lines[last].length + 1 + chunk.length > maxChars) lines.push(chunk);
+          else lines[last] += `${lines[last] ? " " : ""}${chunk}`;
+        }
+      }
+      return [d.label, lines.join("\n")] as const;
+    }),
+  );
+  const maxLines = Math.max(
+    1,
+    ...Array.from(displayLabels.values(), (label) => label.split("\n").length),
+  );
+  const barHeight = Math.max(options.barHeight ?? 32, maxLines * 15 + 12);
   // Render the y-axis title horizontally along the top (labelAnchor "top")
   // rather than rotated in the left gutter, where — even with a widened margin
   // — it collided with long tick labels on narrow widths. A top band keeps the
@@ -79,12 +101,7 @@ export function horizontalBarSpec(
       label: options.yLabel ?? null,
       labelAnchor: "top",
       ...(options.preserveOrder ? { domain: data.map((d) => d.label) } : {}),
-      // Compact labels are display-only; full names remain in tables, ARIA and tips.
-      ...(compact && data.some((d) => d.shortLabel)
-        ? {
-            tickFormat: (label: string) => data.find((d) => d.label === label)?.shortLabel ?? label,
-          }
-        : {}),
+      tickFormat: (label: string) => displayLabels.get(label) ?? label,
     },
     marks: [
       // Base bars render slightly dimmed; the pointerY overlay below brings

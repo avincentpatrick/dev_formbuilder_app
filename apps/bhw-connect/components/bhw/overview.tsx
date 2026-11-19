@@ -124,7 +124,9 @@ export function BhwOverview({
       ? []
       : [
           {
-            label: indicator.label,
+            label: indicator.label
+              .replace("Honorarium receipt from ", "")
+              .replace("citymun", "City/municipality"),
             value,
             shortLabel: indicator.label
               .replace("Honorarium receipt from ", "")
@@ -136,7 +138,6 @@ export function BhwOverview({
   const educationData = publicValues(education).map((v) => ({
     label: v.label ?? "Category",
     value: v.value,
-    shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
   const previousMapHref = restoredBhwMapHref(mapState);
   const compareHref = comparisonHref(
@@ -165,7 +166,7 @@ export function BhwOverview({
             <a href="#qualifications">Qualifications and training</a>
             <a href="#demographics">Demographics</a>
             <a href="#service-history">Service history and workload</a>
-            <a href="#training-topics">Training topics and recency</a>
+            <a href="#training-topics">Training topics and years</a>
             <a href="#support">Support and compensation</a>
             <Link href={compareHref}>Compare places</Link>
             <Link
@@ -244,12 +245,17 @@ export function BhwOverview({
                   </>
                 }
               />
-              <ShareTile
-                indicator={get("bhw.declared-accreditation")}
-                denominator={total}
-                label="LGU-reported accreditation"
-                population="Registered and accredited / LGU-reported headcount · 2025"
-              />
+              <details className="rounded-lg border border-border p-3">
+                <summary className="cursor-pointer">
+                  Accreditation within the reported headcount
+                </summary>
+                <ShareTile
+                  indicator={get("bhw.declared-accreditation")}
+                  denominator={total}
+                  label="LGU-reported accreditation"
+                  population="Registered and accredited / LGU-reported headcount · 2025"
+                />
+              </details>
             </div>
           </PresentationSlide>
           <section aria-label="Workforce distribution preview" className="space-y-3">
@@ -310,6 +316,11 @@ export function BhwOverview({
               ) : (
                 <p>No accepted training or certification observations are available.</p>
               )}
+              <p className="text-sm text-muted">
+                TESDA is the Technical Education and Skills Development Authority. BHS means
+                Barangay Health Services; NC II means National Certificate II. A recorded training
+                course is separate from an earned certificate.
+              </p>
               {certification.map(({ indicator, label }) => (
                 <div key={label}>
                   <span className="sr-only">{label}: </span>
@@ -380,6 +391,8 @@ export function BhwOverview({
           id="service-history"
           title="Service history and household workload"
           prefixes={["bhw.cohorts.", "bhw.workload.", "bhw.active-years"]}
+          detailsLabel="Explore service years, joining years and workload statistics"
+          description="Joining years describe workers in the 2025 profiles, not the size of the workforce in each past year."
         />
         <BhwAnalysisSection
           dataset={dataset}
@@ -388,7 +401,7 @@ export function BhwOverview({
           areaName={areaName}
           mapState={mapState}
           id="training-topics"
-          title="Training topics and recency"
+          title="Training topics and years"
           prefixes={["bhw.training.", "bhw.training-recency."]}
           detailsLabel="Browse training topics and recorded years"
           description="See the percentage recorded as trained in each topic and the middle training year (median). A BHW may have training in several topics; do not add the percentages. The median year does not mean everyone trained that year or that their training is up to date."

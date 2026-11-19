@@ -38,56 +38,59 @@ export function BhwHonorariumDistribution({
           No complete public payment distributions are available for this locality.
         </p>
       )}
-      <div
-        role="region"
-        aria-label="Honorarium distribution values, scroll horizontally for all statistics"
-        tabIndex={0}
-        className="mt-4 max-w-full overflow-x-auto rounded border border-border"
-      >
-        <table className="w-full text-left text-sm">
-          <caption className="sr-only">
-            Exact monthly payment distributions and availability by paying level
-          </caption>
-          <thead>
-            <tr>
-              {[
-                "Paying level",
-                "Minimum",
-                "25th percentile",
-                "Median",
-                "75th percentile",
-                "Maximum",
-              ].map((label) => (
-                <th key={label} scope="col" className="p-3">
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.payer} className="border-t border-border">
-                <th scope="row" className="p-3 font-medium">
-                  {row.label}
-                </th>
-                {row.data ? (
-                  [row.data.min, row.data.p25, row.data.median, row.data.p75, row.data.max].map(
-                    (value, i) => (
-                      <td key={i} className="whitespace-nowrap p-3">
-                        {formatValue({ value }, "PHP/month")}
-                      </td>
-                    ),
-                  )
-                ) : (
-                  <td colSpan={5} className="p-3">
-                    Not plotted. {row.status}
-                  </td>
-                )}
+      <details className="mt-3">
+        <summary className="cursor-pointer underline">Values used in this chart</summary>
+        <div
+          role="region"
+          aria-label="Honorarium distribution values, scroll horizontally for all statistics"
+          tabIndex={0}
+          className="mt-4 max-w-full overflow-x-auto rounded border border-border"
+        >
+          <table className="w-full text-left text-sm">
+            <caption className="sr-only">
+              Exact monthly payment distributions and availability by paying level
+            </caption>
+            <thead>
+              <tr>
+                {[
+                  "Paying level",
+                  "Minimum",
+                  "25th percentile",
+                  "Median",
+                  "75th percentile",
+                  "Maximum",
+                ].map((label) => (
+                  <th key={label} scope="col" className="p-3">
+                    {label}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.payer} className="border-t border-border">
+                  <th scope="row" className="p-3 font-medium">
+                    {row.label}
+                  </th>
+                  {row.data ? (
+                    [row.data.min, row.data.p25, row.data.median, row.data.p75, row.data.max].map(
+                      (value, i) => (
+                        <td key={i} className="whitespace-nowrap p-3">
+                          {formatValue({ value }, "PHP/month")}
+                        </td>
+                      ),
+                    )
+                  ) : (
+                    <td colSpan={5} className="p-3">
+                      Not plotted. {row.status}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
       <p className="mt-3 text-sm text-muted">
         Only complete, ordered published quantiles are plotted. No missing value is estimated.
         Individual approved statistics and their statuses remain available below.

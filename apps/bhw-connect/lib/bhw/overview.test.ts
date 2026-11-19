@@ -82,7 +82,11 @@ it("keeps full names in chart data while using optional compact tick labels on p
   ];
   const phone = horizontalBarSpec(data, { width: 320 });
   expect((phone.y?.tickFormat as (v: string) => string)(data[0].label)).toBe("Manual training");
-  expect(horizontalBarSpec(data, { width: 800 }).y?.tickFormat).toBeUndefined();
+  expect(
+    (horizontalBarSpec(data, { width: 800 }).y?.tickFormat as (v: string) => string)(
+      data[0].label,
+    ).replaceAll("\n", " "),
+  ).toBe(data[0].label);
   expect(data[0].label).toBe("BHW Reference Manual training");
 });
 

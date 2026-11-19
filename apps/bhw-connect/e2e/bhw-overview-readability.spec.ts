@@ -14,6 +14,10 @@ for (const width of [390, 1440]) {
       await summary.focus();
       await page.keyboard.press("Enter");
       await expect(group).toHaveAttribute("open", "");
+      if (section === "honorarium-amounts") {
+        await expect(group.locator("tbody tr")).toHaveCount(4);
+        await expect(group.locator("thead th")).toHaveCount(7);
+      }
       const measure = group.locator("details").first();
       await measure.locator(":scope > summary").focus();
       await page.keyboard.press("Enter");

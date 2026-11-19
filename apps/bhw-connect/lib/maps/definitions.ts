@@ -85,7 +85,7 @@ const stepzeroContext: IndicatorSpec[] = ["population", "households"].map((colum
   id: `stepzero.${column}`,
   label:
     column === "population"
-      ? "Source population (BHW Headcount)"
+      ? "Population reported with BHW headcount"
       : "Source households (BHW Headcount)",
   unit: column === "population" ? "people" : "households",
   source: "bhw-stepzero-2026",

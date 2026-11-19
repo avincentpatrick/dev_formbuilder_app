@@ -16,7 +16,19 @@ vi.mock("@/components/maps/dataset-map-card", () => ({
 }));
 // Inspect the exact props crossing into interactive charts/presentations.
 vi.mock("@/components/charts/figure-view", () => ({
-  FigureView: ({ data }: { data: unknown }) => <pre data-chart>{JSON.stringify(data)}</pre>,
+  FigureView: ({
+    data,
+    preserveOrder,
+    yLabel,
+  }: {
+    data: unknown;
+    preserveOrder?: boolean;
+    yLabel?: string;
+  }) => (
+    <pre data-chart data-preserve-order={preserveOrder} data-axis={yLabel}>
+      {JSON.stringify(data)}
+    </pre>
+  ),
 }));
 const item = (id: string, state: CatalogIndicator["state"], value: number): CatalogIndicator => ({
   id,
@@ -268,4 +280,24 @@ it("groups long lists without losing exact links, unavailable statuses or exposi
   expect(training.textContent).not.toContain("111111");
   expect(document.getElementById("honorarium-amounts")!.textContent).not.toContain("222222");
   expect(training.querySelector("article h3")).toBeNull();
+});
+
+it("connects ordered age values to the chart sequence and descriptive axis", () => {
+  const age = {
+    ...item("bhw.demographics.age_band", "available", 1),
+    values: [
+      { label: "60+", value: 7 },
+      { label: "<30", value: 0 },
+      { label: "40-49", value: 100 },
+    ],
+  };
+  const { document } = parseHTML(render([age]));
+  const chart = document.querySelector("#demographics [data-chart]")!;
+  expect(chart.getAttribute("data-preserve-order")).toBe("true");
+  expect(chart.getAttribute("data-axis")).toBe("Age group");
+  expect(JSON.parse(chart.textContent!).map((row: { label: string }) => row.label)).toEqual([
+    "<30",
+    "40-49",
+    "60+",
+  ]);
 });

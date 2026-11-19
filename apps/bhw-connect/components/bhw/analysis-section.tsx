@@ -1,3 +1,4 @@
+import { categoryAxis } from "@/lib/bhw/category-order";
 import Link from "next/link";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
@@ -35,7 +36,8 @@ function Measure({
           title={item.label}
           caption={`${areaName} · BHW Profiles 2025`}
           xLabel={item.unit}
-          yLabel="Category"
+          yLabel={categoryAxis(item.id) ?? "Category"}
+          preserveOrder={Boolean(categoryAxis(item.id))}
           valueFormat={item.unit === "%" ? "percent" : item.unit === "PHP/month" ? "peso" : "count"}
         />
       ) : values.length ? (

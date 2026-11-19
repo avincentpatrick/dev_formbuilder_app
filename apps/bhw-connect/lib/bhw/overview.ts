@@ -1,3 +1,4 @@
+import { orderedCategoryValues } from "./category-order";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { countAndShare } from "@/lib/format";
 export { countAndShare, shareOf } from "@/lib/format";
@@ -6,7 +7,9 @@ import { hasAvailableValue } from "@/lib/catalog/summary";
 /** Check state again at the presentation boundary: withheld payloads must never
  * reach charts, accessibility labels, tables or presentation mode. */
 export function publicValues(indicator: CatalogIndicator | undefined) {
-  return indicator && hasAvailableValue(indicator.state) ? indicator.values : [];
+  return indicator && hasAvailableValue(indicator.state)
+    ? orderedCategoryValues(indicator.id, indicator.values)
+    : [];
 }
 export function scalar(indicator: CatalogIndicator | undefined): number | null {
   const values = publicValues(indicator);

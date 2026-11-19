@@ -5,7 +5,7 @@ import type { BarDatum } from "@/lib/charts/bar-chart";
 import { formatCount, percentageFormatter } from "@/lib/format";
 
 type SortDir = "asc" | "desc";
-type SortColumn = "count" | "percent" | "value";
+type SortColumn = "category" | "count" | "percent" | "value";
 
 /** Column-header sort toggle. `aria-sort` belongs on the `<th>` (columnheader
  * role), not this button, so the caller applies it there. */
@@ -47,10 +47,12 @@ export function FigureTable({
   valueHeader = "Value",
   valueFormatter = (n: number) => n.toLocaleString(),
   valueKind = "count",
+  preserveOrder = false,
   hoveredGeoCode,
   onHoverGeoCode,
 }: {
   data: BarDatum[];
+  preserveOrder?: boolean;
   labelHeader?: string;
   valueHeader?: string;
   valueFormatter?: (n: number) => string;
@@ -62,10 +64,14 @@ export function FigureTable({
    * can outline the matching map polygon. */
   onHoverGeoCode?: (code: string | null) => void;
 }) {
-  const defaultSort: SortColumn = valueKind === "amount" ? "value" : "percent";
+  const defaultSort: SortColumn = preserveOrder
+    ? "category"
+    : valueKind === "amount"
+      ? "value"
+      : "percent";
   const [sort, setSort] = useState<{ column: SortColumn; dir: SortDir }>({
     column: defaultSort,
-    dir: "desc",
+    dir: preserveOrder ? "asc" : "desc",
   });
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
@@ -77,16 +83,19 @@ export function FigureTable({
 
   const formatPercent = percentageFormatter(rows.map((r) => r.percent));
 
-  const sorted = [...rows].sort((a, b) => {
-    const key = (r: (typeof rows)[number]) =>
-      sort.column === "count"
-        ? (r.count ?? -Infinity)
-        : sort.column === "percent"
-          ? r.percent
-          : r.value;
-    const diff = key(a) - key(b);
-    return sort.dir === "desc" ? -diff : diff;
-  });
+  const sorted =
+    sort.column === "category"
+      ? rows
+      : [...rows].sort((a, b) => {
+          const key = (r: (typeof rows)[number]) =>
+            sort.column === "count"
+              ? (r.count ?? -Infinity)
+              : sort.column === "percent"
+                ? r.percent
+                : r.value;
+          const diff = key(a) - key(b);
+          return sort.dir === "desc" ? -diff : diff;
+        });
 
   function toggleSort(column: SortColumn) {
     setSort((prev) =>
@@ -106,7 +115,24 @@ export function FigureTable({
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-surface">
           <tr>
-            <th className="px-3 py-2 sm:px-4 sm:py-3 font-medium">{labelHeader}</th>
+            <th
+              className="px-3 py-2 sm:px-4 sm:py-3 font-medium"
+              aria-sort={preserveOrder ? ariaSortFor("category") : undefined}
+            >
+              {preserveOrder ? (
+                <button
+                  type="button"
+                  className="font-medium hover:text-accent"
+                  onClick={() => setSort({ column: "category", dir: "asc" })}
+                  aria-label={`Restore ${labelHeader.toLowerCase()} order`}
+                >
+                  {labelHeader}
+                  {sort.column === "category" && <span aria-hidden="true"> ▲</span>}
+                </button>
+              ) : (
+                labelHeader
+              )}
+            </th>
             {valueKind === "amount" ? (
               <th className="px-3 py-2 sm:px-4 sm:py-3" aria-sort={ariaSortFor("value")}>
                 <SortButton

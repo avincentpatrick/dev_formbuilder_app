@@ -70,7 +70,9 @@ it("starts with figures and provides named purpose anchors before methodology", 
 
 it("routes every overview comparison entry through the public headcount contract", () => {
   const { document } = parseHTML(render([item("bhw.total", "available", 0)]));
-  const links = [...document.querySelectorAll('a[href^="/compare"]')];
+  const links = [...document.querySelectorAll('a[href^="/compare"]')].filter((link) =>
+    link.textContent?.trim().startsWith("Compare places"),
+  );
   expect(links).toHaveLength(2);
   for (const link of links) expect(link.getAttribute("href")).toBe("/compare?measure=bhw.total");
 });
@@ -228,4 +230,42 @@ it("makes extended analyses discoverable from overview categories with exact-val
   expect(html).toContain("indicator=bhw.honorarium-amount.barangay.median");
   expect(html).toContain("measure=bhw.honorarium-amount.barangay.median");
   expect(html).not.toContain("987654");
+});
+
+it("shows education once while retaining its exact and comparison destinations", () => {
+  const { document } = parseHTML(render([item("bhw.demographics.education", "available", 42)]));
+  const qualifications = document.getElementById("qualifications")!;
+  expect(qualifications.querySelectorAll("[data-chart]")).toHaveLength(1);
+  expect(
+    qualifications.querySelector('a[href*="indicator=bhw.demographics.education"]'),
+  ).not.toBeNull();
+  expect(
+    qualifications.querySelector('a[href*="measure=bhw.demographics.education"]'),
+  ).not.toBeNull();
+  expect(document.getElementById("demographics")!.querySelectorAll("[data-chart]")).toHaveLength(0);
+});
+
+it("groups long lists without losing exact links, unavailable statuses or exposing withheld values", () => {
+  const { document } = parseHTML(
+    render([
+      item("bhw.training.basic_life_support", "available", 0),
+      item("bhw.training-recency.basic_life_support", "unavailable", 111111),
+      item("bhw.honorarium-amount.region.mean", "suppressed", 222222),
+    ]),
+  );
+  for (const [section, id] of [
+    ["training-topics", "bhw.training.basic_life_support"],
+    ["honorarium-amounts", "bhw.honorarium-amount.region.mean"],
+  ]) {
+    const group = document.querySelector(`#${section} > details`)!;
+    expect(group).not.toBeNull();
+    expect(group.hasAttribute("open")).toBe(false);
+    expect(group.querySelector(`a[href*="indicator=${id}"]`)).not.toBeNull();
+    expect(group.querySelector(`a[href*="measure=${id}"]`)).not.toBeNull();
+  }
+  const training = document.getElementById("training-topics")!;
+  expect(training.textContent).toContain(" · 0");
+  expect(training.textContent).not.toContain("111111");
+  expect(document.getElementById("honorarium-amounts")!.textContent).not.toContain("222222");
+  expect(training.querySelector("article h3")).toBeNull();
 });

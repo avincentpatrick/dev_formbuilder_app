@@ -1,3 +1,5 @@
+import { contextHref } from "@/lib/bhw/context";
+import { initialMapChoice } from "@/lib/maps/prototype";
 import { BhwAnalysisSection } from "./analysis-section";
 import Link from "next/link";
 import { comparisonHref } from "@/lib/bhw/comparison";
@@ -165,6 +167,20 @@ export function BhwOverview({
             <a href="#training-topics">Training topics and recency</a>
             <a href="#support">Support and compensation</a>
             <Link href={compareHref}>Compare places</Link>
+            <Link
+              href={contextHref({
+                context: "households",
+                map: {
+                  ...initialMapChoice("bhw-stepzero-2026"),
+                  level: selection.level === "barangay" ? "citymun" : selection.level,
+                  code:
+                    selection.level === "barangay" ? selection.code.slice(0, 7) : selection.code,
+                  selected: selection.level === "barangay" ? selection.code : null,
+                },
+              })}
+            >
+              Workforce and context
+            </Link>
             <Link href={previousMapHref ?? mapHref}>
               Map explorer{previousMapHref ? " · previous settings" : ""}
             </Link>

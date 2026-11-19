@@ -42,6 +42,7 @@ const BHW_TRAILS: Record<string, Crumb[]> = {
   "/bhw": [BHW_CRUMB],
   "/bhw/search": [BHW_CRUMB, { label: "Search places and indicators" }],
   "/bhw/measure": [BHW_CRUMB, { label: "Selected measure" }],
+  "/bhw/context": [BHW_CRUMB, { label: "Workforce and context" }],
   "/bhw/compare-maps": [BHW_CRUMB, { label: "Compare maps" }],
   "/explore": [BHW_CRUMB, { label: "Explore" }],
   "/compare": [BHW_CRUMB, { label: "Compare" }],

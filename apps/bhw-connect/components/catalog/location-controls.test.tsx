@@ -36,3 +36,31 @@ it("retains BHW in forms and ancestors but explicitly starts a new district sele
     expect(query.has("mapState")).toBe(true);
   }
 });
+
+it("retains Population map context in ancestor links and location forms", () => {
+  const { document } = parseHTML(
+    renderToStaticMarkup(
+      <LocationControls
+        selection={{ mode: "psgc", level: "region", code: "01" }}
+        dataset="population"
+        mapState="dataset=psa-popcen-2024&level=province&code=01028&selected=0102801&populationScope=province%3A01028&populationSearch=Adams"
+        geography={{
+          state: "available",
+          current: region,
+          ancestors: [national],
+          children: [
+            { code: "01028", name: "Example province", level: "province", parentCode: "01" },
+          ],
+        }}
+      />,
+    ),
+  );
+  expect(document.querySelector('input[name="mapState"]')?.getAttribute("value")).toContain(
+    "populationSearch=Adams",
+  );
+  for (const link of document.querySelectorAll('a[href^="/catalog?"]')) {
+    const query = new URLSearchParams(link.getAttribute("href")!.split("?")[1]);
+    if (query.get("mode") !== "district")
+      expect(query.get("mapState")).toContain("selected=0102801");
+  }
+});

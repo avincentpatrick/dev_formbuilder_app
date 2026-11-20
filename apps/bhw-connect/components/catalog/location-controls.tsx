@@ -1,3 +1,4 @@
+import { restoredPopulationMapHref } from "@/lib/catalog/population-navigation";
 import { restoredPovertyMapHref } from "@/lib/catalog/poverty-navigation";
 import Link from "next/link";
 import { withBasePath } from "@/lib/base-path";
@@ -18,11 +19,13 @@ export function LocationControls({
   mapState?: string;
 }) {
   const snapshot = (
-    dataset === "poverty"
-      ? restoredPovertyMapHref(mapState)
-      : !dataset || dataset === "bhw"
-        ? restoredBhwMapHref(mapState)
-        : null
+    dataset === "population"
+      ? restoredPopulationMapHref(mapState)
+      : dataset === "poverty"
+        ? restoredPovertyMapHref(mapState)
+        : !dataset || dataset === "bhw"
+          ? restoredBhwMapHref(mapState)
+          : null
   )?.split("?")[1];
   const href = (scope: CatalogSelection) =>
     catalogJourneyHref(scope, scope.mode === "district" ? null : dataset, snapshot);

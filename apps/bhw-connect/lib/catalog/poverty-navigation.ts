@@ -1,4 +1,4 @@
-import { catalogHref } from "./navigation";
+import { mapDetailsHref } from "./map-details-navigation";
 import { initialMapChoice, mapHref, parseMapChoice, type MapChoice } from "@/lib/maps/prototype";
 
 export const POVERTY_MAP = "psa-sae-poverty-2023";
@@ -21,18 +21,5 @@ export function povertySearchSuffix(params: Pick<URLSearchParams, "get">): strin
 }
 
 export function povertyCatalogReturnHref(choice: MapChoice, search = ""): string {
-  const level = choice.selected
-    ? choice.level === "province"
-      ? "citymun"
-      : choice.level === "region"
-        ? "province"
-        : "region"
-    : choice.level;
-  const query = new URLSearchParams(
-    catalogHref({ mode: "psgc", level, code: choice.selected ?? choice.code }, "poverty").split(
-      "?",
-    )[1],
-  );
-  query.set("mapState", mapHref(choice).split("?")[1] + search);
-  return `/catalog?${query}${search}`;
+  return mapDetailsHref(choice, "poverty", search);
 }

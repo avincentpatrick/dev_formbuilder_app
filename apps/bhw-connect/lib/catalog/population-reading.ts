@@ -43,8 +43,8 @@ export function populationReading(
     partial,
     label: partial
       ? "Partial total — people in matched census areas"
-      : manila
-        ? "Published Manila city population"
+      : selection.mode === "psgc"
+        ? populationAreaLabel(selection.level, selection.code)
         : indicator.aggregation === "sum"
           ? "Population summed from compatible mapped areas"
           : "Recorded population",
@@ -54,3 +54,12 @@ export function populationReading(
 /** Existing catalog coverage reason, shared to avoid repeating it in the overview. */
 export const POPULATION_PARTIAL_REASON =
   "Partial total from matched census areas; complete coverage has not been verified. Manila's province node stores its published census total. Do not repeat it for child areas.";
+
+/** The accepted geographic coverage contract shared by overview and map detail labels. */
+export function populationAreaLabel(level: string, code: string): string {
+  return level === "province" && code === "13806"
+    ? "Published Manila city population"
+    : level === "citymun"
+      ? "Recorded population"
+      : "Partial total — people in matched census areas";
+}

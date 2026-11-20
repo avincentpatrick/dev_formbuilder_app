@@ -109,3 +109,47 @@ remain separate delivery gates, recorded in the implementing PR.
 
 Delivery and final evidence:
 [PR #611](https://github.com/avincentpatrick/dev_formbuilder_app/pull/611).
+
+## Increment 2 — searchable map details and scoped return
+
+Baseline: #611, live `84f3c192b54b380bde34b3009fcf160691ebe154`.
+No competing Population implementation PR was open at this audit; #525/#527/#528
+remain historical drafts. Read the current map reader before extending the view:
+`app/api/dataset-map/route.ts` applies the accepted release, `census_year=2024`,
+source geography and authoritative child membership to both parent and child reads.
+It does not rebuild the parent's total from the displayed children. No new source,
+join, allocation, denominator, trend, grant or aggregate is introduced here.
+
+Reader question: which named areas have accepted counts, which are unavailable,
+and how can I open one area's exact sources then return to the same map?
+Reuse `DatasetMapCard`'s existing table, `searchMapAreas`, count formatting, selectors,
+map parser and native browser history. Population's area table is alphabetical;
+search filters the selector and table only, never the map, stored total or download.
+Clearing search restores all authoritative rows, including missing values/shapes.
+Zero remains zero. Counts use readable grouping; labels reuse the overview's
+Population coverage helper. Parent figures and region/province rows are partial;
+Manila's province-node exception is explicit. No ranked need score or inferred
+coverage percentage is calculated. These are source-qualified side-by-side counts,
+not a standardized peer comparison or causal relationship.
+
+A bounded, scope-specific search travels in shared URLs and validated map snapshots.
+Selection edits use the existing workspace history mechanism. Both map detail and
+header links open the selected child's catalog scope; ancestor navigation retains
+an independent return snapshot. Changing geographic scope clears an irrelevant
+search. Other releases cannot become Population return snapshots. The small
+`mapDetailsHref` helper is shared with Poverty; its existing tests protect Poverty's
+scope/search behavior. Embedded maps do not take ownership of page history.
+
+Verification mapping: `population-navigation.test.ts` covers snapshot validation,
+search bounds/scope, shared navigation, and geographic labels; the existing overview
+and map route tests cover accepted sources, zero/missing and rejected payloads.
+`population-map-details.spec.ts` covers synthetic zero/missing/long-label rows,
+alphabetical order, search/no results/clear, refresh/share, keyboard table access,
+Back/Forward and details/ancestor/map return at 390/1440px, plus partial provinces
+and the Manila exception. Existing Poverty tests run against the shared return helper.
+No production records enter git. Full checks, actual release and bounded live
+verification are recorded in the implementing PR. Representative-reader and physical
+device acceptance, trend prerequisites and all previously deferred work stay open.
+
+Increment 2 delivery and final evidence:
+[PR #612](https://github.com/avincentpatrick/dev_formbuilder_app/pull/612).

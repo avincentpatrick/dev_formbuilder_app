@@ -7,11 +7,15 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\FormTemplate;
 use App\Models\FormVersion;
+use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Explorer\ExplorerQueryRunner;
 use App\Services\Forms\FormService;
+use App\Support\Explorer\ExplorerQuery;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\PermissionRegistrar;
@@ -108,6 +112,11 @@ it('builds NHETE with its tables as grids, publishes it, and takes and refuses r
         'publish refused: '.json_encode(session('toast') ?? session('errors')?->getBag('default')->toArray()),
     );
     $version = FormVersion::query()->findOrFail($form->current_published_version_id);
+    // M247 (`D231`): every screen holding an indicator or parts table is drawn on a wide page, and only those.
+    $wideScreens = array_column(array_filter($plan->sections(), static fn (array $s): bool => ($s['page_width'] ?? null) === 'wide'), 'key');
+    expect($wideScreens)->toHaveCount(8)
+        ->and(collect($version->schema_snapshot['sections'])->where('page_width', 'wide')->pluck('key')->sort()->values()->all())
+        ->toBe(collect($wideScreens)->sort()->values()->all());
     $snapshotRows = collect($version->schema_snapshot['fields'])->firstWhere('key', NhetePlan::indicatorGrid('b'))['config']['rows'];
     expect(collect($snapshotRows)->filter(static fn (array $r): bool => ($r['not_needed'] ?? []) === ['cut'])->pluck('value')->all())
         ->toBe(['b03', 'b08', 'b19', 'b20', 'b21'])
@@ -180,4 +189,33 @@ it('builds NHETE with its tables as grids, publishes it, and takes and refuses r
     file_put_contents($file, $exported->streamedContent());
     expect(filesize($file))->toBeGreaterThan(0);
     @unlink($file);
+
+    // ── 8. Charted row by row in the Data Explorer (M247, `D231`): each answered indicator of each response counts once ──
+    enterTenant($tenant->id, $admin->id);
+    $grid = NhetePlan::indicatorGrid('a');
+    $kept = [];
+    $answered = 0;
+    foreach (Submission::query()->countable()->where('form_id', $form->id)->pluck('id') as $id) {
+        foreach ((array) (SubmissionAnswer::query()->where('submission_id', $id)->value('answers')[$grid] ?? []) as $row) {
+            $filled = array_filter((array) $row, static fn (mixed $cell): bool => $cell !== null && $cell !== '' && $cell !== []);
+            if ($filled === []) {
+                continue;
+            }
+            $answered++;
+            $kept[(string) ($row['keep'] ?? '')] = ($kept[(string) ($row['keep'] ?? '')] ?? 0) + 1;
+        }
+    }
+    $chart = static fn (array $definition): array => app(ExplorerQueryRunner::class)->run(ExplorerQuery::fromArray([
+        'source' => 'grid_rows', 'form_id' => $form->id, 'grid' => $grid, 'chart' => 'bar', 'measures' => [['aggregate' => 'count']],
+        'filters' => [], 'from' => CarbonImmutable::now('UTC')->subDay()->toDateString(), 'to' => CarbonImmutable::now('UTC')->addDay()->toDateString(),
+        'timezone' => 'UTC', 'limit' => 50, ...$definition,
+    ]), $admin);
+
+    $byKeep = $chart(['dimensions' => [['field' => 'column:keep']]]);
+    $counted = array_combine(array_column($byKeep['categories'], 'key'), $byKeep['series'][0]['values']);
+    ksort($counted);
+    ksort($kept);
+    expect($answered)->toBeGreaterThan(0)
+        ->and($byKeep['totals']['rows'])->toBe($answered)
+        ->and($counted)->toBe($kept);
 })->group('nhete');

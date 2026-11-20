@@ -196,7 +196,7 @@ final class NheteBuilderDriver
         ));
     }
 
-    /** @param  array{key: string, label: string, relevant: ?string}  $section */
+    /** @param  array{key: string, label: string, relevant: ?string, page_width?: string}  $section */
     public function section(array $section): string
     {
         $made = $this->send('post', 'sections', [], 'add section '.$section['key']);
@@ -208,6 +208,8 @@ final class NheteBuilderDriver
             'min_instances' => null,
             'max_instances' => null,
             'relevant_expression' => $section['relevant'],
+            // M247 (`D231`): a screen of tables is drawn on a wide page.
+            'page_width' => $section['page_width'] ?? null,
             'version' => $made->json('version'),
         ], 'save section '.$section['key']);
 

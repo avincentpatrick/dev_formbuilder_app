@@ -124,7 +124,7 @@ final class NhetePlan
     /**
      * The form as today's builder can hold it: one section per screen, each with its ordered elements.
      *
-     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>}>
+     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>, page_width?: string}>
      */
     public function sections(): array
     {
@@ -150,6 +150,17 @@ final class NhetePlan
                 'relevant' => $screen['show_if'] ?? null,
                 'elements' => $elements,
             ];
+        }
+
+        // M247 (`grid-wide-sticky-explorer`, `D231`): in the table layout a screen holding an indicator or parts table is
+        // drawn on a wide page, so its five columns are a table rather than squeezed.
+        if ($this->layout === self::TABLE) {
+            foreach ($sections as $i => $section) {
+                $tables = array_filter($section['elements'], static fn (array $e): bool => in_array($e['role'], ['ind_table', 'parts_table'], true));
+                if ($tables !== []) {
+                    $sections[$i]['page_width'] = 'wide';
+                }
+            }
         }
 
         return $sections;

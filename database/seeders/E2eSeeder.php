@@ -649,6 +649,54 @@ class E2eSeeder extends Seeder
                 ]);
             }
 
+            // M247 (`grid-wide-sticky-explorer`, `D231`) — a stepped guest form whose second page is a section marked "Wide page"
+            // holding a 14-row, 7-column grid: the first page keeps the reading width, the second widens, and the table's header
+            // row and first column stay in view while it scrolls in its own box. All optional, so an empty load is axe-clean.
+            // Reached at /f/wide-table by `grid-wide-table.spec.ts`; charted row by row on the explorer board.
+            if (Form::query()->where('title', 'Wide Table')->doesntExist()) {
+                $wideForm = app(FormService::class)->create($tenant, $owner, 'Wide Table', 'A big grid on a wide page (M247 demo).');
+                $wb = app(FormBuilderService::class);
+                $aboutSection = $wb->addSection($wideForm);
+                $aboutSection->update(['label' => 'About your office']);
+                $wb->addField($wideForm, $owner, FieldType::ShortText, $aboutSection->id)->update(['key' => 'office', 'label' => 'Office name']);
+                $tableSection = $wb->addSection($wideForm);
+                $tableSection->update(['label' => 'Indicators', 'page_width' => 'wide']);
+                $choices = static fn (array $pairs): array => array_map(static fn (string $value, string $label): array => ['value' => $value, 'label' => $label], array_keys($pairs), $pairs);
+                $rows = [];
+                for ($n = 1; $n <= 14; $n++) {
+                    $rows[] = [
+                        'value' => sprintf('i%02d', $n),
+                        'label' => sprintf('I%02d Indicator %d', $n, $n),
+                        ...($n === 1 ? ['details' => [['type' => 'paragraph', 'spans' => [['text' => 'Visits to a clinic per 1,000 people each year.']]]]] : []),
+                    ];
+                }
+                $wb->addField($wideForm, $owner, FieldType::Matrix, $tableSection->id)->update([
+                    'key' => 'indicators',
+                    'label' => 'Indicators to review',
+                    'config' => [
+                        'rows' => $rows,
+                        'columns' => [
+                            ['value' => 'use', 'label' => 'Used locally', 'type' => 'single_select', 'options' => $choices(['yes' => 'Yes', 'no' => 'No'])],
+                            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'single_select', 'options' => $choices(['keep' => 'Keep it', 'change' => 'Change it'])],
+                            ['value' => 'worry', 'label' => 'Main worry', 'type' => 'single_select', 'options' => $choices(['none' => 'None', 'data' => 'Data quality', 'other' => 'Something else'])],
+                            ['value' => 'keep', 'label' => 'Keep the indicator', 'type' => 'single_select', 'options' => $choices(['yes' => 'Yes', 'close' => 'Yes, with changes', 'no' => 'No'])],
+                            ['value' => 'staff', 'label' => 'Staff who report it', 'type' => 'integer'],
+                            ['value' => 'since', 'label' => 'Reported since', 'type' => 'date'],
+                            ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text'],
+                        ],
+                        'cells' => [],
+                    ],
+                ]);
+                app(PublishService::class)->publish($wideForm->refresh(), $owner);
+
+                $wideForm->update([
+                    'public_slug' => 'wide-table',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => false,
+                ]);
+            }
+
             // M130 (`R-048a3286`, `D77`) — a guest-enabled form holding every choice layout: a single choice in
             // each of its three layouts (round buttons one per line, side by side, in columns) and a multiple
             // choice in the two it can take. One page, all optional, so an empty load is axe-clean, and one long
@@ -2544,6 +2592,23 @@ class E2eSeeder extends Seeder
                 'measures' => [['aggregate' => 'count', 'field' => null]],
             ]],
         );
+
+        // M247 (`D231`): a grid, counted row by row — the wide-table form's indicators, by whether each is kept.
+        $wideTable = Form::query()->where('title', 'Wide Table')->whereNotNull('current_published_version_id')->first();
+        if ($wideTable !== null) {
+            ExplorerChart::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Indicators kept, row by row'],
+                ['is_shared' => false, 'definition' => [
+                    ...$base,
+                    'source' => 'grid_rows',
+                    'form_id' => $wideTable->id,
+                    'grid' => 'indicators',
+                    'chart' => 'stacked',
+                    'dimensions' => [['field' => 'row', 'bucket' => null], ['field' => 'column:keep', 'bucket' => null]],
+                    'measures' => [['aggregate' => 'count', 'field' => null]],
+                ]],
+            );
+        }
 
         ExplorerChart::updateOrCreate(
             ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Legacy chart'],

@@ -69,6 +69,8 @@ for (const theme of themes) {
 
         // A refused chart is one tile's problem: the page did not fall over, and the other two drew.
         await expect(page.getByRole('link', { name: 'Legacy chart' })).toBeVisible();
+        // M247 (`D231`): a grid counted row by row has its own tile, and an empty range is a sentence, not a broken chart.
+        await expect(page.getByRole('link', { name: 'Indicators kept, row by row' })).toBeVisible();
 
         await scanPane(page, '.explore', `explore board ${theme}`);
     });
@@ -105,6 +107,23 @@ for (const theme of themes) {
         await expect(page.getByRole('button', { name: 'Save chart' })).toBeDisabled();
 
         await scanPane(page, '.explore-builder', `explore builder, empty filter ${theme}`);
+    });
+
+    test(`Explore — a grid counted row by row (${theme})`, async ({ page }) => {
+        await openBuilder(page);
+        await forceTheme(page, theme);
+
+        // M247 (`D231`): "Rows of a grid" asks for the form, then the grid, and groups by the grid's Row.
+        await page.getByLabel('Data source').selectOption('grid_rows');
+        await page.getByLabel('Form', { exact: true }).selectOption({ label: 'Wide Table' });
+        await expect(page.getByLabel('Grid', { exact: true })).toBeVisible();
+        await expect(page.getByText('Choose the grid whose rows to count.')).toBeVisible();
+
+        await page.getByLabel('Grid', { exact: true }).selectOption('indicators');
+        await expect(page.getByLabel('Group by')).toHaveValue('row');
+        await expect(page.getByText('Choose the grid whose rows to count.')).toBeHidden();
+
+        await scanPane(page, '.explore-builder', `explore builder, rows of a grid ${theme}`);
     });
 
     test(`Explore — the save dialog (${theme})`, async ({ page }) => {

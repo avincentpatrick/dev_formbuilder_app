@@ -273,6 +273,20 @@ test('Builder — a NHETE question table clicked into being: a comment column re
         await expect(page.locator('[data-grid-column-settings="1"]')).toContainText('required only sometimes');
         await expect(page.locator('[data-grid-row-settings="1"]')).toContainText('1 not needed');
         await expect(page.locator('[data-grid-row-settings="0"]')).toContainText('has details');
+
+        // M247 (`grid-wide-sticky-explorer`, `D231`): the table's section is drawn on a wide page — ticked on the section's
+        // Advanced tab, and still ticked after a reload.
+        await page.getByRole('button', { name: 'Add section' }).click();
+        await settled(page);
+        await page.locator('[data-section-uid] .canvas__section-head').first().click();
+        await configTab(page, 'Advanced');
+        await page.locator('[data-section-page-width]').getByRole('checkbox', { name: 'Wide page — for big tables' }).check();
+        await settled(page);
+        await page.reload({ waitUntil: 'networkidle' });
+        await structure(page);
+        await page.locator('[data-section-uid] .canvas__section-head').first().click();
+        await configTab(page, 'Advanced');
+        await expect(page.locator('[data-section-page-width]').getByRole('checkbox', { name: 'Wide page — for big tables' })).toBeChecked();
     } finally {
         await archive(page, formId);
     }

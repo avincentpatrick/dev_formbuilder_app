@@ -10,7 +10,7 @@ use App\Models\User;
 /**
  * A data source that reads ONE grid of a form (M247, `grid-wide-sticky-explorer`, `D231`; ADR-0025 §D9).
  *
- * A chart on it names the form and the grid. {@see \App\Services\Explorer\ExplorerCatalog::resolve()} asks for the
+ * A chart on it names the form and the grid. `ExplorerCatalog::resolve()` asks for the
  * source bound to that grid ({@see forGrid()}) and hands it on, so the runner, the compiler and the page read it as
  * any other source: its fields, its rows and its notes are the bound grid's.
  */

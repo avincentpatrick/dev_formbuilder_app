@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.26.0",
+        "title": "Room for big tables, and grids in your charts",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A section can use the whole width of a big screen, so a wide grid is drawn as a table. In the form builder, select the section and tick Wide page on its Advanced tab. Phones are unchanged."
+            },
+            {
+                "kind": "improved",
+                "text": "In a long grid the row names and the column headings stay in view while you scroll through the table."
+            },
+            {
+                "kind": "new",
+                "text": "Explore can count a grid row by row: choose Rows of a grid, the form and the grid, to see for every row how many chose each answer."
+            }
+        ]
+    },
+    {
         "version": "0.25.0",
         "title": "Grids that work like a table of questions",
         "items": [

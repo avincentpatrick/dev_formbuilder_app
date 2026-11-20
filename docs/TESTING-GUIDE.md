@@ -391,9 +391,16 @@ rewriting its answers are different powers.
     *Shared with the workspace*, drawn from the three forms this reviewer holds a grant on — its numbers are
     smaller than the owner's. Open it. **Expect:** *Save a copy*, and no way to change or delete the original.
 12. Still as the reviewer, open **New chart** and look at **Data source**. **Expect:** *Responses*, *Answers
-    to a form* and *Forms* only — no *Members*, *Activity*, *Deliveries* or *Feedback*.
+    to a form*, *Rows of a grid* and *Forms* only — no *Members*, *Activity*, *Deliveries* or *Feedback*.
 13. Sign in as `owner@northwind.test`. **Expect:** no **Explore** in the sidebar, for the reason there is no
     Analytics: Starter lacks `advanced_analytics`.
+14. (`M247`, `D231`) As the owner, build a form with a grid of a few rows and columns, put it in a section, and on the
+    section's **Advanced** tab tick **Wide page — for big tables**. Publish, and answer it twice as a guest on a wide
+    screen. **Expect:** the grid's page is wider than the other pages; with more than eight rows the table scrolls in
+    its own box and its header row and first column stay in view; on a phone it is a card per row.
+15. In **Explore**, **New chart**, choose *Rows of a grid*, the form and the grid. **Expect:** the chart groups by
+    **Row**; split it by one of the grid's columns to see, row by row, how many chose each answer — each answered row
+    of each response counted once.
 
 ---
 

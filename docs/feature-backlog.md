@@ -16039,8 +16039,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
 
-- **`minor` · `explorer-unchartable-questions` — Questions in repeating sections, grids, cascading choices, locations, files and long text cannot be charted in the explorer.**
-  Found by `M236` (2026-11-12). `AnswersSource` offers a form's top-level questions of the countable kinds and says on the page how many it left out (ADR `0025-data-explorer.md` §D6). A repeating section's answers are an array per response, a grid's are an object per row, and a cascading choice stores a path, so each needs its own unnesting rule before it can be grouped or counted. Location, file and long-text answers have no category to group by.
+- **`minor` · `explorer-unchartable-questions` — Questions in repeating sections, cascading choices, locations, files and long text cannot be charted in the explorer.**
+  Found by `M236` (2026-11-12). `AnswersSource` offers a form's top-level questions of the countable kinds and says on the page how many it left out (ADR `0025-data-explorer.md` §D6). A repeating section's answers are an array per response, a grid's are an object per row, and a cascading choice stores a path, so each needs its own unnesting rule before it can be grouped or counted. Location, file and long-text answers have no category to group by. **Amended by `M247` (2026-11-20):** grids are charted row by row by their own source, "Rows of a grid" (ADR `0025-data-explorer.md` §D9, `D231`), whose unnesting is the pattern for a repeating section; the rest stands.
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
 
@@ -16390,12 +16390,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
 
-- **`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
+- ✅ **CLOSED BY `M247` (2026-11-20) — ****`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
   Found by `M237` (2026-11-14). `RuntimeShell.vue` caps every respondent page at 44rem, so NHETE's table, drawn true from 900 px, can never be one. Neither grid component uses `position: sticky` for its header row or first column. The explorer cannot chart a grid (`explorer-unchartable-questions`).
 
   The remedy, when taken: a wide-page option per form or section, a sticky header and first column for wide grids (scrolling inside the table, never the page), and one explorer row per grid row.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M247` (2026-11-20), on its branch, held for the merge point (`D231`).** A section's Advanced tab gains **Wide page — for big tables** (`form_sections.page_width`, additive): while that section is on screen the guest page widens to the scanned-paper view's 90rem column from a 64rem viewport (`page-width.ts`; in single-page mode when any shown section is wide), the banner with it, and the encode page lifts its 45rem column. A grid's table pins its first column and, for more than eight shown rows on a screen at least 40rem tall, its header row in a box capped at 75dvh; the box is a named, focusable group when it overflows, and scroll padding keeps a focused cell clear of the pinned cells. The explorer's **Rows of a grid** source counts each answered row of each response once, with the Row and each column as fields (ADR `0025-data-explorer.md` §D9). Left out, each filed: `repeat-table-sticky`, `wide-page-prose-measure`, `explorer-grid-row-order`, `xlsform-page-width`.
+
+- **`nit` · `repeat-table-sticky` — A repeating section drawn as a table pins neither its header row nor its first column.**
+  Found by `M247` (2026-11-20). `RepeatTableFrame.vue` is the other grid-like table a respondent meets, and `M247` pinned only `MatrixGrid.vue`'s. A long household roster drawn as a table scrolls its column names out of view as a grid did.
+
+  The remedy, when taken: the same local layers, opaque pinned cells, height cap and focusable box `MatrixGrid.vue` has, on the repeat table — ideally one shared rule rather than a second copy.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+
+- **`nit` · `wide-page-prose-measure` — On a wide page, a note's text and a question's description run the full 90rem.**
+  Found by `M247` (2026-11-20). "Wide page" widens the whole column so a grid can be a table (`D231`); everything else on that page takes the width too, so a long note reads at well over the comfortable measure on a big screen.
+
+  The remedy, when taken: keep prose — notes, descriptions, hints — at a reading measure inside a wide column, and let only tables and repeat tables take the full width.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+
+- **`nit` · `explorer-grid-row-order` — A grid charted row by row lists its rows by count or by label, not in the grid's own order.**
+  Found by `M247` (2026-11-20). "Rows of a grid" makes the Row an ordinary category, so the explorer's sorts (by value, or by name) apply; NHETE's indicators read A01 … A11 in the form and by count on the chart.
+
+  The remedy, when taken: a "form order" sort for a category whose values have an author's order — a grid's rows, a choice's options.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-page-width` — An exported or imported XLSForm does not carry a section's wide page.**
+  Found by `M247` (2026-11-20). `form_sections.page_width` is not written by `XlsformExporter` nor read by the importer, as `repeat_layout` is not; a form re-imported from its own export loses "Wide page".
+
+  The remedy, when taken: a `#meridian` token on the group's row, as the answer limits use, read back on import.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
 
 - **`minor` · `respondent-edit-after-submit` — A respondent cannot change their answers after Submit, even while the form is still open.**
   Found by `M237` (2026-11-14). NHETE says *"Until the closing date, a person can come back on the same device and change answers"*. Only staff can edit a submission (`SubmissionAnswerEditService`), and a finalized draft cannot be saved again. It pairs with the single-response-only row filed by `M130` and with `D118`'s same-device "Continue where you left off" row.

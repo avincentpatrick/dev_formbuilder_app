@@ -1638,7 +1638,7 @@ A chart a member built and kept on `/explore` (`M236`; ADR `0025-data-explorer.m
 | `tenant_id` | `uuid` | No | — | No | FK to `tenants.id`, `ON DELETE CASCADE`. |
 | `user_id` | `uuid` | No | — | No | FK to `users.id`, `ON DELETE CASCADE` — the chart's author, and the only member who may change or delete it. Single-column, as `saved_report_views.user_id` is: `users` is a tenant-free global table. |
 | `name` | `varchar(150)` | No | — | No | Unique per `(tenant_id, user_id)`: two members may each keep a "Weekly intake", one member may not keep two. A duplicate raises SQLSTATE 23505, mapped to a field error. |
-| `definition` | `jsonb` | No | `'{}'` | No | An `ExplorerQuery` **declaration**, carrying its own `v` schema tag: which data source, which fields, which range. It holds no data and no SQL. |
+| `definition` | `jsonb` | No | `'{}'` | No | An `ExplorerQuery` **declaration**, carrying its own `v` schema tag: which data source, which fields, which range — and, on "Rows of a grid", which grid (`grid`, M247 / `D231`, stored only when set, so every chart saved before it keeps its exact shape). It holds no data and no SQL. |
 | `is_shared` | `boolean` | No | `false` | No | Whether colleagues who can open `/explore` see this chart on their board. Read-only for them, and run under their own access. |
 | `created_at` / `updated_at` | `timestamptz` | No | set by Eloquent | No | — |
 

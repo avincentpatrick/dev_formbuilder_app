@@ -30,4 +30,7 @@ CREATE TABLE public.agg_poverty_official (
 COMMENT ON TABLE public.agg_poverty_official IS 'PSA official full-year population poverty estimates, 2023 r2. Published 95% CI. Explicit source reporting geography; not SAE, not a rollup or a substitute for missing local values.';
 ALTER TABLE public.agg_poverty_official ENABLE ROW LEVEL SECURITY;
 CREATE POLICY official_poverty_public_read ON public.agg_poverty_official FOR SELECT TO anon, authenticated USING (true);
+-- Override inherited blanket grants (including TRUNCATE, which is not protected by RLS).
+REVOKE ALL ON public.agg_poverty_official FROM anon, authenticated;
+REVOKE ALL ON SEQUENCE public.agg_poverty_official_id_seq FROM anon, authenticated;
 GRANT SELECT ON public.agg_poverty_official TO anon, authenticated;

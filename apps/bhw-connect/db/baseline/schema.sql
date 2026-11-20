@@ -168,6 +168,289 @@ COMMENT ON FUNCTION public.ai_regression_expectation_well_formed(p jsonb) IS 'Sh
 
 
 --
+-- Name: analysis_project_api(uuid, text, uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.analysis_project_api(p_actor uuid, p_operation text, p_project uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare p analysis_projects; j analysis_jobs; access_role text; target uuid; v_result jsonb;
+begin
+  if not exists(select 1 from analysis_users where user_id=p_actor and approved) then
+    raise exception 'Analysis approval required' using errcode='42501';
+  end if;
+  if p_operation='list' then
+    select coalesce(jsonb_agg(to_jsonb(t) order by t.updated_at desc),'[]') into v_result from (
+      select a.id,a.title,a.updated_at,a.revision,
+        case when a.owner_id=p_actor then 'owner' else m.role end as role
+      from analysis_projects a left join analysis_members m on m.project_id=a.id and m.user_id=p_actor
+      where a.deleted_at is null and (a.owner_id=p_actor or m.user_id is not null)
+    ) t;
+    return v_result;
+  end if;
+  if p_operation='create' then
+    insert into analysis_projects(owner_id,creation_key,title,state) values(p_actor,(p_payload->>'requestId')::uuid,coalesce(nullif(p_payload->>'title',''),'New analysis'),coalesce(p_payload->'context','{}')) on conflict(owner_id,creation_key) do update set creation_key=excluded.creation_key returning * into p;
+    return jsonb_build_object('id',p.id);
+  end if;
+  select * into p from analysis_projects where id=p_project and deleted_at is null for update;
+  if not found then raise exception 'Project unavailable' using errcode='42501'; end if;
+  if p.owner_id=p_actor then access_role:='owner'; else
+    select role into access_role from analysis_members where project_id=p.id and user_id=p_actor;
+  end if;
+  if access_role is null then raise exception 'Project unavailable' using errcode='42501'; end if;
+  if p_operation='get' then
+    return to_jsonb(p)-'deleted_at'-'cleanup_at' || jsonb_build_object('role',access_role,
+      'members',case when access_role='owner' then (select coalesce(jsonb_agg(to_jsonb(m)),'[]') from analysis_members m where m.project_id=p.id) else '[]'::jsonb end,
+      'jobs',(select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at),'[]') from (
+        select id,question,status,progress,attempt,error,result,usage,created_at from analysis_jobs where project_id=p.id and (p_payload->>'before' is null or created_at<(p_payload->>'before')::timestamptz) order by created_at desc limit 200
+      )t));
+  end if;
+  if p_operation='artifact' then
+    select * into j from analysis_jobs where id=(p_payload->>'jobId')::uuid and project_id=p.id and status='completed';
+    if not found then raise exception 'Result unavailable' using errcode='42501'; end if;
+    return jsonb_build_object('jobId',j.id,'projectId',p.id,'question',j.question,'context',j.context,'createdAt',j.created_at,'finishedAt',j.finished_at,'actorId',j.actor_id,'result',j.result,'usage',j.usage,'usageHistory',(select coalesce(jsonb_agg(to_jsonb(u)),'[]') from analysis_job_usage u where u.job_id=j.id));
+  end if;
+  if p_operation in ('share','unshare','delete') and access_role <> 'owner' then
+    raise exception 'Owner access required' using errcode='42501';
+  end if;
+  if p_operation='share' then
+    target:=(p_payload->>'userId')::uuid;
+    if target=p.owner_id or not exists(select 1 from analysis_users where user_id=target and approved) then
+      raise exception 'Choose another approved user' using errcode='22023';
+    end if;
+    insert into analysis_members(project_id,user_id,role) values(p.id,target,p_payload->>'role')
+      on conflict(project_id,user_id) do update set role=excluded.role;
+    return '{}'::jsonb;
+  elsif p_operation='unshare' then
+    delete from analysis_members where project_id=p.id and user_id=(p_payload->>'userId')::uuid;
+    return '{}'::jsonb;
+  elsif p_operation='delete' then
+    delete from analysis_job_usage where job_id in (select id from analysis_jobs where project_id=p.id);
+    update analysis_projects set deleted_at=now(),state='{}',title='Deleted project',revision=revision+1 where id=p.id;
+    update analysis_jobs set status='cancelled',question='Deleted',context='{}',result=null,usage=null,error=null,progress='Deleted',lease_id=null,lease_until=null where project_id=p.id;
+    delete from analysis_members where project_id=p.id;
+    return '{}'::jsonb;
+  end if;
+  if access_role='viewer' then raise exception 'Editing access required' using errcode='42501'; end if;
+  if p_operation='enqueue' then
+    -- A replay returns the same job even when the project revision has since advanced.
+    select * into j from analysis_jobs where project_id=p.id and actor_id=p_actor and request_id=(p_payload->>'requestId')::uuid;
+    if found then
+      if j.question<>p_payload->>'question' then raise exception 'Request ID already used' using errcode='22023'; end if;
+      return jsonb_build_object('id',j.id);
+    end if;
+  end if;
+  if p_operation in ('rename','enqueue') and (p_payload->>'revision')::integer is distinct from p.revision then
+    raise exception 'Project changed; refresh and try again' using errcode='40001';
+  end if;
+  if p_operation='rename' then
+    update analysis_projects set title=p_payload->>'title',revision=revision+1,updated_at=now() where id=p.id;
+  elsif p_operation='enqueue' then
+    if exists(select 1 from analysis_jobs where project_id=p.id and status in ('queued','running')) then
+      raise exception 'An analysis is already active in this project' using errcode='40001';
+    end if;
+    insert into analysis_jobs(project_id,actor_id,request_id,question,context)
+      values(p.id,p_actor,(p_payload->>'requestId')::uuid,p_payload->>'question',p.state || coalesce(p_payload->'context','{}')) returning * into j;
+    update analysis_projects set revision=revision+1,updated_at=now(),title=case when title='New analysis' then left(j.question,100) else title end where id=p.id;
+    return jsonb_build_object('id',j.id);
+  elsif p_operation in ('cancel','retry') then
+    select * into j from analysis_jobs where id=(p_payload->>'jobId')::uuid and project_id=p.id for update;
+    if not found then raise exception 'Job unavailable' using errcode='42501'; end if;
+    if p_operation='cancel' and j.status in ('queued','running') then
+      update analysis_jobs set status='cancelled',progress='Cancelled',lease_id=null,lease_until=null,finished_at=now() where id=j.id;
+    elsif p_operation='retry' and j.status in ('failed','cancelled') then
+      if exists(select 1 from analysis_jobs where project_id=p.id and status in ('queued','running')) then raise exception 'Another analysis is active' using errcode='40001'; end if;
+      -- Retry executes for the requesting editor, not a possibly revoked original actor.
+      update analysis_jobs set status='queued',actor_id=p_actor,attempt=0,error=null,result=null,progress='Waiting for a worker',finished_at=null where id=j.id;
+    else raise exception 'Job cannot be changed in this state' using errcode='22023'; end if;
+  else raise exception 'Unknown operation' using errcode='22023'; end if;
+  return '{}'::jsonb;
+end $$;
+
+
+--
+-- Name: analysis_source_api(uuid, uuid, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.analysis_source_api(p_actor uuid, p_project uuid, p_operation text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare p analysis_projects; s analysis_sources; access_role text; result_json jsonb;
+begin
+ if not exists(select 1 from analysis_users where user_id=p_actor and approved) then raise exception 'Approval required' using errcode='42501'; end if;
+ select * into p from analysis_projects where id=p_project and deleted_at is null for update;
+ if not found then raise exception 'Project unavailable' using errcode='42501'; end if;
+ if p.owner_id=p_actor then access_role:='owner'; else select role into access_role from analysis_members where project_id=p.id and user_id=p_actor; end if;
+ if access_role is null then raise exception 'Project unavailable' using errcode='42501'; end if;
+ if p_operation='access' then return jsonb_build_object('role',access_role); end if;
+ if p_operation='list' then
+  select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at),'[]') into result_json from (
+   select id,name,kind,status,error,sha256,bytes,url,provenance,metadata,created_at,content->'profile' as profile,content->'preparations' as preparations
+   from analysis_sources where project_id=p.id and deleted_at is null
+  )t; return result_json;
+ end if;
+ if p_operation='get' then
+  select * into s from analysis_sources where id=(p_payload->>'sourceId')::uuid and project_id=p.id and deleted_at is null;
+  if not found then raise exception 'Source unavailable' using errcode='42501'; end if;
+  return to_jsonb(s)-'lease_id'-'lease_until';
+ end if;
+ if access_role='viewer' then raise exception 'Editing required' using errcode='42501'; end if;
+ if p_operation='create' then
+  insert into analysis_sources(id,project_id,actor_id,kind,name,sha256,bytes,url,provenance,metadata)
+   values((p_payload->>'sourceId')::uuid,p.id,p_actor,p_payload->>'kind',left(p_payload->>'name',200),p_payload->>'sha256',(p_payload->>'bytes')::bigint,p_payload->>'url',coalesce(p_payload->'provenance','{}'),coalesce(p_payload->'metadata','{}'))
+   on conflict(project_id,sha256,kind) do update set sha256=excluded.sha256 returning * into s;
+  if s.deleted_at is not null then raise exception 'This source version was deleted; create a new project or upload a revised file' using errcode='22023'; end if;
+  return to_jsonb(s)-'content'-'lease_id'-'lease_until';
+ end if;
+ select * into s from analysis_sources where id=(p_payload->>'sourceId')::uuid and project_id=p.id and deleted_at is null for update;
+ if not found then raise exception 'Source unavailable' using errcode='42501'; end if;
+ if p_operation='ready' and s.status in ('uploading','failed','blocked') then update analysis_sources set status='pending',attempt=0,error=null,actor_id=p_actor where id=s.id;
+ elsif p_operation='metadata' then
+  update analysis_sources set content=case when (metadata->>'crs') is distinct from (p_payload->'metadata'->>'crs') then null else content end, metadata=p_payload->'metadata',status=case when (metadata->>'crs') is distinct from (p_payload->'metadata'->>'crs') then 'pending' else status end,attempt=0,actor_id=p_actor where id=s.id;
+ elsif p_operation='retry' and s.status in ('failed','blocked','ready') then update analysis_sources set status='pending',attempt=0,error=null,actor_id=p_actor where id=s.id;
+ elsif p_operation='delete' then
+  update analysis_sources set status='deleted',deleted_at=now(),content=null,metadata='{}',name='Deleted',url=null,provenance='{}',error=null,lease_id=null,lease_until=null where id=s.id;
+  -- Invalidate dependent saved evidence and fence work already using the deleted source.
+  update analysis_jobs set result=null,status='cancelled',lease_id=null,lease_until=null,progress='Source removed',error='A source used by this analysis was deleted' where project_id=p.id and (status in ('queued','running') or result::text like '%'||s.id::text||'%');
+ else raise exception 'Source state cannot be changed' using errcode='22023'; end if;
+ return '{}'::jsonb;
+end $$;
+
+
+--
+-- Name: analysis_source_worker_api(text, uuid, uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.analysis_source_worker_api(p_operation text, p_source uuid DEFAULT NULL::uuid, p_lease uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare s analysis_sources; p analysis_projects; candidate uuid; result_json jsonb;
+begin
+ if p_operation='cleanup' then
+  select coalesce(jsonb_agg(to_jsonb(t)),'[]') into result_json from (
+   select id as project_id,null::uuid as source_id from analysis_projects where deleted_at is not null order by cleanup_at nulls first limit 5
+  )t;
+  return result_json || (select coalesce(jsonb_agg(to_jsonb(t)),'[]') from (
+   select project_id,id as source_id from analysis_sources where deleted_at is not null order by cleanup_at nulls first limit 10
+  )t);
+ end if;
+ if p_operation='cleaned' then
+  if p_source is not null then update analysis_sources set cleanup_at=now() where id=p_source and deleted_at is not null;
+  else update analysis_projects set cleanup_at=now() where id=(p_payload->>'projectId')::uuid and deleted_at is not null; end if;
+  return '{}'::jsonb;
+ end if;
+ if p_operation='claim' then
+  select id into candidate from analysis_sources where (p_source is null or id=p_source) and (status='pending' or (status='processing' and lease_until<now())) order by created_at limit 1;
+  if not found then return 'null'::jsonb; end if;
+  select pr.* into p from analysis_projects pr join analysis_sources a on a.project_id=pr.id where a.id=candidate for update of pr skip locked;
+  if not found then return 'null'::jsonb; end if;
+  select * into s from analysis_sources where id=candidate and (status='pending' or (status='processing' and lease_until<now())) for update skip locked;
+  if not found then return 'null'::jsonb; end if;
+ else
+  select pr.* into p from analysis_projects pr join analysis_sources a on a.project_id=pr.id where a.id=p_source for update of pr;
+  if not found then return jsonb_build_object('active',false); end if;
+  select * into s from analysis_sources where id=p_source for update;
+  if s.lease_id is distinct from p_lease or s.status<>'processing' or s.lease_until<now() then return jsonb_build_object('active',false); end if;
+ end if;
+ if p.deleted_at is not null or s.deleted_at is not null or not exists(select 1 from analysis_users where user_id=s.actor_id and approved)
+  or not (p.owner_id=s.actor_id or exists(select 1 from analysis_members where project_id=p.id and user_id=s.actor_id and role='editor')) then
+  update analysis_sources set status='blocked',error='Source processing access was revoked',lease_id=null,lease_until=null where id=s.id and deleted_at is null;
+  return case when p_operation='claim' then 'null'::jsonb else jsonb_build_object('active',false) end;
+ end if;
+ if p_operation='claim' then
+  if s.attempt>=3 then update analysis_sources set status='failed',error='Extraction retry limit reached' where id=s.id; return 'null'::jsonb; end if;
+  update analysis_sources set status='processing',lease_id=gen_random_uuid(),lease_until=now()+interval '60 seconds',attempt=attempt+1 where id=s.id returning * into s;
+  return to_jsonb(s)-'content';
+ elsif p_operation='heartbeat' then update analysis_sources set lease_until=now()+interval '60 seconds' where id=s.id;
+ elsif p_operation='finish' then update analysis_sources set status=case when p_payload->'content'->>'status'='blocked' then 'blocked' else 'ready' end,content=p_payload->'content',error=p_payload->'content'->>'error',lease_id=null,lease_until=null where id=s.id;
+ elsif p_operation='fail' then update analysis_sources set status='failed',error=left(p_payload->>'error',500),lease_id=null,lease_until=null where id=s.id;
+ else raise exception 'Unknown operation' using errcode='22023'; end if;
+ return jsonb_build_object('active',true);
+end $$;
+
+
+--
+-- Name: analysis_sources_on_project_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.analysis_sources_on_project_delete() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+begin
+ if new.deleted_at is not null then
+  update analysis_sources set deleted_at=now(),status='deleted',name='Deleted',url=null,provenance='{}',metadata='{}',content=null,error=null,lease_id=null,lease_until=null where project_id=new.id and deleted_at is null;
+ end if;
+ return new;
+end $$;
+
+
+--
+-- Name: analysis_worker_api(text, uuid, uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.analysis_worker_api(p_operation text, p_job uuid DEFAULT NULL::uuid, p_lease uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare j analysis_jobs; p analysis_projects; history jsonb; active boolean; candidate uuid;
+begin
+  if p_operation='claim' then
+    -- Expired leases are recoverable; a bounded number of automatic retries avoids crash loops.
+
+    select a.id into candidate from analysis_jobs a where (a.status='queued' or (a.status='running' and a.lease_until<now() )) order by a.created_at limit 1;
+    if not found then return 'null'::jsonb; end if;
+    select pr.* into p from analysis_projects pr join analysis_jobs a on a.project_id=pr.id where a.id=candidate for update of pr skip locked;
+    if not found then return 'null'::jsonb; end if;
+    select * into j from analysis_jobs where id=candidate and (status='queued' or (status='running' and lease_until<now() )) for update skip locked;
+    if not found then return 'null'::jsonb; end if;
+    if j.attempt>=3 then
+      update analysis_jobs set status='failed',error='Worker retry limit reached',progress='Failed',lease_id=null,lease_until=null where id=j.id;
+      return 'null'::jsonb;
+    end if;
+    active:=p.deleted_at is null and exists(select 1 from analysis_users where user_id=j.actor_id and approved)
+      and (p.owner_id=j.actor_id or exists(select 1 from analysis_members where project_id=p.id and user_id=j.actor_id and role='editor'));
+    if not active then
+      update analysis_jobs set status='cancelled',progress='Access revoked',lease_id=null,lease_until=null where id=j.id;
+      return 'null'::jsonb;
+    end if;
+    update analysis_jobs set status='running',attempt=attempt+1,lease_id=gen_random_uuid(),lease_until=now()+interval '60 seconds',progress='Preparing analysis' where id=j.id returning * into j;
+    insert into analysis_job_usage(lease_id,job_id,attempt) values(j.lease_id,j.id,j.attempt);
+    select coalesce(jsonb_agg(t.message order by t.created_at,t.seq),'[]') into history from (
+      select a.created_at,v.seq,v.message from (select * from analysis_jobs where project_id=p.id and status='completed' and created_at<j.created_at order by created_at desc limit 14) a
+      cross join lateral (values(1,jsonb_build_object('role','user','content',a.question)),(2,jsonb_build_object('role','assistant','content',left(coalesce(a.result->>'answer',''),4000))))v(seq,message)
+    )t where length(t.message->>'content')>0;
+    return to_jsonb(j) || jsonb_build_object('input',j.context || jsonb_build_object('messages',history || jsonb_build_array(jsonb_build_object('role','user','content',j.question))));
+  end if;
+  select pr.* into p from analysis_projects pr join analysis_jobs a on a.project_id=pr.id where a.id=p_job for update of pr;
+  if not found then return jsonb_build_object('active',false); end if;
+  select * into j from analysis_jobs where id=p_job for update;
+  if j.id is not null and p.deleted_at is null and p_operation in ('finish','fail') then
+    update analysis_job_usage set usage=coalesce(p_payload->'usage',usage) where lease_id=p_lease and job_id=j.id;
+  end if;
+  if j.id is null or j.lease_id is distinct from p_lease or j.status<>'running' or j.lease_until<now() then return jsonb_build_object('active',false); end if;
+  active:=p.deleted_at is null and exists(select 1 from analysis_users where user_id=j.actor_id and approved)
+    and (p.owner_id=j.actor_id or exists(select 1 from analysis_members where project_id=p.id and user_id=j.actor_id and role='editor'));
+  if not active then
+    update analysis_jobs set status='cancelled',progress='Access revoked',lease_id=null,lease_until=null where id=j.id;
+    return jsonb_build_object('active',false);
+  end if;
+  if p_operation='heartbeat' then
+    update analysis_jobs set lease_until=now()+interval '60 seconds',progress=left(coalesce(p_payload->>'progress','Working'),200) where id=j.id;
+  elsif p_operation='finish' then
+    update analysis_jobs set status='completed',progress='Complete',result=p_payload->'result',usage=p_payload->'usage',finished_at=now(),lease_id=null,lease_until=null where id=j.id;
+    update analysis_projects set state=state || coalesce(p_payload->'context','{}'),revision=revision+1,updated_at=now() where id=p.id;
+  elsif p_operation='fail' then
+    update analysis_jobs set status='failed',progress='Failed',error=left(coalesce(p_payload->>'error','Analysis failed'),500),usage=p_payload->'usage',finished_at=now(),lease_id=null,lease_until=null where id=j.id;
+  else raise exception 'Unknown worker operation' using errcode='22023'; end if;
+  return jsonb_build_object('active',true);
+end $$;
+
+
+--
 -- Name: district_dataset_gaps(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -350,6 +633,168 @@ CREATE FUNCTION public.district_index(p_dataset_id bigint) RETURNS TABLE(distric
   left join bhw_agg ba on ba.district_code = d.district_code
   where d.status <> 'rejected'
   order by d.region_code nulls last, d.district_name;
+$$;
+
+
+--
+-- Name: document_library_api(uuid, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.document_library_api(p_actor uuid, p_operation text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare
+  vid uuid; did uuid; aid uuid; duplicate_id uuid; item jsonb; result jsonb;
+  source bigint; job uuid; hash text; skey text;
+begin
+  if not exists(select 1 from admin_users where user_id=p_actor and role='admin') then
+    raise exception 'Admin role required' using errcode='42501';
+  end if;
+  if p_operation='attempt' then
+    insert into document_upload_attempt(uploaded_by,original_filename,byte_count,outcome,safe_reason)
+      values(p_actor,left(coalesce(p_payload->>'filename','Upload request'),255),
+        (p_payload->>'bytes')::bigint,coalesce(p_payload->>'outcome','receiving'),p_payload->>'reason') returning id into aid;
+    return jsonb_build_object('id',aid);
+  elsif p_operation='fail_attempt' then
+    update document_upload_attempt set outcome='failed',safe_reason='Upload could not be registered; retry safely'
+      where id=(p_payload->>'attempt')::uuid and outcome='receiving';
+    return '{}';
+  elsif p_operation='register' then
+    aid:=(p_payload->>'attempt')::uuid;
+    perform 1 from document_upload_attempt where id=aid and uploaded_by=p_actor and outcome='receiving' for update;
+    if not found then raise exception 'Upload attempt unavailable'; end if;
+    hash:=p_payload->>'sha256'; skey:=p_payload->>'storageKey';
+    perform pg_advisory_xact_lock(hashtextextended(hash,0));
+    select id into duplicate_id from document_version where file_sha256=hash order by uploaded_at limit 1;
+    if duplicate_id is not null then
+      update document_upload_attempt set outcome='duplicate',duplicate_version_id=duplicate_id,sha256=hash,
+        detected_type='application/pdf',byte_count=(p_payload->>'bytes')::bigint where id=aid;
+      return jsonb_build_object('duplicate',true,'versionId',duplicate_id);
+    end if;
+    did:=(p_payload->>'documentId')::uuid;
+    if did is null then
+      insert into document_catalog(title,issuer,document_type,issuance_number,tags,collection_key,created_by)
+        values(p_payload->>'title',nullif(p_payload->>'issuer',''),nullif(p_payload->>'type',''),
+          nullif(p_payload->>'number',''),array(select jsonb_array_elements_text(coalesce(p_payload->'tags','[]'))),
+          nullif(p_payload->>'collection',''),p_actor) returning id into did;
+    else
+      perform 1 from document_catalog where id=did for update;
+      if not found then raise exception 'Document unavailable'; end if;
+    end if;
+    if nullif(p_payload->>'supersedes','') is not null and not exists(
+      select 1 from document_version where id=(p_payload->>'supersedes')::uuid and document_id=did) then
+      raise exception 'Superseded version belongs to another document';
+    end if;
+    insert into document_file(sha256,storage_key,byte_count) values(hash,skey,(p_payload->>'bytes')::bigint)
+      on conflict(sha256) do nothing;
+    insert into document_version(document_id,file_sha256,publication_date,effective_date,supersedes_id,uploaded_by)
+      values(did,hash,nullif(p_payload->>'publicationDate','')::date,nullif(p_payload->>'effectiveDate','')::date,
+        nullif(p_payload->>'supersedes','')::uuid,p_actor) returning id into vid;
+    job:=enqueue_document_job(vid,p_actor);
+    update document_upload_attempt set outcome='queued',version_id=vid,sha256=hash,detected_type='application/pdf',
+      byte_count=(p_payload->>'bytes')::bigint where id=aid;
+    insert into document_audit_event(actor_id,document_id,version_id,event) values(p_actor,did,vid,'upload_queued');
+    return jsonb_build_object('duplicate',false,'versionId',vid);
+  elsif p_operation='list' then
+    select coalesce(jsonb_agg(t),'[]') into result from (
+      select v.id,v.document_id,c.title,c.issuer,c.document_type,c.tags,c.collection_key,v.uploaded_at,
+        v.publication_date,v.effective_date,v.archived,v.availability,v.embedding_status,
+        coalesce(j.stage,'queued') as stage,j.progress,j.safe_error
+      from document_version v join document_catalog c on c.id=v.document_id
+      left join lateral(select stage,progress,safe_error from document_job where version_id=v.id and kind='extract'
+        order by created_at desc limit 1) j on true
+      where (coalesce(p_payload->>'q','')='' or concat_ws(' ',c.title,c.issuer,c.issuance_number,array_to_string(c.tags,' ')) ilike '%'||(p_payload->>'q')||'%')
+        and (coalesce(p_payload->>'issuer','')='' or c.issuer ilike '%'||(p_payload->>'issuer')||'%')
+        and (coalesce(p_payload->>'type','')='' or c.document_type=p_payload->>'type')
+        and (coalesce(p_payload->>'tag','')='' or (p_payload->>'tag')=any(c.tags))
+        and (coalesce(p_payload->>'stage','')='' or j.stage=p_payload->>'stage')
+        and (nullif(p_payload->>'from','') is null or v.publication_date >= (p_payload->>'from')::date)
+        and (nullif(p_payload->>'to','') is null or v.publication_date <= (p_payload->>'to')::date)
+        and (coalesce(p_payload->>'archived','')<>'false' or not v.archived)
+      order by v.uploaded_at desc,v.id limit 50 offset least(greatest(coalesce((p_payload->>'offset')::integer,0),0),100000)
+    ) t;
+    select coalesce(jsonb_agg(t),'[]') into item from (
+      select id,original_filename,outcome,safe_reason,version_id,duplicate_version_id,created_at
+        from document_upload_attempt order by created_at desc limit 20) t;
+    return jsonb_build_object('versions',result,'attempts',item);
+  elsif p_operation='selection' then
+    select coalesce(jsonb_agg(s.key),'[]') into result from document_version v
+      join document_catalog c on c.id=v.document_id join document_extraction e on e.id=v.current_extraction_id
+      join doc_source s on s.doc_id=e.source_id
+      where not v.archived and v.availability in ('available','available_with_warnings') and s.status='approved'
+        and ((p_payload->>'version' is not null and v.id=(p_payload->>'version')::uuid)
+          or (p_payload->>'version' is null and c.collection_key=p_payload->>'collection'));
+    if jsonb_array_length(result)=0 then raise exception 'No available documents selected'; end if;
+    if jsonb_array_length(result)>100 then raise exception 'Select a collection with at most 100 active versions'; end if;
+    return result;
+  end if;
+  vid:=(p_payload->>'version')::uuid;
+  select document_id into did from document_version where id=vid for update;
+  if not found then raise exception 'Version unavailable'; end if;
+  if p_operation='detail' then
+    select to_jsonb(t) into result from (
+      select v.*,c.title,c.issuer,c.document_type,c.issuance_number,c.tags,c.collection_key,f.storage_key,f.byte_count
+        from document_version v join document_catalog c on c.id=v.document_id
+        join document_file f on f.sha256=v.file_sha256 where v.id=vid) t;
+    select to_jsonb(e) into item from document_extraction e where e.version_id=vid
+      and e.id=coalesce(nullif(p_payload->>'extraction','')::uuid,(result->>'current_extraction_id')::uuid);
+    result:=result||jsonb_build_object('extraction',item);
+    select coalesce(jsonb_agg(t),'[]') into item from (select id,revision,created_at from document_extraction
+      where version_id=vid order by revision desc) t;
+    result:=result||jsonb_build_object('revisions',item);
+    select coalesce(jsonb_agg(t),'[]') into item from (select id,kind,stage,progress,attempts,safe_error,created_at,updated_at
+      from document_job where version_id=vid order by created_at desc limit 30) t;
+    return result||jsonb_build_object('jobs',item);
+  elsif p_operation='metadata' then
+    update document_catalog set title=p_payload->>'title',issuer=nullif(p_payload->>'issuer',''),
+      document_type=nullif(p_payload->>'type',''),issuance_number=nullif(p_payload->>'number',''),
+      tags=array(select jsonb_array_elements_text(coalesce(p_payload->'tags','[]'))),collection_key=nullif(p_payload->>'collection','') where id=did;
+    if nullif(p_payload->>'supersedes','') is not null and not exists(select 1 from document_version
+      where id=(p_payload->>'supersedes')::uuid and document_id=did and id<>vid) then
+      raise exception 'Superseded version must belong to this document';
+    end if;
+    update document_version set publication_date=nullif(p_payload->>'publicationDate','')::date,
+      effective_date=nullif(p_payload->>'effectiveDate','')::date,supersedes_id=nullif(p_payload->>'supersedes','')::uuid where id=vid;
+  elsif p_operation='archive' then
+    update document_version set archived=(p_payload->>'archived')::boolean where id=vid;
+    update doc_source s set status=case when (p_payload->>'archived')::boolean then 'rejected'
+      when e.id=v.current_extraction_id and v.availability in ('available','available_with_warnings') then 'approved' else 'rejected' end
+      from document_extraction e join document_version v on v.id=e.version_id
+      where e.version_id=vid and s.doc_id=e.source_id;
+  elsif p_operation='retry' then
+    job:=enqueue_document_job(vid,p_actor);
+  else
+    raise exception 'Unknown library operation';
+  end if;
+  insert into document_audit_event(actor_id,document_id,version_id,event) values(p_actor,did,vid,p_operation);
+  return jsonb_build_object('versionId',vid,'jobId',job);
+end;
+$$;
+
+
+--
+-- Name: enqueue_document_job(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enqueue_document_job(p_version uuid, p_actor uuid) RETURNS uuid
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare job uuid;
+begin
+  if not exists (select 1 from admin_users where user_id = p_actor and role = 'admin') then
+    raise exception 'Admin role required' using errcode = '42501';
+  end if;
+  perform 1 from document_version where id = p_version for update;
+  if not found then raise exception 'Version not found'; end if;
+  select id into job from document_job where version_id = p_version and kind='extract'
+    and stage in ('queued','extracting','ocr','indexing');
+  if job is null then
+    insert into document_job(version_id,requested_by) values(p_version,p_actor) returning id into job;
+  end if;
+  return job;
+end;
 $$;
 
 
@@ -711,6 +1156,370 @@ CREATE FUNCTION public.match_ask_answer(q text, scope text, version text, datase
     and extensions.similarity(c.question_norm, q) >= min_sim
   order by score desc
   limit 1;
+$$;
+
+
+--
+-- Name: policy_evidence_api(uuid, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.policy_evidence_api(p_actor uuid, p_operation text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'extensions', 'pg_temp'
+    AS $$
+declare items jsonb; keys text[]; historical boolean:=coalesce((p_payload->>'historical')::boolean,false);
+  anchor doc_chunk%rowtype; versions uuid[]; revisions uuid[];
+begin
+  if not exists(select 1 from admin_users where user_id=p_actor and role='admin') then
+    raise exception 'Admin role required' using errcode='42501';
+  end if;
+  if p_operation='authorize' then return '{}'; end if;
+  if p_operation in ('catalog','select') then
+    versions:=array(select jsonb_array_elements_text(coalesce(p_payload->'versions','[]'))::uuid);
+    revisions:=array(select jsonb_array_elements_text(coalesce(p_payload->'revisions','[]'))::uuid);
+    if cardinality(versions)+cardinality(revisions)>100 then raise exception 'Selection limit is 100'; end if;
+    select coalesce(jsonb_agg(t),'[]') into items from (
+      select c.title,c.issuer,c.document_type,c.issuance_number,c.collection_key,v.id as version_id,
+        e.id as extraction_id,s.key as document,e.revision,e.page_count,e.warnings,
+        v.publication_date,v.effective_date,v.supersedes_id,v.uploaded_at,v.archived,
+        (e.id=v.current_extraction_id) as current_revision
+      from document_catalog c join document_version v on v.document_id=c.id
+      join document_extraction e on e.version_id=v.id join doc_source s on s.doc_id=e.source_id
+      where length(e.canonical_text)>0 and v.availability in ('available','available_with_warnings')
+        and (historical or (not v.archived and e.id=v.current_extraction_id))
+        and (p_operation='catalog' or
+          (coalesce(p_payload->>'mode','active')='active' and e.id=v.current_extraction_id and not v.archived
+           and (nullif(p_payload->>'collection','') is null or c.collection_key=p_payload->>'collection')) or
+          (p_payload->>'mode'='selected' and ((v.id=any(versions) and e.id=v.current_extraction_id) or e.id=any(revisions))))
+      order by v.uploaded_at desc,e.revision desc limit 501
+    ) t;
+    if p_operation='select' then
+      if jsonb_array_length(items)=0 then raise exception 'No available policy text in this selection'; end if;
+      if jsonb_array_length(items)>100 then raise exception 'Select at most 100 policy revisions'; end if;
+      if p_payload->>'mode'='selected' and (
+        exists(select 1 from unnest(versions) x where not exists(select 1 from jsonb_array_elements(items) e where e->>'version_id'=x::text)) or
+        exists(select 1 from unnest(revisions) x where not exists(select 1 from jsonb_array_elements(items) e where e->>'extraction_id'=x::text))) then
+        raise exception 'A selected version is unavailable or historical selection is disabled';
+      end if;
+    end if;
+    return items;
+  end if;
+  keys:=array(select jsonb_array_elements_text(coalesce(p_payload->'keys','[]')));
+  if cardinality(keys)=0 or cardinality(keys)>100 then raise exception 'Invalid policy scope'; end if;
+  if p_operation='read' then
+    select c.* into anchor from doc_chunk c join doc_source s on s.doc_id=c.doc_id
+      where c.chunk_id=(p_payload->>'chunk')::bigint and s.key=any(keys);
+    if not found then raise exception 'Passage outside selected policy scope'; end if;
+  end if;
+  if p_operation not in ('search','read','inventory') then raise exception 'Unknown evidence operation'; end if;
+  select coalesce(jsonb_agg(t),'[]') into items from (
+    select c.chunk_id,s.key as document,s.title as document_title,c.page_from as page,c.page_to,
+      c.heading,c.content,c.char_start,c.char_end,v.id as version_id,e.id as extraction_id,
+      e.revision,v.publication_date,v.effective_date,v.supersedes_id,e.warnings,
+      v.archived,(e.id=v.current_extraction_id) as current_revision
+    from doc_chunk c join doc_source s on s.doc_id=c.doc_id
+    join document_extraction e on e.source_id=s.doc_id join document_version v on v.id=e.version_id
+    where s.key=any(keys) and v.availability in ('available','available_with_warnings')
+      and (historical or (not v.archived and v.current_extraction_id=e.id and s.status='approved'))
+      and (p_operation='inventory' or
+        (p_operation='search' and (c.content ilike '%'||(p_payload->>'query')||'%'
+          or extensions.similarity(c.content,p_payload->>'query')>0.01)) or
+        (p_operation='read' and c.doc_id=anchor.doc_id and c.chunk_index between
+          anchor.chunk_index-least(greatest(coalesce((p_payload->>'neighbors')::integer,0),0),2)
+          and anchor.chunk_index+least(greatest(coalesce((p_payload->>'neighbors')::integer,0),0),2)))
+    order by case when p_operation='search' then extensions.similarity(c.content,p_payload->>'query') else 0 end desc,c.chunk_id
+    limit case when p_operation='read' then 5 else least(greatest(coalesce((p_payload->>'limit')::integer,6),1),25) end
+  ) t;
+  return items;
+end;
+$$;
+
+
+--
+-- Name: policy_research_api(uuid, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.policy_research_api(p_actor uuid, p_operation text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+declare r policy_research_evidence%rowtype; rid uuid; result jsonb; token uuid; key uuid;
+begin
+ if not exists(select 1 from admin_users where user_id=p_actor and role='admin') or
+    not exists(select 1 from analysis_users where user_id=p_actor and approved) then
+  raise exception 'Approved admin required' using errcode='42501';end if;
+ if p_operation='create_run' then
+  -- One immutable opt-in/configuration per idempotent run creation, serialized before the old facade.
+  perform pg_advisory_xact_lock(hashtextextended(p_actor::text||(p_payload->>'requestKey'),0));
+  select id into rid from policy_review_run where actor_id=p_actor and request_key=(p_payload->>'requestKey')::uuid;
+  if found then return jsonb_build_object('id',rid);end if;
+  result:=policy_review_api(p_actor,'create',jsonb_set(p_payload,'{sources,online}','false'));
+  rid:=(result->>'id')::uuid;
+  if coalesce((p_payload#>>'{sources,online}')::boolean,false) then
+   update policy_review_run set settings=p_payload->'sources' where id=rid and actor_id=p_actor;
+   insert into policy_research_evidence(id,actor_id,run_id,settings) values(rid,p_actor,rid,p_payload#>'{sources,research}');
+  end if;
+  return result;
+ end if;
+ key:=(p_payload->>'id')::uuid;
+ if p_operation='begin' and not coalesce((p_payload->>'run')::boolean,false) then
+  insert into policy_research_evidence(id,actor_id,settings) values(key,p_actor,coalesce(p_payload->'settings','{}')) on conflict(id) do nothing;
+ end if;
+ -- Lock the parent first, as the section worker does. A cancelled run cannot publish web evidence.
+ if exists(select 1 from policy_research_evidence where id=key and actor_id=p_actor and run_id is not null) then
+  perform 1 from policy_review_run where id=key and actor_id=p_actor and status in ('queued','running') for update;
+  if not found and p_operation<>'get' then raise exception 'Run is inactive';end if;
+ end if;
+ select * into r from policy_research_evidence where id=key and actor_id=p_actor for update;
+ if not found then raise exception 'Evidence unavailable' using errcode='42501';end if;
+ if p_operation='get' then return jsonb_build_object('id',r.id,'status',r.status,'snapshot',r.snapshot);end if;
+ if p_operation='begin' then
+  if r.status='ready' then return jsonb_build_object('snapshot',r.snapshot);end if;
+  if r.status='running' and r.lease_until>now() then return jsonb_build_object('busy',true);end if;
+  if r.attempts>=3 then
+   result:=jsonb_build_object('id',r.id,'available',false,'results','[]'::jsonb,'gaps',jsonb_build_array('Online research was interrupted repeatedly; internal evidence remains available.'));
+   update policy_research_evidence set status='ready',snapshot=result,lease=null,lease_until=null where id=key;
+   return jsonb_build_object('snapshot',result);
+  end if;
+  token:=gen_random_uuid();update policy_research_evidence set status='running',attempts=attempts+1,lease=token,lease_until=now()+interval '90 seconds' where id=key;
+  return jsonb_build_object('lease',token,'settings',r.settings);
+ elsif p_operation='save' then
+  if r.status<>'running' or r.lease is distinct from (p_payload->>'lease')::uuid or r.lease_until<now() then raise exception 'Lease expired';end if;
+  update policy_research_evidence set snapshot=p_payload->'snapshot',status='ready',lease=null,lease_until=null where id=key;
+  return jsonb_build_object('snapshot',p_payload->'snapshot');
+ end if;
+ raise exception 'Unknown research operation';
+end;
+$$;
+
+
+--
+-- Name: policy_review_api(uuid, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.policy_review_api(p_actor uuid, p_operation text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'extensions', 'pg_temp'
+    AS $$
+declare rid uuid; run policy_review_run%rowtype; v record; e document_extraction%rowtype;
+ did uuid; vid uuid; eid uuid; why text; ids uuid[]; revisions uuid[]; page jsonb; pos integer; stop_at integer;
+ result jsonb; inventory jsonb; sections jsonb; totals jsonb; groups jsonb; topic text; expected_pos integer; expected_page integer; document_count integer:=0; section_count integer:=0;
+begin
+ if not exists(select 1 from admin_users where user_id=p_actor and role='admin') or
+    not exists(select 1 from analysis_users where user_id=p_actor and approved) then
+   raise exception 'Approved admin required' using errcode='42501'; end if;
+ if p_operation='list' then
+  select coalesce(jsonb_agg(t),'[]') into result from(select id,question,status,reason,used,budget,created_at
+   from policy_review_run where actor_id=p_actor order by created_at desc limit 30)t;return result;
+ end if;
+ if p_operation='create' then
+  select * into run from policy_review_run where actor_id=p_actor and request_key=(p_payload->>'requestKey')::uuid;
+  if found then return jsonb_build_object('id',run.id); end if;
+  if coalesce((p_payload#>>'{sources,online}')::boolean,false) then raise exception 'Online research unavailable'; end if;
+  insert into policy_review_run(actor_id,request_key,question,settings,dataset_snapshot,budget)
+   values(p_actor,(p_payload->>'requestKey')::uuid,p_payload->>'question',p_payload->'sources',p_payload->'datasets',
+    least(greatest(coalesce((p_payload->>'budget')::integer,200),1),1000)) on conflict(actor_id,request_key) do nothing returning id into rid;
+  if rid is null then select id into rid from policy_review_run where actor_id=p_actor and request_key=(p_payload->>'requestKey')::uuid;return jsonb_build_object('id',rid);end if;
+  ids:=array(select jsonb_array_elements_text(coalesce(p_payload#>'{sources,versions}','[]'))::uuid);
+  revisions:=array(select jsonb_array_elements_text(coalesce(p_payload#>'{sources,revisions}','[]'))::uuid);
+  for v in select distinct dv.*,c.title,c.issuer,c.document_type,c.collection_key from document_version dv
+   join document_catalog c on c.id=dv.document_id where
+   (p_payload#>>'{sources,mode}'='active' and (nullif(p_payload#>>'{sources,collection}','') is null or c.collection_key=p_payload#>>'{sources,collection}'))
+   or (p_payload#>>'{sources,mode}'='selected' and (dv.id=any(ids) or dv.id in(select version_id from document_extraction where id=any(revisions))))
+   order by dv.uploaded_at,dv.id loop
+   -- Active scope includes excluded archives in the frozen inventory, not in processing.
+   for eid in select x.id from document_extraction x where x.version_id=v.id and
+     (x.id=v.current_extraction_id and (p_payload#>>'{sources,mode}'='active' or v.id=any(ids)) or x.id=any(revisions))
+     union all select null::uuid where not exists(select 1 from document_extraction x where x.version_id=v.id and
+       (x.id=v.current_extraction_id and (p_payload#>>'{sources,mode}'='active' or v.id=any(ids)) or x.id=any(revisions))) loop
+    document_count:=document_count+1; if document_count>1000 then raise exception 'Snapshot exceeds 1000 versions; narrow collection';end if;
+    why:=null;select * into e from document_extraction where id=eid;
+    if eid is null then
+      why:=case when exists(select 1 from document_job where version_id=v.id and kind='extract' and stage in ('queued','extracting','ocr','indexing')) then 'processing' else 'failed_or_no_extracted_text' end;
+    elsif v.archived and not coalesce((p_payload#>>'{sources,historical}')::boolean,false) then why:='archived';
+    elsif eid<>v.current_extraction_id and not coalesce((p_payload#>>'{sources,historical}')::boolean,false) then why:='older_extraction_not_selected_for_history';
+    elsif not length(trim(e.canonical_text))>0 then why:='empty_extraction';
+    end if;
+    insert into policy_review_document(run_id,version_id,extraction_id,identity_key,metadata,exclusion,warnings)
+     values(rid,v.id,eid,coalesce(eid,v.id)::text,jsonb_build_object('title',v.title,'issuer',v.issuer,'version_id',v.id,
+      'extraction_id',eid,'revision',e.revision,'document','upload:'||eid,'publication_date',v.publication_date,
+      'effective_date',v.effective_date,'supersedes_id',v.supersedes_id,'archived_at_start',v.archived,
+      'uploaded_at',v.uploaded_at),why,coalesce(e.warnings,'[]')) returning id into did;
+    if why is null then
+     if jsonb_array_length(e.page_map)<>e.page_count then
+      update policy_review_document set exclusion='invalid_page_map' where id=did;
+     else
+      expected_pos:=0;expected_page:=1;
+      for page in select * from jsonb_array_elements(e.page_map) loop
+       pos:=(page->>'char_start')::integer;stop_at:=(page->>'char_end')::integer;
+       if pos<>expected_pos or (page->>'page')::integer<>expected_page or stop_at<pos or stop_at>length(e.canonical_text) or
+          (expected_page<e.page_count and substring(e.canonical_text from stop_at+1 for 1)<>E'\f') then
+        update policy_review_document set exclusion='invalid_page_map' where id=did;exit;
+       end if;
+       expected_pos:=stop_at+1;expected_page:=expected_page+1;
+       if pos=stop_at then
+        section_count:=section_count+1; if section_count>5000 then raise exception 'Snapshot exceeds 5000 sections; narrow collection';end if;
+        insert into policy_review_section(run_id,document_id,page,char_start,char_end,content_sha256,status,safe_error)
+         values(rid,did,(page->>'page')::integer,pos,pos,encode(extensions.digest('','sha256'),'hex'),'unreadable','Blank or unreadable physical page');
+       end if;
+       while pos<stop_at loop
+        section_count:=section_count+1; if section_count>5000 then raise exception 'Snapshot exceeds 5000 sections; narrow collection';end if;
+        insert into policy_review_section(run_id,document_id,page,char_start,char_end,content_sha256,status,safe_error)
+         values(rid,did,(page->>'page')::integer,pos,least(pos+2400,stop_at),
+          encode(extensions.digest(substring(e.canonical_text from pos+1 for least(2400,stop_at-pos)),'sha256'),'hex'),
+          case when length(trim(substring(e.canonical_text from pos+1 for least(2400,stop_at-pos))))=0 then 'unreadable' else 'pending' end,
+          case when length(trim(substring(e.canonical_text from pos+1 for least(2400,stop_at-pos))))=0 then 'No readable extracted text in section' else null end);
+        pos:=pos+2400;
+       end loop;
+      end loop;
+      if expected_pos<>length(e.canonical_text)+1 or expected_page<>e.page_count+1 then update policy_review_document set exclusion='invalid_page_map' where id=did;end if;
+      if exists(select 1 from policy_review_document where id=did and exclusion is not null) then
+       update policy_review_section set status='unreadable',safe_error='Page map does not cover the canonical source text' where document_id=did;
+      end if;
+     end if;
+    end if;
+   end loop;
+  end loop;
+  -- Explicit IDs that could not be resolved are still visible as gaps.
+  for vid in select unnest(ids) except select version_id from policy_review_document where run_id=rid loop
+   insert into policy_review_document(run_id,identity_key,metadata,exclusion) values(rid,vid::text,jsonb_build_object('title','Unavailable selected version','version_id',vid),'missing_selected_version');
+  end loop;
+  for eid in select unnest(revisions) except select extraction_id from policy_review_document where run_id=rid loop
+   insert into policy_review_document(run_id,identity_key,metadata,exclusion) values(rid,eid::text,jsonb_build_object('title','Unavailable selected extraction','extraction_id',eid),'missing_selected_extraction');
+  end loop;
+  if (select count(*) from policy_review_document where run_id=rid)>1000 or
+     (select count(*) from policy_review_section where run_id=rid)>5000 then raise exception 'Snapshot exceeds 1000 versions or 5000 sections; narrow the collection'; end if;
+  if not exists(select 1 from policy_review_document where run_id=rid) then raise exception 'No policies in selected scope'; end if;
+  if not exists(select 1 from policy_review_section where run_id=rid and status='pending') then
+   update policy_review_run set status='partial',reason='No readable pending sections; inspect excluded material' where id=rid;
+  end if;
+  return jsonb_build_object('id',rid);
+ end if;
+ rid:=(p_payload->>'run')::uuid;
+ select * into run from policy_review_run where id=rid and actor_id=p_actor for update;
+ if not found then raise exception 'Review not available' using errcode='42501'; end if;
+ if p_operation='cancel' then
+  if run.status='completed' then return '{}';end if;
+  update policy_review_run set status='cancelled',reason='Cancelled by requesting admin; unfinished sections were not examined',updated_at=now() where id=rid;
+  update policy_review_section set status='pending',lease=null,lease_until=null,
+   attempts_log=attempts_log||jsonb_build_array(jsonb_build_object('attempt',attempts,'outcome','cancelled','at',now())) where run_id=rid and status='running';
+  return '{}';
+ elsif p_operation='resume' then
+  if run.status not in ('partial','cancelled') then return '{}';end if;
+  update policy_review_section set status='pending',lease=null,lease_until=null,
+   attempts_log=attempts_log||jsonb_build_array(jsonb_build_object('attempt',attempts,'outcome','interrupted_for_resume','at',now()))
+   where run_id=rid and status='running';
+  if coalesce((p_payload->>'retryFailed')::boolean,false) then
+   update policy_review_section set status='pending',cycle_attempts=0,retry_at=null where run_id=rid and status='failed';
+  end if;
+  update policy_review_run set budget=least(10000,greatest(budget,used)+least(greatest(coalesce((p_payload->>'extraBudget')::integer,200),1),1000)),
+   status='queued',reason=null,updated_at=now() where id=rid;
+  return '{}';
+ elsif p_operation='section' then
+  select to_jsonb(t) into result from(select s.*,d.metadata,d.extraction_id,
+    substring(ex.canonical_text from s.char_start+1 for s.char_end-s.char_start) as source_text,
+    encode(extensions.digest(substring(ex.canonical_text from s.char_start+1 for s.char_end-s.char_start),'sha256'),'hex')=s.content_sha256 as integrity_ok
+   from policy_review_section s join policy_review_document d on d.id=s.document_id join document_extraction ex on ex.id=d.extraction_id
+   where s.run_id=rid and s.id=(p_payload->>'section')::bigint)t;
+  if result is null then raise exception 'Section not found'; end if;return result;
+ elsif p_operation<>'get' then raise exception 'Unknown review operation'; end if;
+ select jsonb_build_object('total',count(*),'examined',count(*) filter(where status='examined'),
+   'no_finding',count(*) filter(where status='no_finding'),'unreadable',count(*) filter(where status='unreadable'),
+   'failed',count(*) filter(where status='failed'),'pending',count(*) filter(where status='pending'),
+   'running',count(*) filter(where status='running')) into totals from policy_review_section where run_id=rid;
+ select coalesce(jsonb_agg(t),'[]') into inventory from(select d.*,count(s.id) as sections,
+   count(s.id) filter(where s.status in ('examined','no_finding')) as examined_sections
+   from policy_review_document d left join policy_review_section s on s.document_id=d.id where d.run_id=rid group by d.id order by d.identity_key)t;
+ topic:=nullif(p_payload->>'topic','');
+ select coalesce(jsonb_agg(t),'[]') into sections from(select s.*,d.metadata from policy_review_section s join policy_review_document d on d.id=s.document_id
+   where s.run_id=rid and (topic is null or exists(select 1 from jsonb_array_elements(coalesce(s.result->'findings','[]')) f where lower(trim(f->>'topic'))=topic))
+   order by s.id limit 50 offset greatest(coalesce((p_payload->>'offset')::integer,0),0))t;
+ -- Consolidate every accepted finding by topic; no top-hit or model-authored completeness claim.
+ select coalesce(jsonb_agg(t),'[]') into groups from(select lower(trim(f->>'topic')) as topic,
+   count(*) as findings,count(distinct d.version_id) as versions,
+   (count(distinct d.version_id)>1 and count(distinct f->>'comparisonValue') filter(where f->>'kind'='policy_requirement' and nullif(f->>'comparisonValue','') is not null)>1) as comparison_needed
+   from policy_review_section s join policy_review_document d on d.id=s.document_id cross join lateral jsonb_array_elements(coalesce(s.result->'findings','[]')) f
+   where s.run_id=rid and s.status='examined' group by lower(trim(f->>'topic')) order by lower(trim(f->>'topic')))t;
+ return jsonb_build_object('run',to_jsonb(run),'documents',inventory,'coverage',totals,'sections',sections,'groups',groups,
+   'complete',run.status='completed','dataset_rows_frozen',false);
+end;
+$$;
+
+
+--
+-- Name: policy_review_worker(text, bigint, uuid, uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.policy_review_worker(p_operation text, p_section bigint DEFAULT NULL::bigint, p_lease uuid DEFAULT NULL::uuid, p_run uuid DEFAULT NULL::uuid, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'extensions', 'pg_temp'
+    AS $$
+declare r policy_review_run%rowtype; s policy_review_section%rowtype; d policy_review_document%rowtype;
+ text_value text; token uuid; complete boolean; why text;
+begin
+ if p_operation='claim' then
+  -- Revocation pauses work; no new evidence is sent to a provider.
+  update policy_review_run x set status='partial',reason='Requesting admin is no longer authorized' where x.status in ('queued','running') and
+   (not exists(select 1 from admin_users where user_id=x.actor_id and role='admin') or not exists(select 1 from analysis_users where user_id=x.actor_id and approved));
+  for r in select * from policy_review_run where status in ('queued','running') and (p_run is null or id=p_run) order by created_at for update skip locked loop
+  update policy_review_section set status=case when cycle_attempts>=3 then 'failed' else 'pending' end,
+   lease=null,lease_until=null,safe_error='Previous worker stopped; recovered expired lease',
+   attempts_log=attempts_log||jsonb_build_array(jsonb_build_object('attempt',attempts,'outcome','abandoned','at',now()))
+   where run_id=r.id and status='running' and lease_until<now();
+
+   if r.used>=r.budget then
+    if exists(select 1 from policy_review_section where run_id=r.id and status='running') then continue;end if;
+    update policy_review_run set status='partial',reason='Section-attempt budget exhausted; unfinished sections were not examined',updated_at=now() where id=r.id;continue;
+   end if;
+   select * into s from policy_review_section where run_id=r.id and status='pending' and cycle_attempts<3
+    and (retry_at is null or retry_at<=now()) order by id for update skip locked limit 1;
+   if found then
+    token:=gen_random_uuid();update policy_review_section set status='running',attempts=attempts+1,cycle_attempts=cycle_attempts+1,
+     lease=token,lease_until=now()+interval '60 seconds',updated_at=now() where id=s.id returning * into s;
+    update policy_review_run set status='running',used=used+1,updated_at=now() where id=r.id returning * into r;
+    select * into d from policy_review_document where id=s.document_id;
+    select substring(canonical_text from s.char_start+1 for s.char_end-s.char_start) into text_value from document_extraction where id=d.extraction_id;
+    return jsonb_build_object('run',to_jsonb(r),'section',to_jsonb(s),'document',to_jsonb(d),'text',text_value,
+      'integrity_ok',encode(extensions.digest(text_value,'sha256'),'hex')=s.content_sha256);
+   end if;
+   if exists(select 1 from policy_review_section where run_id=r.id and status in ('pending','running')) then continue; end if;
+   complete:=not exists(select 1 from policy_review_section where run_id=r.id and status not in ('examined','no_finding'))
+      and not exists(select 1 from policy_review_document where run_id=r.id and (exclusion is not null or jsonb_array_length(warnings)>0));
+   update policy_review_run set status=case when complete then 'completed' else 'partial' end,
+    reason=case when complete then 'Every frozen extracted section was examined; this is not legal verification'
+      else 'All remaining readable work finished; excluded, unreadable, failed or quality-limited material prevents completeness' end,updated_at=now() where id=r.id;
+  end loop;
+  return null;
+ end if;
+ select * into r from policy_review_run where id=(select run_id from policy_review_section where id=p_section) for update;
+ if not found then return jsonb_build_object('active',false);end if;
+ select * into s from policy_review_section where id=p_section for update;
+ if s.status<>'running' or s.lease is distinct from p_lease or s.lease_until<now() or r.status<>'running' or
+   not exists(select 1 from admin_users where user_id=r.actor_id and role='admin') or not exists(select 1 from analysis_users where user_id=r.actor_id and approved) then
+   return jsonb_build_object('active',false);
+ end if;
+ if p_operation='heartbeat' then
+  update policy_review_section set lease_until=now()+interval '60 seconds',updated_at=now() where id=s.id;return jsonb_build_object('active',true);
+ elsif p_operation='finish' then
+  if p_payload->>'outcome' not in ('examined','no_finding') then raise exception 'Invalid review outcome';end if;
+  update policy_review_section set status=p_payload->>'outcome',result=p_payload->'result',evidence=p_payload->'evidence',lease=null,lease_until=null,
+   safe_error=null,updated_at=now(),attempts_log=attempts_log||jsonb_build_array(jsonb_build_object('attempt',attempts,'outcome',p_payload->>'outcome','at',now(),'usage',p_payload#>'{evidence,usage}')) where id=s.id;
+ elsif p_operation='fail' then
+  update policy_review_section set status=case when cycle_attempts>=3 then 'failed' else 'pending' end,
+   retry_at=now()+interval '1 minute',lease=null,lease_until=null,safe_error='Section review unavailable or failed evidence validation; retry is bounded',updated_at=now(),
+   attempts_log=attempts_log||jsonb_build_array(jsonb_build_object('attempt',attempts,'outcome','failed','at',now(),'usage',p_payload->'usage')) where id=s.id;
+ else raise exception 'Unknown worker operation';end if;
+ if not exists(select 1 from policy_review_section where run_id=r.id and status in ('pending','running')) then
+  complete:=not exists(select 1 from policy_review_section where run_id=r.id and status not in ('examined','no_finding'))
+   and not exists(select 1 from policy_review_document where run_id=r.id and (exclusion is not null or jsonb_array_length(warnings)>0));
+  update policy_review_run set status=case when complete then 'completed' else 'partial' end,
+   reason=case when complete then 'Every frozen extracted section was examined; this is not legal verification'
+    else 'Excluded, unreadable, failed or quality-limited material prevents completeness' end,updated_at=now() where id=r.id;
+ elsif r.used>=r.budget and not exists(select 1 from policy_review_section where run_id=r.id and status='running') then
+  update policy_review_run set status='partial',reason='Section-attempt budget exhausted; unfinished sections were not examined',updated_at=now() where id=r.id;
+ end if;
+ return jsonb_build_object('active',true);
+end;
 $$;
 
 
@@ -1161,6 +1970,29 @@ CREATE FUNCTION public.search_geo(search_query text, result_limit integer DEFAUL
   group by geo_code, geo_level, geo_name, n_total, parent_chain
   order by match_rank desc, n_total desc nulls last
   limit result_limit;
+$$;
+
+
+--
+-- Name: search_library_documents(uuid, text[], text, integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.search_library_documents(p_actor uuid, p_keys text[], p_query text, p_limit integer DEFAULT 6) RETURNS TABLE(chunk_id bigint, doc_key text, doc_title text, doc_as_of date, page_from integer, page_to integer, heading text, content text, char_start integer, char_end integer, matched_by text, score real)
+    LANGUAGE plpgsql
+    SET search_path TO 'public', 'extensions', 'pg_temp'
+    AS $$
+begin
+  if not exists(select 1 from admin_users where user_id=p_actor and role='admin') then
+    raise exception 'Admin role required' using errcode='42501';
+  end if;
+  if cardinality(p_keys)>100 then raise exception 'Selection too large'; end if;
+  return query select c.chunk_id,s.key,s.title,s.as_of,c.page_from,c.page_to,c.heading,c.content,c.char_start,c.char_end,
+    'lexical'::text,extensions.similarity(c.content,p_query) from doc_chunk c join doc_source s on s.doc_id=c.doc_id
+    join document_extraction e on e.source_id=s.doc_id join document_version v on v.current_extraction_id=e.id
+    where s.key=any(p_keys) and s.status='approved' and not v.archived
+      and (c.content ilike '%'||p_query||'%' or extensions.similarity(c.content,p_query)>0.01)
+    order by extensions.similarity(c.content,p_query) desc,c.chunk_id limit least(greatest(p_limit,1),25);
+end;
 $$;
 
 
@@ -2601,6 +3433,67 @@ ALTER TABLE public.agg_poverty ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 
 
 --
+-- Name: agg_poverty_official; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agg_poverty_official (
+    id bigint NOT NULL,
+    dataset_id bigint NOT NULL,
+    geo_code text NOT NULL,
+    geo_level public.geo_level_enum NOT NULL,
+    reference_year smallint NOT NULL,
+    poverty_incidence double precision,
+    ci_low double precision,
+    ci_high double precision,
+    cv double precision,
+    is_suppressed boolean DEFAULT false NOT NULL,
+    value_status text NOT NULL,
+    source_label text NOT NULL,
+    source_table text NOT NULL,
+    source_row integer NOT NULL,
+    boundary_note text NOT NULL,
+    publication_note text NOT NULL,
+    workbook_sha256 text NOT NULL,
+    CONSTRAINT agg_poverty_official_boundary_note_check CHECK ((length(TRIM(BOTH FROM boundary_note)) > 0)),
+    CONSTRAINT agg_poverty_official_check CHECK ((is_suppressed = (value_status = 'suppressed'::text))),
+    CONSTRAINT agg_poverty_official_check1 CHECK ((((value_status = 'available'::text) AND ((poverty_incidence >= (0)::double precision) AND (poverty_incidence <= (100)::double precision)) AND (poverty_incidence IS NOT NULL)) OR ((value_status <> 'available'::text) AND (poverty_incidence IS NULL)))),
+    CONSTRAINT agg_poverty_official_check2 CHECK (((ci_low IS NULL) OR (ci_high IS NULL) OR (ci_low <= ci_high))),
+    CONSTRAINT agg_poverty_official_ci_high_check CHECK (((ci_high IS NULL) OR ((ci_high > '-Infinity'::double precision) AND (ci_high < 'Infinity'::double precision)))),
+    CONSTRAINT agg_poverty_official_ci_low_check CHECK (((ci_low IS NULL) OR ((ci_low > '-Infinity'::double precision) AND (ci_low < 'Infinity'::double precision)))),
+    CONSTRAINT agg_poverty_official_cv_check CHECK (((cv IS NULL) OR ((cv >= (0)::double precision) AND (cv < 'Infinity'::double precision)))),
+    CONSTRAINT agg_poverty_official_geo_level_check CHECK ((geo_level = ANY (ARRAY['national'::public.geo_level_enum, 'region'::public.geo_level_enum, 'province'::public.geo_level_enum, 'citymun'::public.geo_level_enum]))),
+    CONSTRAINT agg_poverty_official_publication_note_check CHECK ((length(TRIM(BOTH FROM publication_note)) > 0)),
+    CONSTRAINT agg_poverty_official_reference_year_check CHECK ((reference_year = 2023)),
+    CONSTRAINT agg_poverty_official_source_label_check CHECK ((length(TRIM(BOTH FROM source_label)) > 0)),
+    CONSTRAINT agg_poverty_official_source_row_check CHECK ((source_row > 6)),
+    CONSTRAINT agg_poverty_official_source_table_check CHECK ((source_table = ANY (ARRAY['tab2'::text, 'tab2a'::text]))),
+    CONSTRAINT agg_poverty_official_value_status_check CHECK ((value_status = ANY (ARRAY['available'::text, 'unavailable'::text, 'not_absolute_zero'::text, 'suppressed'::text]))),
+    CONSTRAINT agg_poverty_official_workbook_sha256_check CHECK ((workbook_sha256 ~ '^[a-f0-9]{64}$'::text))
+);
+
+
+--
+-- Name: TABLE agg_poverty_official; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.agg_poverty_official IS 'PSA official full-year population poverty estimates, 2023 r2. Published 95% CI. Explicit source reporting geography; not SAE, not a rollup or a substitute for missing local values.';
+
+
+--
+-- Name: agg_poverty_official_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.agg_poverty_official ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.agg_poverty_official_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: agg_training; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3062,6 +3955,125 @@ ALTER TABLE public.ai_regression_run ALTER COLUMN run_id ADD GENERATED ALWAYS AS
     NO MAXVALUE
     CACHE 1
 );
+
+
+--
+-- Name: analysis_job_usage; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_job_usage (
+    lease_id uuid NOT NULL,
+    job_id uuid NOT NULL,
+    attempt integer NOT NULL,
+    usage jsonb DEFAULT '{"note": "Attempt started; final usage is unavailable if this worker was interrupted.", "requests": 0, "estimatedCostUsd": null}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: analysis_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    project_id uuid NOT NULL,
+    actor_id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    question text NOT NULL,
+    status text DEFAULT 'queued'::text NOT NULL,
+    attempt integer DEFAULT 0 NOT NULL,
+    lease_id uuid,
+    lease_until timestamp with time zone,
+    progress text DEFAULT 'Waiting for a worker'::text NOT NULL,
+    context jsonb DEFAULT '{}'::jsonb NOT NULL,
+    result jsonb,
+    usage jsonb,
+    error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone,
+    CONSTRAINT analysis_jobs_question_check CHECK (((length(question) >= 1) AND (length(question) <= 4000))),
+    CONSTRAINT analysis_jobs_status_check CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: analysis_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_members (
+    project_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text NOT NULL,
+    CONSTRAINT analysis_members_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text])))
+);
+
+
+--
+-- Name: analysis_projects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_projects (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    owner_id uuid NOT NULL,
+    creation_key uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    revision integer DEFAULT 0 NOT NULL,
+    state jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    cleanup_at timestamp with time zone,
+    CONSTRAINT analysis_projects_title_check CHECK (((length(title) >= 1) AND (length(title) <= 200)))
+);
+
+
+--
+-- Name: analysis_sources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_sources (
+    id uuid NOT NULL,
+    project_id uuid NOT NULL,
+    actor_id uuid NOT NULL,
+    kind text NOT NULL,
+    name text NOT NULL,
+    sha256 text NOT NULL,
+    bytes bigint NOT NULL,
+    url text,
+    provenance jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    content jsonb,
+    status text DEFAULT 'uploading'::text NOT NULL,
+    error text,
+    lease_id uuid,
+    lease_until timestamp with time zone,
+    attempt integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone,
+    cleanup_at timestamp with time zone,
+    CONSTRAINT analysis_sources_bytes_check CHECK ((bytes >= 0)),
+    CONSTRAINT analysis_sources_kind_check CHECK ((kind = ANY (ARRAY['file'::text, 'web'::text]))),
+    CONSTRAINT analysis_sources_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT analysis_sources_status_check CHECK ((status = ANY (ARRAY['uploading'::text, 'pending'::text, 'processing'::text, 'ready'::text, 'blocked'::text, 'failed'::text, 'deleted'::text])))
+);
+
+
+--
+-- Name: analysis_users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.analysis_users (
+    user_id uuid NOT NULL,
+    approved boolean DEFAULT false NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by uuid NOT NULL
+);
+
+
+--
+-- Name: TABLE analysis_users; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.analysis_users IS 'Dashboard analysis approval. Server authorization required; no automatic admin bypass.';
 
 
 --
@@ -3529,6 +4541,168 @@ ALTER TABLE public.doc_source ALTER COLUMN doc_id ADD GENERATED ALWAYS AS IDENTI
     NO MINVALUE
     NO MAXVALUE
     CACHE 1
+);
+
+
+--
+-- Name: document_audit_event; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_audit_event (
+    id bigint NOT NULL,
+    actor_id uuid NOT NULL,
+    document_id uuid,
+    version_id uuid,
+    event text NOT NULL,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: document_audit_event_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_audit_event ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.document_audit_event_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: document_catalog; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_catalog (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    issuer text,
+    document_type text,
+    issuance_number text,
+    tags text[] DEFAULT '{}'::text[] NOT NULL,
+    collection_key text,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: document_extraction; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_extraction (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    version_id uuid NOT NULL,
+    revision integer NOT NULL,
+    canonical_text text NOT NULL,
+    page_map jsonb NOT NULL,
+    page_count integer NOT NULL,
+    parser_version text NOT NULL,
+    ocr_version text,
+    languages text[] DEFAULT '{}'::text[] NOT NULL,
+    warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
+    source_id bigint,
+    activation_origin text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    job_id uuid,
+    CONSTRAINT document_extraction_activation_origin_check CHECK ((activation_origin = 'successful_upload'::text)),
+    CONSTRAINT document_extraction_check CHECK (((source_id IS NULL) OR ((length(canonical_text) > 0) AND (activation_origin IS NOT NULL)))),
+    CONSTRAINT document_extraction_page_count_check CHECK (((page_count >= 1) AND (page_count <= 300))),
+    CONSTRAINT document_extraction_page_map_check CHECK ((jsonb_typeof(page_map) = 'array'::text)),
+    CONSTRAINT document_extraction_revision_check CHECK ((revision > 0)),
+    CONSTRAINT document_extraction_warnings_check CHECK ((jsonb_typeof(warnings) = 'array'::text))
+);
+
+
+--
+-- Name: document_file; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_file (
+    sha256 text NOT NULL,
+    storage_key text NOT NULL,
+    byte_count bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT document_file_byte_count_check CHECK (((byte_count > 0) AND (byte_count <= 26214400))),
+    CONSTRAINT document_file_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT document_file_storage_key_check CHECK ((storage_key ~ '^[0-9a-f-]{36}\.pdf$'::text))
+);
+
+
+--
+-- Name: document_job; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_job (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    version_id uuid NOT NULL,
+    requested_by uuid NOT NULL,
+    stage text DEFAULT 'queued'::text NOT NULL,
+    progress integer DEFAULT 0 NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    lease_token uuid,
+    lease_until timestamp with time zone,
+    heartbeat_at timestamp with time zone,
+    retry_at timestamp with time zone,
+    safe_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text DEFAULT 'extract'::text NOT NULL,
+    extraction_id uuid,
+    CONSTRAINT document_job_attempts_check CHECK (((attempts >= 0) AND (attempts <= 3))),
+    CONSTRAINT document_job_kind_check CHECK ((kind = ANY (ARRAY['extract'::text, 'embed'::text]))),
+    CONSTRAINT document_job_progress_check CHECK (((progress >= 0) AND (progress <= 100))),
+    CONSTRAINT document_job_stage_check CHECK ((stage = ANY (ARRAY['queued'::text, 'extracting'::text, 'ocr'::text, 'indexing'::text, 'ready'::text, 'ready_with_warnings'::text, 'failed'::text]))),
+    CONSTRAINT embedding_job_has_extraction CHECK (((kind = 'extract'::text) OR (extraction_id IS NOT NULL)))
+);
+
+
+--
+-- Name: document_upload_attempt; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_upload_attempt (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    uploaded_by uuid NOT NULL,
+    original_filename text NOT NULL,
+    detected_type text,
+    byte_count bigint,
+    sha256 text,
+    outcome text NOT NULL,
+    duplicate_version_id uuid,
+    version_id uuid,
+    safe_reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT document_upload_attempt_byte_count_check CHECK ((byte_count >= 0)),
+    CONSTRAINT document_upload_attempt_outcome_check CHECK ((outcome = ANY (ARRAY['receiving'::text, 'rejected'::text, 'duplicate'::text, 'queued'::text, 'failed'::text]))),
+    CONSTRAINT document_upload_attempt_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+--
+-- Name: document_version; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_version (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    file_sha256 text NOT NULL,
+    publication_date date,
+    effective_date date,
+    supersedes_id uuid,
+    archived boolean DEFAULT false NOT NULL,
+    availability text DEFAULT 'unavailable'::text NOT NULL,
+    embedding_status text DEFAULT 'pending'::text NOT NULL,
+    uploaded_by uuid NOT NULL,
+    uploaded_at timestamp with time zone DEFAULT now() NOT NULL,
+    current_extraction_id uuid,
+    CONSTRAINT document_version_availability_check CHECK ((availability = ANY (ARRAY['unavailable'::text, 'available'::text, 'available_with_warnings'::text]))),
+    CONSTRAINT document_version_check CHECK ((supersedes_id IS DISTINCT FROM id)),
+    CONSTRAINT document_version_embedding_status_check CHECK ((embedding_status = ANY (ARRAY['pending'::text, 'running'::text, 'ready'::text, 'failed'::text, 'disabled'::text])))
 );
 
 
@@ -4204,6 +5378,107 @@ COMMENT ON COLUMN public.kb_node.evidence_quote IS 'The verbatim span of doc_chu
 
 ALTER TABLE public.kb_node ALTER COLUMN node_id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME public.kb_node_node_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: policy_research_evidence; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.policy_research_evidence (
+    id uuid NOT NULL,
+    actor_id uuid NOT NULL,
+    run_id uuid,
+    settings jsonb NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    snapshot jsonb,
+    lease uuid,
+    lease_until timestamp with time zone,
+    attempts integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT policy_research_evidence_snapshot_check CHECK (((snapshot IS NULL) OR (octet_length((snapshot)::text) <= 200000))),
+    CONSTRAINT policy_research_evidence_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'ready'::text])))
+);
+
+
+--
+-- Name: policy_review_document; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.policy_review_document (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    version_id uuid,
+    extraction_id uuid,
+    identity_key text NOT NULL,
+    metadata jsonb NOT NULL,
+    exclusion text,
+    warnings jsonb DEFAULT '[]'::jsonb NOT NULL
+);
+
+
+--
+-- Name: policy_review_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.policy_review_run (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    actor_id uuid NOT NULL,
+    request_key uuid NOT NULL,
+    question text NOT NULL,
+    settings jsonb NOT NULL,
+    dataset_snapshot jsonb NOT NULL,
+    status text DEFAULT 'queued'::text NOT NULL,
+    budget integer NOT NULL,
+    used integer DEFAULT 0 NOT NULL,
+    reason text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT policy_review_run_budget_check CHECK (((budget >= 1) AND (budget <= 10000))),
+    CONSTRAINT policy_review_run_question_check CHECK (((length(question) >= 1) AND (length(question) <= 4000))),
+    CONSTRAINT policy_review_run_status_check CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'partial'::text, 'completed'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: policy_review_section; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.policy_review_section (
+    id bigint NOT NULL,
+    run_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    page integer NOT NULL,
+    char_start integer NOT NULL,
+    char_end integer NOT NULL,
+    content_sha256 text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    cycle_attempts integer DEFAULT 0 NOT NULL,
+    lease uuid,
+    lease_until timestamp with time zone,
+    retry_at timestamp with time zone,
+    safe_error text,
+    result jsonb,
+    evidence jsonb,
+    attempts_log jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT policy_review_section_check CHECK (((char_start >= 0) AND (char_end >= char_start))),
+    CONSTRAINT policy_review_section_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'examined'::text, 'no_finding'::text, 'unreadable'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: policy_review_section_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.policy_review_section ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.policy_review_section_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -4939,6 +6214,22 @@ ALTER TABLE ONLY public.agg_poverty
 
 
 --
+-- Name: agg_poverty_official agg_poverty_official_dataset_id_geo_code_reference_year_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agg_poverty_official
+    ADD CONSTRAINT agg_poverty_official_dataset_id_geo_code_reference_year_key UNIQUE (dataset_id, geo_code, reference_year);
+
+
+--
+-- Name: agg_poverty_official agg_poverty_official_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agg_poverty_official
+    ADD CONSTRAINT agg_poverty_official_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: agg_poverty agg_poverty_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5080,6 +6371,78 @@ ALTER TABLE ONLY public.ai_regression_case
 
 ALTER TABLE ONLY public.ai_regression_run
     ADD CONSTRAINT ai_regression_run_pkey PRIMARY KEY (run_id);
+
+
+--
+-- Name: analysis_job_usage analysis_job_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_job_usage
+    ADD CONSTRAINT analysis_job_usage_pkey PRIMARY KEY (lease_id);
+
+
+--
+-- Name: analysis_jobs analysis_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_jobs
+    ADD CONSTRAINT analysis_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: analysis_jobs analysis_jobs_project_id_actor_id_request_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_jobs
+    ADD CONSTRAINT analysis_jobs_project_id_actor_id_request_id_key UNIQUE (project_id, actor_id, request_id);
+
+
+--
+-- Name: analysis_members analysis_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_members
+    ADD CONSTRAINT analysis_members_pkey PRIMARY KEY (project_id, user_id);
+
+
+--
+-- Name: analysis_projects analysis_projects_owner_id_creation_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_projects
+    ADD CONSTRAINT analysis_projects_owner_id_creation_key_key UNIQUE (owner_id, creation_key);
+
+
+--
+-- Name: analysis_projects analysis_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_projects
+    ADD CONSTRAINT analysis_projects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: analysis_sources analysis_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_sources
+    ADD CONSTRAINT analysis_sources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: analysis_sources analysis_sources_project_id_sha256_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_sources
+    ADD CONSTRAINT analysis_sources_project_id_sha256_kind_key UNIQUE (project_id, sha256, kind);
+
+
+--
+-- Name: analysis_users analysis_users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_users
+    ADD CONSTRAINT analysis_users_pkey PRIMARY KEY (user_id);
 
 
 --
@@ -5267,6 +6630,102 @@ ALTER TABLE ONLY public.doc_source
 
 
 --
+-- Name: document_audit_event document_audit_event_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_audit_event
+    ADD CONSTRAINT document_audit_event_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_catalog document_catalog_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_catalog
+    ADD CONSTRAINT document_catalog_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_extraction document_extraction_job_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_job_id_key UNIQUE (job_id);
+
+
+--
+-- Name: document_extraction document_extraction_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_extraction document_extraction_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_source_id_key UNIQUE (source_id);
+
+
+--
+-- Name: document_extraction document_extraction_version_id_revision_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_version_id_revision_key UNIQUE (version_id, revision);
+
+
+--
+-- Name: document_file document_file_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_file
+    ADD CONSTRAINT document_file_pkey PRIMARY KEY (sha256);
+
+
+--
+-- Name: document_file document_file_storage_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_file
+    ADD CONSTRAINT document_file_storage_key_key UNIQUE (storage_key);
+
+
+--
+-- Name: document_job document_job_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_job
+    ADD CONSTRAINT document_job_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_upload_attempt document_upload_attempt_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_upload_attempt
+    ADD CONSTRAINT document_upload_attempt_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: document_version document_version_document_id_file_sha256_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_document_id_file_sha256_key UNIQUE (document_id, file_sha256);
+
+
+--
+-- Name: document_version document_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: fact_bhw_raw fact_bhw_raw_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5432,6 +6891,70 @@ ALTER TABLE ONLY public.kb_node
 
 ALTER TABLE ONLY public.kb_node
     ADD CONSTRAINT kb_node_pkey PRIMARY KEY (node_id);
+
+
+--
+-- Name: policy_research_evidence policy_research_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_research_evidence
+    ADD CONSTRAINT policy_research_evidence_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: policy_research_evidence policy_research_evidence_run_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_research_evidence
+    ADD CONSTRAINT policy_research_evidence_run_id_key UNIQUE (run_id);
+
+
+--
+-- Name: policy_review_document policy_review_document_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_document
+    ADD CONSTRAINT policy_review_document_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: policy_review_document policy_review_document_run_id_identity_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_document
+    ADD CONSTRAINT policy_review_document_run_id_identity_key_key UNIQUE (run_id, identity_key);
+
+
+--
+-- Name: policy_review_run policy_review_run_actor_id_request_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_run
+    ADD CONSTRAINT policy_review_run_actor_id_request_key_key UNIQUE (actor_id, request_key);
+
+
+--
+-- Name: policy_review_run policy_review_run_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_run
+    ADD CONSTRAINT policy_review_run_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: policy_review_section policy_review_section_document_id_page_char_start_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_section
+    ADD CONSTRAINT policy_review_section_document_id_page_char_start_key UNIQUE (document_id, page, char_start);
+
+
+--
+-- Name: policy_review_section policy_review_section_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_section
+    ADD CONSTRAINT policy_review_section_pkey PRIMARY KEY (id);
 
 
 --
@@ -5635,6 +7158,27 @@ CREATE INDEX ai_regression_run_started_idx ON public.ai_regression_run USING btr
 
 
 --
+-- Name: analysis_jobs_project; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX analysis_jobs_project ON public.analysis_jobs USING btree (project_id, created_at);
+
+
+--
+-- Name: analysis_jobs_queue; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX analysis_jobs_queue ON public.analysis_jobs USING btree (status, created_at);
+
+
+--
+-- Name: analysis_sources_queue; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX analysis_sources_queue ON public.analysis_sources USING btree (status, created_at);
+
+
+--
 -- Name: dataset_column_join_key_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5765,6 +7309,41 @@ CREATE INDEX doc_chunk_embedding_model_idx ON public.doc_chunk_embedding USING b
 --
 
 CREATE INDEX doc_chunk_page_idx ON public.doc_chunk USING btree (doc_id, page_from);
+
+
+--
+-- Name: document_extraction_version_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX document_extraction_version_idx ON public.document_extraction USING btree (version_id);
+
+
+--
+-- Name: document_job_claim_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX document_job_claim_idx ON public.document_job USING btree (stage, retry_at, lease_until);
+
+
+--
+-- Name: document_job_one_active_embedding; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX document_job_one_active_embedding ON public.document_job USING btree (extraction_id) WHERE ((kind = 'embed'::text) AND (stage = ANY (ARRAY['queued'::text, 'extracting'::text, 'ocr'::text, 'indexing'::text])));
+
+
+--
+-- Name: document_job_one_active_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX document_job_one_active_version ON public.document_job USING btree (version_id) WHERE ((kind = 'extract'::text) AND (stage = ANY (ARRAY['queued'::text, 'extracting'::text, 'ocr'::text, 'indexing'::text])));
+
+
+--
+-- Name: document_version_catalog_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX document_version_catalog_idx ON public.document_version USING btree (document_id);
 
 
 --
@@ -5950,10 +7529,38 @@ CREATE INDEX kb_node_review_idx ON public.kb_node USING btree (status, origin) W
 
 
 --
+-- Name: policy_research_evidence_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX policy_research_evidence_owner ON public.policy_research_evidence USING btree (actor_id, created_at DESC);
+
+
+--
+-- Name: policy_review_runs_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX policy_review_runs_owner ON public.policy_review_run USING btree (actor_id, created_at DESC);
+
+
+--
+-- Name: policy_review_section_claim; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX policy_review_section_claim ON public.policy_review_section USING btree (status, retry_at, lease_until, run_id, id);
+
+
+--
 -- Name: usage_events_created_at_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX usage_events_created_at_idx ON public.usage_events USING btree (created_at);
+
+
+--
+-- Name: analysis_projects analysis_sources_project_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER analysis_sources_project_delete AFTER UPDATE OF deleted_at ON public.analysis_projects FOR EACH ROW EXECUTE FUNCTION public.analysis_sources_on_project_delete();
 
 
 --
@@ -6281,6 +7888,22 @@ ALTER TABLE ONLY public.agg_poverty
 
 
 --
+-- Name: agg_poverty_official agg_poverty_official_dataset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agg_poverty_official
+    ADD CONSTRAINT agg_poverty_official_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES public.dim_dataset(dataset_id);
+
+
+--
+-- Name: agg_poverty_official agg_poverty_official_geo_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agg_poverty_official
+    ADD CONSTRAINT agg_poverty_official_geo_code_fkey FOREIGN KEY (geo_code) REFERENCES public.dim_geo(geo_code);
+
+
+--
 -- Name: agg_training agg_training_dataset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6358,6 +7981,38 @@ ALTER TABLE ONLY public.agg_workload
 
 ALTER TABLE ONLY public.agg_workload
     ADD CONSTRAINT agg_workload_geo_code_fkey FOREIGN KEY (geo_code) REFERENCES public.dim_geo(geo_code);
+
+
+--
+-- Name: analysis_job_usage analysis_job_usage_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_job_usage
+    ADD CONSTRAINT analysis_job_usage_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.analysis_jobs(id);
+
+
+--
+-- Name: analysis_jobs analysis_jobs_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_jobs
+    ADD CONSTRAINT analysis_jobs_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.analysis_projects(id);
+
+
+--
+-- Name: analysis_members analysis_members_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_members
+    ADD CONSTRAINT analysis_members_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.analysis_projects(id) ON DELETE CASCADE;
+
+
+--
+-- Name: analysis_sources analysis_sources_project_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.analysis_sources
+    ADD CONSTRAINT analysis_sources_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.analysis_projects(id);
 
 
 --
@@ -6470,6 +8125,110 @@ ALTER TABLE ONLY public.doc_chunk_embedding
 
 ALTER TABLE ONLY public.doc_chunk_embedding
     ADD CONSTRAINT doc_chunk_embedding_model_dim_fkey FOREIGN KEY (model, dim) REFERENCES public.doc_embedding_model(model, dim) ON UPDATE CASCADE;
+
+
+--
+-- Name: document_audit_event document_audit_event_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_audit_event
+    ADD CONSTRAINT document_audit_event_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.document_catalog(id);
+
+
+--
+-- Name: document_audit_event document_audit_event_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_audit_event
+    ADD CONSTRAINT document_audit_event_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: document_extraction document_extraction_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.document_job(id);
+
+
+--
+-- Name: document_extraction document_extraction_source_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.doc_source(doc_id);
+
+
+--
+-- Name: document_extraction document_extraction_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_extraction
+    ADD CONSTRAINT document_extraction_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: document_job document_job_extraction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_job
+    ADD CONSTRAINT document_job_extraction_id_fkey FOREIGN KEY (extraction_id) REFERENCES public.document_extraction(id);
+
+
+--
+-- Name: document_job document_job_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_job
+    ADD CONSTRAINT document_job_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: document_upload_attempt document_upload_attempt_duplicate_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_upload_attempt
+    ADD CONSTRAINT document_upload_attempt_duplicate_version_id_fkey FOREIGN KEY (duplicate_version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: document_upload_attempt document_upload_attempt_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_upload_attempt
+    ADD CONSTRAINT document_upload_attempt_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: document_version document_version_current_extraction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_current_extraction_id_fkey FOREIGN KEY (current_extraction_id) REFERENCES public.document_extraction(id);
+
+
+--
+-- Name: document_version document_version_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.document_catalog(id);
+
+
+--
+-- Name: document_version document_version_file_sha256_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_file_sha256_fkey FOREIGN KEY (file_sha256) REFERENCES public.document_file(sha256);
+
+
+--
+-- Name: document_version document_version_supersedes_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_version
+    ADD CONSTRAINT document_version_supersedes_id_fkey FOREIGN KEY (supersedes_id) REFERENCES public.document_version(id);
 
 
 --
@@ -6662,6 +8421,54 @@ ALTER TABLE ONLY public.kb_edge
 
 ALTER TABLE ONLY public.kb_node
     ADD CONSTRAINT kb_node_source_chunk_fk FOREIGN KEY (source_chunk_id) REFERENCES public.doc_chunk(chunk_id) ON DELETE RESTRICT;
+
+
+--
+-- Name: policy_research_evidence policy_research_evidence_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_research_evidence
+    ADD CONSTRAINT policy_research_evidence_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.policy_review_run(id);
+
+
+--
+-- Name: policy_review_document policy_review_document_extraction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_document
+    ADD CONSTRAINT policy_review_document_extraction_id_fkey FOREIGN KEY (extraction_id) REFERENCES public.document_extraction(id);
+
+
+--
+-- Name: policy_review_document policy_review_document_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_document
+    ADD CONSTRAINT policy_review_document_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.policy_review_run(id);
+
+
+--
+-- Name: policy_review_document policy_review_document_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_document
+    ADD CONSTRAINT policy_review_document_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.document_version(id);
+
+
+--
+-- Name: policy_review_section policy_review_section_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_section
+    ADD CONSTRAINT policy_review_section_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.policy_review_document(id);
+
+
+--
+-- Name: policy_review_section policy_review_section_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.policy_review_section
+    ADD CONSTRAINT policy_review_section_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.policy_review_run(id);
 
 
 --
@@ -6942,6 +8749,12 @@ CREATE POLICY "agg_poverty public read" ON public.agg_poverty FOR SELECT TO anon
 
 
 --
+-- Name: agg_poverty_official; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.agg_poverty_official ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: agg_training; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -7041,6 +8854,42 @@ ALTER TABLE public.ai_regression_case ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.ai_regression_run ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_job_usage; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_job_usage ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_jobs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_jobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_members; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_projects; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_projects ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_sources; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_sources ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: analysis_users; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.analysis_users ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: changelog_entries; Type: ROW SECURITY; Schema: public; Owner: -
@@ -7183,6 +9032,48 @@ ALTER TABLE public.doc_embedding_model ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.doc_source ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: document_audit_event; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_audit_event ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_catalog; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_catalog ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_extraction; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_extraction ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_file; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_file ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_job; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_job ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_upload_attempt; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_upload_attempt ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_version; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_version ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: fact_bhw_raw; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -7310,6 +9201,37 @@ ALTER TABLE public.kb_edge ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.kb_node ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: agg_poverty_official official_poverty_public_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY official_poverty_public_read ON public.agg_poverty_official FOR SELECT TO anon, authenticated USING (true);
+
+
+--
+-- Name: policy_research_evidence; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.policy_research_evidence ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: policy_review_document; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.policy_review_document ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: policy_review_run; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.policy_review_run ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: policy_review_section; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.policy_review_section ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: ref_fhsis_indicator; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -7367,6 +9289,46 @@ GRANT ALL ON FUNCTION public.ai_regression_expectation_well_formed(p jsonb) TO s
 
 
 --
+-- Name: FUNCTION analysis_project_api(p_actor uuid, p_operation text, p_project uuid, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.analysis_project_api(p_actor uuid, p_operation text, p_project uuid, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.analysis_project_api(p_actor uuid, p_operation text, p_project uuid, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION analysis_source_api(p_actor uuid, p_project uuid, p_operation text, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.analysis_source_api(p_actor uuid, p_project uuid, p_operation text, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.analysis_source_api(p_actor uuid, p_project uuid, p_operation text, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION analysis_source_worker_api(p_operation text, p_source uuid, p_lease uuid, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.analysis_source_worker_api(p_operation text, p_source uuid, p_lease uuid, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.analysis_source_worker_api(p_operation text, p_source uuid, p_lease uuid, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION analysis_sources_on_project_delete(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.analysis_sources_on_project_delete() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.analysis_sources_on_project_delete() TO service_role;
+
+
+--
+-- Name: FUNCTION analysis_worker_api(p_operation text, p_job uuid, p_lease uuid, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.analysis_worker_api(p_operation text, p_job uuid, p_lease uuid, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.analysis_worker_api(p_operation text, p_job uuid, p_lease uuid, p_payload jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION district_dataset_gaps(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7391,6 +9353,22 @@ GRANT ALL ON FUNCTION public.district_gap_members(p_district_code text) TO servi
 GRANT ALL ON FUNCTION public.district_index(p_dataset_id bigint) TO anon;
 GRANT ALL ON FUNCTION public.district_index(p_dataset_id bigint) TO authenticated;
 GRANT ALL ON FUNCTION public.district_index(p_dataset_id bigint) TO service_role;
+
+
+--
+-- Name: FUNCTION document_library_api(p_actor uuid, p_operation text, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.document_library_api(p_actor uuid, p_operation text, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.document_library_api(p_actor uuid, p_operation text, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION enqueue_document_job(p_version uuid, p_actor uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.enqueue_document_job(p_version uuid, p_actor uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.enqueue_document_job(p_version uuid, p_actor uuid) TO service_role;
 
 
 --
@@ -7466,6 +9444,38 @@ GRANT ALL ON FUNCTION public.match_ask_answer(q text, scope text, version text, 
 
 
 --
+-- Name: FUNCTION policy_evidence_api(p_actor uuid, p_operation text, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.policy_evidence_api(p_actor uuid, p_operation text, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.policy_evidence_api(p_actor uuid, p_operation text, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION policy_research_api(p_actor uuid, p_operation text, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.policy_research_api(p_actor uuid, p_operation text, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.policy_research_api(p_actor uuid, p_operation text, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION policy_review_api(p_actor uuid, p_operation text, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.policy_review_api(p_actor uuid, p_operation text, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.policy_review_api(p_actor uuid, p_operation text, p_payload jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION policy_review_worker(p_operation text, p_section bigint, p_lease uuid, p_run uuid, p_payload jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.policy_review_worker(p_operation text, p_section bigint, p_lease uuid, p_run uuid, p_payload jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.policy_review_worker(p_operation text, p_section bigint, p_lease uuid, p_run uuid, p_payload jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION profile_dataset(p_table text, p_title text, p_summary text, p_grain text, p_dataset_slug text, p_force boolean); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7517,6 +9527,14 @@ GRANT ALL ON FUNCTION public.search_documents(p_query text, p_limit integer, p_e
 GRANT ALL ON FUNCTION public.search_geo(search_query text, result_limit integer) TO anon;
 GRANT ALL ON FUNCTION public.search_geo(search_query text, result_limit integer) TO authenticated;
 GRANT ALL ON FUNCTION public.search_geo(search_query text, result_limit integer) TO service_role;
+
+
+--
+-- Name: FUNCTION search_library_documents(p_actor uuid, p_keys text[], p_query text, p_limit integer); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.search_library_documents(p_actor uuid, p_keys text[], p_query text, p_limit integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.search_library_documents(p_actor uuid, p_keys text[], p_query text, p_limit integer) TO service_role;
 
 
 --
@@ -7907,6 +9925,22 @@ GRANT ALL ON SEQUENCE public.agg_poverty_id_seq TO service_role;
 
 
 --
+-- Name: TABLE agg_poverty_official; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.agg_poverty_official TO service_role;
+GRANT SELECT ON TABLE public.agg_poverty_official TO anon;
+GRANT SELECT ON TABLE public.agg_poverty_official TO authenticated;
+
+
+--
+-- Name: SEQUENCE agg_poverty_official_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.agg_poverty_official_id_seq TO service_role;
+
+
+--
 -- Name: TABLE agg_training; Type: ACL; Schema: public; Owner: -
 --
 
@@ -8084,6 +10118,48 @@ GRANT ALL ON TABLE public.ai_regression_run TO service_role;
 GRANT ALL ON SEQUENCE public.ai_regression_run_run_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.ai_regression_run_run_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.ai_regression_run_run_id_seq TO service_role;
+
+
+--
+-- Name: TABLE analysis_job_usage; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_job_usage TO service_role;
+
+
+--
+-- Name: TABLE analysis_jobs; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_jobs TO service_role;
+
+
+--
+-- Name: TABLE analysis_members; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_members TO service_role;
+
+
+--
+-- Name: TABLE analysis_projects; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_projects TO service_role;
+
+
+--
+-- Name: TABLE analysis_sources; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_sources TO service_role;
+
+
+--
+-- Name: TABLE analysis_users; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.analysis_users TO service_role;
 
 
 --
@@ -8300,6 +10376,64 @@ GRANT ALL ON TABLE public.doc_source TO service_role;
 GRANT ALL ON SEQUENCE public.doc_source_doc_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.doc_source_doc_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.doc_source_doc_id_seq TO service_role;
+
+
+--
+-- Name: TABLE document_audit_event; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_audit_event TO service_role;
+
+
+--
+-- Name: SEQUENCE document_audit_event_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.document_audit_event_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.document_audit_event_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.document_audit_event_id_seq TO service_role;
+
+
+--
+-- Name: TABLE document_catalog; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_catalog TO service_role;
+
+
+--
+-- Name: TABLE document_extraction; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_extraction TO service_role;
+
+
+--
+-- Name: TABLE document_file; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_file TO service_role;
+
+
+--
+-- Name: TABLE document_job; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_job TO service_role;
+
+
+--
+-- Name: TABLE document_upload_attempt; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_upload_attempt TO service_role;
+
+
+--
+-- Name: TABLE document_version; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.document_version TO service_role;
 
 
 --
@@ -8552,6 +10686,43 @@ GRANT ALL ON TABLE public.kb_node TO service_role;
 GRANT ALL ON SEQUENCE public.kb_node_node_id_seq TO anon;
 GRANT ALL ON SEQUENCE public.kb_node_node_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.kb_node_node_id_seq TO service_role;
+
+
+--
+-- Name: TABLE policy_research_evidence; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.policy_research_evidence TO service_role;
+
+
+--
+-- Name: TABLE policy_review_document; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.policy_review_document TO service_role;
+
+
+--
+-- Name: TABLE policy_review_run; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.policy_review_run TO service_role;
+
+
+--
+-- Name: TABLE policy_review_section; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.policy_review_section TO service_role;
+
+
+--
+-- Name: SEQUENCE policy_review_section_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.policy_review_section_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.policy_review_section_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.policy_review_section_id_seq TO service_role;
 
 
 --

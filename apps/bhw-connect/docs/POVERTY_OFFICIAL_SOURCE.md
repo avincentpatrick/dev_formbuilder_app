@@ -71,6 +71,7 @@ and prepare directly from the primary source; no private transfer is required if
 From the deployed app source with Node dependencies installed, save the workbook outside git, then:
 
 ```powershell
+New-Item -ItemType Directory -Force C:\private | Out-Null
 Invoke-WebRequest 'https://psa.gov.ph/system/files/phdsd/2023%20Full%20Year%20Official%20Poverty%20Statistics_r2.xlsx' -OutFile C:\private\poverty-2023-r2.xlsx
 node ingestion/prepare-poverty-official.mjs C:\private\poverty-2023-r2.xlsx C:\private\poverty-official-2023.json
 # Set BHW_LOAD_DATABASE_URL privately using the operator's normal PostgreSQL credentials.
@@ -108,3 +109,35 @@ Local validation: 2,154 tests passed / 55 skipped (database services unavailable
 additive migration lint and prefixed production build passed. Lint has only the existing intentional
 base-path fixture warning. The real source was prepared and bundle-validated privately: 103 accepted
 rows / 5 exclusions; this is preparation evidence, not a server load or live acceptance.
+
+
+## Release and bounded live evidence
+
+- Feature delivery: [PR #613](https://github.com/avincentpatrick/dev_formbuilder_app/pull/613),
+  merged 2026-11-20 11:06 UTC as `b285231d78f2e446196f44d177f1d3620dde2d48`.
+- [PR CI](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/44723459203):
+  2,197 tests passed / 13 skipped; 192 browser checks passed / 1 skipped. This includes the real
+  migration plus synthetic import/rollback and public read-only permission test.
+- [Main CI](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/44724807588):
+  every required job passed.
+- [Deployment](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/44729446025):
+  migration `20261120120000_official_poverty.sql` applied; explicit
+  `BHW Connect b285231d78f2e446196f44d177f1d3620dde2d48 is live` at **11:42:23 UTC**.
+- Live at `https://iconnect.com.de/bhw-connect`, Chromium viewports **390×844 and 1440×844**:
+  all-datasets BARMM omission link opens Poverty; provincial coverage settles and keeps SGA's
+  missing municipal estimates visible; keyboard navigation opens Lanao del Sur; the direct jump
+  reaches the municipal list; searching Bacolod opens its local SAE90% estimate; browser Back
+  retains the search. National view shows the explicit pending-import state and original workbook
+  link. Both tested views fit their viewport without horizontal page overflow. Screenshots were
+  inspected privately, not committed with live data.
+- [Development-copy refresh](https://github.com/avincentpatrick/dev_formbuilder_app/actions/runs/44729899023)
+  completed successfully after the migration became live. Its reviewed schema/version/synthetic seed
+  advance the development baseline from `20261107090000` to `20261120120000`, including already-live
+  intervening migrations. There are no official poverty observations or source metadata in the seed.
+  Existing FHSIS definitions/metadata and generated fixtures refresh with the export; no real facts
+  are copied. Whitespace was normalized on the version marker and one generated INSERT header.
+
+**Official observations are not yet loaded.** Live verification confirms the pending-import state,
+not populated official rates. avincentpatrick must run the private load above and then the listed
+source-row checkpoints. This does not sign off representative-reader comprehension or physical
+phones, nor close the previously deferred BHW work.

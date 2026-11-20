@@ -1,3 +1,4 @@
+import { PovertyOfficialOverview } from "./poverty-official-overview";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import {
   povertyReading,
@@ -12,10 +13,12 @@ export function PovertyOverview({
   dataset,
   selection,
   locationName,
+  mapState,
 }: {
   dataset: CatalogDataset;
   selection: CatalogSelection;
   locationName: string;
+  mapState?: string;
 }) {
   const indicator = dataset.indicators.find((item) => item.id === "poverty.incidence");
   const local = selection.mode === "psgc" && selection.level === "citymun";
@@ -29,10 +32,11 @@ export function PovertyOverview({
         : selection.mode === "all"
           ? "Choose a region, then a province and a city or municipality using the location controls above. No national estimate is shown."
           : !local
-            ? "There is no poverty estimate for this geographic level in this release. Choose a supported city or municipality; no local value is replaced with a higher-area figure."
+            ? "There is no municipal SAE estimate for this geographic level. Choose a supported city or municipality; no local value is replaced with a higher-area figure."
             : "No usable accepted poverty estimate is available for this place. Missing estimates are not zero.";
   return (
     <div className="space-y-4" data-testid="poverty-overview">
+      <PovertyOfficialOverview dataset={dataset} selection={selection} mapState={mapState} />
       <FigureCard
         title="What does the poverty estimate tell us?"
         caption={`${locationName} · PSA Small Area Estimates · 2023 · people`}

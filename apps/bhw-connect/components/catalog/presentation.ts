@@ -13,7 +13,7 @@ export const HEADLINES: Record<CatalogDataset["id"], readonly string[]> = {
   "uuc-phc": ["uuc.listed", "uuc.route.health"],
   fhsis: ["fhsis.fic", "fhsis.anc4", "fhsis.water_basic"],
   population: ["population.residents"],
-  poverty: ["poverty.incidence"],
+  poverty: ["poverty.official-incidence", "poverty.incidence"],
 };
 export function previewIndicators(dataset: CatalogDataset): CatalogIndicator[] {
   return HEADLINES[dataset.id].flatMap((id) => {

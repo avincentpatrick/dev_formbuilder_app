@@ -1,0 +1,968 @@
+{
+  "source_url": "https://psa.gov.ph/system/files/phdsd/2023%20Full%20Year%20Official%20Poverty%20Statistics_r2.xlsx",
+  "workbook_sha256": "fd374441fa8746f816758089010a00d9179970cea96348d68de021958345f44a",
+  "dataset_slug": "psa-official-poverty-2023-r2",
+  "reference_year": 2023,
+  "confidence_level": 95,
+  "mapping": [
+    {
+      "source_table": "tab2",
+      "source_row": 8,
+      "source_label": "PHILIPPINES",
+      "geo_code": "PH",
+      "geo_level": "national",
+      "geo_name": "Philippines",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 10,
+      "source_label": "National Capital Region (NCR)",
+      "geo_code": "13",
+      "geo_level": "region",
+      "geo_name": "NATIONAL CAPITAL REGION (NCR)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 16,
+      "source_label": "Cordillera Administrative Region (CAR)",
+      "geo_code": "14",
+      "geo_level": "region",
+      "geo_name": "CORDILLERA ADMINISTRATIVE REGION (CAR)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 17,
+      "source_label": "Abra",
+      "geo_code": "14001",
+      "geo_level": "province",
+      "geo_name": "ABRA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 18,
+      "source_label": "Apayao",
+      "geo_code": "14081",
+      "geo_level": "province",
+      "geo_name": "APAYAO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 19,
+      "source_label": "Benguet",
+      "geo_code": "14011",
+      "geo_level": "province",
+      "geo_name": "BENGUET",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 20,
+      "source_label": "Ifugao",
+      "geo_code": "14027",
+      "geo_level": "province",
+      "geo_name": "IFUGAO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 21,
+      "source_label": "Kalinga",
+      "geo_code": "14032",
+      "geo_level": "province",
+      "geo_name": "KALINGA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 22,
+      "source_label": "Mt. Province",
+      "geo_code": "14044",
+      "geo_level": "province",
+      "geo_name": "MOUNTAIN PROVINCE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 24,
+      "source_label": "Region I (Ilocos Region)",
+      "geo_code": "01",
+      "geo_level": "region",
+      "geo_name": "REGION I (ILOCOS REGION)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 25,
+      "source_label": "Ilocos Norte",
+      "geo_code": "01028",
+      "geo_level": "province",
+      "geo_name": "ILOCOS NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 26,
+      "source_label": "Ilocos Sur",
+      "geo_code": "01029",
+      "geo_level": "province",
+      "geo_name": "ILOCOS SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 27,
+      "source_label": "La Union",
+      "geo_code": "01033",
+      "geo_level": "province",
+      "geo_name": "LA UNION",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 28,
+      "source_label": "Pangasinan",
+      "geo_code": "01055",
+      "geo_level": "province",
+      "geo_name": "PANGASINAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 30,
+      "source_label": "Region II (Cagayan Valley)",
+      "geo_code": "02",
+      "geo_level": "region",
+      "geo_name": "REGION II (CAGAYAN VALLEY)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 31,
+      "source_label": "Batanes",
+      "geo_code": "02009",
+      "geo_level": "province",
+      "geo_name": "BATANES",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 32,
+      "source_label": "Cagayan",
+      "geo_code": "02015",
+      "geo_level": "province",
+      "geo_name": "CAGAYAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 33,
+      "source_label": "Isabela",
+      "geo_code": "02031",
+      "geo_level": "province",
+      "geo_name": "ISABELA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 34,
+      "source_label": "Nueva Vizcaya",
+      "geo_code": "02050",
+      "geo_level": "province",
+      "geo_name": "NUEVA VIZCAYA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 35,
+      "source_label": "Quirino",
+      "geo_code": "02057",
+      "geo_level": "province",
+      "geo_name": "QUIRINO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 37,
+      "source_label": "Region III (Central Luzon)",
+      "geo_code": "03",
+      "geo_level": "region",
+      "geo_name": "REGION III (CENTRAL LUZON)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 38,
+      "source_label": "Aurora",
+      "geo_code": "03077",
+      "geo_level": "province",
+      "geo_name": "AURORA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 39,
+      "source_label": "Bataan",
+      "geo_code": "03008",
+      "geo_level": "province",
+      "geo_name": "BATAAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 40,
+      "source_label": "Bulacan",
+      "geo_code": "03014",
+      "geo_level": "province",
+      "geo_name": "BULACAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 41,
+      "source_label": "Nueva Ecija",
+      "geo_code": "03049",
+      "geo_level": "province",
+      "geo_name": "NUEVA ECIJA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 42,
+      "source_label": "Pampanga",
+      "geo_code": "03054",
+      "geo_level": "province",
+      "geo_name": "PAMPANGA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 43,
+      "source_label": "Tarlac",
+      "geo_code": "03069",
+      "geo_level": "province",
+      "geo_name": "TARLAC",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 44,
+      "source_label": "Zambales",
+      "geo_code": "03071",
+      "geo_level": "province",
+      "geo_name": "ZAMBALES",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 46,
+      "source_label": "Region IV-A (CALABARZON)",
+      "geo_code": "04",
+      "geo_level": "region",
+      "geo_name": "REGION IV-A (CALABARZON)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 47,
+      "source_label": "Batangas",
+      "geo_code": "04010",
+      "geo_level": "province",
+      "geo_name": "BATANGAS",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 48,
+      "source_label": "Cavite",
+      "geo_code": "04021",
+      "geo_level": "province",
+      "geo_name": "CAVITE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 49,
+      "source_label": "Laguna",
+      "geo_code": "04034",
+      "geo_level": "province",
+      "geo_name": "LAGUNA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 50,
+      "source_label": "Quezon",
+      "geo_code": "04056",
+      "geo_level": "province",
+      "geo_name": "QUEZON",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 51,
+      "source_label": "Rizal",
+      "geo_code": "04058",
+      "geo_level": "province",
+      "geo_name": "RIZAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 53,
+      "source_label": "MIMAROPA Region",
+      "geo_code": "17",
+      "geo_level": "region",
+      "geo_name": "MIMAROPA REGION",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 54,
+      "source_label": "Marinduque",
+      "geo_code": "17040",
+      "geo_level": "province",
+      "geo_name": "MARINDUQUE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 55,
+      "source_label": "Occidental Mindoro",
+      "geo_code": "17051",
+      "geo_level": "province",
+      "geo_name": "OCCIDENTAL MINDORO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 56,
+      "source_label": "Oriental Mindoro",
+      "geo_code": "17052",
+      "geo_level": "province",
+      "geo_name": "ORIENTAL MINDORO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 57,
+      "source_label": "Palawan",
+      "geo_code": "17053",
+      "geo_level": "province",
+      "geo_name": "PALAWAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 58,
+      "source_label": "Romblon",
+      "geo_code": "17059",
+      "geo_level": "province",
+      "geo_name": "ROMBLON",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 60,
+      "source_label": "Region V (Bicol Region)",
+      "geo_code": "05",
+      "geo_level": "region",
+      "geo_name": "REGION V (BICOL REGION)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 61,
+      "source_label": "Albay",
+      "geo_code": "05005",
+      "geo_level": "province",
+      "geo_name": "ALBAY",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 62,
+      "source_label": "Camarines Norte",
+      "geo_code": "05016",
+      "geo_level": "province",
+      "geo_name": "CAMARINES NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 63,
+      "source_label": "Camarines Sur",
+      "geo_code": "05017",
+      "geo_level": "province",
+      "geo_name": "CAMARINES SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 64,
+      "source_label": "Catanduanes",
+      "geo_code": "05020",
+      "geo_level": "province",
+      "geo_name": "CATANDUANES",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 65,
+      "source_label": "Masbate",
+      "geo_code": "05041",
+      "geo_level": "province",
+      "geo_name": "MASBATE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 66,
+      "source_label": "Sorsogon",
+      "geo_code": "05062",
+      "geo_level": "province",
+      "geo_name": "SORSOGON",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 68,
+      "source_label": "Region VI (Western Visayas)",
+      "geo_code": "06",
+      "geo_level": "region",
+      "geo_name": "REGION VI (WESTERN VISAYAS)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. The workbook separates Negros Island Region from Regions VI and VII."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 69,
+      "source_label": "Aklan",
+      "geo_code": "06004",
+      "geo_level": "province",
+      "geo_name": "AKLAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 70,
+      "source_label": "Antique",
+      "geo_code": "06006",
+      "geo_level": "province",
+      "geo_name": "ANTIQUE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 71,
+      "source_label": "Capiz",
+      "geo_code": "06019",
+      "geo_level": "province",
+      "geo_name": "CAPIZ",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 72,
+      "source_label": "Guimaras",
+      "geo_code": "06079",
+      "geo_level": "province",
+      "geo_name": "GUIMARAS",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 73,
+      "source_label": "Iloilo",
+      "geo_code": "06030",
+      "geo_level": "province",
+      "geo_name": "ILOILO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 75,
+      "source_label": "Negros Island Region (NIR)",
+      "geo_code": "18",
+      "geo_level": "region",
+      "geo_name": "NEGROS ISLAND REGION (NIR)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. The workbook separates Negros Island Region from Regions VI and VII."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 76,
+      "source_label": "Negros Occidental",
+      "geo_code": "18045",
+      "geo_level": "province",
+      "geo_name": "NEGROS OCCIDENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 77,
+      "source_label": "Negros Oriental",
+      "geo_code": "18046",
+      "geo_level": "province",
+      "geo_name": "NEGROS ORIENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 78,
+      "source_label": "Siquijor",
+      "geo_code": "18061",
+      "geo_level": "province",
+      "geo_name": "SIQUIJOR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 80,
+      "source_label": "Region VII (Central Visayas)",
+      "geo_code": "07",
+      "geo_level": "region",
+      "geo_name": "REGION VII (CENTRAL VISAYAS)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. The workbook separates Negros Island Region from Regions VI and VII."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 81,
+      "source_label": "Bohol",
+      "geo_code": "07012",
+      "geo_level": "province",
+      "geo_name": "BOHOL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 82,
+      "source_label": "Cebu",
+      "geo_code": "07022",
+      "geo_level": "province",
+      "geo_name": "CEBU",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 84,
+      "source_label": "Region VIII (Eastern Visayas)",
+      "geo_code": "08",
+      "geo_level": "region",
+      "geo_name": "REGION VIII (EASTERN VISAYAS)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 85,
+      "source_label": "Biliran",
+      "geo_code": "08078",
+      "geo_level": "province",
+      "geo_name": "BILIRAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 86,
+      "source_label": "Eastern Samar",
+      "geo_code": "08026",
+      "geo_level": "province",
+      "geo_name": "EASTERN SAMAR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 87,
+      "source_label": "Leyte",
+      "geo_code": "08037",
+      "geo_level": "province",
+      "geo_name": "LEYTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 88,
+      "source_label": "Northern Samar",
+      "geo_code": "08048",
+      "geo_level": "province",
+      "geo_name": "NORTHERN SAMAR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 89,
+      "source_label": "Southern Leyte",
+      "geo_code": "08064",
+      "geo_level": "province",
+      "geo_name": "SOUTHERN LEYTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 90,
+      "source_label": "Samar",
+      "geo_code": "08060",
+      "geo_level": "province",
+      "geo_name": "SAMAR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 92,
+      "source_label": "Region IX (Zamboanga Peninsula)",
+      "geo_code": "09",
+      "geo_level": "region",
+      "geo_name": "REGION IX (ZAMBOANGA PENINSULA)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. This vintage excludes Sulu and includes Isabela City separately from Basilan."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 93,
+      "source_label": "Zamboanga del Norte",
+      "geo_code": "09072",
+      "geo_level": "province",
+      "geo_name": "ZAMBOANGA DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 94,
+      "source_label": "Zamboanga del Sur",
+      "geo_code": "09073",
+      "geo_level": "province",
+      "geo_name": "ZAMBOANGA DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 95,
+      "source_label": "Zamboanga Sibugay",
+      "geo_code": "09083",
+      "geo_level": "province",
+      "geo_name": "ZAMBOANGA SIBUGAY",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 96,
+      "source_label": "Isabela City",
+      "geo_code": "0990101",
+      "geo_level": "citymun",
+      "geo_name": "CITY OF ISABELA",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. This city is explicitly published separately in Table 2. Do not apply this rate to other cities or the app’s parent grouping."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 98,
+      "source_label": "Region X (Northern Mindanao)",
+      "geo_code": "10",
+      "geo_level": "region",
+      "geo_name": "REGION X (NORTHERN MINDANAO)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 99,
+      "source_label": "Bukidnon",
+      "geo_code": "10013",
+      "geo_level": "province",
+      "geo_name": "BUKIDNON",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 100,
+      "source_label": "Camiguin",
+      "geo_code": "10018",
+      "geo_level": "province",
+      "geo_name": "CAMIGUIN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 101,
+      "source_label": "Lanao del Norte",
+      "geo_code": "10035",
+      "geo_level": "province",
+      "geo_name": "LANAO DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 102,
+      "source_label": "Misamis Occidental",
+      "geo_code": "10042",
+      "geo_level": "province",
+      "geo_name": "MISAMIS OCCIDENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 103,
+      "source_label": "Misamis Oriental",
+      "geo_code": "10043",
+      "geo_level": "province",
+      "geo_name": "MISAMIS ORIENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 105,
+      "source_label": "Region XI (Davao Region)",
+      "geo_code": "11",
+      "geo_level": "region",
+      "geo_name": "REGION XI (DAVAO REGION)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 106,
+      "source_label": "Davao del Norte",
+      "geo_code": "11023",
+      "geo_level": "province",
+      "geo_name": "DAVAO DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 107,
+      "source_label": "Davao del Sur",
+      "geo_code": "11024",
+      "geo_level": "province",
+      "geo_name": "DAVAO DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 108,
+      "source_label": "Davao Oriental",
+      "geo_code": "11025",
+      "geo_level": "province",
+      "geo_name": "DAVAO ORIENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 109,
+      "source_label": "Davao de Oro",
+      "geo_code": "11082",
+      "geo_level": "province",
+      "geo_name": "DAVAO DE ORO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 110,
+      "source_label": "Davao Occidental",
+      "geo_code": "11086",
+      "geo_level": "province",
+      "geo_name": "DAVAO OCCIDENTAL",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 112,
+      "source_label": "Region XII (SOCCSKSARGEN)",
+      "geo_code": "12",
+      "geo_level": "region",
+      "geo_name": "REGION XII (SOCCSKSARGEN)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. The 2023 source excludes the 63 barangays transferred to BARMM."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 113,
+      "source_label": "Cotabato",
+      "geo_code": "12047",
+      "geo_level": "province",
+      "geo_name": "COTABATO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series. The 2023 source excludes the 63 barangays transferred to BARMM."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 114,
+      "source_label": "Sarangani",
+      "geo_code": "12080",
+      "geo_level": "province",
+      "geo_name": "SARANGANI",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 115,
+      "source_label": "South Cotabato",
+      "geo_code": "12063",
+      "geo_level": "province",
+      "geo_name": "SOUTH COTABATO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 116,
+      "source_label": "Sultan Kudarat",
+      "geo_code": "12065",
+      "geo_level": "province",
+      "geo_name": "SULTAN KUDARAT",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 118,
+      "source_label": "Region XIII (Caraga)",
+      "geo_code": "16",
+      "geo_level": "region",
+      "geo_name": "REGION XIII (CARAGA)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 119,
+      "source_label": "Agusan del Norte",
+      "geo_code": "16002",
+      "geo_level": "province",
+      "geo_name": "AGUSAN DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 120,
+      "source_label": "Agusan del Sur",
+      "geo_code": "16003",
+      "geo_level": "province",
+      "geo_name": "AGUSAN DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 121,
+      "source_label": "Surigao del Norte",
+      "geo_code": "16067",
+      "geo_level": "province",
+      "geo_name": "SURIGAO DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 122,
+      "source_label": "Surigao del Sur",
+      "geo_code": "16068",
+      "geo_level": "province",
+      "geo_name": "SURIGAO DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 123,
+      "source_label": "Dinagat Islands",
+      "geo_code": "16085",
+      "geo_level": "province",
+      "geo_name": "DINAGAT ISLANDS",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 125,
+      "source_label": "Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)",
+      "geo_code": "19",
+      "geo_level": "region",
+      "geo_name": "BANGSAMORO AUTONOMOUS REGION IN MUSLIM MINDANAO (BARMM)",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. This vintage includes Sulu and the 63 barangays transferred to BARMM in 2023; it is not the later BARMM boundary excluding Sulu."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 126,
+      "source_label": "Basilan",
+      "geo_code": "19007",
+      "geo_level": "province",
+      "geo_name": "BASILAN",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series. Isabela City is a separate source reporting area."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 127,
+      "source_label": "Lanao del Sur",
+      "geo_code": "19036",
+      "geo_level": "province",
+      "geo_name": "LANAO DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 129,
+      "source_label": "Maguindanao del Norte",
+      "geo_code": "19087",
+      "geo_level": "province",
+      "geo_name": "MAGUINDANAO DEL NORTE",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series. Uses the separately published split-province row, not the combined Maguindanao row. Cotabato City is a separate source reporting area; app navigation parentage does not redefine this rate."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 130,
+      "source_label": "Maguindanao del Sur",
+      "geo_code": "19088",
+      "geo_level": "province",
+      "geo_name": "MAGUINDANAO DEL SUR",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series. Uses the separately published split-province row, not the combined Maguindanao row. Cotabato City is a separate source reporting area; app navigation parentage does not redefine this rate."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 131,
+      "source_label": "Sulu",
+      "geo_code": "19066",
+      "geo_level": "province",
+      "geo_name": "SULU",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 132,
+      "source_label": "Tawi-tawi",
+      "geo_code": "19070",
+      "geo_level": "province",
+      "geo_name": "TAWI-TAWI",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. Table 2 retains the source’s province grouping, including associated HUCs where applicable; it is not the Table 2a province-without-HUC series."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 133,
+      "source_label": "Cotabato City",
+      "geo_code": "1908703",
+      "geo_level": "citymun",
+      "geo_name": "CITY OF COTABATO",
+      "boundary_note": "PSA Table 2 reporting geography for 2023. These are published area estimates, not sums or averages of the app’s municipalities. This city is explicitly published separately in Table 2. Do not apply this rate to other cities or the app’s parent grouping."
+    }
+  ],
+  "excluded": [
+    {
+      "source_table": "tab2",
+      "source_row": 11,
+      "source_label": "1st District",
+      "reason": "NCR statistical districts do not match the app reporting hierarchy."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 12,
+      "source_label": "2nd District",
+      "reason": "NCR statistical districts do not match the app reporting hierarchy."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 13,
+      "source_label": "3rd District",
+      "reason": "NCR statistical districts do not match the app reporting hierarchy."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 14,
+      "source_label": "4th District",
+      "reason": "NCR statistical districts do not match the app reporting hierarchy."
+    },
+    {
+      "source_table": "tab2",
+      "source_row": 128,
+      "source_label": "Maguindanao",
+      "reason": "Combined province; use the two separately published split-province rows."
+    }
+  ]
+}

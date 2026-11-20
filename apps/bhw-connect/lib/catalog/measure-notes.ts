@@ -9,6 +9,8 @@ import { CATALOG } from "./definitions";
 import type { CatalogIndicator } from "./types";
 
 const definitions: Record<string, string> = {
+  "poverty.official-incidence":
+    "PSA full-year 2023 official poverty incidence among population: people below the poverty threshold divided by all people in the source reporting area, expressed as a percentage. Not a family rate. Published 95% confidence interval, not the municipal SAE 90% interval. Source boundaries and precision cautions accompany the estimate. No municipal averaging or parent substitution.",
   "bhw.total":
     "BHWs reported by local government units (LGUs), including registered-only, registered-and-accredited and nonregistered workers. This count covers a different group from the checked individual profiles.",
   "bhw.registered":

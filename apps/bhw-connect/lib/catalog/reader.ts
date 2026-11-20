@@ -30,6 +30,8 @@ export interface CatalogReader {
 const specs = CATALOG.flatMap((d) => d.indicators);
 /** One allowlisted projection per aggregate. Never SELECT * or request a service-role client. */
 export function columns(table: CatalogTable): string {
+  if (table === "agg_poverty_official")
+    return "poverty_incidence,reference_year,is_suppressed,ci_low,ci_high,cv,source_label,source_table,boundary_note,publication_note,value_status";
   return [
     ...new Set(
       specs

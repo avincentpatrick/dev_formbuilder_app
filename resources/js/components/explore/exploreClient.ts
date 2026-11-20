@@ -46,8 +46,10 @@ export async function fetchChartResult(chartId: string): Promise<RunPayload> {
 export async function fetchFields(
     source: string,
     formId: string,
+    grid: string | null = null,
 ): Promise<{ payload: FieldsPayload | null; message: string | null }> {
-    const query = new URLSearchParams({ source, form_id: formId });
+    // M247: on a source that reads one grid, the named grid's fields (and the form's grids either way).
+    const query = new URLSearchParams({ source, form_id: formId, ...(grid === null ? {} : { grid }) });
 
     try {
         const response = await builderClient.get<FieldsPayload>(`/explore/fields?${query.toString()}`);

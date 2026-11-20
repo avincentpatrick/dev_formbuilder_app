@@ -159,6 +159,7 @@ export function fitToChart(definition: Definition, chart: ChartOption, fields: F
 export function incompleteReason(definition: Definition, source: Source | undefined, fields: Field[]): string | null {
     if (source === undefined) return 'Choose a data source.';
     if (source.requires_form && definition.form_id === null) return 'Choose the form whose answers to chart.';
+    if (source.requires_grid === true && (definition.grid ?? null) === null) return 'Choose the grid whose rows to count.';
 
     const byKey = new Map(fields.map((f) => [f.key, f]));
 
@@ -215,7 +216,8 @@ export function sameDefinition(a: Definition, b: Definition): boolean {
 
 /** The body the server reads: the declaration without the version key, which it alone writes. */
 export function toPayload(definition: Definition): Definition {
-    const { v: _version, ...rest } = definition;
+    const { v: _version, grid, ...rest } = definition;
 
-    return rest;
+    // M247: the server stores a grid only when one is named, so an unnamed one is no key at all, here as there.
+    return grid === undefined || grid === null ? rest : { ...rest, grid };
 }

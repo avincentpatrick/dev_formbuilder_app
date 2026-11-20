@@ -601,6 +601,14 @@ describe('incompleteReason', () => {
         );
     });
 
+    it('M247: asks for the grid on a source that counts one grid’s rows, once the form is chosen', () => {
+        const ROWS = source({ key: 'grid_rows', label: 'Rows of a grid', requires_form: true, requires_grid: true });
+
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1' }), ROWS, FIELDS)).toBe('Choose the grid whose rows to count.');
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1', grid: null }), ROWS, FIELDS)).toBe('Choose the grid whose rows to count.');
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1', grid: 'clinics' }), ROWS, FIELDS)).toBeNull();
+    });
+
     it('asks what to group by when a group-by names a field that is not there', () => {
         expect(incompleteReason(definition({ dimensions: [{ field: 'answer:district', bucket: null }] }), RESPONSES, FIELDS)).toBe(
             'Choose what to group by.',
@@ -796,5 +804,18 @@ describe('toPayload', () => {
 
         expect(live.v).toBe(1);
         expect(Object.keys(live)).toContain('v');
+    });
+});
+
+describe('M247: a chart that names a grid', () => {
+    it('sends a grid only when one is named, so a chart without one is the shape the server stores', () => {
+        expect(toPayload(definition({ grid: null }))).not.toHaveProperty('grid');
+        expect(toPayload(definition())).not.toHaveProperty('grid');
+        expect(toPayload(definition({ source: 'grid_rows', grid: 'clinics' })).grid).toBe('clinics');
+    });
+
+    it('reads a chart saved without a grid as the same chart built with an unnamed one', () => {
+        expect(sameDefinition(definition({ grid: null }), definition())).toBe(true);
+        expect(sameDefinition(definition({ grid: 'clinics' }), definition())).toBe(false);
     });
 });

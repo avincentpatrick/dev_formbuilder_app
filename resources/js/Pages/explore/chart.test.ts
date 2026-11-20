@@ -27,7 +27,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
     runQuery: vi.fn<(definition: Definition) => Promise<RunPayload>>(),
-    fetchFields: vi.fn<(source: string, formId: string) => Promise<{ payload: FieldsPayload | null; message: string | null }>>(),
+    fetchFields: vi.fn<(source: string, formId: string, grid?: string | null) => Promise<{ payload: FieldsPayload | null; message: string | null }>>(),
     patch: vi.fn<(url: string, data: Record<string, unknown>, options: Record<string, unknown>) => void>(),
     del: vi.fn(),
 }));
@@ -583,6 +583,48 @@ describe('Chart builder — saving', () => {
         // `v` is the server's to write; a client echo is how a stored shape comes to carry a version nothing wrote.
         expect(body.definition).not.toHaveProperty('v');
         expect(body.definition).toEqual(toPayload({ ...storedDefinition(), sort: 'label' }));
+        wrapper.unmount();
+    });
+});
+
+// ── M247 (`D231`): a grid, counted row by row ───────────────────────────────────────────────────────────
+
+describe('Chart builder — counting a grid row by row', () => {
+    const GRID_ROWS: Source = { ...ANSWERS, key: 'grid_rows', label: 'Rows of a grid', requires_grid: true };
+
+    it('asks for the grid once the form is chosen, loads its fields, groups by its Row and sends the grid', async () => {
+        mocks.fetchFields.mockImplementation((_source, _formId, grid) =>
+            Promise.resolve({
+                payload: {
+                    fields: grid ? [...ANSWERS.fields, field('row', 'Row', 'category', 'Grid'), field('column:rate', 'Rating', 'category', 'Grid')] : ANSWERS.fields,
+                    notes: [],
+                    grids: [{ value: 'clinics', label: 'Clinics' }],
+                },
+                message: null,
+            }),
+        );
+        const wrapper = render({ sources: [GRID_ROWS, RESPONSES] });
+        await flushPromises();
+
+        expect(wrapper.find('#explore-grid').exists()).toBe(false);
+        await wrapper.find('#explore-form').setValue('f1');
+        await flushPromises();
+        expect(wrapper.find('#explore-grid').exists()).toBe(true);
+        expect(optionLabels(wrapper, '#explore-grid')).toContain('Clinics');
+        await settle();
+        expect(wrapper.text()).toContain('Choose the grid whose rows to count.');
+
+        await wrapper.find('#explore-grid').setValue('clinics');
+        await flushPromises();
+        expect(mocks.fetchFields).toHaveBeenLastCalledWith('grid_rows', 'f1', 'clinics');
+
+        await settle();
+        expect(lastQuery()).toMatchObject({ source: 'grid_rows', form_id: 'f1', grid: 'clinics', dimensions: [{ field: 'row', bucket: null }] });
+
+        // Another form has other grids: the grid goes with the form.
+        await wrapper.find('#explore-form').setValue('f2');
+        await flushPromises();
+        expect((wrapper.find('#explore-grid').element as HTMLSelectElement).value).toBe('');
         wrapper.unmount();
     });
 });

@@ -45,6 +45,8 @@ export type Definition = {
     timezone: string;
     sort: Sort;
     limit: number;
+    /** M247 (`D231`): the grid a "Rows of a grid" chart counts. Absent or null for every other source. */
+    grid?: string | null;
 };
 
 export interface Option {
@@ -68,6 +70,8 @@ export interface Source {
     description: string;
     row_noun: string;
     requires_form: boolean;
+    /** M247 (`D231`): a chart on this source names one of the form's grids too. */
+    requires_grid?: boolean;
     default_range_days: number;
     /** The key of the field the chart's date range applies to. */
     range_field: string;
@@ -172,4 +176,6 @@ export interface RunPayload {
 export interface FieldsPayload {
     fields: Field[];
     notes: string[];
+    /** M247: on a source that reads one grid, the form's grids it may chart. */
+    grids?: Option[];
 }

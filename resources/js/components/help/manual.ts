@@ -637,7 +637,7 @@ const guide: ChapterDraft[] = [
                     ),
                     steps(
                         ['Click ', ui('New chart', EXPLORE_BOARD), ' (or ', ui('Build a chart', EXPLORE_BOARD), ' if you have none yet).'],
-                        ['Under ', ui('Data source', EXPLORE_CHART), ', choose what to count. To chart the answers to a form, choose the form under ', ui('Form', EXPLORE_CHART), '.'],
+                        ['Under ', ui('Data source', EXPLORE_CHART), ', choose what to count. To chart the answers to a form, choose the form under ', ui('Form', EXPLORE_CHART), '. To count a grid row by row — for example, how many chose each answer in every row of a table — choose “Rows of a grid”, the form, and the grid under ', ui('Grid', EXPLORE_CHART), '; each answered row of each response counts once.'],
                         ['Choose a ', ui('Chart type', EXPLORE_CHART), ' and what to ', ui('Group by', EXPLORE_CHART), '. The chart redraws as you change it.'],
                         ['Narrow it with ', ui('Filters', EXPLORE_CHART), ' and the ', ui('Date range', EXPLORE_CHART), ', and tick ', ui('Show the numbers', EXPLORE_CHART), ' to see the table behind the chart.'],
                         ['Click ', ui('Save chart', EXPLORE_CHART), ', give it a ', ui('Name', EXPLORE_SAVE), ', and tick ', ui('Share with the workspace', EXPLORE_SAVE), ' if your colleagues should see it too.'],

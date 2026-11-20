@@ -1,3 +1,8 @@
+import {
+  POPULATION_DEFINITION,
+  POPULATION_COVERAGE,
+  POPULATION_COMPARISON,
+} from "./population-reading";
 import { POVERTY_DEFINITION, POVERTY_SCOPE, POVERTY_UNCERTAINTY } from "./poverty-reading";
 import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { CATALOG } from "./definitions";
@@ -39,8 +44,7 @@ const definitions: Record<string, string> = {
     "Listed barangays qualifying through the recorded 4Ps route under AO 2020-0023. Denominator: listed barangays.",
   "uuc.route.health":
     "Listed barangays qualifying through recorded health criteria. Denominator: health-evaluable listed barangays; unusable provincial benchmarks are excluded.",
-  "population.residents":
-    "PSA POPCEN 2024 resident population in accepted matched census rows. Higher-level totals sum matched municipalities and may be partial; Manila retains its published province-node figure.",
+  "population.residents": `${POPULATION_DEFINITION} ${POPULATION_COVERAGE} ${POPULATION_COMPARISON}`,
   "poverty.incidence": `${POVERTY_DEFINITION} ${POVERTY_UNCERTAINTY} ${POVERTY_SCOPE}`,
 };
 const specs = new Map(CATALOG.flatMap((d) => d.indicators.map((s) => [s.id, s] as const)));

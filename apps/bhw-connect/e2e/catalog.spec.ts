@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function openPovertyDetails(page: Page) {
-  if (new URL(page.url()).searchParams.get("dataset") !== "poverty") return;
+async function openReadableDetails(page: Page) {
+  if (!["poverty", "population"].includes(new URL(page.url()).searchParams.get("dataset") ?? ""))
+    return;
   const summary = page.getByText("Exact data, availability and sources", { exact: true });
   const details = page.locator("details").filter({ has: summary });
   await expect(async () => {
@@ -88,12 +89,12 @@ test("catalog opens available-source details without claiming national values", 
   await expect(catalogLink).toBeVisible();
   await catalogLink.click();
   await expect(page).toHaveURL(/mode=all.*dataset=/);
-  await openPovertyDetails(page);
+  await openReadableDetails(page);
   await expect(
     page.getByText("This is an availability summary, not a national data table.", { exact: false }),
   ).toBeVisible();
   await page.reload();
-  await openPovertyDetails(page);
+  await openReadableDetails(page);
   await expect(page.getByRole("table")).toBeVisible();
   await page.getByRole("link", { name: "All datasets for this selection", exact: false }).click();
   // All-locations probes stream behind a loading state; allow shared CI database contention.
@@ -147,7 +148,7 @@ test("home starts with the catalog and every available card has consistent detai
       await page.goto("./");
       continue;
     }
-    await openPovertyDetails(page);
+    await openReadableDetails(page);
     await expect(page.getByRole("table")).toBeVisible();
     await expect(page.getByText("Accepted release:", { exact: false }).first()).toBeVisible();
     await expect(page.getByRole("table")).not.toContainText("Definition unavailable.");

@@ -1,5 +1,16 @@
 "use client";
 import {
+  POPULATION_MAP,
+  populationCatalogReturnHref,
+  populationSearch,
+  populationSearchSuffix,
+} from "@/lib/catalog/population-navigation";
+import {
+  populationAreaLabel,
+  POPULATION_COVERAGE,
+  POPULATION_COMPARISON,
+} from "@/lib/catalog/population-reading";
+import {
   POVERTY_MAP,
   povertyCatalogReturnHref,
   povertySearchSuffix,
@@ -18,7 +29,7 @@ import { datasetMapExport } from "@/lib/maps/export";
 import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { formatPct } from "@/lib/format";
+import { formatCount, formatPct } from "@/lib/format";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -96,16 +107,20 @@ export function DatasetMapCard({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const population = dataset === POPULATION_MAP;
   const listSearch = dataset === POVERTY_MAP ? povertySearchSuffix(searchParams) : "";
   const [mapOnly, setMapOnly] = useState(false);
   const [mapTableOpen, setMapTableOpen] = useState(false);
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
-  // Embedded previews do not own the page URL. BHW and Poverty workspaces
+  // Embedded previews do not own the page URL. BHW, Poverty and Population workspaces
   // record analysis edits; Next integrates native history without a server reload.
   const historyEnabled =
     Boolean(onChoiceChange) &&
-    (dataset === "bhw-stepzero-2026" || dataset === "bhw-2025" || dataset === POVERTY_MAP);
+    (dataset === "bhw-stepzero-2026" ||
+      dataset === "bhw-2025" ||
+      dataset === POVERTY_MAP ||
+      population);
   const [choice, updateChoice] = useState(() => initial ?? initialMapChoice(dataset));
   const latestChoice = useRef(choice);
   const setChoice = useCallback(
@@ -122,10 +137,23 @@ export function DatasetMapCard({
       }
       latestChoice.current = next;
       if (historyEnabled)
-        window.history.pushState(null, "", withBasePath(mapHref(next) + listSearch));
+        window.history.pushState(
+          null,
+          "",
+          withBasePath(
+            mapHref(next) +
+              listSearch +
+              (population
+                ? populationSearchSuffix(
+                    next,
+                    populationSearch(new URLSearchParams(window.location.search), next),
+                  )
+                : ""),
+          ),
+        );
       updateChoice(next);
     },
-    [historyEnabled, overviewPreview, router, mapOnly, listSearch],
+    [historyEnabled, overviewPreview, router, mapOnly, listSearch, population],
   );
   useEffect(() => {
     onChoiceChange?.(choice);
@@ -149,7 +177,21 @@ export function DatasetMapCard({
   const [search, setSearch] = useState({ scope: "", text: "" });
   const searchStatusId = useId();
   const searchScope = `${dataset}:${choice.level}:${choice.code}`;
-  const searchText = search.scope === searchScope ? search.text : "";
+  const searchText =
+    population && expanded
+      ? populationSearch(new URLSearchParams(searchParams.toString()), choice)
+      : search.scope === searchScope
+        ? search.text
+        : "";
+  function changeAreaSearch(text: string) {
+    if (population && expanded) {
+      window.history.replaceState(
+        null,
+        "",
+        withBasePath(mapHref(choice) + populationSearchSuffix(choice, text)),
+      );
+    } else setSearch({ scope: searchScope, text });
+  }
   const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
   const [geometry, setGeometry] = useState<{
     key: string;
@@ -905,6 +947,14 @@ export function DatasetMapCard({
                       "Stages are mutually exclusive current workflow states. Shares use each area’s BHW headcount, rounded to whole percentages, not pipeline totals. No regional average is calculated. Not yet encoded is the headcount minus all pipeline stages, floored at zero."
                     ) : income ? (
                       "Income classes are published for LGUs. No total or average class is calculated; barangays have no independently published class. Manila submunicipal entries reflect the city classification."
+                    ) : population ? (
+                      <>
+                        {populationAreaLabel(choice.level, choice.code)}:{" "}
+                        {data.total === null
+                          ? "Unavailable — no accepted count"
+                          : `${formatCount(data.total)} people`}
+                        . Reference year: 2024. {POPULATION_COVERAGE}
+                      </>
                     ) : poverty ? (
                       "Poverty incidence is published only for cities/municipalities. No provincial, regional or national rate is calculated here."
                     ) : (
@@ -962,14 +1012,14 @@ export function DatasetMapCard({
                       aria-describedby={searchStatusId}
                       className="mt-1 block w-full min-w-0 rounded border border-border bg-background p-2"
                       value={searchText}
-                      onChange={(e) => setSearch({ scope: searchScope, text: e.target.value })}
+                      onChange={(e) => changeAreaSearch(e.target.value)}
                     />
                   </label>
                   {searchText && (
                     <button
                       type="button"
                       className="text-sm underline"
-                      onClick={() => setSearch({ scope: searchScope, text: "" })}
+                      onClick={() => changeAreaSearch("")}
                     >
                       Clear area search
                     </button>
@@ -980,8 +1030,9 @@ export function DatasetMapCard({
                       " The selected area is retained outside these search results."}
                   </p>
                   <p className="text-sm text-muted">
-                    Search narrows the area selector only. The map, totals, complete table and
-                    downloads stay unchanged.
+                    {population
+                      ? "Search narrows the area selector and area table only. The map, totals and downloads stay unchanged. Clear search to show every area, including unavailable counts."
+                      : "Search narrows the area selector only. The map, totals, complete table and downloads stay unchanged."}
                   </p>
                   <label className="block text-sm">
                     Select an area
@@ -1016,13 +1067,18 @@ export function DatasetMapCard({
                               "No matched source record")
                             : selected.value === null
                               ? "Not reported"
-                              : metric?.unit === "%"
-                                ? formatPct(selected.value)
-                                : selected.value}{" "}
+                              : population
+                                ? formatCount(selected.value)
+                                : metric?.unit === "%"
+                                  ? formatPct(selected.value)
+                                  : selected.value}{" "}
                         {selected.value !== null && !income && metric?.unit !== "%"
                           ? metric?.unit
                           : ""}
                       </p>
+                      {population && selected.value !== null && (
+                        <p>{populationAreaLabel(data.childLevel, selected.code)}</p>
+                      )}
                       {comparisonHref && (
                         <div>
                           <Link href={comparisonHref} className="underline">
@@ -1110,9 +1166,20 @@ export function DatasetMapCard({
                       onSelect={(code) => setChoice((current) => ({ ...current, selected: code }))}
                     />
                   )}
+                  {population && (
+                    <div className="space-y-2 text-sm">
+                      <p>{POPULATION_COMPARISON}</p>
+                      <p>
+                        Areas are listed alphabetically, not ranked by need. Unavailable counts are
+                        not zero. A missing map shape does not make an accepted count unavailable.
+                      </p>
+                    </div>
+                  )}
                   <details>
                     <summary className="cursor-pointer text-sm font-medium">
-                      Complete area table ({data.rows.length})
+                      {population
+                        ? `Population area table (${matchingAreas.length} of ${data.rows.length})`
+                        : `Complete area table (${data.rows.length})`}
                     </summary>
                     <div
                       className="max-h-80 overflow-auto"
@@ -1140,7 +1207,14 @@ export function DatasetMapCard({
                           </tr>
                         </thead>
                         <tbody>
-                          {data.rows.map((r) => (
+                          {(population
+                            ? [...matchingAreas].sort(
+                                (a, b) =>
+                                  a.name.localeCompare(b.name, "en", { numeric: true }) ||
+                                  a.code.localeCompare(b.code),
+                              )
+                            : data.rows
+                          ).map((r) => (
                             <tr key={r.code}>
                               <th scope="row" className="py-2 font-normal">
                                 <button
@@ -1150,19 +1224,38 @@ export function DatasetMapCard({
                                 >
                                   {r.name}
                                 </button>
+                                {population && (
+                                  <span className="block text-xs text-muted">
+                                    PSGC {r.code}
+                                    {r.code === selected?.code ? " · Selected place" : ""}
+                                  </span>
+                                )}
                               </th>
                               <td>
-                                {navigationOnly
-                                  ? "Not published at this level"
-                                  : income
-                                    ? (incomeClassLabel(r.value) ??
-                                      r.note ??
-                                      "No matched source record")
-                                    : r.value === null
-                                      ? "Not reported"
-                                      : metric?.unit === "%"
-                                        ? formatPct(r.value)
-                                        : r.value}
+                                {navigationOnly ? (
+                                  "Not published at this level"
+                                ) : income ? (
+                                  (incomeClassLabel(r.value) ??
+                                  r.note ??
+                                  "No matched source record")
+                                ) : r.value === null ? (
+                                  population ? (
+                                    "Unavailable — no accepted count"
+                                  ) : (
+                                    "Not reported"
+                                  )
+                                ) : population ? (
+                                  <>
+                                    {formatCount(r.value)}
+                                    <span className="block text-xs">
+                                      {populationAreaLabel(data.childLevel, r.code)}
+                                    </span>
+                                  </>
+                                ) : metric?.unit === "%" ? (
+                                  formatPct(r.value)
+                                ) : (
+                                  r.value
+                                )}
                               </td>
                               {(poverty || censusUncertainty) && !navigationOnly && (
                                 <td>
@@ -1186,6 +1279,11 @@ export function DatasetMapCard({
                         </tbody>
                       </table>
                     </div>
+                    {population && matchingAreas.length === 0 && (
+                      <p role="status">
+                        No matching areas. Clear the search or try another name or PSGC code.
+                      </p>
+                    )}
                   </details>
                   <p className="text-xs text-muted">
                     Source: {data.source}. Source date: {data.date ?? "Not provided"}. License:{" "}
@@ -1215,9 +1313,21 @@ export function DatasetMapCard({
       )}
       {exportError && <p role="status">{exportError}</p>}
       <div className="flex flex-wrap gap-4 text-sm underline">
-        <Link prefetch={false} href={mapHref(bhw ? { ...choice, view } : choice) + listSearch}>
+        <Link
+          prefetch={false}
+          href={
+            mapHref(bhw ? { ...choice, view } : choice) +
+            listSearch +
+            (population ? populationSearchSuffix(choice, searchText) : "")
+          }
+        >
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
+        {population && expanded && (
+          <Link href={populationCatalogReturnHref(choice, searchText)}>
+            Open Population details for this selection
+          </Link>
+        )}
         {dataset === POVERTY_MAP && expanded && (
           <Link href={povertyCatalogReturnHref(choice, listSearch)}>
             Open Poverty details for this selection

@@ -1,4 +1,9 @@
 "use client";
+import {
+  POPULATION_MAP,
+  populationCatalogReturnHref,
+  populationSearch,
+} from "@/lib/catalog/population-navigation";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { parseMapChoice } from "@/lib/maps/prototype";
@@ -19,7 +24,12 @@ export function DatasetMapBackLink() {
       ? { href: "/districts", label: "Legislative districts" }
       : {
           href:
-            (choice && bhwCatalogReturnHref(choice)) ??
+            (choice?.dataset === POPULATION_MAP
+              ? populationCatalogReturnHref(
+                  choice,
+                  populationSearch(new URLSearchParams(params.toString()), choice),
+                )
+              : choice && bhwCatalogReturnHref(choice)) ??
             catalogHref(
               choice && subject.id === "bhw"
                 ? { mode: "psgc", level: choice.level, code: choice.code }

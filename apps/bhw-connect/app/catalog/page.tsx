@@ -1,3 +1,4 @@
+import { restoredPopulationMapHref } from "@/lib/catalog/population-navigation";
 import { restoredPovertyMapHref } from "@/lib/catalog/poverty-navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -32,11 +33,13 @@ export default async function CatalogPage({
     );
   }
   const returnMap =
-    request?.dataset === "poverty"
-      ? restoredPovertyMapHref(params.mapState)
-      : request && (!request.dataset || request.dataset === "bhw")
-        ? restoredBhwMapHref(params.mapState)
-        : null;
+    request?.dataset === "population"
+      ? restoredPopulationMapHref(params.mapState)
+      : request?.dataset === "poverty"
+        ? restoredPovertyMapHref(params.mapState)
+        : request && (!request.dataset || request.dataset === "bhw")
+          ? restoredBhwMapHref(params.mapState)
+          : null;
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <header className="space-y-4">
@@ -52,7 +55,13 @@ export default async function CatalogPage({
       {params.mapState !== undefined && (
         <BhwMapReturnLink
           href={returnMap}
-          datasetName={request?.dataset === "poverty" ? "Poverty" : "BHW"}
+          datasetName={
+            request?.dataset === "population"
+              ? "Population"
+              : request?.dataset === "poverty"
+                ? "Poverty"
+                : "BHW"
+          }
           scopeNote="Catalog figures keep their own scope."
         />
       )}

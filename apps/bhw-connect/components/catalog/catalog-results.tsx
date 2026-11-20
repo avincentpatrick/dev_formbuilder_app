@@ -1,3 +1,4 @@
+import { PopulationOverview } from "./population-overview";
 import Link from "next/link";
 import { PovertyOverview } from "./poverty-overview";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
@@ -279,7 +280,8 @@ export function CatalogDetails({
   mapState?: string;
   locationName?: string;
 }) {
-  const DetailContainer = dataset.id === "poverty" ? "details" : "div";
+  const readable = dataset.id === "poverty" || dataset.id === "population";
+  const DetailContainer = readable ? "details" : "div";
   const available = dataset.indicators.filter((i) => hasAvailableValue(i.state));
   const missing = dataset.indicators.filter((i) => !hasAvailableValue(i.state));
   return (
@@ -293,9 +295,13 @@ export function CatalogDetails({
       </Link>
       <div>
         <h2 className="text-2xl font-semibold">
-          {dataset.id === "poverty" ? "Poverty in 2023" : `${dataset.title} indicators`}
+          {dataset.id === "poverty"
+            ? "Poverty in 2023"
+            : dataset.id === "population"
+              ? "Population in 2024"
+              : `${dataset.title} indicators`}
         </h2>
-        {dataset.id !== "poverty" && (
+        {!readable && (
           <p className="mt-2 text-muted">
             {dataset.availableIndicators} of {dataset.totalIndicators} indicators available
           </p>
@@ -303,6 +309,13 @@ export function CatalogDetails({
       </div>
       {dataset.id === "poverty" && (
         <PovertyOverview
+          dataset={dataset}
+          selection={catalog.selection}
+          locationName={locationName}
+        />
+      )}
+      {dataset.id === "population" && (
+        <PopulationOverview
           dataset={dataset}
           selection={catalog.selection}
           locationName={locationName}
@@ -324,7 +337,7 @@ export function CatalogDetails({
         </Link>
       )}
       <DetailContainer className="space-y-4">
-        {dataset.id === "poverty" && (
+        {readable && (
           <summary className="cursor-pointer rounded border border-border p-4 font-medium">
             Exact data, availability and sources
           </summary>

@@ -1,3 +1,4 @@
+import { POPULATION_PARTIAL_REASON } from "./population-reading";
 import "server-only";
 import { FHSIS_OVER_100_NOTE } from "@/lib/db/fhsis";
 import { CATALOG, catalogDetailHref, type IndicatorSpec } from "./definitions";
@@ -355,8 +356,7 @@ export async function getPublicCatalog(
                   item = {
                     ...item,
                     state: "partial",
-                    reason:
-                      "Partial total from matched census areas; complete coverage has not been verified. Manila's province node stores its published census total. Do not repeat it for child areas.",
+                    reason: POPULATION_PARTIAL_REASON,
                   };
                 }
                 if (

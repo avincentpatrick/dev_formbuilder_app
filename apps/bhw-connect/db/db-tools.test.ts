@@ -221,6 +221,13 @@ describe("make-seed (no database)", () => {
     expect(syntheticLiteral("fact_bhw_raw", column, 1)).toBe("'synthetic full_name 2'");
   });
 
+  it("keeps synthetic FHSIS totals usable when breakdowns exceed the category-copy limit", () => {
+    const column = { column_name: "breakdown", udt_name: "text", is_nullable: "NO", character_maximum_length: null };
+    expect(syntheticValue("fact_fhsis_indicator", column, 0)).toBe("total");
+    expect(syntheticValue("fact_fhsis_indicator", column, 0, { categories: ["male", "female"] })).toBe("male");
+    expect(syntheticValue("fact_other", column, 0)).toBe("synthetic breakdown 1");
+  });
+
   it("keeps numbers and dates inside the column's real range", () => {
     const age = {
       column_name: "age",

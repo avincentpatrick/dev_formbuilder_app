@@ -141,3 +141,12 @@ rows / 5 exclusions; this is preparation evidence, not a server load or live acc
 not populated official rates. avincentpatrick must run the private load above and then the listed
 source-row checkpoints. This does not sign off representative-reader comprehension or physical
 phones, nor close the previously deferred BHW work.
+
+
+The first refresh CI exposed a synthetic-data regression in the existing Health Services browser
+path: expanded FHSIS breakdowns no longer met the generator's safe categorical-copy limit, so every
+breakdown became free text rather than a usable `total`. The follow-up fixes the development seed
+generator to use the known `total` code in that fallback case, and applies it to the 200 generated
+FHSIS fixture rows. Existing safely copied categorical codes are preserved; unrelated free-text
+columns remain synthetic. No production FHSIS record, code meaning or calculation changes. The
+existing populated Health Services browser test remains enabled and must pass before merging.

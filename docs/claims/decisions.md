@@ -28,6 +28,20 @@ _None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the
 
 
 ## ANSWERED
+### D231 — A big table needs room and its header in view, and a grid cannot be charted: what widens, and how is a grid charted? **Wide page: per section (A). Charting: by row (A).**
+
+**Asked and answered 2026-11-20 (user decision, in chat), in the planning of `M247` (NHETE recommendation 5b).** Two questions, each put with its options and the session's recommendation.
+
+1. **Every respondent page is capped at a reading width (44rem), so a 5-column table like NHETE's indicator tables cannot fit. When a table needs more room, what gets wider?**
+   - **A — the page, per section (chosen, the recommendation).** The author ticks "Wide page" on a section; while it is on screen the whole page widens, reusing the scanned-paper view's wide mode. Phones are unchanged (a grid is cards there). In single-page mode the page is wide when any shown section is wide.
+   - **B — only the table.** A "use the full width" switch on the grid lets just that table spill out of the reading column; nicer to read, harder to build right in the builder preview and the encode page.
+   - **C — the whole form.** One switch makes every page wide; simplest, but every page's text runs long.
+2. **Grid answers cannot be charted in the Data Explorer. How is a grid charted?**
+   - **A — by row (chosen, the recommendation).** Pick the grid itself as what to count; each answered row of each response counts once, so one chart shows, for every indicator, how many chose Keep, Close or Drop — the view NHETE's agreement report (recommendation 7) needs.
+   - **B — each cell separately.** Every cell joins the question list as "Grid — Row — Column", counted per response; NHETE's 35-row table would add 175 entries and need a chart per indicator.
+
+**What the answer files:** `M247` builds both and closes `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`. It files `repeat-table-sticky`, `wide-page-prose-measure`, `explorer-grid-row-order` and `xlsform-page-width`, each `during-testing`.
+
 ### D230 — A grid becomes a question table: what may a rule elsewhere read of it, and how does NHETE lay out its parts? **Rules elsewhere: only an always-asked cell (A). NHETE's parts: one table per indicator (A).**
 
 **Asked and answered 2026-11-18 (user decision, in chat), in the planning of `M246` (NHETE recommendation 5a).** Two questions, each put with its options and the session's recommendation.

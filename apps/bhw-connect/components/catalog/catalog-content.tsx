@@ -1,3 +1,4 @@
+import { PovertyMunicipalities } from "./poverty-municipalities";
 import Link from "next/link";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { getPublicCatalog } from "@/lib/catalog/catalog";
@@ -98,6 +99,11 @@ export async function CatalogContent({
     );
   const catalog = await getPublicCatalog(request.selection);
   const locationName = geography.current?.name ?? "All locations";
+  const povertyProvince =
+    request.dataset === "poverty" &&
+    (geography.current?.level === "province" || geography.current?.level === "citymun")
+      ? [geography.current, ...geography.ancestors].find((place) => place?.level === "province")
+      : null;
   const dataset = request.dataset ? catalog.datasets.find((d) => d.id === request.dataset) : null;
   return (
     <div className="space-y-6">
@@ -126,6 +132,15 @@ export async function CatalogContent({
         />
       ) : (
         <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
+      )}
+      {povertyProvince && (
+        <PovertyMunicipalities
+          key={povertyProvince.code}
+          province={povertyProvince.code}
+          name={povertyProvince.name}
+          selected={geography.current?.level === "citymun" ? geography.current.code : null}
+          mapState={mapState}
+        />
       )}
     </div>
   );

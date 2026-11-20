@@ -16,7 +16,19 @@ vi.mock("@/components/maps/dataset-map-card", () => ({
 }));
 // Inspect the exact props crossing into interactive charts/presentations.
 vi.mock("@/components/charts/figure-view", () => ({
-  FigureView: ({ data }: { data: unknown }) => <pre data-chart>{JSON.stringify(data)}</pre>,
+  FigureView: ({
+    data,
+    preserveOrder,
+    yLabel,
+  }: {
+    data: unknown;
+    preserveOrder?: boolean;
+    yLabel?: string;
+  }) => (
+    <pre data-chart data-preserve-order={preserveOrder} data-axis={yLabel}>
+      {JSON.stringify(data)}
+    </pre>
+  ),
 }));
 const item = (id: string, state: CatalogIndicator["state"], value: number): CatalogIndicator => ({
   id,
@@ -70,7 +82,11 @@ it("starts with figures and provides named purpose anchors before methodology", 
 
 it("routes every overview comparison entry through the public headcount contract", () => {
   const { document } = parseHTML(render([item("bhw.total", "available", 0)]));
-  const links = [...document.querySelectorAll('a[href^="/compare"]')];
+  const links = [...document.querySelectorAll('a[href^="/compare"]')].filter(
+    (link) =>
+      link.textContent?.trim().startsWith("Compare places") &&
+      link.getAttribute("href")?.includes("measure=bhw.total"),
+  );
   expect(links).toHaveLength(2);
   for (const link of links) expect(link.getAttribute("href")).toBe("/compare?measure=bhw.total");
 });
@@ -92,8 +108,10 @@ it("resumes the validated map from navigation while retaining a fresh national h
   );
   expect(explorer?.getAttribute("href")).toBe(previous);
   expect(explorer?.textContent).toContain("previous settings");
-  const comparisons = [...document.querySelectorAll("a")].filter((a) =>
-    a.textContent?.trim().startsWith("Compare places"),
+  const comparisons = [...document.querySelectorAll("a")].filter(
+    (a) =>
+      a.textContent?.trim().startsWith("Compare places") &&
+      a.getAttribute("href")?.includes("measure=bhw.total"),
   );
   expect(comparisons).toHaveLength(2);
   for (const link of comparisons) {
@@ -228,4 +246,136 @@ it("makes extended analyses discoverable from overview categories with exact-val
   expect(html).toContain("indicator=bhw.honorarium-amount.barangay.median");
   expect(html).toContain("measure=bhw.honorarium-amount.barangay.median");
   expect(html).not.toContain("987654");
+});
+
+it("shows education once while retaining its exact and comparison destinations", () => {
+  const { document } = parseHTML(render([item("bhw.demographics.education", "available", 42)]));
+  const qualifications = document.getElementById("qualifications")!;
+  expect(qualifications.querySelectorAll("[data-chart]")).toHaveLength(1);
+  expect(
+    qualifications.querySelector('a[href*="indicator=bhw.demographics.education"]'),
+  ).not.toBeNull();
+  expect(
+    qualifications.querySelector('a[href*="measure=bhw.demographics.education"]'),
+  ).not.toBeNull();
+  expect(document.getElementById("demographics")!.querySelectorAll("[data-chart]")).toHaveLength(0);
+});
+
+it("groups long lists without losing exact links, unavailable statuses or exposing withheld values", () => {
+  const { document } = parseHTML(
+    render([
+      { ...item("bhw.training.basic_life_support", "available", 0), unit: "%" },
+      item("bhw.training-recency.basic_life_support", "unavailable", 111111),
+      item("bhw.honorarium-amount.region.mean", "suppressed", 222222),
+    ]),
+  );
+  for (const [section, id] of [
+    ["training-topics", "bhw.training.basic_life_support"],
+    ["honorarium-amounts", "bhw.honorarium-amount.region.mean"],
+  ]) {
+    const group = document.querySelector(`#${section} > details`)!;
+    expect(group).not.toBeNull();
+    expect(group.hasAttribute("open")).toBe(false);
+    expect(group.querySelector(`a[href*="indicator=${id}"]`)).not.toBeNull();
+    expect(group.querySelector(`a[href*="measure=${id}"]`)).not.toBeNull();
+  }
+  const training = document.getElementById("training-topics")!;
+  expect(training.textContent).toContain("0%");
+  expect(training.textContent).not.toContain("111111");
+  expect(document.getElementById("honorarium-amounts")!.textContent).not.toContain("222222");
+  expect(training.querySelector("article h3")).toBeNull();
+});
+
+it("connects ordered age values to the chart sequence and descriptive axis", () => {
+  const age = {
+    ...item("bhw.demographics.age_band", "available", 1),
+    values: [
+      { label: "60+", value: 7 },
+      { label: "<30", value: 0 },
+      { label: "40-49", value: 100 },
+    ],
+  };
+  const { document } = parseHTML(render([age]));
+  const chart = document.querySelector("#demographics [data-chart]")!;
+  expect(chart.getAttribute("data-preserve-order")).toBe("true");
+  expect(chart.getAttribute("data-axis")).toBe("Age group");
+  expect(JSON.parse(chart.textContent!).map((row: { label: string }) => row.label)).toEqual([
+    "<30",
+    "40-49",
+    "60+",
+  ]);
+});
+
+it("keeps payer statistics accessible independently when a complete distribution cannot be plotted", () => {
+  const { document } = parseHTML(
+    render([
+      { ...item("bhw.honorarium-amount.region.median", "available", 1250), unit: "PHP/month" },
+      { ...item("bhw.honorarium-amount.region.mean", "suppressed", 999888), unit: "PHP/month" },
+    ]),
+  );
+  const table = document.querySelector("#honorarium-amounts > details table")!;
+  expect(table.querySelectorAll("tbody tr")).toHaveLength(4);
+  expect(table.textContent).toContain("1,250");
+  expect(table.textContent).toContain("Withheld");
+  expect(table.textContent).not.toContain("999888");
+  expect(table.querySelectorAll('a[href*="indicator=bhw.honorarium-amount."]')).toHaveLength(24);
+  expect(table.querySelectorAll('a[href*="measure=bhw.honorarium-amount."]')).toHaveLength(24);
+});
+
+it("shows the workload middle half only for compatible, ordered public values", () => {
+  const workload = (stat: string, value: number) => ({
+    ...item(`bhw.workload.${stat}`, "available", value),
+    unit: "households",
+  });
+  const valid = [workload("p25", 20), workload("median", 40), workload("p75", 80)];
+  expect(render(valid)).toContain("The middle half runs from 20 households to 80 households");
+  expect(render([valid[0], valid[1], { ...valid[2], state: "suppressed" }])).not.toContain(
+    "The middle half runs",
+  );
+  expect(render([valid[0], valid[1], workload("p75", 10)])).not.toContain("The middle half runs");
+  expect(render([valid[0], valid[1], { ...valid[2], sourceSlug: "unaccepted" }])).not.toContain(
+    "The middle half runs",
+  );
+});
+
+it("prioritizes age and sex without losing secondary demographics or their destinations", () => {
+  const { document } = parseHTML(
+    render([
+      item("bhw.demographics.age_band", "available", 10),
+      item("bhw.demographics.bloodtype", "available", 15),
+    ]),
+  );
+  const section = document.getElementById("demographics")!;
+  const secondary = Array.from(section.querySelectorAll("details")).find((d) =>
+    d.querySelector("summary")?.textContent?.includes("More recorded characteristics"),
+  )!;
+  expect(secondary.hasAttribute("open")).toBe(false);
+  expect(secondary.querySelector('a[href*="indicator=bhw.demographics.bloodtype"]')).not.toBeNull();
+  expect(secondary.textContent).not.toContain("bhw.demographics.age_band");
+});
+
+it("shows clarified demographic labels and retains original wording in explanations", () => {
+  const { document } = parseHTML(
+    render([
+      {
+        ...item("bhw.demographics.education", "available", 2),
+        values: [{ label: "College Level", value: 2 }],
+      },
+      {
+        ...item("bhw.demographics.bloodtype", "available", 3),
+        values: [
+          { label: "U", value: 3 },
+          { label: "A", value: 4 },
+        ],
+      },
+    ]),
+  );
+  expect(document.querySelector("#qualifications [data-chart]")?.textContent).toContain(
+    "Attended college but did not graduate",
+  );
+  expect(document.querySelector("#qualifications details")?.textContent).toContain("College Level");
+  expect(document.querySelector("#demographics [data-chart]")?.textContent).toContain("Unknown");
+  expect(document.getElementById("demographics")?.textContent).toContain(
+    "original source code “U”",
+  );
 });

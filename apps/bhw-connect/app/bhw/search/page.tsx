@@ -7,7 +7,7 @@ import { BhwMapReturnLink } from "@/components/bhw/map-return-link";
 import { parseComparisonSearch, publicPlace, type PlaceGroup } from "@/lib/bhw/comparison";
 import { ComparisonQueryResolver } from "@/components/compare/query-resolver";
 
-export const metadata = { title: "Search BHW places and indicators" };
+export const metadata = { title: "Search BHW places and topics" };
 
 export default async function BhwSearchPage({
   searchParams,
@@ -45,7 +45,7 @@ export default async function BhwSearchPage({
         <Link href={bhwOverviewHref(mapState)} className="underline">
           ← BHW overview
         </Link>
-        <h1 className="text-2xl font-semibold">Search BHW places and indicators</h1>
+        <h1 className="text-2xl font-semibold">Search BHW places and topics</h1>
         {returnPanel}
         <BhwSearchForm query={query} mapState={mapState} />
         <ComparisonQueryResolver
@@ -82,7 +82,7 @@ export default async function BhwSearchPage({
       <Link href={bhwOverviewHref(mapState)} className="underline">
         ← BHW overview
       </Link>
-      <h1 className="text-2xl font-semibold">Search BHW places and indicators</h1>
+      <h1 className="text-2xl font-semibold">Search BHW places and topics</h1>
       {returnPanel}
       <BhwSearchForm query={query.slice(0, 100)} mapState={mapState} />
       {intent.state === "unsupported" && (

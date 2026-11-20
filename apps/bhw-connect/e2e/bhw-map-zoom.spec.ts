@@ -83,8 +83,13 @@ for (const width of [390, 1440]) {
     const ready = page.locator('[data-map-state="ready"]');
     await expect(ready).toBeVisible();
     for (const level of ["region", "province", "citymun"] as const) {
-      if (width === 1440 && level === "region")
+      if (width === 1440 && level === "region") {
         await page.getByRole("button", { name: "Map only", exact: true }).click();
+        await page.getByRole("button", { name: "Show table", exact: true }).click();
+        await expect(page.getByRole("region", { name: "Localities in view" })).toContainText(
+          "Synthetic region",
+        );
+      }
       for (
         let attempt = 0;
         attempt < 5 && new URL(page.url()).searchParams.get("level") !== level;
@@ -101,6 +106,9 @@ for (const width of [390, 1440]) {
       await expect(page).toHaveURL(/valueMin=2/);
       if (width === 1440 && level === "region") {
         await expect(page.getByRole("dialog", { name: "Map only" })).toBeVisible();
+        await expect(page.getByRole("region", { name: "Localities in view" })).toContainText(
+          "Synthetic province",
+        );
         await page.getByRole("button", { name: "Exit map only" }).click();
       }
       await expect(

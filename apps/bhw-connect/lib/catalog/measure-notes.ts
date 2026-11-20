@@ -1,23 +1,26 @@
+import { POVERTY_DEFINITION, POVERTY_SCOPE, POVERTY_UNCERTAINTY } from "./poverty-reading";
+import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { CATALOG } from "./definitions";
 import type { CatalogIndicator } from "./types";
 
 const definitions: Record<string, string> = {
   "bhw.total":
-    "All LGU-reported BHWs, including registered-only, registered-and-accredited and nonregistered workers. This is distinct from validated profiles.",
+    "BHWs reported by local government units (LGUs), including registered-only, registered-and-accredited and nonregistered workers. This count covers a different group from the checked individual profiles.",
   "bhw.registered":
-    "LGU-reported registered-only workers; excludes the registered-and-accredited bucket.",
-  "bhw.registered-accredited": "LGU-reported workers who are both registered and accredited.",
-  "bhw.nonregistered": "LGU-reported workers recorded as nonregistered.",
+    "Workers reported by local governments as registered but not accredited. Workers who are both registered and accredited are counted separately.",
+  "bhw.registered-accredited":
+    "Workers reported by local governments as both registered and accredited.",
+  "bhw.nonregistered": "Workers reported by local governments as not registered.",
   "bhw.declared-accreditation":
-    "Registered-and-accredited LGU-reported workers divided by all LGU-reported BHWs, multiplied by 100.",
+    "The percentage of all BHWs reported by local governments who are both registered and accredited.",
   "bhw.validated-profiles":
-    "Validated individual profiles in BHW Profiles 2025; not the entire LGU-reported workforce.",
+    "Individual BHW records included after data checks in BHW Profiles 2025. This is a different group from the workforce reported by local governments.",
   "bhw.profile-accreditation":
-    "Accredited validated profiles divided by all validated profiles, multiplied by 100.",
+    "The percentage of checked BHW profiles recorded as accredited. The base is all checked profiles, not the local-government headcount.",
   "bhw.active-years":
-    "Mean recorded years active among validated profiles with a usable value; averages are not added across locations.",
+    "Average recorded years active as a BHW, using checked profiles with a usable value. Profiles without a usable value are excluded. Do not add averages from different places.",
   "bhw.any-honorarium":
-    "Validated profiles with any honorarium record divided by all validated profiles, multiplied by 100.",
+    "The percentage of all checked profiles with an allowance (honorarium) record. This does not establish the amount received or whether it is enough.",
   "nhfr.facilities":
     "Registered facilities in the accepted NHFR snapshot, counted once per facility.",
   "nhfr.government":
@@ -38,10 +41,30 @@ const definitions: Record<string, string> = {
     "Listed barangays qualifying through recorded health criteria. Denominator: health-evaluable listed barangays; unusable provincial benchmarks are excluded.",
   "population.residents":
     "PSA POPCEN 2024 resident population in accepted matched census rows. Higher-level totals sum matched municipalities and may be partial; Manila retains its published province-node figure.",
-  "poverty.incidence":
-    "PSA 2023 small-area estimate of the percentage of people below the poverty threshold. The published 90% confidence interval describes estimate uncertainty. No higher-level or district rate is inferred.",
+  "poverty.incidence": `${POVERTY_DEFINITION} ${POVERTY_UNCERTAINTY} ${POVERTY_SCOPE}`,
 };
 const specs = new Map(CATALOG.flatMap((d) => d.indicators.map((s) => [s.id, s] as const)));
+
+const statisticExplanations: Record<string, string> = {
+  mean: "Average (mean): add the recorded values, then divide by the number of usable records.",
+  median:
+    "Middle value (median): half the recorded values are at or below it and half are at or above it.",
+  p10: "10th percentile: roughly 10 in 100 recorded values are at or below this point. Tied values can increase that share.",
+  p25: "25th percentile: roughly 25 in 100 recorded values are at or below this point. Tied values can increase that share.",
+  p75: "75th percentile: roughly 75 in 100 recorded values are at or below this point. Tied values can increase that share.",
+  p90: "90th percentile: roughly 90 in 100 recorded values are at or below this point. Tied values can increase that share.",
+  min: "The lowest recorded monthly amount in this group; it is not a standard payment rate.",
+  max: "The highest recorded monthly amount in this group; it is not a standard payment rate.",
+  "busiest-share":
+    "The percentage of recorded household assignments held by the group ranked in the highest tenth for assigned households. Ties can make this group larger than 10% of workers.",
+  gini: "Gini describes how uneven recorded allowances are: 0 means everyone in this group has the same amount; values closer to 1 mean greater inequality.",
+  ratio:
+    "The amount at the 90th percentile divided by the amount at the 10th percentile. This compares two points in the payment distribution, not the average payments of the highest- and lowest-paid groups.",
+};
+
+function statisticExplanation(id: string): string {
+  return statisticExplanations[id.split(".").at(-1)!] ?? "";
+}
 
 /** Public interpretation only; calculations and source authority remain in the adapters. */
 export function measureDefinition(indicator: CatalogIndicator): string {
@@ -51,26 +74,26 @@ export function measureDefinition(indicator: CatalogIndicator): string {
   if (definitions[indicator.id]) return definitions[indicator.id];
   const spec = specs.get(indicator.id);
   if (indicator.id.startsWith("bhw.training-recency."))
-    return "Median recorded training year among profiles trained in this topic. Missing years remain unavailable; this is not a current certification-validity assessment.";
+    return "The middle recorded training year (median) among profiles recorded as trained in this topic. Missing years are unavailable. This does not mean everyone trained in that year or that their training or certification is up to date.";
   if (indicator.id.startsWith("bhw.honorarium-amount."))
-    return "Normalized monthly pesos among recipients paid by this government level. Payers overlap; payer-specific averages and percentiles cannot be added to obtain a worker’s combined total. These are 2025 profile records, not current payroll.";
+    return `${statisticExplanation(indicator.id)} Amounts converted to pesos per month, using available amount records for recipients from this government source. A worker can receive allowances from several sources; do not add their averages or percentile values to estimate a worker’s total. These are 2025 records, not current payroll.`;
   switch (spec?.table) {
     case "agg_cohorts":
-      return "Counts of today’s validated profiles by recorded registration, accreditation or first-active year. These joining waves do not measure historical workforce size or retention. Missing year categories are not asserted to be zero.";
+      return "Profiles in the 2025 dataset, grouped by the year of registration, accreditation or first service. These counts do not show how many BHWs worked in each past year or how many stayed in service. A missing year does not mean zero workers.";
     case "agg_workload":
-      return "Distribution of positive assigned-household counts reported by individual validated BHWs; not the Headcount household-to-worker ratio. Busiest-tenth share describes concentration of assigned households.";
+      return `${statisticExplanation(indicator.id)} Uses checked profiles with more than zero assigned households recorded; zero and missing assignments are excluded. These are assignments reported by individual BHWs, not total households in an area divided by its worker count. Household assignments do not measure every part of a BHW’s work.`;
     case "agg_honorarium_cumulative":
-      return "Each profile’s normalized monthly honorarium summed across paying levels; denominator includes all validated profiles, including profiles with no positive recorded amount. The stored ₱2,040/month comparison is a historical analysis reference, not a legal minimum or current sufficiency standard. Missing amounts do not establish confirmed non-payment.";
+      return `${indicator.id.endsWith(".median") ? `${statisticExplanations.median} ` : ""}Each profile’s recorded positive allowances are converted to monthly amounts and added across government sources. This measure includes all checked profiles, including those with no amount above zero recorded. Missing amounts do not confirm non-payment. The ₱2,040/month comparison is a historical analysis reference, not a legal minimum or a current standard for what is enough.`;
     case "agg_honorarium_inequality":
-      return "Combined normalized monthly honorarium among positive-amount recipients. Gini ranges from 0 (equal) to 1; the 90th-to-10th percentile ratio describes payment spread. Non-recipients are excluded.";
+      return `${statisticExplanation(indicator.id)} Uses each recipient’s recorded allowances added across sources and converted to monthly amounts. Only profiles with a recorded total above zero are included; other profiles are excluded. These 2025 records do not describe current payroll.`;
     case "agg_training":
-      return "Validated profiles recorded as trained in this topic divided by all validated profiles, multiplied by 100. Topics overlap and are not summed.";
+      return "The percentage of all checked profiles recorded as trained in this topic. One BHW can have several training topics, so do not add the percentages. This describes recorded training, not a test of current skills.";
     case "agg_certification":
-      return "Validated profiles with this recorded certification or training, as a percentage of all validated profiles.";
+      return "The percentage of all checked profiles with this training or certification recorded. Training and certification are separate measures; a worker can appear in more than one.";
     case "agg_demographics":
-      return "Counts of validated profiles in each recorded category. Missing categories need not sum to the profile total. All stored category counts are published. Categories already nulled in the source remain unavailable.";
+      return `Counts of checked profiles in each recorded category. Categories may not add up to the profile total when source information is missing. All stored category counts are shown, including zero. Values missing from the source stay unavailable; they are not treated as zero. ${demographicSourceNote(indicator.id)}`.trim();
     case "agg_honorarium":
-      return "Validated profiles receiving honorarium from this payer level, as a percentage of all validated profiles. Payers overlap; their shares must not be added. Receipt does not establish the amount paid.";
+      return "The percentage of all checked profiles recorded as receiving an allowance from this government source. A worker may receive allowances from several sources, so do not add these percentages. A receipt record does not establish the amount paid.";
     case "agg_nhfr_counts":
       return `Registered facilities classified as ${indicator.label.toLowerCase()} in the accepted NHFR snapshot. These headline types are not an exhaustive partition of all facilities.`;
     case "fact_fhsis_workforce":

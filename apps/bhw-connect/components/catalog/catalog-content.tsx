@@ -64,7 +64,12 @@ export async function CatalogContent({
           {locationName}
         </h2>
         {dataset ? (
-          <CatalogDetails catalog={catalog} dataset={dataset} mapState={mapState} />
+          <CatalogDetails
+            catalog={catalog}
+            dataset={dataset}
+            mapState={mapState}
+            locationName={locationName}
+          />
         ) : (
           <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
         )}
@@ -113,7 +118,12 @@ export async function CatalogContent({
         </p>
       </div>
       {dataset ? (
-        <CatalogDetails catalog={catalog} dataset={dataset} mapState={mapState} />
+        <CatalogDetails
+          catalog={catalog}
+          dataset={dataset}
+          mapState={mapState}
+          locationName={locationName}
+        />
       ) : (
         <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
       )}

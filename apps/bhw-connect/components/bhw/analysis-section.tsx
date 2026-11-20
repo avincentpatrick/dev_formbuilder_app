@@ -1,3 +1,8 @@
+import { trainingOverviewRows } from "@/lib/bhw/training-overview";
+import { TrainingTable } from "./training-table";
+import { WorkloadSummary } from "./workload-summary";
+import { PayerStatistics } from "./payer-statistics";
+import { categoryAxis } from "@/lib/bhw/category-order";
 import Link from "next/link";
 import type { CatalogDataset, CatalogIndicator } from "@/lib/catalog/types";
 import { publicValues, scalar, measureStatus } from "@/lib/bhw/overview";
@@ -27,8 +32,7 @@ function Measure({
   const values = publicValues(item);
   const chart = values.length > 1 && item.unit !== "calendar year";
   return (
-    <article className="space-y-3 rounded-lg border border-border p-4">
-      <h3 className="text-lg font-semibold">{item.label}</h3>
+    <article aria-label={item.label} className="space-y-3">
       <p className="text-xs text-muted">{areaName} · BHW Profiles 2025 · validated profiles</p>
       {chart ? (
         <FigureView
@@ -36,7 +40,8 @@ function Measure({
           title={item.label}
           caption={`${areaName} · BHW Profiles 2025`}
           xLabel={item.unit}
-          yLabel="Category"
+          yLabel={categoryAxis(item.id) ?? "Category"}
+          preserveOrder={Boolean(categoryAxis(item.id))}
           valueFormat={item.unit === "%" ? "percent" : item.unit === "PHP/month" ? "peso" : "count"}
         />
       ) : values.length ? (
@@ -49,7 +54,7 @@ function Measure({
       {values.length > 0 && item.reason && <p className="text-sm text-muted">{item.reason}</p>}
       <p className="text-sm text-muted">{measureDefinition(item)}</p>
       <div className="flex flex-wrap gap-4 text-sm underline">
-        <Link href={bhwMeasureHref(item.id, level, code, mapState)}>View exact values</Link>
+        <Link href={bhwMeasureHref(item.id, level, code, mapState)}>Full data and definition</Link>
         <Link href={comparisonHref(item.id, [code], undefined, mapState)}>Compare places</Link>
       </div>
     </article>
@@ -60,7 +65,6 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
   const get = (id: string) => dataset.indicators.find((i) => i.id === id);
   const median = scalar(get("bhw.combined-honorarium.median"));
   const none = scalar(get("bhw.combined-honorarium.none"));
-  const ratio = scalar(get("bhw.honorarium-inequality.ratio"));
   const formatMoney = (value: number) => formatValue({ value }, "PHP/month");
   return (
     <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
@@ -77,14 +81,7 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
           Missing amount records do not confirm non-payment.
         </p>
       )}
-      {ratio !== null && (
-        <p>
-          Among recipients, the 90th-percentile combined amount is{" "}
-          {ratio.toLocaleString("en-PH", { maximumFractionDigits: 2 })} times the 10th-percentile
-          amount.
-        </p>
-      )}
-      {median === null && none === null && ratio === null && (
+      {median === null && none === null && (
         <p>
           Payment insights are unavailable for this location. Check individual measure statuses
           below.
@@ -98,68 +95,82 @@ function HonorariumHighlights({ dataset, areaName }: Pick<Props, "dataset" | "ar
   );
 }
 
-function PayerAmounts({ dataset, areaName }: Pick<Props, "dataset" | "areaName">) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {["mean", "median"].map((stat) => {
-        const data = ["region", "province", "citymun", "barangay"].flatMap((payer) => {
-          const value = scalar(
-            dataset.indicators.find((i) => i.id === `bhw.honorarium-amount.${payer}.${stat}`),
-          );
-          return value === null
-            ? []
-            : [
-                {
-                  label:
-                    payer === "citymun"
-                      ? "City/municipality"
-                      : payer[0].toUpperCase() + payer.slice(1),
-                  value,
-                },
-              ];
-        });
-        const title = `${stat === "mean" ? "Average" : "Median"} monthly honorarium by paying level`;
-        return (
-          <article key={stat} className="space-y-3 rounded-lg border border-border p-4">
-            <h3 className="text-lg font-semibold">{title}</h3>
-            {data.length ? (
-              <FigureView
-                data={data}
-                title={title}
-                caption={`${areaName} · recipients at each payer level · 2025`}
-                xLabel="PHP/month"
-                yLabel="Paying level"
-                valueFormat="peso"
-              />
-            ) : (
-              <p>No public amount observations are available here.</p>
-            )}
-            <p className="text-sm text-muted">
-              Recipients at each payer level; averages and medians cannot be added across levels.
-              Missing or withheld payers are omitted; see their statuses below.
-            </p>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
 /** Same catalog-approved observations as search, exact-value pages and comparisons. */
 export function BhwAnalysisSection({
   title,
   id,
   prefixes,
+  exclude = [],
+  detailsLabel,
+  description,
   ...props
-}: Props & { title: string; id: string; prefixes: string[] }) {
-  const items = props.dataset.indicators.filter((i) =>
-    prefixes.some((prefix) => i.id.startsWith(prefix)),
+}: Props & {
+  title: string;
+  id: string;
+  prefixes: string[];
+  exclude?: string[];
+  detailsLabel?: string;
+  description?: string;
+}) {
+  const items = props.dataset.indicators.filter(
+    (i) => !exclude.includes(i.id) && prefixes.some((prefix) => i.id.startsWith(prefix)),
+  );
+  const trainingRows =
+    id === "training-topics"
+      ? trainingOverviewRows(props.dataset).map((row) => ({
+          ...row,
+          href: bhwMeasureHref(row.id, props.level, props.code, props.mapState),
+          yearHref: bhwMeasureHref(row.yearId, props.level, props.code, props.mapState),
+          compareHref: comparisonHref(row.id, [props.code], undefined, props.mapState),
+        }))
+      : null;
+  const renderItems = (list: CatalogIndicator[]) =>
+    list.map((item) => (
+      <details key={item.id} className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer font-medium">
+          {item.label}
+          {publicValues(item).length === 1
+            ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
+            : ""}
+        </summary>
+        <div className="mt-3">
+          <Measure {...props} item={item} />
+        </div>
+      </details>
+    ));
+  const mainDemographics = ["bhw.demographics.sex", "bhw.demographics.age_band"];
+  const secondary =
+    id === "demographics" ? items.filter((i) => !mainDemographics.includes(i.id)) : [];
+  const primary =
+    id === "demographics" ? items.filter((i) => mainDemographics.includes(i.id)) : items;
+  const measureList = trainingRows ? (
+    <TrainingTable rows={trainingRows} />
+  ) : id === "honorarium-amounts" ? (
+    <PayerStatistics {...props} />
+  ) : (
+    <div className="grid gap-4 md:grid-cols-2">
+      {renderItems(primary)}
+      {secondary.length > 0 && (
+        <details className="rounded-lg border border-border p-3 md:col-span-2">
+          <summary className="cursor-pointer font-medium">
+            More recorded characteristics ({secondary.length})
+          </summary>
+          <p className="my-3 text-sm text-muted">
+            Civil status, Indigenous Peoples identification and blood type use the categories
+            recorded in the source. Blood-type “U” is shown as “Unknown”. Other unexplained codes
+            retain their original wording; do not infer their meaning.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">{renderItems(secondary)}</div>
+        </details>
+      )}
+    </div>
   );
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className="scroll-mt-20 space-y-4">
       <h2 id={`${id}-heading`} className="text-2xl font-semibold">
         {title}
       </h2>
+      {description && <p className="text-sm text-muted">{description}</p>}
       {props.level === "barangay" && (
         <p className="text-sm text-muted">
           Some analyses are available only from city/municipality to national level. Unsupported
@@ -168,28 +179,23 @@ export function BhwAnalysisSection({
       )}
       {id === "honorarium-amounts" && (
         <>
-          <PayerAmounts dataset={props.dataset} areaName={props.areaName} />
           <BhwHonorariumDistribution dataset={props.dataset} areaName={props.areaName} />
         </>
       )}
+      {id === "service-history" && <WorkloadSummary dataset={props.dataset} />}
       {id === "combined-honorarium" && (
         <HonorariumHighlights dataset={props.dataset} areaName={props.areaName} />
       )}
-      <div className="grid gap-4 md:grid-cols-2">
-        {items.map((item) => (
-          <details key={item.id} className="rounded-lg border border-border p-3">
-            <summary className="cursor-pointer font-medium">
-              {item.label}
-              {publicValues(item).length === 1
-                ? ` · ${formatValue(publicValues(item)[0], item.unit)}`
-                : ""}
-            </summary>
-            <div className="mt-3">
-              <Measure {...props} item={item} />
-            </div>
-          </details>
-        ))}
-      </div>
+      {detailsLabel ? (
+        <details className="rounded-lg border border-border p-4">
+          <summary className="cursor-pointer font-medium">
+            {detailsLabel} ({trainingRows ? `${trainingRows.length} topics` : items.length})
+          </summary>
+          <div className="mt-4">{measureList}</div>
+        </details>
+      ) : (
+        measureList
+      )}
     </section>
   );
 }

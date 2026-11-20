@@ -1,5 +1,9 @@
+import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
+import { contextHref } from "@/lib/bhw/context";
+import { initialMapChoice } from "@/lib/maps/prototype";
 import { BhwAnalysisSection } from "./analysis-section";
 import Link from "next/link";
+import { bhwMeasureHref } from "@/lib/bhw/search";
 import { comparisonHref } from "@/lib/bhw/comparison";
 import { bhwScopedCatalogHref, restoredBhwMapHref } from "@/lib/maps/catalog-return";
 import type { CatalogDataset, CatalogIndicator, CatalogSelection } from "@/lib/catalog/types";
@@ -121,7 +125,9 @@ export function BhwOverview({
       ? []
       : [
           {
-            label: indicator.label,
+            label: indicator.label
+              .replace("Honorarium receipt from ", "")
+              .replace("citymun", "City/municipality"),
             value,
             shortLabel: indicator.label
               .replace("Honorarium receipt from ", "")
@@ -133,7 +139,6 @@ export function BhwOverview({
   const educationData = publicValues(education).map((v) => ({
     label: v.label ?? "Category",
     value: v.value,
-    shortLabel: (v.label ?? "Category").length > 16 ? `${v.label!.slice(0, 15)}…` : v.label,
   }));
   const previousMapHref = restoredBhwMapHref(mapState);
   const compareHref = comparisonHref(
@@ -162,9 +167,23 @@ export function BhwOverview({
             <a href="#qualifications">Qualifications and training</a>
             <a href="#demographics">Demographics</a>
             <a href="#service-history">Service history and workload</a>
-            <a href="#training-topics">Training topics and recency</a>
+            <a href="#training-topics">Training topics and years</a>
             <a href="#support">Support and compensation</a>
             <Link href={compareHref}>Compare places</Link>
+            <Link
+              href={contextHref({
+                context: "households",
+                map: {
+                  ...initialMapChoice("bhw-stepzero-2026"),
+                  level: selection.level === "barangay" ? "citymun" : selection.level,
+                  code:
+                    selection.level === "barangay" ? selection.code.slice(0, 7) : selection.code,
+                  selected: selection.level === "barangay" ? selection.code : null,
+                },
+              })}
+            >
+              Workforce and context
+            </Link>
             <Link href={previousMapHref ?? mapHref}>
               Map explorer{previousMapHref ? " · previous settings" : ""}
             </Link>
@@ -180,8 +199,8 @@ export function BhwOverview({
             {national ? "National workforce" : `Workforce in ${areaName}`}
           </h2>
           <p className="text-sm text-muted">
-            Headcount and validated profiles describe different populations. Do not add them or read
-            them as change over time.
+            Local-government headcounts and checked individual profiles describe different groups.
+            Do not add the totals or interpret their difference as change over time.
           </p>
           <PresentationSlide
             id="national-figures"
@@ -217,14 +236,27 @@ export function BhwOverview({
                 label="Validated profiles"
                 value={countAndShare(profiles, shareOf(profiles, total))}
                 caption={`${areaName} · 2025 · % of LGU-reported headcount (distinct sources)`}
-                context={<Status indicator={get("bhw.validated-profiles")} />}
+                context={
+                  <>
+                    <Status indicator={get("bhw.validated-profiles")} />
+                    <p className="mt-2 text-sm text-muted">
+                      Individual records included after data checks. The percentage compares two
+                      source totals; it does not show matched registration coverage.
+                    </p>
+                  </>
+                }
               />
-              <ShareTile
-                indicator={get("bhw.declared-accreditation")}
-                denominator={total}
-                label="LGU-reported accreditation"
-                population="Registered and accredited / LGU-reported headcount · 2025"
-              />
+              <details className="rounded-lg border border-border p-3">
+                <summary className="cursor-pointer">
+                  Accreditation within the reported headcount
+                </summary>
+                <ShareTile
+                  indicator={get("bhw.declared-accreditation")}
+                  denominator={total}
+                  label="LGU-reported accreditation"
+                  population="Registered and accredited / LGU-reported headcount · 2025"
+                />
+              </details>
             </div>
           </PresentationSlide>
           <section aria-label="Workforce distribution preview" className="space-y-3">
@@ -285,6 +317,11 @@ export function BhwOverview({
               ) : (
                 <p>No accepted training or certification observations are available.</p>
               )}
+              <p className="text-sm text-muted">
+                TESDA is the Technical Education and Skills Development Authority. BHS means
+                Barangay Health Services; NC II means National Certificate II. A recorded training
+                course is separate from an earned certificate.
+              </p>
               {certification.map(({ indicator, label }) => (
                 <div key={label}>
                   <span className="sr-only">{label}: </span>
@@ -297,7 +334,7 @@ export function BhwOverview({
             <FigureCard
               title="Educational attainment"
               caption={caption}
-              headline="Only public, disclosure-checked categories are shown."
+              headline="Highest education level recorded in the profiles. Missing source information is not counted as zero."
             >
               {educationData.length ? (
                 <FigureView
@@ -309,6 +346,32 @@ export function BhwOverview({
                 />
               ) : null}
               <Status indicator={education} />
+              <details className="mt-3 text-sm text-muted">
+                <summary className="cursor-pointer">Original education labels explained</summary>
+                <p className="mt-2">{demographicSourceNote("bhw.demographics.education")}</p>
+              </details>
+              <div className="mt-3 flex flex-wrap gap-4 text-sm underline">
+                <Link
+                  href={bhwMeasureHref(
+                    "bhw.demographics.education",
+                    selection.level,
+                    selection.code,
+                    mapState,
+                  )}
+                >
+                  Full data and definition
+                </Link>
+                <Link
+                  href={comparisonHref(
+                    "bhw.demographics.education",
+                    [selection.code],
+                    undefined,
+                    mapState,
+                  )}
+                >
+                  Compare education
+                </Link>
+              </div>
             </FigureCard>
           </PresentationSlide>
         </section>
@@ -321,6 +384,8 @@ export function BhwOverview({
           id="demographics"
           title="Demographics"
           prefixes={["bhw.demographics."]}
+          exclude={["bhw.demographics.education"]}
+          description="Recorded characteristics of BHWs in the checked profiles. Education is shown above under Qualifications and training."
         />
         <BhwAnalysisSection
           dataset={dataset}
@@ -331,6 +396,8 @@ export function BhwOverview({
           id="service-history"
           title="Service history and household workload"
           prefixes={["bhw.cohorts.", "bhw.workload.", "bhw.active-years"]}
+          detailsLabel="Explore service years, joining years and workload statistics"
+          description="Joining years describe workers in the 2025 profiles, not the size of the workforce in each past year."
         />
         <BhwAnalysisSection
           dataset={dataset}
@@ -339,8 +406,10 @@ export function BhwOverview({
           areaName={areaName}
           mapState={mapState}
           id="training-topics"
-          title="Training topics and recency"
+          title="Training topics and years"
           prefixes={["bhw.training.", "bhw.training-recency."]}
+          detailsLabel="Browse training topics and recorded years"
+          description="See the percentage recorded as trained in each topic and the middle training year (median). A BHW may have training in several topics; do not add the percentages. The median year does not mean everyone trained that year or that their training is up to date."
         />
         <section id="support" aria-labelledby="support-heading" className="scroll-mt-20 space-y-4">
           <h2 id="support-heading" className="text-2xl font-semibold">
@@ -401,6 +470,7 @@ export function BhwOverview({
             id="honorarium-amounts"
             title="Honorarium amounts and payment spread"
             prefixes={["bhw.honorarium-amount."]}
+            detailsLabel="View all payment statistics by source"
           />
           <BhwAnalysisSection
             dataset={dataset}
@@ -411,6 +481,7 @@ export function BhwOverview({
             id="combined-honorarium"
             title="Combined honorarium and payment inequality"
             prefixes={["bhw.combined-honorarium.", "bhw.honorarium-inequality."]}
+            detailsLabel="View combined payment measures and inequality statistics"
           />
         </section>
         <section aria-labelledby="examine-heading" className="space-y-3">

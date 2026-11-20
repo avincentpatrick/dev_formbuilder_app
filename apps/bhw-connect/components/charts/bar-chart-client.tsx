@@ -13,11 +13,13 @@ export function BarChartClient({
   yLabel,
   valueSuffix,
   valueFormat,
+  preserveOrder,
   width,
   barHeight,
   fill,
 }: {
   data: BarDatum[];
+  preserveOrder?: boolean;
   xLabel?: string;
   yLabel?: string;
   valueSuffix?: string;
@@ -68,6 +70,7 @@ export function BarChartClient({
             yLabel,
             valueSuffix,
             valueFormat,
+            preserveOrder,
             width: plotWidth,
             barHeight,
             fill: resolvedFill,
@@ -88,7 +91,17 @@ export function BarChartClient({
       cancelled = true;
       plot?.remove();
     };
-  }, [data, xLabel, yLabel, valueSuffix, valueFormat, plotWidth, barHeight, resolvedFill]);
+  }, [
+    data,
+    xLabel,
+    yLabel,
+    valueSuffix,
+    valueFormat,
+    plotWidth,
+    barHeight,
+    resolvedFill,
+    preserveOrder,
+  ]);
 
   const format =
     valueSuffix === "%"

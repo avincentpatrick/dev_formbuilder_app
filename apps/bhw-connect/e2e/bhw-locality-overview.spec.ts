@@ -4,7 +4,7 @@ for (const width of [390, 1440]) {
   test(`place selection retains the visual dashboard at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("bhw");
-    const input = page.getByRole("combobox", { name: "Search BHW places and indicators" });
+    const input = page.getByRole("combobox", { name: "Search BHW places and topics" });
     await input.fill("Ilocos");
     const region = page
       .getByRole("option")

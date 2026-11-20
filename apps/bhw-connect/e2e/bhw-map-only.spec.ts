@@ -55,12 +55,8 @@ for (const [width, count] of [
       const box = await canvas.boundingBox();
       await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
     }
-    await clickCenter();
+    const initialUrl = page.url();
     const value = page.getByRole("status", { name: "Selected map value" });
-    await expect(value).toContainText("Test region");
-    await expect(value).toContainText(`${count} people`);
-    await page.getByRole("button", { name: "Close map value" }).click();
-    await expect(value).toBeHidden();
     await page.getByRole("button", { name: "Map only", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Map only", exact: true });
     await expect(dialog).toBeVisible();
@@ -72,8 +68,38 @@ for (const [width, count] of [
       .toEqual({ x: 0, y: 0, width, height: 844 });
     await expect(page.getByRole("group", { name: "Map viewport controls" })).toBeHidden();
     expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
-    await clickCenter();
+    await canvas.hover();
     await expect(value).toContainText(`${count} people`);
+    await clickCenter();
+    await page.mouse.move(0, 0);
+    await expect(value).toContainText(`${count} people`);
+    expect(page.url()).toBe(initialUrl);
+    await expect(value.getByRole("link", { name: "Open locality profile" })).toHaveAttribute(
+      "href",
+      /location=region%3A01/,
+    );
+    await page.getByRole("button", { name: "Show table", exact: true }).click();
+    const table = page.getByRole("region", { name: "Localities in view" });
+    await expect(table).toContainText("Test region");
+    await expect(table).toContainText(`${count} people`);
+    await table.getByRole("button", { name: "Test region" }).click();
+    await expect(value).toContainText("Test region");
+    expect(page.url()).toBe(initialUrl);
+    await page.getByRole("button", { name: "Close map value" }).click();
+    await expect(value).toBeHidden();
+    // Moving the camera changes the table, never the page or locality selection.
+    const mapBox = (await canvas.boundingBox())!;
+    for (let i = 0; i < 3; i++) {
+      await page.mouse.move(mapBox.x + mapBox.width * 0.2, mapBox.y + mapBox.height * 0.45);
+      await page.mouse.down();
+      await page.mouse.move(mapBox.x + mapBox.width * 0.9, mapBox.y + mapBox.height * 0.45, {
+        steps: 20,
+      });
+      await page.mouse.up();
+    }
+    await expect(table).toContainText("No matching localities in view.");
+    expect(page.url()).toBe(initialUrl);
+    await page.getByRole("button", { name: "Hide table", exact: true }).click();
     await page.getByRole("button", { name: "Exit map only" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("button", { name: "Map only", exact: true })).toBeFocused();
@@ -83,5 +109,12 @@ for (const [width, count] of [
     await expect(dialog).toBeHidden();
     expect(requests).toBe(1);
     await expect(page.locator(".maplibregl-map")).toHaveCount(1);
+    await page.goto(`map?dataset=bhw-stepzero-2026&valueMin=${count + 1}`);
+    await expect(canvas).toBeVisible();
+    await page.getByRole("button", { name: "Map only", exact: true }).click();
+    await page.getByRole("button", { name: "Show table", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Localities in view" })).toContainText(
+      "No matching localities in view.",
+    );
   });
 }

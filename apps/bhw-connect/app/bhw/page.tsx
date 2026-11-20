@@ -86,6 +86,10 @@ export default async function Home({
       </Suspense>
       <div>
         <ChatLauncher geoCode={selection.code} geoLevel={selection.level} placement="inline" />
+        <p className="mt-2 text-sm text-muted">
+          Sign-in and access approval are required for Ask the Data. Public figures above are
+          available without signing in.
+        </p>
       </div>
     </div>
   );

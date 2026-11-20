@@ -11,12 +11,12 @@ export const GLOSSARY = {
   accredited: {
     term: "Accredited",
     definition:
-      "A BHW who has completed the Department of Health's accreditation process, as recorded in the ACCREDITED BHW field of the source dataset.",
+      "A BHW recorded as accredited in the relevant source. Headcount and individual profiles are separate sources; their accreditation figures use different populations.",
   },
   suppressed: {
     term: "Suppressed",
     definition:
-      "A figure hidden because fewer than 5 BHWs are represented in that cell — showing the exact number could let someone identify a specific individual. The number rolls up to the nearest larger area where it's safe to show instead.",
+      "A value withheld under the publication rules for that measure. Withheld does not mean zero. Rules differ across measures, so a public total does not establish that every related amount or breakdown can also be shown.",
   },
   honorarium: {
     term: "Honorarium",
@@ -24,18 +24,19 @@ export const GLOSSARY = {
       "A cash allowance paid to a BHW by a local government unit (region, province, city/municipality, or barangay) in recognition of their service. A BHW can receive honorarium from more than one level at once.",
   },
   honorarium_sufficiency: {
-    term: "Honorarium sufficiency",
+    term: "Historical honorarium reference",
     definition:
-      "Each BHW's honorarium summed across every paying level (region, province, city/municipality, barangay) into one cumulative monthly total, then compared to a sufficiency cut of ₱2,040/month (≈₱68/day, using a 30-day-month convention). Unlike the distribution and inequality figures, which describe amounts only among BHWs who receive something, the denominator here is every profiled BHW, including those who receive no honorarium at all.",
+      "Combined recorded monthly allowances compared with the historical reference of ₱2,040 per month (₱68 per day using 30 days). This is not a legal minimum or evidence that an allowance meets living costs. The base is all checked profiles, including profiles with no positive recorded amount. Missing amount records do not confirm non-payment.",
   },
   active_years: {
     term: "Years of service",
     definition:
-      "The number of distinct years a BHW is recorded as having been active, based on their self-reported active-service year list.",
+      "Recorded years active as a BHW. The average uses checked profiles with a usable value; missing values are excluded. It is not the number of years continuously employed.",
   },
   ip_status: {
     term: "IP status",
-    definition: "Whether a BHW self-identifies as belonging to an Indigenous People (IP) group.",
+    definition:
+      "The Indigenous Peoples identification recorded in the source profile. Retain the source categories; an unexplained or missing code should not be interpreted as a negative response.",
   },
   psgc: {
     term: "PSGC",
@@ -50,7 +51,7 @@ export const GLOSSARY = {
   total_bhw: {
     term: "Total BHWs",
     definition:
-      "The full count of Barangay Health Workers in an area, from the DOH BHW Headcount 2025: registered, registered & accredited, and non-registered BHWs combined. This is the universe against which the individually-profiled subset is measured.",
+      "The local-government count of Barangay Health Workers in BHW Headcount 2025: registered-only, registered-and-accredited, and nonregistered workers combined. Checked individual profiles are a separate source and population; do not add the two totals.",
   },
   validated_profile: {
     term: "Validated profile",
@@ -60,7 +61,7 @@ export const GLOSSARY = {
   profiling_coverage: {
     term: "Profiling coverage",
     definition:
-      "The share of registered BHWs who have a validated individual profile — validated profiles divided by the registered universe (registered + registered & accredited). Non-registered BHWs are excluded from this ratio because they are not individually profiled.",
+      "Checked individual profiles divided by the registered headcount (registered-only plus registered-and-accredited). These are distinct sources, without person-by-person matching. This ratio does not establish which registered workers have a profile.",
   },
   registered_bhw: {
     term: "Registered BHW",
@@ -70,22 +71,22 @@ export const GLOSSARY = {
   non_registered_bhw: {
     term: "Non-registered BHW",
     definition:
-      "A Barangay Health Worker counted in the BHW Headcount who is not recorded as registered with the DOH. Non-registered BHWs are part of the total headcount but are not individually profiled.",
+      "A worker reported as not registered in the local-government headcount. This category alone does not establish whether the worker appears in the separate individual-profile source.",
   },
   stepzero: {
     term: "BHW Headcount 2025",
     definition:
-      "A DOH barangay-level aggregate headcount of Barangay Health Workers (registered, accredited, and non-registered) with population and household context. It provides the total BHW universe; it is a coarser, self-reported tally distinct from the individually-validated per-person dataset.",
+      "A DOH barangay-level aggregate headcount of Barangay Health Workers (registered, accredited, and non-registered) with population and household context. It is a reported area tally, distinct from the checked individual-profile dataset.",
   },
   census_population: {
     term: "Census population",
     definition:
-      "The official resident count from the Philippine Statistics Authority (PSA) census — the 2024 Census of Population (POPCEN) for the current figure, with the 2020 Census of Population and Housing (CPH) also available. Per-resident rates here prefer the BHW program's own BHW Headcount population figure; the census fills in only where an area has no Headcount population at all. The finest census grain here is city/municipality.",
+      "An official resident count from the Philippine Statistics Authority (PSA) census. Read the figure's source and year: census population and population reported with BHW headcounts are different sources. Context views retain the selected source and do not silently replace a missing count.",
   },
   households_per_bhw: {
     term: "Households per BHW",
     definition:
-      "The area's household count divided by its Total BHWs (the BHW Headcount universe) — roughly how many households each BHW serves. BHWs in the Philippines are assigned to households, so this ratio is the operative workload measure, and it lets places of very different sizes be compared. Household counts come from the BHW Headcount 2025 and the ratio is unavailable for areas with no Headcount row.",
+      "The area's reported household count divided by its reported BHW count, using BHW Headcount 2025. This is an area-level comparison, not a worker's recorded assignments or actual visits. It does not by itself establish a staffing shortage. Areas without a usable source count have no ratio.",
   },
   ref_manual_trained: {
     term: "BHW Reference Manual Training",
@@ -110,7 +111,7 @@ export const GLOSSARY = {
   bhw_per_1000: {
     term: "BHWs per 1,000 residents",
     definition:
-      "Total BHWs divided by the area's population, times 1,000 — how many health workers serve each 1,000 people. Population is the BHW Headcount's own self-reported barangay figure, the same source as the BHW counts it divides; where the Headcount has no population for an area, the PSA census count is used instead. Higher means denser BHW coverage.",
+      "The area's reported BHW count divided by the population named for that figure, multiplied by 1,000. It compares reported workforce size with population size. Read the source and year before comparing places. A higher ratio does not by itself show better access, enough staff, or more services delivered.",
   },
   poverty_incidence: {
     term: "Poverty incidence",
@@ -125,7 +126,7 @@ export const GLOSSARY = {
   confidence_interval: {
     term: "confidence interval",
     definition:
-      "The range the true rate is very likely to fall in, given how few people were counted. A wide interval means the percentage is based on so few BHWs that it could really be quite different; a narrow one means it's well-pinned-down. Shown here as a 95% Wilson interval.",
+      "A range expressing uncertainty around an estimated percentage. Wider intervals generally mean less precision. Where this site labels an interval as 95% Wilson, that names the statistical method and confidence level; it is not a range of individual workers' values.",
   },
   data_completeness: {
     term: "Data completeness",
@@ -140,7 +141,7 @@ export const GLOSSARY = {
   income_class: {
     term: "LGU income class",
     definition:
-      "The government's ranking of a province, city, or municipality by its yearly income, from 1st class (highest income) to 5th class (lowest). It's a rough proxy for how much a local government can afford to spend — including on supporting its BHWs. The values here are the DOF's 2024 reclassification (Department Order 074-2024 under RA 11964, effective 2025), which replaced the older six-class system.",
+      "A government classification of a local government's yearly income, from 1st class (highest income) to 5th class (lowest). The source is the DOF's 2024 reclassification under Department Order 074-2024 and RA 11964, effective 2025. It does not show the budget available for BHW allowances or establish why payments differ.",
   },
   adjusted_rate: {
     term: "Adjusted rate",

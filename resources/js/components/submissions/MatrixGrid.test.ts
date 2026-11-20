@@ -6,7 +6,7 @@
  */
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 
 import type { AnswerValue, EncodeField } from './FieldInput.vue';
 import { GridAuthoringKey, type GridAuthoring, type GridEdit } from './grid-authoring';
@@ -370,5 +370,44 @@ describe('M246 — a grid as a question table', () => {
 
         expect(wrapper.find('table').exists()).toBe(false);
         expect(wrapper.find('[data-grid-nothing]').text()).toBe('Nothing in this grid applies to you.');
+    });
+});
+
+describe('M247 — a big table keeps its header row and first column in view', () => {
+    const rowsOf = (n: number) => Array.from({ length: n }, (_, i) => ({ value: `r${i + 1}`, label: `Row ${i + 1}` }));
+    const sized = (rows: number) => typedGrid({ matrix: { ...typedGrid().matrix!, rows: rowsOf(rows) } });
+
+    it('marks a grid of more than eight shown rows long, so a tall screen gives it a box of its own', () => {
+        expect(grid(sized(9)).get('[data-matrix-grid]').classes()).toContain('mds-grid--long');
+        expect(grid(sized(8)).get('[data-matrix-grid]').classes()).not.toContain('mds-grid--long');
+    });
+
+    it('counts the shown rows only, so a grid long on paper but short on screen is not long', () => {
+        const hidden = Object.fromEntries(rowsOf(9).map((row, i) => [row.value, i < 4]));
+        const wrapper = mount(MatrixGrid, {
+            props: { field: sized(9), kind: 'matrix', modelValue: null, relevance: { rows: hidden, columns: {}, cells: {} } },
+            attachTo: document.body,
+        });
+        expect(wrapper.get('[data-matrix-grid]').classes()).not.toContain('mds-grid--long');
+    });
+
+    it('makes the scroll box a named, focusable group only when the table overflows it', async () => {
+        const plain = grid(sized(3)).get('[data-grid-scroll]');
+        expect(plain.attributes('tabindex')).toBeUndefined();
+        expect(plain.attributes('role')).toBeUndefined();
+
+        const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(1200);
+        const box = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600);
+        try {
+            const mounted = grid(sized(3));
+            await nextTick();
+            const wide = mounted.get('[data-grid-scroll]');
+            expect(wide.attributes('tabindex')).toBe('0');
+            expect(wide.attributes('role')).toBe('group');
+            expect(wide.attributes('aria-label')).toBe('Clinics');
+        } finally {
+            width.mockRestore();
+            box.mockRestore();
+        }
     });
 });

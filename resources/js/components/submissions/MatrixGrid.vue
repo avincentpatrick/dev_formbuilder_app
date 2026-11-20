@@ -35,7 +35,7 @@
  * and column, so a hidden one can still be renamed there.
  */
 import { MdsButton, MdsCheckbox, MdsIconButton, MdsNumberInput, MdsSelect, MdsTextarea, MdsTextInput } from '@meridian/design-system';
-import { computed, inject, useId } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue';
 
 import type { AnswerValue, EncodeField, GridRelevanceView, MatrixColumn, MatrixOption, RequiredMarker } from './FieldInput.vue';
 import { GridAuthoringKey, type GridEdit } from './grid-authoring';
@@ -217,12 +217,47 @@ function cellDescribedby(i: number, j: number | null, rowValue: string, colValue
 function onCellLeft(rowValue: string, colValue: string | null): void {
     emit('cellTouched', cellPathOf(rowValue, colValue));
 }
+
+// ── M247 (`grid-wide-sticky-explorer`, `D231`): a big table keeps its first column, and a long one its header row, in view ──
+/** More shown rows than this, and on a screen tall enough the table scrolls in a box of its own so its header row stays pinned. */
+const LONG_GRID_ROWS = 8;
+const long = computed<boolean>(() => visibleRows.value.length > LONG_GRID_ROWS);
+const scrollBox = ref<HTMLElement | null>(null);
+/** The table is wider or taller than its box: the box is then a named, focusable group, so a keyboard can scroll it (as `MdsDataTable`). */
+const overflows = ref(false);
+let observer: ResizeObserver | null = null;
+
+/**
+ * Measures the box, and keeps a focused cell clear of the pinned header row and first column (WCAG 2.4.11): the box's
+ * scroll padding is the header row's height and the first column's width while they are pinned, and nothing in the cards.
+ */
+function measureScroll(): void {
+    const box = scrollBox.value;
+    if (box === null) return;
+    overflows.value = box.scrollWidth > box.clientWidth + 1 || box.scrollHeight > box.clientHeight + 1;
+    const header = box.querySelector<HTMLElement>('.mds-grid__col');
+    const label = box.querySelector<HTMLElement>('.mds-grid__row-label');
+    const pinned = header !== null && getComputedStyle(header).position === 'sticky';
+    box.style.scrollPaddingBlockStart = pinned && header ? `${header.offsetHeight}px` : '';
+    box.style.scrollPaddingInlineStart = pinned && label ? `${label.offsetWidth}px` : '';
+}
+
+onMounted(() => {
+    measureScroll();
+    if (typeof ResizeObserver === 'undefined' || scrollBox.value === null) return;
+    observer = new ResizeObserver(() => measureScroll());
+    observer.observe(scrollBox.value);
+    const table = scrollBox.value.querySelector('table');
+    if (table !== null) observer.observe(table);
+});
+watch([visibleRows, visibleColumns], () => queueMicrotask(measureScroll));
+onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
     <fieldset
         class="mds-grid"
-        :class="{ 'mds-grid--stacked': stacked, 'mds-grid--likert': kind === 'likert-matrix', 'mds-grid--authoring': authoring !== null }"
+        :class="{ 'mds-grid--stacked': stacked, 'mds-grid--likert': kind === 'likert-matrix', 'mds-grid--authoring': authoring !== null, 'mds-grid--long': long }"
         :aria-describedby="describedby"
         data-matrix-grid
     >
@@ -235,7 +270,7 @@ function onCellLeft(rowValue: string, colValue: string | null): void {
 
         <p v-if="nothingToAnswer && !authoring" class="mds-grid__help" data-grid-nothing>Nothing in this grid applies to you.</p>
         <div v-else class="mds-grid__frame">
-            <div class="mds-grid__scroll">
+            <div ref="scrollBox" class="mds-grid__scroll" :tabindex="overflows ? 0 : undefined" :role="overflows ? 'group' : undefined" :aria-label="overflows ? field.label : undefined" data-grid-scroll>
                 <table class="mds-grid__table" :style="{ '--matrix-grid-columns': String(Math.max(columns.length, 1)) }">
                     <thead class="mds-grid__head">
                         <tr>
@@ -779,5 +814,61 @@ function onCellLeft(rowValue: string, colValue: string | null): void {
     width: 1em;
     height: 1em;
     margin-top: 0.15em;
+}
+
+/* ── M247 (`grid-wide-sticky-explorer`, `D231`): a table wider than its box keeps its first column in view, and a long one
+   its header row too. The layers are local to the box (`isolation`), so they never compete with the page's z-index scale:
+   1 a Likert radio, 2 the first column, 3 the header row, 4 their corner. Separate borders, because collapsed ones do not
+   travel with a pinned cell; every pinned cell is opaque, in the table's own surface or its band. ── */
+@container mds-grid (min-width: 30em) {
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__scroll {
+        isolation: isolate;
+    }
+
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__table {
+        border-collapse: separate;
+        border-spacing: 0;
+        background-color: var(--mds-color-bg-surface);
+    }
+
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__row-label {
+        position: sticky;
+        inset-inline-start: 0;
+        z-index: 2;
+        background-color: var(--mds-color-bg-surface);
+    }
+
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__row:nth-child(even) > .mds-grid__row-label {
+        background-color: var(--mds-color-bg-sunken);
+    }
+
+    /* A first column of long row details must not leave the cells no room. */
+    .mds-grid:not(.mds-grid--stacked):not(.mds-grid--likert) .mds-grid__row-label {
+        max-inline-size: 22rem;
+    }
+
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__col,
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__corner {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background-color: var(--mds-color-bg-surface);
+    }
+
+    .mds-grid:not(.mds-grid--stacked) .mds-grid__corner {
+        inset-inline-start: 0;
+        z-index: 4;
+    }
+}
+
+/* A long table on a screen tall enough scrolls in its own box, so its header row stays pinned while its rows go by. */
+@media (min-height: 40rem) {
+    @container mds-grid (min-width: 30em) {
+        .mds-grid--long:not(.mds-grid--stacked) .mds-grid__scroll {
+            max-block-size: 75vh;
+            max-block-size: 75dvh;
+            overflow: auto;
+        }
+    }
 }
 </style>

@@ -117,6 +117,13 @@ for (const theme of themes) {
         for (const head of await page.locator('[data-matrix-grid] .mds-grid__head').all()) {
             expect(await head.evaluate((el) => getComputedStyle(el).position)).toBe(wide ? 'static' : 'absolute');
         }
+        // M247 (`grid-wide-sticky-explorer`): in the table the first column is pinned, and opaque so nothing scrolls
+        // through it — in both themes; on the phone it is an ordinary card heading.
+        for (const label of await page.locator('[data-matrix-grid] .mds-grid__row-label').all()) {
+            const style = await label.evaluate((el) => ({ position: getComputedStyle(el).position, background: getComputedStyle(el).backgroundColor }));
+            expect(style.position).toBe(wide ? 'sticky' : 'static');
+            if (wide) expect(style.background).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+        }
         await expect(page.locator('[data-likert-line]').first()).toBeVisible();
 
         // Likert matrix: pick a score in one row. Every control is named by its row and its column, in either

@@ -51,7 +51,7 @@ final class VersionComparison
     /** A section's settings, in the order `conflict-diff.ts` lists them. Icon and colour are the hub's, not the form's. */
     private const array SECTION_SETTINGS = [
         'label', 'label_translations', 'description', 'description_translations', 'relevant_expression', 'is_repeatable',
-        'min_instances', 'max_instances', 'repeat_layout',
+        'min_instances', 'max_instances', 'repeat_layout', 'page_width',
     ];
 
     public function __construct(private readonly TemplateParser $templates = new TemplateParser) {}

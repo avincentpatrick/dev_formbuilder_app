@@ -121,7 +121,7 @@ final class FormBuilderService
                 'min_instances' => $data['min_instances'] ?? null,
                 'max_instances' => $data['max_instances'] ?? null,
                 // M185 (`R-0a7275ce`): cards are stored as null, so a section never set to a table hashes as it always did.
-                'repeat_layout' => ($data['repeat_layout'] ?? null) === 'table' ? 'table' : null,
+                'repeat_layout' => ($data['repeat_layout'] ?? null) === 'table' ? 'table' : null, 'page_width' => ($data['page_width'] ?? null) === 'wide' ? 'wide' : null,
                 'relevant_expression' => $data['relevant_expression'] ?? null,
             ])->save();
 

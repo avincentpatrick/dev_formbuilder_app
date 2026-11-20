@@ -56,6 +56,8 @@ class FormSection extends Model implements TenantScoped
         'max_instances',
         // M185 (`R-0a7275ce`): `table` draws a repeatable section as a table; null is the cards.
         'repeat_layout',
+        // M247 (`D231`): `wide` widens the respondent's page while this section is on screen; null is the reading width.
+        'page_width',
         'relevant_expression',
     ];
 

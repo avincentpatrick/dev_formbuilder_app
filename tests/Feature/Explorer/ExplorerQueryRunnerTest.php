@@ -15,6 +15,7 @@ use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Explorer\ExplorerPresenter;
 use App\Services\Explorer\ExplorerQueryRunner;
 use App\Services\Explorer\ExplorerResultShaper;
 use App\Services\Forms\FormService;
@@ -642,4 +643,162 @@ it('never reads another workspace\'s rows', function (): void {
         ->and(explore($stranger, ['source' => 'activity', 'from' => '2024-04-01', 'to' => '2026-12-31', 'chart' => 'bar', 'dimensions' => [['field' => 'actor']]])['categories'])
         ->each(fn ($category) => $category->label->not->toBe($this->owner->name))
         ->and(explorerRunRefusal($stranger, ['source' => 'answers', 'form_id' => $form->id]))->toBe('form_unavailable');
+});
+
+// ── M247 (`grid-wide-sticky-explorer`, `D231`): a grid, counted row by row ─────────────────────────────────────
+
+/**
+ * A published form with a Grid of every column kind the rows source reads and two it must leave out, a Likert grid on
+ * a numeric scale, and a grid marked personal.
+ */
+function explorerGridForm(Tenant $tenant, User $owner, string $title = 'Clinic review'): Form
+{
+    $form = app(FormService::class)->create($tenant, $owner, $title);
+    $version = $form->draftVersion;
+
+    addFormField($version, $owner, 'clinics', FieldType::Matrix, 0, ['label' => 'Clinics', 'config' => [
+        'rows' => [['value' => 'a', 'label' => 'Clinic A'], ['value' => 'b', 'label' => 'Clinic B'], ['value' => 'c', 'label' => 'Clinic C']],
+        'columns' => [
+            ['value' => 'rate', 'label' => 'Rating', 'type' => 'single_select', 'options' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']]],
+            ['value' => 'svc', 'label' => 'Services', 'type' => 'multi_select', 'options' => [['value' => 'lab', 'label' => 'Lab'], ['value' => 'xray', 'label' => 'X-ray']]],
+            ['value' => 'staff', 'label' => 'Staff on duty', 'type' => 'integer'],
+            ['value' => 'opened', 'label' => 'Opened', 'type' => 'date'],
+            ['value' => 'remark', 'label' => 'Remark', 'type' => 'short_text'],
+            ['value' => 'note', 'label' => 'Note', 'type' => 'long_text'],
+            ['value' => 'odd name', 'label' => 'Odd', 'type' => 'short_text'],
+        ],
+    ]]);
+    addFormField($version, $owner, 'satisfaction', FieldType::LikertMatrix, 1, ['label' => 'Satisfaction', 'config' => [
+        'rows' => [['value' => 'clean', 'label' => 'Cleanliness'], ['value' => 'staff', 'label' => 'Staff']],
+        'columns' => [['value' => '1', 'label' => 'Poor'], ['value' => '4', 'label' => 'Good'], ['value' => '5', 'label' => 'Excellent']],
+    ]]);
+    addFormField($version, $owner, 'private_grid', FieldType::Matrix, 2, ['is_pii' => true, 'config' => [
+        'rows' => [['value' => 'r', 'label' => 'R']],
+        'columns' => [['value' => 'v', 'label' => 'V', 'type' => 'short_text']],
+    ]]);
+
+    app(PublishService::class)->publish($form->refresh(), $owner);
+
+    return $form->refresh();
+}
+
+/** Three responses in March, one with no grid at all, one whose grid is not an object, one in April and a draft. */
+function explorerGridResponses(Form $form): void
+{
+    explorerResponse($form, '2026-03-02 09:00:00', [
+        'clinics' => [
+            'a' => ['rate' => 'good', 'svc' => ['lab'], 'staff' => 3, 'opened' => '2026-03-02', 'remark' => 'busy', 'note' => 'long words'],
+            'b' => ['rate' => 'poor', 'staff' => '2'],
+            'c' => ['rate' => null, 'svc' => []],
+        ],
+        'satisfaction' => ['clean' => '5', 'staff' => '4'],
+    ]);
+    explorerResponse($form, '2026-03-05 09:00:00', [
+        'clinics' => ['a' => ['rate' => 'good'], 'c' => ['rate' => 'poor', 'opened' => '2026-02-30']],
+        'satisfaction' => ['clean' => '5', 'staff' => ''],
+    ]);
+    explorerResponse($form, '2026-03-06 09:00:00', ['clinics' => 'not a grid']);
+    explorerResponse($form, '2026-03-07 09:00:00', []);
+    explorerResponse($form, '2026-04-02 09:00:00', ['clinics' => ['a' => ['rate' => 'poor']]]);
+    explorerResponse($form, '2026-03-08 09:00:00', ['clinics' => ['b' => ['rate' => 'good']]], SubmissionStatus::Draft);
+}
+
+it('M247: counts each answered row of a grid once, and never a blank row, a non-grid answer, a draft or another month', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridResponses($form);
+
+    $result = explore($this->owner, ['source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'clinics', 'chart' => 'bar', 'dimensions' => [['field' => 'row']]]);
+
+    expect(explorerPairs($result))->toBe(['Clinic A' => 2, 'Clinic B' => 1, 'Clinic C' => 1])
+        ->and($result['meta']['notes'])->toContain('Each answered row counts once: a response counts once for every row it answered, and a row left blank is not counted.');
+});
+
+it('M247: shows, row by row, how many chose each answer of a column', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridResponses($form);
+
+    $result = explore($this->owner, [
+        'source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'clinics', 'chart' => 'column',
+        'dimensions' => [['field' => 'row'], ['field' => 'column:rate']],
+    ]);
+
+    $byRating = [];
+    foreach ($result['series'] as $i => $series) {
+        $byRating[$series['label']] = explorerPairs($result, $i);
+    }
+
+    expect($byRating['Good']['Clinic A'] ?? null)->toBe(2)
+        ->and($byRating['Poor']['Clinic B'] ?? null)->toBe(1)
+        ->and($byRating['Poor']['Clinic C'] ?? null)->toBe(1);
+});
+
+it('M247: reads a number, a multiple choice and a date column, and survives a date that does not exist', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridResponses($form);
+    $on = fn (array $definition): array => explore($this->owner, ['source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'clinics', ...$definition]);
+
+    $staff = $on(['chart' => 'number', 'measures' => [['aggregate' => 'avg', 'field' => 'column:staff']]]);
+    $services = $on(['chart' => 'bar', 'dimensions' => [['field' => 'column:svc']]]);
+    $opened = $on(['chart' => 'column', 'dimensions' => [['field' => 'column:opened', 'bucket' => 'month']]]);
+
+    expect($staff['totals']['values'])->toBe([2.5])
+        ->and(explorerPairs($services))->toMatchArray(['Lab' => 1])
+        // Four answered rows: one opened in March, one on a day that does not exist and two with no date.
+        ->and(explorerPairs($opened))->toBe(['Mar 2026' => 1, '(empty)' => 3]);
+});
+
+it('M247: reads a Likert grid by its scale, as a label and as a number', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridResponses($form);
+
+    $ratings = explore($this->owner, ['source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'satisfaction', 'chart' => 'bar', 'dimensions' => [['field' => 'rating']]]);
+    $score = explore($this->owner, ['source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'satisfaction', 'chart' => 'number', 'measures' => [['aggregate' => 'avg', 'field' => 'rating_score']]]);
+
+    expect(explorerPairs($ratings))->toBe(['Excellent' => 2, 'Good' => 1])
+        ->and(round((float) $score['totals']['values'][0], 2))->toBe(4.67);
+});
+
+it('M247: filters on the Row', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridResponses($form);
+
+    $result = explore($this->owner, [
+        'source' => 'grid_rows', 'form_id' => $form->id, 'grid' => 'clinics', 'chart' => 'number',
+        'filters' => [['field' => 'row', 'operator' => 'in', 'values' => ['a']]],
+    ]);
+
+    expect($result['totals']['rows'])->toBe(2);
+});
+
+it('M247: offers the grids a reader may chart, and of a grid only the columns a chart can read', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    $presenter = app(ExplorerPresenter::class);
+
+    $list = $presenter->fields($this->owner, 'grid_rows', $form->id);
+    $clinics = $presenter->fields($this->owner, 'grid_rows', $form->id, 'clinics');
+
+    expect(array_column($list['grids'], 'label', 'value'))->toBe(['clinics' => 'Clinics', 'satisfaction' => 'Satisfaction'])
+        ->and(array_column($clinics['fields'], 'key'))->toContain('row', 'column:rate', 'column:svc', 'column:staff', 'column:opened', 'column:remark')
+        ->and(array_column($clinics['fields'], 'key'))->not->toContain('column:note')
+        ->and(array_column($clinics['fields'], 'key'))->not->toContain('column:odd name')
+        ->and($clinics['notes'])->toContain('2 columns cannot be charted: long text, or names with characters a chart cannot use.');
+});
+
+it('M247: refuses a grid marked personal, a grid of another form, and a chart on the rows source that names no grid', function (array $definition, string $reason): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+    explorerGridForm($this->tenant, $this->owner, 'Another review');
+
+    expect(explorerRunRefusal($this->owner, ['source' => 'grid_rows', 'form_id' => $form->id, ...$definition]))->toBe($reason);
+})->with([
+    'a grid marked personal' => [['grid' => 'private_grid'], 'grid_unavailable'],
+    'a grid the form does not have' => [['grid' => 'other_grid'], 'grid_unavailable'],
+    'no grid at all' => [[], 'grid_required'],
+]);
+
+it('M247: says on the answers that a grid is charted row by row', function (): void {
+    $form = explorerGridForm($this->tenant, $this->owner);
+
+    $result = explore($this->owner, ['source' => 'answers', 'form_id' => $form->id, 'chart' => 'number']);
+
+    expect($result['meta']['notes'])->toContain('A grid is charted row by row: choose “Rows of a grid” as the data.');
 });

@@ -14,6 +14,7 @@ use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
 use App\Services\Explorer\Sources\FeedbackReportsSource;
 use App\Services\Explorer\Sources\FormsSource;
+use App\Services\Explorer\Sources\GridRowsSource;
 use App\Services\Explorer\Sources\GridScopedSource;
 use App\Services\Explorer\Sources\MembersSource;
 use App\Services\Explorer\Sources\PointsSource;
@@ -37,6 +38,8 @@ final class ExplorerCatalog
     private const array SOURCES = [
         ResponsesSource::class,
         AnswersSource::class,
+        // M247 (`D231`): a grid, row by row.
+        GridRowsSource::class,
         FormsSource::class,
         MembersSource::class,
         ActivitySource::class,

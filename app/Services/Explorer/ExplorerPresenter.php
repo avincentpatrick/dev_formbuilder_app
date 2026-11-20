@@ -16,6 +16,7 @@ use App\Models\Form;
 use App\Models\User;
 use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
+use App\Services\Explorer\Sources\GridScopedSource;
 use App\Support\Explorer\ExplorerField;
 use App\Support\Explorer\ExplorerQuery;
 use DateTimeZone;
@@ -127,9 +128,12 @@ final class ExplorerPresenter
      * The fields of one source — asked for on its own when the source needs a form, because a form's
      * questions are not known until the form is.
      *
-     * @return array{fields: list<array<string, mixed>>, notes: list<string>}
+     * M247 (`D231`): a source that reads one grid also lists the form's grids it may chart (`grids`), and once a grid is
+     * named, its fields and notes are that grid's.
+     *
+     * @return array{fields: list<array<string, mixed>>, notes: list<string>, grids?: list<array{value: string, label: string}>}
      */
-    public function fields(User $user, string $sourceKey, ?string $formId): array
+    public function fields(User $user, string $sourceKey, ?string $formId, ?string $grid = null): array
     {
         $source = $this->catalog->source($sourceKey);
 
@@ -151,6 +155,24 @@ final class ExplorerPresenter
                     ? InvalidExplorerQueryException::formRequired()
                     : InvalidExplorerQueryException::formUnavailable();
             }
+        }
+
+        if ($source instanceof GridScopedSource && $form !== null) {
+            $grids = [];
+            foreach ($source->grids($user, $form) as $value => $label) {
+                $grids[] = ['value' => (string) $value, 'label' => $label];
+            }
+            $bound = $grid === null ? null : $source->forGrid($user, $form, $grid);
+            if ($grid !== null && $bound === null) {
+                throw InvalidExplorerQueryException::gridUnavailable();
+            }
+            $read = $bound ?? $source;
+
+            return [
+                'fields' => $this->fieldRows($read->fields($user, $form), $user),
+                'notes' => $read->notes($user, $form),
+                'grids' => $grids,
+            ];
         }
 
         return [
@@ -221,6 +243,8 @@ final class ExplorerPresenter
             'description' => $source->description(),
             'row_noun' => $source->rowNoun(),
             'requires_form' => $source->requiresForm(),
+            // M247 (`D231`): a chart on this source names one of the form's grids too.
+            'requires_grid' => $source instanceof GridScopedSource,
             'default_range_days' => $source->defaultRangeDays(),
             'range_field' => $source->rangeField(),
             // A source that needs a form ships the fields every form has; the questions follow by fetch.

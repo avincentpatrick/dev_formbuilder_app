@@ -111,7 +111,7 @@ export async function loadBundle(client, bundle, { apply = false } = {}) {
       [
         bundle.dataset_slug,
         "PSA 2023 Full-Year Official Poverty Statistics (r2)",
-        "Philippine Statistics Authority — official population poverty, Tables 2 and 2a",
+        "Philippine Statistics Authority — official population poverty, Table 2",
         bundle.source_url,
         "PSA source attribution; retain original workbook and publication terms",
         "Population poverty incidence; published 95% CI. Explicit source reporting geography, no rollups. Audited workbook SHA-256: " +

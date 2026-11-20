@@ -1,4 +1,9 @@
 "use client";
+import {
+  POVERTY_MAP,
+  povertyCatalogReturnHref,
+  povertySearchSuffix,
+} from "@/lib/catalog/poverty-navigation";
 import { zoomGeography, type MapCamera } from "@/lib/maps/zoom-geography";
 import { CENSUS_ACTIVE_YEARS_ID } from "@/lib/maps/census-active-years";
 import { isCensusProfileRate } from "@/lib/maps/census-accreditation";
@@ -14,7 +19,7 @@ import { PROFILING_BINS } from "@/lib/maps/profiling";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { formatPct } from "@/lib/format";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -90,14 +95,17 @@ export function DatasetMapCard({
   onChoiceChange?: (choice: MapChoice) => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const listSearch = dataset === POVERTY_MAP ? povertySearchSuffix(searchParams) : "";
   const [mapOnly, setMapOnly] = useState(false);
   const [mapTableOpen, setMapTableOpen] = useState(false);
   const definition = getDatasetMap(dataset)!;
   const metrics = prototypeIndicators(dataset);
-  // Embedded previews do not own the page URL. Only the BHW map workspace
-  // records analysis edits; Next integrates native history without a server reload.
+  // Embedded previews do not own the page URL. BHW and Poverty workspaces
+  // record analysis edits; Next integrates native history without a server reload.
   const historyEnabled =
-    Boolean(onChoiceChange) && (dataset === "bhw-stepzero-2026" || dataset === "bhw-2025");
+    Boolean(onChoiceChange) &&
+    (dataset === "bhw-stepzero-2026" || dataset === "bhw-2025" || dataset === POVERTY_MAP);
   const [choice, updateChoice] = useState(() => initial ?? initialMapChoice(dataset));
   const latestChoice = useRef(choice);
   const setChoice = useCallback(
@@ -113,10 +121,11 @@ export function DatasetMapCard({
         }
       }
       latestChoice.current = next;
-      if (historyEnabled) window.history.pushState(null, "", withBasePath(mapHref(next)));
+      if (historyEnabled)
+        window.history.pushState(null, "", withBasePath(mapHref(next) + listSearch));
       updateChoice(next);
     },
-    [historyEnabled, overviewPreview, router, mapOnly],
+    [historyEnabled, overviewPreview, router, mapOnly, listSearch],
   );
   useEffect(() => {
     onChoiceChange?.(choice);
@@ -1206,9 +1215,14 @@ export function DatasetMapCard({
       )}
       {exportError && <p role="status">{exportError}</p>}
       <div className="flex flex-wrap gap-4 text-sm underline">
-        <Link prefetch={false} href={mapHref(bhw ? { ...choice, view } : choice)}>
+        <Link prefetch={false} href={mapHref(bhw ? { ...choice, view } : choice) + listSearch}>
           {expanded ? "Share this map selection" : `Enlarge ${definition.title} map`}
         </Link>
+        {dataset === POVERTY_MAP && expanded && (
+          <Link href={povertyCatalogReturnHref(choice, listSearch)}>
+            Open Poverty details for this selection
+          </Link>
+        )}
         {dashboard && !overviewPreview && (
           <Link
             href={dashboard === "/bhw" ? (bhwOverviewReturnHref(choice) ?? dashboard) : dashboard}

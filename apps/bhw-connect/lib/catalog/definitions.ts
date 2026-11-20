@@ -20,7 +20,8 @@ export type CatalogTable =
   | "fact_fhsis_indicator"
   | "fact_fhsis_workforce"
   | "agg_population"
-  | "agg_poverty";
+  | "agg_poverty"
+  | "agg_poverty_official";
 export type IndicatorSpec = {
   id: string;
   label: string;
@@ -75,6 +76,7 @@ export const ACCEPTED_RELEASES = {
   fhsis: "fhsis-2025",
   population: "psa-popcen-2024",
   poverty: "psa-sae-poverty-2023",
+  povertyOfficial: "psa-official-poverty-2023-r2",
 } as const;
 const R = ACCEPTED_RELEASES;
 
@@ -495,6 +497,19 @@ export const CATALOG: readonly DatasetSpec[] = [
     category: "Socioeconomic conditions",
     detailRoot: null,
     indicators: [
+      {
+        id: "poverty.official-incidence",
+        label: "PSA official 2023 population poverty incidence (r2)",
+        unit: "%",
+        source: R.povertyOfficial,
+        table: "agg_poverty_official",
+        column: "poverty_incidence",
+        levels: AREA_LEVELS,
+        filters: { reference_year: 2023 },
+        locationPrivacy: true,
+        suppression: "is_suppressed",
+        attributes: { ciLow: "ci_low", ciHigh: "ci_high" },
+      },
       {
         id: "poverty.incidence",
         label: "PSA SAE 2023 poverty incidence",

@@ -69,6 +69,7 @@ describe("public catalog contract", () => {
       fhsis: DATASET_SLUGS.fhsis,
       population: DATASET_SLUGS.popcen2024,
       poverty: POVERTY_SAE_SLUG,
+      povertyOfficial: "psa-official-poverty-2023-r2",
     });
   });
 

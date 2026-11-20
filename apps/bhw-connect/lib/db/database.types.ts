@@ -1131,6 +1131,66 @@ export type Database = {
           },
         ];
       };
+      agg_poverty_official: {
+        Row: {
+          id: number;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          reference_year: number;
+          poverty_incidence: number | null;
+          ci_low: number | null;
+          ci_high: number | null;
+          cv: number | null;
+          is_suppressed: boolean;
+          value_status: string;
+          source_label: string;
+          source_table: string;
+          source_row: number;
+          boundary_note: string;
+          publication_note: string;
+          workbook_sha256: string;
+        };
+        Insert: {
+          id?: never;
+          dataset_id: number;
+          geo_code: string;
+          geo_level: Database["public"]["Enums"]["geo_level_enum"];
+          reference_year: number;
+          poverty_incidence?: number | null;
+          ci_low?: number | null;
+          ci_high?: number | null;
+          cv?: number | null;
+          is_suppressed?: boolean;
+          value_status: string;
+          source_label: string;
+          source_table: string;
+          source_row: number;
+          boundary_note: string;
+          publication_note: string;
+          workbook_sha256: string;
+        };
+        Update: {
+          id?: never;
+          dataset_id?: number;
+          geo_code?: string;
+          geo_level?: Database["public"]["Enums"]["geo_level_enum"];
+          reference_year?: number;
+          poverty_incidence?: number | null;
+          ci_low?: number | null;
+          ci_high?: number | null;
+          cv?: number | null;
+          is_suppressed?: boolean;
+          value_status?: string;
+          source_label?: string;
+          source_table?: string;
+          source_row?: number;
+          boundary_note?: string;
+          publication_note?: string;
+          workbook_sha256?: string;
+        };
+        Relationships: [];
+      };
       agg_poverty: {
         Row: {
           ci_high: number | null;

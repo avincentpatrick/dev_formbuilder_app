@@ -140,8 +140,9 @@ export function PovertyMunicipalities({
               </button>
             )}
             <p id={statusId} role="status" className="text-sm">
-              {filtered.length} of {rows.length} places shown. Search filters this list only.
-              Unavailable estimates remain listed.
+              {rows.filter((row) => row.value !== null).length} of {rows.length} places have usable
+              estimates. {filtered.length} of {rows.length} places shown. Search filters this list
+              only. Unavailable estimates remain listed.
             </p>
             <div
               className="overflow-x-auto rounded border border-border"

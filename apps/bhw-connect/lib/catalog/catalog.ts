@@ -1,3 +1,4 @@
+import { officialPovertyIndicator } from "./poverty-official";
 import { POPULATION_PARTIAL_REASON } from "./population-reading";
 import "server-only";
 import { FHSIS_OVER_100_NOTE } from "@/lib/db/fhsis";
@@ -54,6 +55,7 @@ function selectedValues(
   rows: Row[],
   item: CatalogIndicator,
 ): CatalogIndicator {
+  if (spec.table === "agg_poverty_official") return officialPovertyIndicator(rows, item);
   let matched = rows.filter((row) =>
     Object.entries(spec.filters ?? {}).every(([key, value]) => row[key] === value),
   );

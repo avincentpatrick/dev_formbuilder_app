@@ -228,6 +228,15 @@ export function CatalogResults({
             {omitted.map((dataset) => (
               <li key={dataset.id}>
                 <strong>{dataset.title}:</strong> {omissionReason(dataset, catalog.selection)}
+                {dataset.id === "poverty" && (
+                  <Link
+                    prefetch={false}
+                    className="ml-2 underline"
+                    href={catalogJourneyHref(catalog.selection, "poverty", mapState)}
+                  >
+                    Find covered areas and sources →
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -309,6 +318,7 @@ export function CatalogDetails({
       </div>
       {dataset.id === "poverty" && (
         <PovertyOverview
+          mapState={mapState}
           dataset={dataset}
           selection={catalog.selection}
           locationName={locationName}
@@ -406,7 +416,9 @@ export function CatalogDetails({
                               {value.ciLow != null && value.ciHigh != null && (
                                 <span className="block text-xs text-muted">
                                   {dataset.id === "poverty"
-                                    ? "90% confidence interval"
+                                    ? indicator.id === "poverty.official-incidence"
+                                      ? "95% confidence interval"
+                                      : "90% confidence interval"
                                     : "Confidence interval"}
                                   : {value.ciLow}–{value.ciHigh}
                                 </span>

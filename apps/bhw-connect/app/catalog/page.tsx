@@ -1,3 +1,4 @@
+import { restoredPovertyMapHref } from "@/lib/catalog/poverty-navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -31,9 +32,11 @@ export default async function CatalogPage({
     );
   }
   const returnMap =
-    request && (!request.dataset || request.dataset === "bhw")
-      ? restoredBhwMapHref(params.mapState)
-      : null;
+    request?.dataset === "poverty"
+      ? restoredPovertyMapHref(params.mapState)
+      : request && (!request.dataset || request.dataset === "bhw")
+        ? restoredBhwMapHref(params.mapState)
+        : null;
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <header className="space-y-4">
@@ -47,7 +50,11 @@ export default async function CatalogPage({
         </p>
       </header>
       {params.mapState !== undefined && (
-        <BhwMapReturnLink href={returnMap} scopeNote="Catalog figures keep their own scope." />
+        <BhwMapReturnLink
+          href={returnMap}
+          datasetName={request?.dataset === "poverty" ? "Poverty" : "BHW"}
+          scopeNote="Catalog figures keep their own scope."
+        />
       )}
       {request ? (
         <Suspense key={JSON.stringify(request)} fallback={<CatalogLoading />}>

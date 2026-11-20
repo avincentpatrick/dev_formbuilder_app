@@ -83,6 +83,9 @@ final readonly class ExplorerQuery
         public string $timezone,
         public ExplorerSort $sort = ExplorerSort::ValueDescending,
         public int $limit = self::DEFAULT_LIMIT,
+        // M247 (`grid-wide-sticky-explorer`, `D231`): the grid whose rows a "Rows of a grid" chart counts; null for every
+        // other source. Added last and stored only when set, so every chart saved before it reads and hashes as it did.
+        public ?string $grid = null,
     ) {
         if (! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
             throw InvalidExplorerQueryException::unknownTimezone($timezone);
@@ -143,6 +146,7 @@ final readonly class ExplorerQuery
             'timezone' => $this->timezone,
             'sort' => $this->sort->value,
             'limit' => $this->limit,
+            ...($this->grid !== null ? ['grid' => $this->grid] : []),
         ];
     }
 
@@ -185,6 +189,11 @@ final readonly class ExplorerQuery
             throw InvalidExplorerQueryException::unknownTimezone('');
         }
 
+        $grid = $data['grid'] ?? null;
+        if ($grid !== null && (! is_string($grid) || strlen($grid) > 150)) {
+            throw InvalidExplorerQueryException::malformed('its grid is not a question key');
+        }
+
         return new self(
             source: $source,
             formId: $formId === '' ? null : $formId,
@@ -197,6 +206,7 @@ final readonly class ExplorerQuery
             timezone: $timezone,
             sort: $sort,
             limit: (int) $limit,
+            grid: $grid === '' ? null : $grid,
         );
     }
 

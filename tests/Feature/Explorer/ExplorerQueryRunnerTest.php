@@ -576,6 +576,8 @@ it('refuses what the catalogue does not offer', function (array $definition, str
     'answers of a form that does not exist' => [['source' => 'answers', 'form_id' => '019a0000-0000-7000-8000-000000000000'], 'form_unavailable'],
     'answers of something that is not an id' => [['source' => 'answers', 'form_id' => "x' or true --"], 'form_unavailable'],
     'the hour of a date with no time' => [['source' => 'answers', 'form_id' => 'FORM', 'chart' => 'column', 'dimensions' => [['field' => 'answer:visit', 'bucket' => 'hour']]], 'bucket_not_allowed'],
+    'M247: a grid named on a source that does not read one' => [['source' => 'answers', 'form_id' => 'FORM', 'grid' => 'clinics'], 'grid_not_allowed'],
+    'M247: a grid named on a source with no form' => [['source' => 'responses', 'grid' => 'clinics'], 'grid_not_allowed'],
 ]);
 
 it('binds a filter\'s values: a quote in one is a value, never SQL', function (): void {

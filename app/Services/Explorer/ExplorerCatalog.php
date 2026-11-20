@@ -14,6 +14,7 @@ use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
 use App\Services\Explorer\Sources\FeedbackReportsSource;
 use App\Services\Explorer\Sources\FormsSource;
+use App\Services\Explorer\Sources\GridScopedSource;
 use App\Services\Explorer\Sources\MembersSource;
 use App\Services\Explorer\Sources\PointsSource;
 use App\Services\Explorer\Sources\ResponsesSource;
@@ -82,6 +83,11 @@ final class ExplorerCatalog
             throw InvalidExplorerQueryException::sourceForbidden(strtolower($source->label()));
         }
 
+        // M247 (`D231`): only a source that counts a grid's rows reads a grid, and it reads only a grid it names.
+        if ($query->grid !== null && ! $source instanceof GridScopedSource) {
+            throw InvalidExplorerQueryException::gridNotAllowed(strtolower($source->label()));
+        }
+
         if (! $source->requiresForm()) {
             return [$source, null];
         }
@@ -94,6 +100,14 @@ final class ExplorerCatalog
 
         if ($form === null) {
             throw InvalidExplorerQueryException::formUnavailable();
+        }
+
+        if ($source instanceof GridScopedSource) {
+            if ($query->grid === null) {
+                throw InvalidExplorerQueryException::gridRequired();
+            }
+
+            return [$source->forGrid($user, $form, $query->grid) ?? throw InvalidExplorerQueryException::gridUnavailable(), $form];
         }
 
         return [$source, $form];

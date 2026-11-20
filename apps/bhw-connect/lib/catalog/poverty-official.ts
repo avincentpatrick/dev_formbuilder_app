@@ -1,5 +1,10 @@
 import type { CatalogIndicator } from "./types";
 
+export const OFFICIAL_POVERTY_DEFINITION =
+  "PSA full-year 2023 official poverty incidence among population: people below the poverty threshold divided by all people in the source reporting area, expressed as a percentage. This is a people rate, not a family or household rate, and not an average of municipal estimates.";
+export const OFFICIAL_POVERTY_INTERPRETATION =
+  "Published 95% confidence interval, not the municipal SAE 90% interval. Source boundaries and precision cautions accompany the estimate. No municipal averaging or parent substitution.";
+
 export const OFFICIAL_POVERTY_URL =
   "https://psa.gov.ph/system/files/phdsd/2023%20Full%20Year%20Official%20Poverty%20Statistics_r2.xlsx";
 const finite = (value: unknown): value is number =>

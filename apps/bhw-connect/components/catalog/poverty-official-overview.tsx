@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FigureCard } from "@/components/narrative/figure-card";
 import { StatValue } from "@/components/home/stat-value";
 import { percentageFormatter } from "@/lib/format";
-import { OFFICIAL_POVERTY_URL } from "@/lib/catalog/poverty-official";
+import { OFFICIAL_POVERTY_URL, OFFICIAL_POVERTY_DEFINITION } from "@/lib/catalog/poverty-official";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { ACCEPTED_RELEASES } from "@/lib/catalog/definitions";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
@@ -58,10 +58,7 @@ export function PovertyOfficialOverview({
       headline="A separate survey-based source, with its own reporting boundaries and uncertainty."
     >
       <div className="space-y-3" data-testid="poverty-official-overview">
-        <p className="text-sm">
-          Share of people below the poverty threshold, not families or households. This is not an
-          average of municipal estimates.
-        </p>
+        <p className="text-sm">{OFFICIAL_POVERTY_DEFINITION}</p>
         {selection.mode === "all" ? (
           <p>
             All locations is an availability view.{" "}

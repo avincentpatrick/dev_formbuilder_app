@@ -65,6 +65,9 @@ Later HUC coverage and 2025 require a separate audited mapping/version, not near
 
 ## Private load: avincentpatrick's server action
 
+Operator handoff: [Vincent's step-by-step import checklist](POVERTY_IMPORT_HANDOFF.md), including
+private credential setup, expected command output, stop conditions and live verification.
+
 Repository AGENTS.md requires data loads on the Windows server to be performed by avincentpatrick.
 No real workbook, observation bundle or SQL observations enter public git. The operator can download
 and prepare directly from the primary source; no private transfer is required if network permits.

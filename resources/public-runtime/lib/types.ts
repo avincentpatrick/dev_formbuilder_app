@@ -86,6 +86,7 @@ export interface RawSection {
      * every section drawn as cards since — is the cards.
      */
     repeat_layout?: 'table' | 'cards' | null;
+    page_width?: 'wide' | null; // M247 (`D231`): `wide` widens the page while the section is on screen; absent is the reading width.
     relevant_expression: string | null;
 }
 
@@ -377,6 +378,8 @@ export interface RenderSection {
     maxInstances: number | null;
     /** M185: the section is drawn as a table when it holds only questions a table can hold (`repeat-table.ts`). */
     repeatLayout: 'table' | 'cards';
+    /** M247 (`D231`): `wide` widens the respondent's page while this section is on screen (`page-width.ts`). */
+    pageWidth: 'wide' | 'normal';
     relevantExpression: string | null;
 }
 

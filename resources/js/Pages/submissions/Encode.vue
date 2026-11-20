@@ -57,7 +57,7 @@ interface Block {
     min_instances: number | null;
     max_instances: number | null;
     /** M185 (`R-0a7275ce`): `table` when the author laid the section out as one. */
-    repeat_layout?: 'table' | null;
+    repeat_layout?: 'table' | null; page_width?: 'wide' | null; // M247 (`D231`): `wide` when the author widened its page.
     fields: EncodeField[];
 }
 
@@ -201,7 +201,7 @@ const isScanning = computed(() => props.scan != null);
  * the save target) keeps reading `isScanning`, so correcting a scanned response is still an ordinary edit.
  */
 const paperPages = computed<ScanPage[]>(() => (isScanning.value ? props.scan!.pages : isEditing.value ? props.scan_pages ?? [] : []));
-const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0);
+const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0); const pageWide = computed(() => !hasPaper.value && shownSteps.value.some((step) => blockFor(step)?.page_width === 'wide')); // M247 (`D231`): every section is on this one page, so it is wide when any shown section is; a scanned paper takes the room instead.
 
 // ── M186 (`R-7a2f4a13`): a list-backed cascade's choices, fetched beside the page ─────────────────────────────────
 // The guest page's shape (`ChoiceListMaterializer::listsForBrowser()`), each choice a tuple to halve a 42,000-row
@@ -1234,7 +1234,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-    <div ref="pageRoot" class="encode" :class="{ 'encode--scan': hasPaper }">
+    <div ref="pageRoot" class="encode" :class="{ 'encode--scan': hasPaper, 'encode--wide': pageWide }">
         <Head
             :title="isScanning ? `Review a scan — ${form.title}` : isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`"
         />
@@ -2349,5 +2349,18 @@ function onConflictKeydown(event: KeyboardEvent): void {
     margin: var(--mds-space-1) 0 0;
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+/* M247 (`grid-wide-sticky-explorer`, `D231`): a section marked "Wide page" lifts the 45rem reading column so a big grid can be a
+   table; from the 75rem split the form takes every column the side panel leaves. A scanned paper still takes the room
+   instead (`pageWide` is false beside one). */
+.encode--wide .encode__layout {
+    max-inline-size: none;
+}
+
+@container (min-width: 75rem) {
+    .encode.encode--wide:not(.encode--scan) .encode__layout {
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+    }
 }
 </style>

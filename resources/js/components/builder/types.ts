@@ -106,7 +106,7 @@ export interface ServerSection {
     min_instances: number | null;
     max_instances: number | null;
     /** M185 (`R-0a7275ce`): `table` draws a repeatable section as a table; null (or absent, in an older fixture) is the cards. */
-    repeat_layout?: 'table' | 'cards' | null;
+    repeat_layout?: 'table' | 'cards' | null; page_width?: 'wide' | null; // M247 (`D231`): `wide` widens the respondent's page while this section is on screen.
     relevant_expression: string | null;
     sequence: number;
     version: string | null;

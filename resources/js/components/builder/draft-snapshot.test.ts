@@ -577,3 +577,23 @@ group('a formula default reaches the preview (M180, R-20784770)', () => {
         expect(shapeOf(formula.schema.version.schema)).not.toBe(shapeOf(fixed.schema.version.schema));
     });
 });
+
+group('M247: a section’s wide page', () => {
+    it('projects a wide page into the preview schema, and anything else as the reading width', () => {
+        const { schema } = projectDraft(
+            input([], [section({ uid: 'w', key: 'wide', page_width: 'wide' }), section({ uid: 'p', key: 'plain', sequence: 1 })]),
+        );
+
+        expect(schema.version.schema.sections.map((s) => [s.key, s.page_width])).toEqual([
+            ['wide', 'wide'],
+            ['plain', null],
+        ]);
+    });
+
+    it('leaves the engine shape alone, as a layout setting the engine never reads', () => {
+        const narrow = projectDraft(input([], [section({ uid: 'w', key: 'wide' })]));
+        const wide = projectDraft(input([], [section({ uid: 'w', key: 'wide', page_width: 'wide' })]));
+
+        expect(shapeOf(wide.schema.version.schema)).toBe(shapeOf(narrow.schema.version.schema));
+    });
+});

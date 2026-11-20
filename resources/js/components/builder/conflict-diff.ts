@@ -66,6 +66,7 @@ const SECTION_SETTINGS: Record<string, string> = {
     min_instances: 'Min instances',
     max_instances: 'Max instances',
     repeat_layout: 'Layout',
+    page_width: 'Wide page',
     key: 'Section key',
 };
 

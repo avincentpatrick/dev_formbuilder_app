@@ -133,6 +133,22 @@ describe('buildRenderModel', () => {
         expect(model.fields.map((f) => f.key)).toEqual(['x', 'y']);
     });
 
+    it('M247: carries a section’s wide page, and reads an absent or unknown one as the reading width', () => {
+        const schema = schemaResponse({
+            sections: [
+                section({ key: 'wide', sequence: 0, page_width: 'wide' }),
+                section({ key: 'plain', sequence: 1 }),
+                section({ key: 'odd', sequence: 2, page_width: 'huge' as unknown as 'wide' }),
+            ],
+            fields: [],
+        });
+        expect(buildRenderModel(schema).sections.map((s) => [s.key, s.pageWidth])).toEqual([
+            ['wide', 'wide'],
+            ['plain', 'normal'],
+            ['odd', 'normal'],
+        ]);
+    });
+
     it('carries the choice layout, and a note’s content blocks while no other question gets any (M130)', () => {
         const blocks = [{ type: 'paragraph', spans: [{ text: 'Bring your card.' }] }];
         const schema = schemaResponse({

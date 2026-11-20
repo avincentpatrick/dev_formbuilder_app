@@ -36,6 +36,8 @@ export function section(partial: Partial<RawSection> & { key: string }): RawSect
         max_instances: partial.max_instances ?? null,
         // M185: only when a case sets it, as a snapshot carries it only for a table.
         ...(partial.repeat_layout !== undefined ? { repeat_layout: partial.repeat_layout } : {}),
+        // M247: likewise only when a case sets it, as a snapshot carries it only for a wide page.
+        ...(partial.page_width !== undefined ? { page_width: partial.page_width } : {}),
         relevant_expression: partial.relevant_expression ?? null,
     };
 }

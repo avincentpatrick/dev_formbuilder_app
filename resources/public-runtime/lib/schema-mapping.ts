@@ -629,7 +629,7 @@ function toRenderSection(section: RawSection): RenderSection {
         isRepeatable: section.is_repeatable,
         minInstances: section.min_instances ?? null,
         maxInstances: section.max_instances ?? null,
-        repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards',
+        repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards', pageWidth: section.page_width === 'wide' ? 'wide' : 'normal',
         relevantExpression: section.relevant_expression,
     };
 }

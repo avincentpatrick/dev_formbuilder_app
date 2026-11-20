@@ -1024,7 +1024,7 @@ watch(librarySaved, (value) => {
                                     @update:model-value="setSection('max_instances', $event)"
                                 />
                             </MdsFormField>
-                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" />
+                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" /><MdsCheckbox :model-value="section.page_width === 'wide'" label="Wide page — for big tables" data-section-page-width @update:model-value="setSection('page_width', $event ? 'wide' : null)" /><p class="config__note" data-section-page-width-note>While this section is on screen the page uses the whole width of a big screen, so a wide grid is drawn as a table. Phones, and the Preview pane here, are unchanged.</p>
                         <ConditionEditor
                             :key="`section-${section.uid}`"
                             :expression="section.relevant_expression"

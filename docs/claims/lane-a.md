@@ -16,7 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M246`, `grid-question-table` and `R-ffd10da2`: a grid becomes a real question table — a row shown only when an answer calls for it, a cell "Not needed" or required only when its row says so, a column shown only when an answer calls for it, a long-text column, details under a row's label — and conditions, calculations and piped text can read a grid's cell (m246-grid-question-table)
+## Status: ACTIVE CLAIM — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer)
+
+Taken 2026-11-20, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`, rewritten for 5b). NHETE recommendation 5b, the NHETE plan's next item after `M246` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m247-grid-wide-sticky-explorer`, cut from `origin/m246-grid-question-table` at `7ab0cc8d`, so it is **stacked on #597**: NHETE's tables (`NhetePlan`'s TABLE layout) and `MatrixGrid.vue`'s M246 rework exist only there, as `M240` stacked on #521. `origin/main` is merged in for the claim files. PR into main (CI runs only on pull requests into main), held after #597 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.25.0 → 0.26.0 (a feature) with its release notes.**
+Rows: `grid-wide-sticky-explorer` (filed by `M237`), *"A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted."*, and the grid half of `explorer-unchartable-questions` (filed by `M236`), whose text loses grids.
+
+The user's answers in planning (2026-11-20), recorded on this branch as `D231`:
+- **A wide page is set per section.** While a section ticked "Wide page" is on screen the whole page widens, reusing the scanned-paper view's `wide` mode; phones are unchanged; in single-page mode the page is wide when any shown section is.
+- **A grid is charted by row.** A "Rows of a grid" source counts each answered row of each response once, with Row and each column as fields.
+
+### Evidence verified
+- *"`RuntimeShell.vue` caps every respondent page at 44rem"*: **held** — `.runtime__column { max-width: 44rem }`, and its only widening is the `wide` prop (90rem), set today only for the scanned-paper split (`RuntimeSession.vue`'s `:wide="paperPages !== null"`).
+- *"Neither grid component uses `position: sticky`"*: **held** — no `sticky` in `MatrixGrid.vue` or `RepeatTableFrame.vue`.
+- *"The explorer cannot chart a grid"*: **held** — `AnswersSource::questionField()` maps every other shape to `default => null`, and its page note names grids.
+
+### Premise verified
+- A section has **no settings jsonb**: every section attribute is its own column (`repeat_layout`, migration `2026_08_17_000145`), so "Wide page" is one additive nullable column, `page_width`, with a check constraint. `2026_08_17_000150` is #589's glossary table, invisible to `state.php` from main, so this takes `000151`.
+- `SchemaSnapshotSerializer` adds a section key only when it differs from the default, so old versions' checksums do not move; `page_width` follows it.
+- `RuntimeShell.vue` may gain **no `position`** (it is in the clipped-node-containment test's `KNOWN_UNGUARDED`, which may only shrink): the wide mode is a class it already has, so the file is not edited.
+- In table mode `.mds-grid__scroll` has `overflow-x: auto`, which makes it the sticky scrollport in **both** axes: a sticky first column works as it is, but a sticky header sticks only if that box has a height cap.
+- The explorer reads `submission_answers.answers` directly (no rollup, ADR 0025 §D3), and a saved chart stores `ExplorerQuery::toArray()`; a new optional key emitted only when set leaves every stored chart byte-identical.
+- CI runs only on pull requests **into main** (`ci.yml`'s `pull_request: branches: [main]`), so a stacked PR still targets main and shows #597's commits until #597 merges.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the row's sketch:**
+1. Wide is per section (`D231`), not per form, and reuses the existing wide column rather than adding a second width.
+2. The header sticks only in a height-capped scroll box, and only for a grid with more than eight shown rows on a screen at least 40rem tall; the first column sticks whenever the table scrolls sideways. The box takes `tabindex=0`, `role=group` and the question's label when it overflows (`MdsDataTable`'s pattern), and scroll padding keeps a focused cell clear of the sticky cells.
+3. "One explorer row per grid row" is a new grid-scoped source; `ExplorerQuery` gains an optional `grid`, and `SCHEMA_VERSION` stays 1.
+
+Files:
+- **Section setting:** new `database/migrations/2026_08_17_000151_add_page_width_to_form_sections_table.php`; `app/Models/FormSection.php`, `app/Http/Requests/Forms/UpdateSectionRequest.php`, `app/Services/Forms/` `FormBuilderService.php`, `SchemaSnapshotSerializer.php`, `BuilderPresenter.php`, `SchemaBlueprintMaterializer.php`, `VersionComparison.php` (wherever each lives).
+- **Runtime and encode:** `resources/public-runtime/` `lib/types.ts`, `lib/schema-mapping.ts`, new `lib/page-width.ts`, `components/RuntimeSession.vue`, `App.vue`; `resources/js/Pages/submissions/Encode.vue` (wherever it lives).
+- **Builder:** `resources/js/components/builder/` `ConfigPanel.vue`, `types.ts`, `draft-snapshot.ts`, `conflict-diff.ts`; `resources/js/stores/useBuilderStore.ts` (wherever it lives); `resources/js/components/help/manual.ts`.
+- **Grid:** `resources/js/components/submissions/MatrixGrid.vue`.
+- **Explorer:** `app/Support/Explorer/ExplorerQuery.php`, `app/Services/Explorer/` `ExplorerCatalog.php`, `ExplorerPresenter.php`, `Sources/AnswersSource.php`, new `Sources/AnswerFieldMapper.php`, `Sources/GridScopedSource.php`, `Sources/GridRowsSource.php`; `app/Exceptions/…/InvalidExplorerQueryException.php`; `app/Http/Controllers/…/ExplorerQueryController.php`; `resources/js/Pages/explore/Chart.vue`, `resources/js/components/explore/` (`types.ts`, `definition.ts`, the client).
+- **Tests:** the unit, feature and Vitest files beside each of the above; new `tests/Feature/Explorer/GridRowsSourceTest.php`; `tests/Pest.php`; `tests/Support/Nhete/` (`NhetePlan.php`, `NheteBuilderDriver.php`); `tests/Feature/Forms/Nhete/NheteTableRouteTest.php`; `database/seeders/E2eSeeder.php` and `tests/Feature/Seeders/`; `tests/e2e/` new `grid-wide-table.spec.ts`, `public-runtime-axe.spec.ts`, `explore-axe.spec.ts`, `nhete-builder-block.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/data-dictionary.md`, `docs/adr/0025-data-explorer.md` (a dated section), `docs/ux/design-system-reference.md` (as-built notes), `docs/TESTING-GUIDE.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D231`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, the four `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only). `openapi.json` is taken if the explorer's documented endpoints move (the fields endpoint gains a `grid` parameter).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: migration prefix `2026_08_17_000151` (rechecked at the merge point, after #589's `000150`); `D231`. No ADR: ADR 0025 gains a dated section.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin a section's settings payload, the snapshot's keys and the explorer's sources list.
+- NHETE's indicator chart, counted by row, equals what `NheteAnswers::scenario` implies, and its total equals the answered rows.
+- The one most likely wrong: the sticky header in a height-capped box at 834–1440 px — the threshold or the scroll padding may need tuning. Also at risk: axe on the focusable scroll box in dark mode, and `E2eSeederIdempotencyTest`'s count of seeded published forms.
+
+## HELD — `M246`, `grid-question-table` and `R-ffd10da2`: a grid becomes a real question table — a row shown only when an answer calls for it, a cell "Not needed" or required only when its row says so, a column shown only when an answer calls for it, a long-text column, details under a row's label — and conditions, calculations and piped text can read a grid's cell (m246-grid-question-table) — BUILT AND HELD: PR #597, CI 44355204759 every job green with real step counts
 
 Taken 2026-11-18, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`). NHETE recommendation 5a, the NHETE plan's next item after `M245` (`~/.claude/plans/this-is-a-working-composed-ripple.md`); 5b (`grid-wide-sticky-explorer`) is not taken.
 Branch `m246-grid-question-table`, cut from origin/main at `0b80093f`, PR into main. **A change a tester sees: `VERSION` 0.21.0 → 0.25.0 (a feature) with its release notes.** `M242` (#545, 0.21.1), `M243` (#568, 0.22.0), `M244` (#580, 0.23.0) and `M245` (#589, 0.24.0) are held too; at the merge point they go first, and this branch then takes the trunk and keeps 0.25.0 on top. Held green for a merge point on the user's word (`D137`).

@@ -35,7 +35,10 @@ export async function GET(request: Request) {
 
   const figure = await buildNhfrFigure(parsed.data.geoCode, parsed.data.geoLevel);
   if (!figure) {
-    return NextResponse.json({ error: "No facility data for this area" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Facility export is unavailable or incomplete. Please try again." },
+      { status: 503 },
+    );
   }
 
   const png = await renderNhfrPng(figure);

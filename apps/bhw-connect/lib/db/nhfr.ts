@@ -44,7 +44,7 @@ export type NhfrCounts = {
   nBarangaysWithFacility: number;
   /** Barangays in this area in total, from dim_geo — the coverage denominator. */
   nBarangays: number;
-  /** `nBarangaysWithFacility` as a rounded % of `nBarangays`, or null when there is no denominator. */
+  /** `nBarangaysWithFacility` as an unrounded % of `nBarangays`, or null when there is no denominator. */
   coveragePct: number | null;
   /** Coverage as a share of the bar (0..1). 0 when the denominator is 0. */
   coverageFraction: number;
@@ -140,7 +140,9 @@ export function nhfrContextSentence(counts: NhfrCounts | null): string | null {
     return `No health facilities are on the DOH registry for this area (${NHFR_SNAPSHOT_LABEL})`;
   }
   const facilities =
-    counts.nFacilities === 1 ? "1 health facility is" : `${counts.nFacilities.toLocaleString()} health facilities are`;
+    counts.nFacilities === 1
+      ? "1 health facility is"
+      : `${counts.nFacilities.toLocaleString()} health facilities are`;
   if (counts.nBarangays <= 0) {
     return `${facilities} on the DOH registry for this area (${NHFR_SNAPSHOT_LABEL})`;
   }
@@ -188,7 +190,7 @@ export function toNhfrCounts(row: Row): NhfrCounts {
     totalBedCapacity: row.total_bed_capacity,
     nBarangaysWithFacility: covered,
     nBarangays: total,
-    coveragePct: total <= 0 ? null : Math.round((100 * covered) / total),
+    coveragePct: total <= 0 ? null : (100 * covered) / total,
     // Clamped: coverage above 1 is impossible by construction, but a bar that can overflow its
     // track is worth making impossible too (toUucPhcCounts's precedent).
     coverageFraction: total <= 0 ? 0 : Math.min(1, covered / total),
@@ -261,14 +263,14 @@ export const getNhfrChildren = cache(
 /**
  * The facility-type breakdown for one area, most common first.
  *
- * `agg_nhfr_by_type` is sparse — a row exists only where the count is non-zero — so an empty
- * array means "no facilities here", which `getNhfrCounts` states as an explicit 0. The two are
+ * `agg_nhfr_by_type` is sparse — a row exists only where the count is non-zero — so a successful empty
+ * array means zero only when `getNhfrCounts` also states an explicit 0. Null means unavailable. The two are
  * read together on every page that renders this.
  */
 export const getNhfrTypes = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<NhfrTypeCount[]> => {
+  async (geoCode: string, geoLevel: GeoLevel): Promise<NhfrTypeCount[] | null> => {
     const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.nhfr);
-    if (datasetId === null) return [];
+    if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
@@ -279,7 +281,7 @@ export const getNhfrTypes = cache(
       .eq("geo_level", geoLevel)
       .order("n_facilities", { ascending: false });
 
-    if (error || !data) return [];
+    if (error || !data) return null;
     return data.map((row) => ({
       facilityType: row.facility_type,
       nFacilities: row.n_facilities,
@@ -301,34 +303,36 @@ export const getNhfrTypes = cache(
  */
 const LIST_LIMIT = 1000;
 
-export const getNhfrFacilities = cache(async (citymunCode: string): Promise<NhfrFacility[]> => {
-  const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.nhfr);
-  if (datasetId === null) return [];
+export const getNhfrFacilities = cache(
+  async (citymunCode: string): Promise<NhfrFacility[] | null> => {
+    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.nhfr);
+    if (datasetId === null) return null;
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("fact_nhfr_facility")
-    .select(
-      "facility_code, facility_name, facility_type, ownership_major, ownership_sub, barangay_geo_code, source_barangay_name, bed_capacity, licensing_status",
-    )
-    .eq("dataset_id", datasetId)
-    .eq("geo_code", citymunCode)
-    .order("facility_name", { ascending: true })
-    .limit(LIST_LIMIT);
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("fact_nhfr_facility")
+      .select(
+        "facility_code, facility_name, facility_type, ownership_major, ownership_sub, barangay_geo_code, source_barangay_name, bed_capacity, licensing_status",
+      )
+      .eq("dataset_id", datasetId)
+      .eq("geo_code", citymunCode)
+      .order("facility_name", { ascending: true })
+      .limit(LIST_LIMIT);
 
-  if (error || !data) return [];
-  return data.map((row) => ({
-    facilityCode: row.facility_code,
-    facilityName: row.facility_name,
-    facilityType: row.facility_type,
-    ownershipMajor: row.ownership_major,
-    ownershipSub: row.ownership_sub,
-    barangayName: row.source_barangay_name,
-    barangayGeoCode: row.barangay_geo_code,
-    bedCapacity: row.bed_capacity,
-    licensingStatus: row.licensing_status,
-  }));
-});
+    if (error || !data) return null;
+    return data.map((row) => ({
+      facilityCode: row.facility_code,
+      facilityName: row.facility_name,
+      facilityType: row.facility_type,
+      ownershipMajor: row.ownership_major,
+      ownershipSub: row.ownership_sub,
+      barangayName: row.source_barangay_name,
+      barangayGeoCode: row.barangay_geo_code,
+      bedCapacity: row.bed_capacity,
+      licensingStatus: row.licensing_status,
+    }));
+  },
+);
 
 /**
  * Region + province `{ geoLevel, geoCode }` for `generateStaticParams` and the sitemap —

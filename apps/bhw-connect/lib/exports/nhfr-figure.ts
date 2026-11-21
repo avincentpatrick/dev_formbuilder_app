@@ -104,7 +104,9 @@ function pushTwoStateBar(
   const fillW = Math.round(INNER * fraction);
   parts.push(`<rect x="${MARGIN}" y="${y}" width="${INNER}" height="12" rx="6" fill="${TRACK}"/>`);
   if (fillW > 0) {
-    parts.push(`<rect x="${MARGIN}" y="${y}" width="${fillW}" height="12" rx="6" fill="${ACCENT}"/>`);
+    parts.push(
+      `<rect x="${MARGIN}" y="${y}" width="${fillW}" height="12" rx="6" fill="${ACCENT}"/>`,
+    );
   }
   y += 24;
   // Two anchored elements, not one padded string: SVG collapses runs of whitespace, so a padded
@@ -185,9 +187,13 @@ export function composeNhfrFigureSvg(input: NhfrFigureInput): NhfrFigure {
       parts,
       y,
       "Barangays with at least one facility",
-      { label: "With a facility", count: counts.nBarangaysWithFacility, pct: counts.coveragePct },
       {
-        label: "With none",
+        label: "With attributed facility",
+        count: counts.nBarangaysWithFacility,
+        pct: counts.coveragePct,
+      },
+      {
+        label: "Without attribution",
         count: Math.max(0, counts.nBarangays - counts.nBarangaysWithFacility),
         pct: counts.coveragePct === null ? null : 100 - counts.coveragePct,
       },
@@ -221,7 +227,9 @@ export function composeNhfrFigureSvg(input: NhfrFigureInput): NhfrFigure {
     );
   }
 
-  parts.push(`<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`);
+  parts.push(
+    `<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`,
+  );
   y += 18;
 
   // ---- Facility types, most common first (agg_nhfr_by_type is already ordered this way) ----
@@ -243,7 +251,9 @@ export function composeNhfrFigureSvg(input: NhfrFigureInput): NhfrFigure {
       `<text x="${cPriv}" y="${y}" font-size="10" fill="${MUTED}" text-anchor="end">Private</text>`,
     );
     y += 6;
-    parts.push(`<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`);
+    parts.push(
+      `<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`,
+    );
     y += 16;
     for (const t of shown) {
       parts.push(
@@ -299,7 +309,9 @@ export function composeNhfrFigureSvg(input: NhfrFigureInput): NhfrFigure {
       `<text x="${cCoverage}" y="${y}" font-size="10" fill="${MUTED}" text-anchor="end">Coverage</text>`,
     );
     y += 6;
-    parts.push(`<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`);
+    parts.push(
+      `<line x1="${MARGIN}" y1="${y}" x2="${MARGIN + INNER}" y2="${y}" stroke="${BORDER}"/>`,
+    );
     y += 16;
     for (const c of shown) {
       parts.push(
@@ -387,10 +399,12 @@ export function composeNhfrFigureSvg(input: NhfrFigureInput): NhfrFigure {
     `Source: DOH National Health Facility Registry (nhfr.doh.gov.ph), ${NHFR_SNAPSHOT_LABEL} snapshot.`,
     "Licence status is not shown here: most facilities carry no status in the source, overwhelmingly barangay health stations.",
     "A blank never means unlicensed — see the facility list on screen for what the source states per facility.",
-    "Coverage counts any facility at all. 108 facilities nationwide carry no barangay code and cannot count toward it.",
+    "Presence counts attributed facilities only. Unassigned facilities are excluded; this does not establish access or quality.",
   ];
   for (const line of footerLines) {
-    parts.push(`<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">${escapeXml(line)}</text>`);
+    parts.push(
+      `<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">${escapeXml(line)}</text>`,
+    );
     y += 14;
   }
   y += 6;
@@ -425,7 +439,14 @@ export async function buildNhfrFigure(
     getNhfrTypes(geoCode, geoLevel),
     isCitymun ? getNhfrFacilities(geoCode) : Promise.resolve([]),
   ]);
-  if (!counts) return null;
+  if (
+    !counts ||
+    types === null ||
+    facilities === null ||
+    types.reduce((sum, item) => sum + item.nFacilities, 0) !== counts.nFacilities ||
+    (isCitymun && facilities.length !== counts.nFacilities)
+  )
+    return null;
 
   return composeNhfrFigureSvg({
     geoName: geo?.geoName ?? geoCode,

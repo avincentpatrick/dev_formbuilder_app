@@ -27,9 +27,14 @@ export function ChildBreakdown({ heading, items }: { heading: string; items: Nhf
     <section aria-label={heading}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">{heading}</h2>
-        <span className="text-xs text-muted">Least covered first</span>
+        <span className="text-xs text-muted">Lowest recorded presence first</span>
       </div>
-      <div className="mt-2 overflow-x-auto">
+      <div
+        className="mt-2 overflow-x-auto"
+        role="region"
+        aria-label="Scrollable locality breakdown"
+        tabIndex={0}
+      >
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted">
@@ -40,10 +45,10 @@ export function ChildBreakdown({ heading, items }: { heading: string; items: Nhf
                 Facilities
               </th>
               <th scope="col" className="py-2 pr-3 text-right font-medium">
-                Barangays with one
+                Barangays with an attributed facility
               </th>
               <th scope="col" className="py-2 text-right font-medium">
-                Coverage
+                Recorded presence
               </th>
             </tr>
           </thead>

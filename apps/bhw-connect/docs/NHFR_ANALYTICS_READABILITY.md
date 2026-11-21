@@ -138,3 +138,53 @@ performance and Headcount reuse prerequisites and Poverty import #615 remain ope
   synthetic row and screenshots were not committed. Phone figure visually reviewed.
 - CI and deployment remain pending in the implementing PR. These results do not
   establish human comprehension or physical-device acceptance.
+
+## First increment delivered; detail increment — 21 November
+
+#617 merged as `47e47ad4b2d88d3b26f9ee5e4981c136797918cb`.
+PR CI 44862593403 passed 2,203 unit/database tests (13 skips) and 194 browser tests.
+Main CI 44863360410 passed all jobs. Deploy 44866347801 switched that BHW release
+and confirmed it live at 04:30:54 UTC, with no pending migrations. Unmocked live
+Chromium checks at 390/1440px covered national PH, region 01, municipality 0102801
+and barangay 0102801001: three overview figures agreed with exact data in every
+sample, keyboard disclosure and scope/reload/Back worked, with no ordinary page
+overflow. All-locations remained availability-only. This is bounded software
+verification; no representative-reader or physical-device sign-off.
+
+The follow-up addresses the assessed detail gaps in the existing facilities
+routes, without adding another reader or changing source observations:
+
+- Failed/missing type and facility reads return null, distinct from successful
+  empty arrays. Empty detail cannot claim zero when the accepted total is positive.
+  Incomplete type/list reads are labeled; incomplete facility lists do not create
+  a misleading point map. Exports require complete type/list detail and report
+  unavailability when it cannot be assembled.
+- A progressively enhanced GET facility search matches public name, type and source barangay name,
+  keeps full names, naturally orders numbers in names and retains its query in the
+  URL. Clear/reload/Back/Forward remain in the same municipality. Search never
+  changes area totals, map or downloads; partial lists say what is searchable.
+- Presence wording qualifies attribution; no attributed facility does not prove
+  physical absence. The legacy share retains raw precision until formatting.
+  Duplicate headline type tiles are removed; the complete type table remains.
+- A named synthetic fixture in `supabase/seed.sql` provides a consistent municipal
+  count/type/list for browser testing, including a long name, natural numeric
+  ordering and a facility without barangay attribution. It supplements the generic
+  synthetic records; no real data or schema migration is included.
+
+Further analytics (per-resident ratios, peers, assignment, need ranking, trends)
+are not justified by this audit. Child-area completeness beyond existing readers,
+source-vintage boundary certification, source refreshes and representative-reader
+acceptance remain separate work; no source coverage claim is expanded here.
+Follow-up local/CI/deployment and live evidence belongs in its PR delivery ledger.
+
+The first browser run exposed stale search text on Back with a native form.
+Next Form plus an input keyed by the canonical query restores both the URL-driven
+results and text; the same Back/Forward assertions are retained.
+
+Follow-up local validation: lint and typecheck passed; 2,168 unit tests passed
+(56 skipped), migration lint passed, and both prefixed production builds and
+standalone extractors passed. Ten browser cases passed across the overview,
+portal navigation and facility search suites, including both 390/1440px history
+regressions. Final facility/type sections had zero axe WCAG 2 A/AA and 2.1 AA
+violations at both widths. Synthetic PNG export returned a successful image.
+CI, deployment and unmocked live verification are recorded in the follow-up PR.

@@ -67,7 +67,7 @@ describe("toNhfrCounts", () => {
     expect(c.nFacilities).toBe(44799);
     expect(c.nBarangaysWithFacility).toBe(28490);
     expect(c.nBarangays).toBe(41958);
-    expect(c.coveragePct).toBe(68);
+    expect(c.coveragePct).toBeCloseTo((100 * 28490) / 41958);
     expect(c.coverageFraction).toBeCloseTo(28490 / 41958);
   });
 

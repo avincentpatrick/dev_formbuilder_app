@@ -4,7 +4,7 @@
  * Moved out of `main.ts` in M140 (`R-68656155`) so the resume token's source can be tested: `main.ts` mounts the
  * app the moment it is imported.
  */
-import { resumeTokenFromPath } from './resume-shell';
+import { amendTokenFromPath, resumeTokenFromPath } from './resume-shell';
 import type { Bootstrap } from './types';
 
 export function readBootstrap(el: HTMLElement, pathname: string): Bootstrap {
@@ -23,6 +23,8 @@ export function readBootstrap(el: HTMLElement, pathname: string): Bootstrap {
         // wrong one. The address is what the server verified to render the page, so it is the token's source;
         // the attribute is the fallback for an address this cannot parse.
         resumeToken: resumeTokenFromPath(pathname) || (data.resumeToken ?? ''),
+        // M248 (`D232`) — set on a `/f/amend/{token}` entry. From the address only: the blade embeds no copy of it.
+        amendToken: amendTokenFromPath(pathname),
         // Increment H23b — the tenant ramp's fingerprint, or 'none'. Never blank in practice; the fallback
         // keeps a hand-built or pre-H23b cached shell from comparing `undefined` against a real value.
         brandVersion: data.brandVersion ?? 'none',

@@ -20,7 +20,7 @@ import { clientsClaim } from 'workbox-core';
 import { CONTENT_IMAGE_CACHE, contentImageCacheKey } from './lib/content-images'; import { REFERENCE_FILE_CACHE, referenceFileCacheKey } from './lib/reference-files';
 import { openDb } from './lib/db'; import { LINKED_CHOICE_CACHE, linkedChoicesCacheKey } from './lib/linked-choices'; import { CHOICE_LIST_CACHE, choiceListsCacheKey } from './lib/choice-lists';
 import { replayOutbox } from './lib/replay';
-import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache'; import { isResumeShell } from './lib/brand-cache'; import { purgeTokenKeyedResumeShells, resumeShellCacheKey, tokenFreeShell } from './lib/resume-shell';
+import { SHELL_CACHE, SHELL_EXPIRATION } from './lib/shell-cache'; import { isResumeShell } from './lib/brand-cache'; import { isAmendShell, purgeTokenKeyedResumeShells, resumeShellCacheKey, tokenFreeShell } from './lib/resume-shell';
 
 declare const self: ServiceWorkerGlobalScope & {
     __WB_MANIFEST: Array<string | { url: string; revision: string | null }>;
@@ -86,8 +86,12 @@ registerRoute(
 // ⚠️ M75 — THE NAME AND THE EXPIRY COME FROM `lib/shell-cache.ts` RATHER THAN FROM LITERALS HERE, and
 // that is the one route where it matters: `lib/brand-cache.ts` writes into this cache from the WINDOW
 // and renews this same clock, so a literal here would be one of two copies of a fact.
+//
+// M248 (`D232`) — and NOT a respondent's amend page: its address is the whole credential for a SENT response's answers,
+// so `/f/amend/` is left to the network by this route and claimed by no other (`isAmendShell()`, `lib/resume-shell.ts`).
 registerRoute(
-    ({ request, url, sameOrigin }) => request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/') && !isResumeShell(url.href),
+    ({ request, url, sameOrigin }) =>
+        request.mode === 'navigate' && sameOrigin && url.pathname.startsWith('/f/') && !isResumeShell(url.href) && !isAmendShell(url.href),
     new NetworkFirst({
         cacheName: SHELL_CACHE,
         networkTimeoutSeconds: 5,

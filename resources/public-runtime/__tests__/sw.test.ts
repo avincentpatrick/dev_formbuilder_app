@@ -236,6 +236,27 @@ describe('sw.ts route matchers — which URLs enter a cache at all', () => {
         expect(matcherFor('guest-choice-lists')(resumeRead)).toBe(false);
     });
 
+    it("⛔ keeps a respondent's amend page and its read out of every cache (M248, D232)", () => {
+        // The amend link's address is the whole credential for a SENT response's answers: the page boots on it, and the
+        // read under `submissions/amend/` answers every answer with a fresh share token. Neither may enter a cache — the
+        // shell route leaves `/f/amend/` to the network (`isAmendShell()`), and no route claims the read's prefix.
+        for (const request of [
+            nav('/f/amend/v1.payload.signature'),
+            apiGet('/api/v1/public/submissions/amend/v1.payload.signature'),
+        ]) {
+            expect(matcherFor('guest-schema')(request)).toBe(false);
+            expect(matcherFor('guest-shell-html')(request)).toBe(false);
+            expect(resumeRoute().match(request)).toBe(false);
+            expect(matcherFor('guest-shell-assets')(request)).toBe(false);
+            expect(matcherFor('guest-content-images')(request)).toBe(false);
+            expect(matcherFor('guest-reference-files')(request)).toBe(false);
+            expect(matcherFor('guest-linked-choices')(request)).toBe(false);
+            expect(matcherFor('guest-choice-lists')(request)).toBe(false);
+        }
+        // The control: a form NAMED like the segment's neighbours is still a cached shell.
+        expect(matcherFor('guest-shell-html')(nav('/f/amendments'))).toBe(true);
+    });
+
     it('keeps a sent paper copy, read back by its sender, out of every cache (M166)', () => {
         // The answers as read and the scanned pages are a respondent's handwriting, reached with a paper token in the path.
         // They escape caching for the resume read's reason — a prefix (`paper/`) no route claims — and this arm is the gate.

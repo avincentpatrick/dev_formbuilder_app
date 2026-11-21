@@ -87,6 +87,12 @@ export interface AutosaveOptions {
      * visit alive forever and defeat the rotation entirely.
      */
     onActivity?: () => void;
+    /**
+     * M248 (`D232` answer 4) — the SERVER draft this session is shadowing, once "Save and finish later" has made one:
+     * its uuid, this device's baseline and the latest resume token. Written onto the row so "Continue where you left
+     * off" carries on that same server draft. A getter, read at each write; null (or absent) while there is none.
+     */
+    serverDraft?: () => { clientSubmissionUuid: string; baseContentChecksum: string | null; resumeToken: string } | null;
 }
 
 export interface Autosave {
@@ -138,11 +144,15 @@ export function createAutosave(options: AutosaveOptions): Autosave {
         const stampedAt = new Date(now()).toISOString();
         // The identity of the draft's CONTENT, deliberately excluding `updated_at` — that is the field
         // whose spurious movement is the defect.
+        // M248 — the server-draft identity is part of what is written, so a "Save and finish later" that changed only
+        // it (the answers unchanged) still reaches the row when the caller flushes.
+        const server = options.serverDraft?.() ?? null;
         const signature = JSON.stringify([
             options.checksum,
             options.locale.value,
             options.currentStepKey.value,
             plainClone(options.answers),
+            server,
         ]);
         if (signature === lastWritten) {
             saving.value = false;
@@ -161,6 +171,14 @@ export function createAutosave(options: AutosaveOptions): Autosave {
                 // `RuntimeSession`'s `enqueue()` applies to the outbox. `null` when unscoped, which reads as
                 // an earlier visit to every scoped reader and is the safe direction.
                 respondent_session_id: options.sessionId ?? null,
+                // M248 — the server draft this row shadows, for "Continue where you left off" (`lib/db.ts`).
+                ...(server !== null
+                    ? {
+                          client_submission_uuid: server.clientSubmissionUuid,
+                          base_content_checksum: server.baseContentChecksum,
+                          resume_token: server.resumeToken,
+                      }
+                    : {}),
             });
             savedAt.value = stampedAt;
             // Only after the write COMMITTED. Recording it before would let a failed put suppress the

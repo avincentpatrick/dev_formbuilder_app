@@ -97,7 +97,7 @@ describe('RuntimeSession (component wiring)', () => {
         expect(client.submit).toHaveBeenCalledWith(expect.objectContaining({ answers: { name: 'Ada' } }));
         // The second payload is Increment H6b's rendered confirmation copy — null here because this form
         // sets no `confirmation_message`, which is what keeps App.vue's hardcoded default in place.
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null, null]);
 
         wrapper.unmount();
     });
@@ -713,7 +713,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!', null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Thanks, Ada!', null, null]);
         wrapper.unmount();
     });
 
@@ -730,7 +730,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!', null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, 'Salamat, Ada!', null, null]);
         wrapper.unmount();
     });
 
@@ -741,7 +741,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null, null]);
         wrapper.unmount();
     });
 
@@ -755,7 +755,7 @@ describe('RuntimeSession — piping (Increment H6b, Doc #26)', () => {
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, null, null]);
         wrapper.unmount();
     });
 
@@ -1977,7 +1977,7 @@ describe('RuntimeSession — the destination after the thank-you (M130, D76)', (
         await wrapper.find('form').trigger('submit');
         await settle();
 
-        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, next]);
+        expect(wrapper.emitted('submitted')?.[0]).toEqual([SUBMISSION_ID, SUBMISSION_REFERENCE, null, next, null]);
         wrapper.unmount();
     });
 });

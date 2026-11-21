@@ -28,11 +28,20 @@
  *   · The count stops on `pagehide`, and a page restored from the back/forward cache keeps the link without
  *     counting again — otherwise Back would bounce the respondent forward.
  *   · Leaving emits `leave` first, and App.vue rotates the respondent session as Submit-another does.
+ *
+ * ── WHAT COMES NEXT FOR THE RESPONDENT (M248, `D232`) ───────────────────────────────────────────────────
+ * The form's "After submitting" setting decides the last part of the card:
+ *   · `another` — "Submit another response", as every form did before;
+ *   · `amend` — "Change my answers", and the link to do it from another device, to copy or to email to oneself (a
+ *     `mailto:` the respondent's own mail app sends — this server relays no mail on an unauthenticated request). While
+ *     the link is on screen nothing counts down: a respondent reading or copying it must not be moved off the page;
+ *   · `once` — nothing more.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { MdsButton } from '@meridian/design-system';
+import { MdsButton, MdsFormField, MdsTextInput } from '@meridian/design-system';
 import { DEFAULT_REDIRECT_DELAY } from '../lib/api-client';
-import type { SubmitRedirect } from '../lib/types';
+import { formatInstantInZone } from '../lib/schedule';
+import type { AmendLink, SubmitRedirect } from '../lib/types';
 
 const props = withDefaults(
     defineProps<{
@@ -47,10 +56,57 @@ const props = withDefaults(
         framed?: boolean;
         /** Goes to the destination: `window.location.assign`, unless a test passes its own. */
         navigate?: (url: string) => void;
+        /** M248 — the form's "After submitting" setting; absent is `another`, what every form did before. */
+        afterSubmit?: 'another' | 'amend' | 'once';
+        /** M248 — the link to change this response, in `amend` mode once the server issued one. */
+        amendLink?: AmendLink | null;
+        /** M248 — for formatting the link's closing date in the respondent's own zone and language. */
+        timeZone?: string;
+        locale?: string;
     }>(),
-    { redirect: null, unsent: 0, framed: false, navigate: (url: string) => window.location.assign(url) },
+    {
+        redirect: null,
+        unsent: 0,
+        framed: false,
+        navigate: (url: string) => window.location.assign(url),
+        afterSubmit: 'another',
+        amendLink: null,
+        timeZone: 'UTC',
+        locale: 'en',
+    },
 );
-const emit = defineEmits<{ restart: []; leave: [] }>();
+const emit = defineEmits<{ restart: []; leave: []; change: [] }>();
+
+// M248 — "Change my answers" and its link, in `amend` mode once the response reached the server.
+const offersChange = computed(() => props.afterSubmit === 'amend' && props.amendLink !== null);
+const changeUntil = computed(() =>
+    props.amendLink?.until ? formatInstantInZone(props.amendLink.until, props.timeZone, props.locale) : null,
+);
+const linkCopied = ref(false);
+const mailtoHref = computed(() =>
+    props.amendLink === null
+        ? ''
+        : `mailto:?subject=${encodeURIComponent('My form response')}&body=${encodeURIComponent(
+              `Open this link to change the answers I sent:\n${props.amendLink.url}`,
+          )}`,
+);
+
+async function onCopyLink(): Promise<void> {
+    if (props.amendLink === null) return;
+    try {
+        await navigator.clipboard?.writeText(props.amendLink.url);
+        linkCopied.value = true;
+        announcement.value = 'Link copied.';
+    } catch {
+        // The field is selectable; copying by hand still works.
+    }
+}
+
+function onChange(): void {
+    settled = true;
+    stop();
+    emit('change');
+}
 
 
 const heading = ref<HTMLElement | null>(null);
@@ -110,7 +166,8 @@ function onRestart(): void {
 }
 
 function startCount(): void {
-    if (settled || counting.value || destination.value === null || props.framed || props.unsent > 0) return;
+    // M248 — never while the amend link is on screen: a respondent copying it must not be moved off the page.
+    if (settled || counting.value || destination.value === null || props.framed || props.unsent > 0 || offersChange.value) return;
     counting.value = true;
     remaining.value = delaySeconds.value;
     announcement.value = `Next: ${destination.value.label}, in ${delaySeconds.value} seconds. Choose Stay on this page to remain here.`;
@@ -198,7 +255,32 @@ onBeforeUnmount(() => {
                 </div>
             </div>
             <p class="confirmation__sr" role="status">{{ announcement }}</p>
-            <MdsButton variant="secondary" @click="onRestart">Submit another response</MdsButton>
+            <div v-if="offersChange && amendLink !== null" class="confirmation__change" data-amend-link>
+                <p class="confirmation__change-lead">
+                    You can change your answers<template v-if="changeUntil !== null"> until {{ changeUntil }}</template><template v-else> while the form is open</template>.
+                    On this device, open the form's link again. On another device, use this link.
+                </p>
+                <MdsFormField label="Your link to change your answers" class="confirmation__change-field">
+                    <template #default="{ id, describedby }">
+                        <MdsTextInput
+                            :id="id"
+                            :model-value="amendLink.url"
+                            :describedby="describedby"
+                            readonly
+                            @focus="($event.target as HTMLInputElement).select()"
+                        />
+                    </template>
+                </MdsFormField>
+                <div class="confirmation__next-actions">
+                    <MdsButton variant="primary" data-change-answers @click="onChange">Change my answers</MdsButton>
+                    <MdsButton variant="secondary" @click="onCopyLink">{{ linkCopied ? 'Copied' : 'Copy link' }}</MdsButton>
+                    <MdsButton variant="tertiary" as="a" :href="mailtoHref">Email it to myself</MdsButton>
+                </div>
+            </div>
+            <p v-else-if="afterSubmit === 'amend' && queueTag !== null" class="confirmation__ref-note">
+                Once this response is sent, you can change your answers by opening the form's link again on this device.
+            </p>
+            <MdsButton v-if="afterSubmit === 'another'" variant="secondary" @click="onRestart">Submit another response</MdsButton>
         </div>
     </div>
 </template>
@@ -308,6 +390,30 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
     justify-content: center;
     gap: var(--mds-space-2);
+}
+
+/* M248 (`D232`) — the way back to the answers sent, set off by a rule like the destination above. */
+.confirmation__change {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--mds-space-3);
+    width: 100%;
+    padding-top: var(--mds-space-4);
+    border-top: 1px solid var(--mds-color-border-default);
+}
+
+.confirmation__change-lead {
+    margin: 0;
+    font-family: var(--mds-font-family-body);
+    font-size: var(--mds-type-body-md-font-size);
+    line-height: var(--mds-type-body-md-line-height);
+    color: var(--mds-color-text-body);
+}
+
+.confirmation__change-field {
+    width: 100%;
+    text-align: left;
 }
 
 /* Read once by a screen reader; the visible countdown above is not a live region, so it never chatters. */

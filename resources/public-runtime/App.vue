@@ -21,10 +21,10 @@ import {
 } from './composables/context';
 import { useOnline } from './composables/useOnline';
 import { createSyncOutbox } from './composables/useSyncOutbox';
-import { createApiClient, resumeDraft } from './lib/api-client';
+import { createApiClient, readAmend, resumeDraft } from './lib/api-client';
 import { contentImageUrl, warmContentImages } from './lib/content-images';
 import { conflictCopy } from './lib/conflict-notice';
-import { draftBelongsToVisit, openDb } from './lib/db';
+import { adoptDraft, draftBelongsToVisit, earlierVisitDraft, openDb, type DraftRow } from './lib/db';
 import { localMediaRefId, stash } from './lib/media-queue';
 import { reconcileDraft, type LocalDraft } from './lib/reconcile';
 import { respondentSession, rotateRespondentSession } from './lib/respondent-session';
@@ -33,16 +33,22 @@ import { ApiError } from './lib/error-normalizer';
 import { deriveReference } from './lib/reference-number';
 import { formatInstantInZone, scheduleStateCopy, type ScheduleStateCopy } from './lib/schedule';
 import { isoClock } from './lib/schema-mapping';
-import type { AnswerMap, Bootstrap, PaperFieldMeta, PaperPage, PaperReview, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
+import type { AmendLink, AnswerMap, Bootstrap, PaperFieldMeta, PaperPage, PaperReview, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
 // M166 — below the other imports on purpose: `App.vue:29-31` is cited by line, and an import above would move it.
 import PaperReading from './components/PaperReading.vue';
+// M248 (`D118`, `D232`) — the same reason.
+import AlreadyAnswered from './components/AlreadyAnswered.vue';
+import ContinueOrStartOver from './components/ContinueOrStartOver.vue';
+import { readAnswered, rememberAnswered, type AnsweredRecord } from './lib/answered';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
 // 'unavailable' = a scheduled form the runtime refuses to render for filling (opens-soon / closed / full),
 // computed from the server-side `acceptance` label (Increment H12b). It REPLACES the form.
 // 'reading' = a sent paper copy being read, before its sender checks it (M166, `D116`). It REPLACES the form too.
-type Phase = 'loading' | 'ready' | 'reading' | 'confirmation' | 'error' | 'unavailable';
+// 'continue' = this device holds answers an earlier visit left; ask before showing them (M248, `D118`). REPLACES the form.
+// 'answered' = this device already sent a response to a one-response form (M248, `D232`). REPLACES the form.
+type Phase = 'loading' | 'ready' | 'reading' | 'confirmation' | 'error' | 'unavailable' | 'continue' | 'answered';
 
 const CONFIRM_MESSAGE = 'Thanks — your response has been recorded.';
 const QUEUED_MESSAGE = "Saved on this device — we'll submit it automatically when you're back online.";
@@ -144,7 +150,11 @@ const initialSearch = typeof window === 'undefined' ? '' : window.location.searc
 // M180 (`D153`): the instant is read here, once; it is STAMPED in the form's zone once the schema is in, so `today()` is
 // the form's calendar day — and a remount still keeps the instant the respondent started under.
 const sessionInstant = new Date();
-const sessionNow = computed(() => isoClock(sessionInstant, schema.value?.form.schedule?.timezone ?? 'UTC'));
+// M248 (`D232`) — a session changing a SENT response is checked against the day it was sent, as the server checks it
+// (`SubmissionAnswerEditService`'s `submitted_at` clock); otherwise a date rule could pass on the server and fail here.
+const sessionNow = computed(() =>
+    isoClock(amendClock.value ?? sessionInstant, schema.value?.form.schedule?.timezone ?? 'UTC'),
+);
 
 // Increment G8b — the offline database + replay driver are created once here and shared with every session
 // (and, via the same DB name, with the service worker's Background-Sync replay). The slug scopes G8c conflict
@@ -205,11 +215,21 @@ onMounted(load);
 async function load(): Promise<void> {
     phase.value = 'loading';
     try {
+        // M248 (`D232`) — opened from a respondent's link to change the response they sent.
+        // Truthy rather than `!== ''`: a bootstrap built before M248 carries no `amendToken` at all.
+        if (props.bootstrap.amendToken) {
+            await loadAmend(props.bootstrap.amendToken);
+            return;
+        }
         if (props.bootstrap.resumeToken !== '') {
             await loadResume(props.bootstrap.resumeToken);
             return;
         }
         schema.value = await client.fetchSchema();
+        // M248 (`D232`) — BEFORE the schedule gate below, so a FULL form still offers its respondent "Change my answers".
+        if (await offerAlreadyAnswered(schema.value)) {
+            return;
+        }
         // Increment H12b — a scheduled form that isn't accepting fresh responses (opens-soon / closed / full)
         // shows a full-screen state INSTEAD of the fill session. This gate is on the FRESH-load path only: a
         // resume link (loadResume) is never blocked here, so H12a's grace window (a draft started before close
@@ -218,6 +238,10 @@ async function load(): Promise<void> {
         if (state !== null) {
             unavailableCopy.value = state;
             phase.value = 'unavailable';
+            return;
+        }
+        // M248 (`D118` A) — answers an earlier visit left here are offered back, behind a choice, before any appears.
+        if (await offerContinue(schema.value)) {
             return;
         }
         phase.value = 'ready';
@@ -344,7 +368,22 @@ async function loadResume(resumeToken: string): Promise<void> {
     phase.value = 'ready';
 }
 
-function onSubmitted(id: string, submittedReference: string, authored: string | null = null, redirect: SubmitRedirect | null = null): void {
+function onSubmitted(
+    id: string,
+    submittedReference: string,
+    authored: string | null = null,
+    redirect: SubmitRedirect | null = null,
+    amend: AmendLink | null = null,
+): void {
+    // M248 (`D232`) — a one-response form: the device remembers it answered, and in `amend` mode how to change it.
+    confirmationAmendLink.value = amend;
+    if (afterSubmit.value !== 'another') {
+        void rememberAnswered(db, props.bootstrap.slug, {
+            reference: submittedReference,
+            at: new Date().toISOString(),
+            amendToken: amend?.token ?? null,
+        });
+    }
     // M166 — a checked paper copy is now a response like any other; nothing of the review outlives it.
     paperReview.value = null;
     // Increment G8c — a resolved conflict: drop the parked row now that its reviewed answers are recorded.
@@ -415,6 +454,12 @@ function onQueued(clientUuid: string): void {
     }
     queueTag.value = deriveReference(clientUuid);
     reference.value = null;
+    // M248 (`D232`) — a one-response form remembers a QUEUED response at once; the replay that delivers it adds the
+    // reference and, in `amend` mode, the token (`lib/replay.ts`).
+    confirmationAmendLink.value = null;
+    if (afterSubmit.value !== 'another') {
+        void rememberAnswered(db, props.bootstrap.slug, { reference: null, at: new Date().toISOString(), amendToken: null });
+    }
     // Increment H6b deliberately does NOT let an author message replace this one. It is not a thank-you —
     // it is the only thing telling the respondent their answers have not been delivered yet, and swapping
     // it for "Thanks, Maria — your response has been recorded." would be a factual lie about delivery
@@ -578,6 +623,207 @@ function onRestart(): void {
     rotateRespondentSession();
     window.location.reload();
 }
+
+// ── M248 (`D118`, `D232`) — the respondent's own answers ────────────────────────────────────────────────────────────
+
+/** The form's "After submitting" setting; a manifest cached before M248 has none, which is `another`. */
+const afterSubmit = computed<'another' | 'amend' | 'once'>(() => schema.value?.form.after_submit ?? 'another');
+/** The respondent's own zone and language, for the times the new screens show. */
+const viewerZone = (() => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    } catch {
+        return 'UTC';
+    }
+})();
+const viewerLocale = props.bootstrap.defaultLocale || 'en';
+const errorHeadline = ref('This form isn’t available');
+
+/** The earlier visit's draft `ContinueOrStartOver` asks about, while it asks. */
+const earlierDraft = shallowRef<DraftRow | null>(null);
+/** What this device remembers sending, while `AlreadyAnswered` shows it. */
+const answered = shallowRef<(AnsweredRecord & { canChange: boolean; closedNote: string | null; until: string | null }) | null>(null);
+/** The response being changed, while a session changes it; its clock is the day it was sent. */
+const amendSession = shallowRef<{ token: string; baseline: string | null } | null>(null);
+const amendClock = ref<Date | null>(null);
+/** The link the thank-you page offers, after a submit or a change in `amend` mode. */
+const confirmationAmendLink = shallowRef<AmendLink | null>(null);
+
+/**
+ * Show "You've already answered this form" when this device remembers sending a response and the form takes one per
+ * device. The answers stay off screen until "Change my answers".
+ */
+async function offerAlreadyAnswered(loaded: SchemaResponse): Promise<boolean> {
+    const mode = loaded.form.after_submit ?? 'another';
+    if (mode === 'another') {
+        return false;
+    }
+    const record = await readAnswered(db, props.bootstrap.slug);
+    if (record === null) {
+        return false;
+    }
+    const acceptance = loaded.form.schedule?.acceptance ?? 'open';
+    const closed = acceptance === 'closed' || acceptance === 'opens_soon';
+    const canChange = mode === 'amend' && record.amendToken !== null && !closed;
+    answered.value = {
+        ...record,
+        canChange,
+        until: loaded.form.schedule?.closes_at ?? null,
+        closedNote:
+            mode !== 'amend' || canChange
+                ? null
+                : closed
+                  ? 'This form has closed, so your answers can no longer be changed.'
+                  : 'Your response is still waiting to be sent from this device. Once it is sent, you can change it here.',
+    };
+    phase.value = 'answered';
+    return true;
+}
+
+/** Ask "Continue where you left off" or "Start over" when an earlier visit left answers on this form. */
+async function offerContinue(loaded: SchemaResponse): Promise<boolean> {
+    const row = await earlierVisitDraft(
+        db,
+        { formVersionId: loaded.version.id, slug: props.bootstrap.slug, checksum: loaded.version.checksum },
+        respondentSessionId,
+    );
+    if (row === null) {
+        return false;
+    }
+    earlierDraft.value = row;
+    phase.value = 'continue';
+    return true;
+}
+
+/**
+ * "Continue where you left off": the row becomes this visit's. When it shadows a server draft ("Save and finish later"),
+ * the session carries on THAT draft through the resume read — same uuid, the server's baseline, newest answers win
+ * (`D232` answer 4); otherwise the session's own restore picks the row up. A server draft that is gone (sent, or reaped)
+ * falls back to the answers on this device.
+ */
+async function onContinue(): Promise<void> {
+    const row = earlierDraft.value;
+    earlierDraft.value = null;
+    if (row === null) {
+        phase.value = 'ready';
+        return;
+    }
+    try {
+        await adoptDraft(db, { formVersionId: row.form_version_id, slug: props.bootstrap.slug }, respondentSessionId);
+    } catch {
+        // A refused write leaves the row foreign; the form then starts blank, which is today's behaviour.
+    }
+    if (row.resume_token) {
+        try {
+            await loadResume(row.resume_token);
+        } catch {
+            phase.value = 'error';
+        }
+        if (phase.value === 'ready') {
+            return;
+        }
+        // The server draft is gone: fall back to the device's own copy, under a fresh session.
+        errorMessage.value = '';
+        resumeSeed.value = null;
+        retainedAnswers.value = undefined;
+        try {
+            schema.value = await client.fetchSchema();
+        } catch {
+            errorMessage.value = 'We could not load this form. Please try again.';
+            phase.value = 'error';
+            return;
+        }
+    }
+    sessionKey.value += 1;
+    phase.value = 'ready';
+}
+
+/** "Start over": a blank form. The earlier row is left for the first save to overwrite, as before M248. */
+function onStartOver(): void {
+    earlierDraft.value = null;
+    phase.value = 'ready';
+}
+
+/** "Change my answers" from the already-answered screen or the thank-you page: open the response through its token. */
+async function onChangeAnswers(): Promise<void> {
+    const token = answered.value?.amendToken ?? confirmationAmendLink.value?.token ?? null;
+    if (token === null) {
+        return;
+    }
+    phase.value = 'loading';
+    await loadAmend(token);
+}
+
+/**
+ * M248 (`D232`) — open the response a respondent SENT, to change it. Its version is the one it was sent under: the read
+ * returns a share token minted for that version, adopted BEFORE the schema is fetched, as `loadResume()` does. No
+ * schedule gate here — the read already refused a closed form — and no "full" gate, because a change adds no response.
+ */
+async function loadAmend(amendToken: string): Promise<void> {
+    let read;
+    try {
+        read = await readAmend(amendToken);
+    } catch (error) {
+        errorHeadline.value = 'Your answers can’t be changed';
+        errorMessage.value = amendUnavailableMessage(error);
+        phase.value = 'error';
+        return;
+    }
+
+    client.adoptToken(read.shareToken);
+    try {
+        schema.value = await client.fetchSchema();
+    } catch (error) {
+        errorMessage.value = error instanceof ApiError ? error.normalized.message : 'We could not load this form. Please try again.';
+        phase.value = 'error';
+        return;
+    }
+
+    amendClock.value = read.submittedAt === null ? null : new Date(read.submittedAt);
+    amendSession.value = { token: amendToken, baseline: read.contentChecksum };
+    confirmationAmendLink.value = { token: amendToken, url: window.location.origin + '/f/amend/' + encodeURIComponent(amendToken), until: read.until };
+    retainedAnswers.value = read.answers;
+    resumeSeed.value = null;
+    driftNotice.value = null;
+    sessionKey.value += 1;
+    phase.value = 'ready';
+}
+
+function amendUnavailableMessage(error: unknown): string {
+    if (!(error instanceof ApiError)) {
+        return 'We could not reach the server. Check your connection and try again.';
+    }
+    switch (error.normalized.code) {
+        case 'form_closed':
+            return 'This form has closed, so your answers can no longer be changed.';
+        case 'form_not_open':
+            return 'This form is not open yet.';
+        case 'response_under_review':
+        case 'amend_not_allowed':
+            return error.normalized.message;
+        default:
+            return error.normalized.kind === 'terminal'
+                ? 'This link to change your answers is no longer valid.'
+                : error.normalized.message;
+    }
+}
+
+/** A change to a sent response was saved. */
+function onAmended(amendedReference: string): void {
+    // This device now knows the response, wherever the link was opened.
+    if (amendSession.value !== null) {
+        void rememberAnswered(db, props.bootstrap.slug, {
+            reference: amendedReference,
+            at: new Date().toISOString(),
+            amendToken: amendSession.value.token,
+        });
+    }
+    reference.value = amendedReference;
+    queueTag.value = null;
+    redirectTarget.value = null;
+    confirmationMessage.value = 'Your changes were saved.';
+    phase.value = 'confirmation';
+}
 </script>
 
 <template>
@@ -604,7 +850,7 @@ function onRestart(): void {
             <MdsSpinner size="lg" label="Loading form" />
         </div>
         <div v-else-if="phase === 'error'" class="app-state">
-            <MdsEmptyState illustration="lock" headline="This form isn’t available" :description="errorMessage" />
+            <MdsEmptyState illustration="lock" :headline="errorHeadline" :description="errorMessage" />
         </div>
         <div v-else-if="phase === 'unavailable' && unavailableCopy" class="app-state">
             <MdsEmptyState
@@ -621,8 +867,34 @@ function onRestart(): void {
             :redirect="redirectTarget"
             :unsent="syncOutbox.pending.value"
             :framed="framed"
+            :after-submit="afterSubmit"
+            :amend-link="confirmationAmendLink"
+            :time-zone="viewerZone"
+            :locale="viewerLocale"
             @leave="rotateRespondentSession"
             @restart="onRestart"
+            @change="onChangeAnswers"
+        />
+        <ContinueOrStartOver
+            v-else-if="phase === 'continue' && earlierDraft"
+            :title="schema?.form.title ?? bootstrap.formTitle"
+            :saved-at="earlierDraft.updated_at"
+            :time-zone="viewerZone"
+            :locale="viewerLocale"
+            @continue="onContinue"
+            @start-over="onStartOver"
+        />
+        <AlreadyAnswered
+            v-else-if="phase === 'answered' && answered"
+            :title="schema?.form.title ?? bootstrap.formTitle"
+            :reference="answered.reference"
+            :sent-at="answered.at"
+            :can-change="answered.canChange"
+            :closed-note="answered.closedNote"
+            :until="answered.until"
+            :time-zone="viewerZone"
+            :locale="viewerLocale"
+            @change="onChangeAnswers"
         />
         <PaperReading
             v-else-if="phase === 'reading' && paperToken"
@@ -643,10 +915,12 @@ function onRestart(): void {
             :resolving="resolveMode"
             :resolving-uuid="resolvingUuid"
             :resume="resumeSeed"
-            :search="initialSearch"
+            :search="amendSession ? '' : initialSearch"
             :now="sessionNow"
             :paper-review="paperReview"
+            :amend="amendSession"
             @submitted="onSubmitted"
+            @amended="onAmended"
             @queued="onQueued"
             @reschema="onReschema"
             @redraft="onRedraft"

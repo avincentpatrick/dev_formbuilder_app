@@ -114,3 +114,11 @@ export const PaperNotesKey: InjectionKey<Record<string, PaperNote>> = Symbol('Pa
 export function usePaperNotes(): Record<string, PaperNote> | null {
     return inject(PaperNotesKey, null);
 }
+
+/**
+ * M248 (`D232`) — this session is changing a response the respondent already SENT. Read by `FieldControl`, which draws
+ * a photo, file or signature as what was sent: the server keeps a sent response's media whatever the page sends
+ * (`SubmissionAnswerEditService::mergeMedia()`), so a control that offered a new file would offer a change that is
+ * never saved. Absent (false) on every other session.
+ */
+export const AmendModeKey: InjectionKey<boolean> = Symbol('public-runtime-amend-mode');

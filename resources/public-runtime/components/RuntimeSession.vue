@@ -21,6 +21,7 @@ import { createAutosave } from '../composables/useAutosave';
 import { createFormRuntime, type StepResolution } from '../composables/useFormRuntime';
 import { useOnline } from '../composables/useOnline';
 import {
+    AmendModeKey,
     AnnouncerKey,
     DbKey,
     DraftFlowKey,
@@ -46,8 +47,8 @@ import {
 import { getDeviceId } from '../lib/device';
 import { touchRespondentSession } from '../lib/respondent-session';
 import { APP_VERSION } from '../lib/app-version';
-import type { ApiClient } from '../lib/api-client';
-import type { AnswerMap, Bootstrap, PaperReview, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
+import { sendAmend, type ApiClient } from '../lib/api-client';
+import type { AmendLink, AnswerMap, Bootstrap, PaperReview, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
 import { paperNotes } from '../lib/paper-notes';
 
 const props = defineProps<{
@@ -95,6 +96,13 @@ const props = defineProps<{
      * the upload are all off, because none of them can carry the token.
      */
     paperReview?: PaperReview | null;
+    /**
+     * M248 (`D232`) — this session changes a response the respondent already SENT, through its amend token. Its answers
+     * come in as `initialAnswers`, its clock as `now` (the day it was sent, which the server checks against), and its
+     * Submit goes straight to the server as a PUT: autosave, the server draft, the outbox, the paper upload and URL
+     * prefill are all off, because none of them can carry a change to a sent response.
+     */
+    amend?: { token: string; baseline: string | null } | null;
 }>();
 
 const emit = defineEmits<{
@@ -106,7 +114,10 @@ const emit = defineEmits<{
     // Increment J2e — the SERVER-issued reference rides along, so App.vue prints the code the tenant can
     // find rather than one derived on the device from the id.
     // M130 (`D76`) — and where the respondent goes after the thank-you screen, from the same response.
-    submitted: [id: string, reference: string, confirmation: string | null, redirect: SubmitRedirect | null];
+    // M248 (`D232`) — and the link to change it, when the form offers "Change my answers".
+    submitted: [id: string, reference: string, confirmation: string | null, redirect: SubmitRedirect | null, amend: AmendLink | null];
+    // M248 — a sent response was changed; App shows that it was saved.
+    amended: [reference: string];
     queued: [clientUuid: string];
     // Increment M14 — `conflictCode` names WHICH 409 caused the remount (null = the ordinary republish
     // drift), so App.vue can pick a true sentence instead of asserting a republish for all five causes.
@@ -136,12 +147,13 @@ const runtime = createFormRuntime(props.schema, {
     // (a version drift remounts), so a plain boolean is exact; a single-page form never splits.
     paginateAtPageBreaks: !props.schema.form.single_page_mode,
     // M180 (`R-20784770`) — defaults only on a form opened fresh: nothing restored, resumed, read from paper or reviewed.
-    seedDefaults: props.initialAnswers === undefined && !props.resume && !props.paperReview && !props.resolving,
+    seedDefaults: props.initialAnswers === undefined && !props.resume && !props.paperReview && !props.resolving && !props.amend,
 });
 const announcer = createAnnouncer();
 
 provide(RuntimeKey, runtime);
 provide(AnnouncerKey, announcer);
+provide(AmendModeKey, Boolean(props.amend));
 
 // R-95a94b36 (M121) — the respondent is told when the rule engine fails, and Submit stays open (D67 = warn):
 // the server stays authoritative, exactly as the staff encode page already behaves. ⚠️ The copy is hedged
@@ -181,7 +193,8 @@ const autosave = createAutosave({
     // Increment M124 — the BLOCK, never a page of it: what a saved draft records (`resumeStepKey`).
     currentStepKey: runtime.resumeStepKey,
     // A conflict-review session must not autosave — the durable copy is the parked outbox row (Increment G8c).
-    enabled: !props.resolving && !props.paperReview,
+    // M248 — nor a session changing a SENT response: the server holds it, and a draft row would offer it back as unsent.
+    enabled: !props.resolving && !props.paperReview && !props.amend,
     // Increment M21 — the visit `respondentSessionId` reads, so an abandoned draft is never restored into the next
     // respondent's form. `undefined` (a bare test mount, where the inject falls back to null) keeps the
     // pre-M21 unscoped behaviour, which is M15's convention for this argument throughout the runtime.
@@ -190,6 +203,16 @@ const autosave = createAutosave({
     // measured elapsed-since-boot rather than idle, so a refresh part-way through a long fill issued a
     // FRESH visit and this session's own draft became unrestorable. See `lib/respondent-session.ts`.
     onActivity: touchRespondentSession,
+    // M248 (`D232` answer 4) — once "Save and finish later" has made a server draft, the row carries its identity, so
+    // "Continue where you left off" on this device carries on that same draft.
+    serverDraft: () =>
+        draftResumeToken.value === null
+            ? null
+            : {
+                  clientSubmissionUuid: runtime.clientSubmissionUuid,
+                  baseContentChecksum: draftBaseline.value,
+                  resumeToken: draftResumeToken.value,
+              },
 });
 
 // Restore a same-browser draft — but only on a FRESH session. A version-drift remount already carries the
@@ -451,7 +474,7 @@ async function submitPaperReview(paperToken: string): Promise<SubmitOutcome> {
             appVersion: APP_VERSION,
             paperToken,
         });
-        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null);
+        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null, null);
         return 'success';
     } catch (error) {
         if (!(error instanceof ApiError)) {
@@ -485,6 +508,59 @@ async function submitPaperReview(paperToken: string): Promise<SubmitOutcome> {
     }
 }
 
+/**
+ * M248 (`D232`) — the Submit of a change to a SENT response. Straight to the server with the amend token, never through
+ * the outbox: a queued row cannot carry the token, and a change that reached the server later than the respondent
+ * believes could land after staff began reviewing. Offline it says so and waits, as the paper review's does.
+ *
+ * Every refusal is a sentence on the page, never a remount: `refresh` would re-mint onto the form's CURRENT version, and
+ * this session is deliberately on the version the response was sent under.
+ */
+async function submitAmend(amendToken: string): Promise<SubmitOutcome> {
+    if (!online.value) {
+        notice.value = { type: 'error', message: 'Connect to the internet to send your changes. Your changes are still on this page.' };
+        return 'blocked';
+    }
+
+    submitting.value = true;
+    notice.value = null;
+    try {
+        const result = await sendAmend(amendToken, runtime.effectiveAnswers.value, props.amend?.baseline ?? null);
+        emit('amended', result.reference);
+        return 'success';
+    } catch (error) {
+        if (!(error instanceof ApiError)) {
+            notice.value = { type: 'error', message: 'We could not reach the server. Check your connection and press Submit again.' };
+            return 'blocked';
+        }
+        const normalized = error.normalized;
+        if (normalized.kind === 'field') {
+            runtime.setServerErrors(normalized.fieldErrors);
+            runtime.markSubmitAttempted();
+            return 'field-errors';
+        }
+        notice.value = {
+            type: normalized.kind === 'rate_limited' ? 'rate-limited' : 'error',
+            message: amendRefusal(normalized.code, normalized.message),
+        };
+        return 'blocked';
+    } finally {
+        submitting.value = false;
+    }
+}
+
+/** M248 — the sentence for a refused change. The server's own wording, except where a respondent needs the reason. */
+function amendRefusal(code: string, message: string): string {
+    switch (code) {
+        case 'form_closed':
+            return 'This form has closed, so your answers can no longer be changed.';
+        case 'response_changed':
+            return 'These answers were changed on another device. Open your link again to see the latest answers.';
+        default:
+            return message;
+    }
+}
+
 async function submit(): Promise<SubmitOutcome> {
     runtime.markSubmitAttempted();
     if (!runtime.passed.value) {
@@ -493,6 +569,10 @@ async function submit(): Promise<SubmitOutcome> {
 
     if (props.paperReview) {
         return await submitPaperReview(props.paperReview.token);
+    }
+
+    if (props.amend) {
+        return await submitAmend(props.amend.token);
     }
 
     // Increment H12b — fail CLOSED offline for a scheduled/capped form. Its `acceptance` was computed
@@ -569,7 +649,7 @@ async function submit(): Promise<SubmitOutcome> {
         await discardRow(db, uuid);
         void sync?.refresh();
         await autosave.clear();
-        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null);
+        emit('submitted', result.id, result.reference, authoredConfirmation(), result.redirect ?? null, result.amend ?? null);
         return 'success';
     } catch (error) {
         return await handleSubmitError(error, uuid);
@@ -641,6 +721,9 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
         // it. Skipping this would make every save after the first look like a second device.
         draftBaseline.value = result.contentChecksum;
         draftResumeToken.value = result.resumeToken;
+        // M248 — write the server draft's identity onto the local row now, so "Continue where you left off" on this
+        // device carries on this draft even if nothing else is typed before the tab closes.
+        autosave.flush();
         const email = (options.email ?? '').trim();
         return { resumeUrl: result.resumeUrl, emailed: options.finishLater && email !== '' };
     } catch (error) {
@@ -679,7 +762,7 @@ async function saveDraftAction(options: { email?: string | null; finishLater: bo
     }
 }
 
-if (props.schema.form.save_and_resume && !props.resolving && !props.paperReview) {
+if (props.schema.form.save_and_resume && !props.resolving && !props.paperReview && !props.amend) {
     provide(DraftFlowKey, { saving: draftSaving, completeness: draftCompleteness, saveDraft: saveDraftAction });
 }
 
@@ -738,11 +821,19 @@ const description = computed(() => runtime.renderModel.form.description);
             <!-- M165: never while a parked response is being reviewed — that respondent is finishing an answer — and never on
                  the paper copy being checked (M166). -->
             <PaperCopyUpload
-                v-if="schema.form.paper_upload && !resolving && !paperReview"
+                v-if="schema.form.paper_upload && !resolving && !paperReview && !amend"
                 :limits="schema.form.paper_upload"
                 :client="client"
                 :online="online"
                 @received="(reference, paperToken) => emit('paper-received', reference, paperToken)"
+            />
+            <!-- M248 (`D232`): changing a sent response. A standing condition, so a Banner. -->
+            <MdsBanner
+                v-if="amend"
+                tone="info"
+                icon="info"
+                message="You are changing the answers you sent. Press Submit at the end to save your changes."
+                data-amend-notice
             />
             <!-- M166 (`D116`): the sender checks what their paper was read as. A standing condition, so a Banner. -->
             <MdsBanner

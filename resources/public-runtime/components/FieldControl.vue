@@ -8,13 +8,15 @@
 import { computed, inject } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
 import { resolveCascade, resolveMatrix, resolveText } from '../lib/schema-mapping';
-import { useRuntime, OfflineMediaKey, UploadUrlKey } from '../composables/context';
+import { useRuntime, AmendModeKey, OfflineMediaKey, UploadUrlKey } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
 const props = defineProps<{ field: RenderField }>();
 const runtime = useRuntime();
 const resolveUploadUrl = inject(UploadUrlKey, null);
 const stashOffline = inject(OfflineMediaKey, null);
+// M248 (`D232`) — changing a SENT response: its photos, files and signatures show what was sent (`AmendModeKey`).
+const amendMode = inject(AmendModeKey, false);
 
 const marker = computed(() => runtime.requiredMarkerFor(props.field));
 
@@ -90,6 +92,8 @@ function onUpdate(next: AnswerValue): void {
         :model-value="value"
         :required-marker="marker"
         :error="runtime.errorFor(field.key)"
+        :read-only="amendMode"
+        read-only-audience="respondent"
         @update:model-value="onUpdate"
     />
 </template>

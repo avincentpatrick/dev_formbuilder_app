@@ -14,6 +14,8 @@ export const NHFR_ATTRIBUTION =
 
 const units: Record<string, string> = {
   "nhfr.facilities": "facilities",
+  "nhfr.government": "facilities",
+  "nhfr.private": "facilities",
   "nhfr.beds": "beds",
   "nhfr.barangay-presence": "barangays",
 };

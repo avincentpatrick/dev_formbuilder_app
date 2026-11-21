@@ -13,7 +13,7 @@ export type MapSubject = { id: CatalogId | "districts"; title: string; releases:
 
 export const MAP_SUBJECTS: readonly MapSubject[] = [
   { id: "bhw", title: "BHW", releases: ["bhw-stepzero-2026", "bhw-2025", "bhw-profiling-status-2026"] },
-  { id: "nhfr", title: "NHFR", releases: ["nhfr-2026-09"] },
+  { id: "nhfr", title: "Health facilities", releases: ["nhfr-2026-09"] },
   { id: "uuc-phc", title: "UUC-PHC", releases: ["uuc-phc-2025"] },
   { id: "fhsis", title: "FHSIS", releases: ["fhsis-2025"] },
   { id: "population", title: "Population", releases: ["psa-popcen-2024"] },

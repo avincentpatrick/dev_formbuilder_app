@@ -1,4 +1,5 @@
 "use client";
+import { catalogHref } from "@/lib/catalog/navigation";
 import {
   POPULATION_MAP,
   populationCatalogReturnHref,
@@ -1134,7 +1135,21 @@ export function DatasetMapCard({
                           {dashboard && !overviewPreview && (
                             <Link
                               className="underline"
-                              href={`${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${data.childLevel === "barangay" ? choice.code : selected.code}`}
+                              href={
+                                dataset === "nhfr-2026-09"
+                                  ? catalogHref(
+                                      {
+                                        mode: "psgc",
+                                        level: "citymun",
+                                        code:
+                                          data.childLevel === "barangay"
+                                            ? choice.code
+                                            : selected.code,
+                                      },
+                                      "nhfr",
+                                    )
+                                  : `${dashboard === "/bhw" ? "/place" : dashboard}/citymun/${data.childLevel === "barangay" ? choice.code : selected.code}`
+                              }
                             >
                               Open municipal dashboard and barangay information
                             </Link>
@@ -1335,9 +1350,15 @@ export function DatasetMapCard({
         )}
         {dashboard && !overviewPreview && (
           <Link
-            href={dashboard === "/bhw" ? (bhwOverviewReturnHref(choice) ?? dashboard) : dashboard}
+            href={
+              dataset === "nhfr-2026-09"
+                ? catalogHref({ mode: "psgc", level: choice.level, code: choice.code }, "nhfr")
+                : dashboard === "/bhw"
+                  ? (bhwOverviewReturnHref(choice) ?? dashboard)
+                  : dashboard
+            }
           >
-            Open dashboard
+            {dataset === "nhfr-2026-09" ? "Explore health facilities" : "Open dashboard"}
           </Link>
         )}
         {expanded && data && (

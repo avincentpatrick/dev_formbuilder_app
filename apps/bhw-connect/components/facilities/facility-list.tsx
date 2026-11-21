@@ -44,6 +44,9 @@ export function FacilityList({
     );
   }
 
+  const [formPath, formQuery] = areaHref.split("?");
+  const scopeFields = Array.from(new URLSearchParams(formQuery).entries());
+
   // The query is bounded, so say so when the bound bit rather than showing a short list that
   // looks complete (the failure the district export had to fix).
   const truncated = facilities.length !== expectedCount;
@@ -54,10 +57,13 @@ export function FacilityList({
       <Form
         role="search"
         aria-label="Facility list"
-        action={`${areaHref}#facility-list-search`}
+        action={`${formPath}#facility-list-search`}
         prefetch={false}
         className="mb-4 space-y-2"
       >
+        {scopeFields.map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
         <label htmlFor="facility-search" className="block text-sm font-medium">
           Search facilities by name, type or barangay
         </label>

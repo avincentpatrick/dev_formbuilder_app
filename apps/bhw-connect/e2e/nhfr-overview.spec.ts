@@ -34,7 +34,7 @@ for (const width of [390, 1440]) {
     // Seed availability is not proof of a populated live count. Both exact
     // data and the explicit no-data status must remain accessible in this region.
     await expect(disclosure).toContainText(/Source|source|figures/);
-    const mapLink = page.getByRole("link", { name: "Open full NHFR map", exact: true });
+    const mapLink = page.getByRole("link", { name: "Open full Health facilities map", exact: true });
     await expect(mapLink).toHaveAttribute("href", /dataset=nhfr-2026-09/);
     await page.reload();
     await expect(page).toHaveURL(/location=citymun%3A0102801/);

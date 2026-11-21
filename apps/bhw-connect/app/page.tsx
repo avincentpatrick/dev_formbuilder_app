@@ -46,7 +46,7 @@ export default function Portal() {
         <p className="max-w-2xl text-center text-sm text-muted">
           Find a barangay, municipality, city, province, region, or legislative district. Choose a
           dataset in the results to explore that place. Barangays open the municipality overview in
-          UUC, facilities, and health services.
+          UUC and health services. Health facilities keeps the selected geographic scope.
         </p>
         <GeoSearch mode="portal" />
       </section>
@@ -70,7 +70,6 @@ export default function Portal() {
         </p>
         <nav aria-label="Existing dashboards" className="flex flex-wrap gap-4 text-sm underline">
           <Link href="/bhw">BHW dashboard</Link>
-          <Link href="/facilities">Facilities dashboard</Link>
           <Link href="/uuc-phc">UUC-PHC dashboard</Link>
           <Link href="/health-services">Health services dashboard</Link>
           <Link href="/districts">District mapping and sources</Link>

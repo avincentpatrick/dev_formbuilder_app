@@ -103,7 +103,9 @@ function loadRecents(): RecentPlace[] {
 
 function recentHref(recent: RecentPlace, mode: SearchMode): string {
   if (recent.kind === "district") return `/districts/${recent.geoCode}`;
-  if (mode === "uuc-phc" || mode === "facilities" || mode === "health-services")
+  if (mode === "facilities")
+    return `/catalog?${new URLSearchParams({ mode: "psgc", location: `${recent.geoLevel}:${recent.geoCode}`, dataset: "nhfr" })}`;
+  if (mode === "uuc-phc" || mode === "health-services")
     return `/${mode}/${recent.geoLevel}/${recent.geoCode}`;
   return mode === "explore"
     ? `/explore?geoLevel=${recent.geoLevel}&geoCode=${recent.geoCode}`

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { NhfrOverview } from "./nhfr-overview";
 import { PopulationOverview } from "./population-overview";
 import Link from "next/link";
@@ -131,7 +132,7 @@ export function CatalogResults({
             className="flex min-w-0 flex-col rounded-xl border border-border bg-background p-5"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {dataset.category}
+              {dataset.id === "nhfr" ? "DOH NHFR · September 2026" : dataset.category}
             </p>
             <h2 className="mt-1 text-xl font-semibold">
               <Link
@@ -205,7 +206,9 @@ export function CatalogResults({
               >
                 {dataset.id === "bhw" && catalog.selection.mode === "all"
                   ? "Open BHW overview →"
-                  : `View ${dataset.title} indicators →`}
+                  : dataset.id === "nhfr"
+                    ? "Explore health facilities →"
+                    : `View ${dataset.title} indicators →`}
               </Link>
               <FullMapLink dataset={dataset} selection={catalog.selection} />
               <SourceDates dataset={dataset} />
@@ -284,11 +287,13 @@ export function CatalogDetails({
   dataset,
   mapState,
   locationName = "Selected location",
+  facilityDetails,
 }: {
   catalog: PublicCatalog;
   dataset: CatalogDataset;
   mapState?: string;
   locationName?: string;
+  facilityDetails?: ReactNode;
 }) {
   const readable = dataset.id === "poverty" || dataset.id === "population" || dataset.id === "nhfr";
   const DetailContainer = readable ? "details" : "div";
@@ -309,7 +314,9 @@ export function CatalogDetails({
             ? "Poverty in 2023"
             : dataset.id === "population"
               ? "Population in 2024"
-              : `${dataset.title} indicators`}
+              : dataset.id === "nhfr"
+                ? "Health facilities"
+                : `${dataset.title} indicators`}
         </h2>
         {!readable && (
           <p className="mt-2 text-muted">
@@ -336,7 +343,8 @@ export function CatalogDetails({
         <NhfrOverview dataset={dataset} selection={catalog.selection} locationName={locationName} />
       )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
-      {dataset.detailHref && (
+      {facilityDetails}
+      {dataset.detailHref && dataset.id !== "nhfr" && (
         <Link
           href={
             dataset.id === "bhw"

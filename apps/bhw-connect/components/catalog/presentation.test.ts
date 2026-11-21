@@ -3,7 +3,7 @@ import { formatValue, omissionReason, previewIndicators } from "./presentation";
 import type { CatalogDataset } from "@/lib/catalog/types";
 const dataset: CatalogDataset = {
   id: "nhfr",
-  title: "NHFR",
+  title: "Health facilities",
   category: "Facilities",
   state: "partial",
   availableIndicators: 1,

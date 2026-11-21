@@ -7646,7 +7646,7 @@
             },
             "GuestAmendRequest": {
                 "type": "object",
-                "description": "A respondent's changed answers to the response they sent (M248, `D232`), with the content checksum their page was\ngiven \u2014 the lost-update baseline, always claimed, because the respondent may have the link open on two devices.",
+                "description": "A respondent's changed answers to the response they sent, with the content checksum their page was given \u2014 the\nlost-update baseline, always claimed, because the respondent may have the link open on two devices.",
                 "properties": {
                     "answers": {
                         "type": "array",

@@ -109,7 +109,10 @@ it('keeps the builder\'s form block in the order and with the keys it always had
     $builder = app(BuilderPresenter::class)->present($this->form)['form'];
 
     expect(array_keys($builder))->toBe([
-        'id', 'title', 'description', 'status', 'save_and_resume', 'single_page_mode', 'opens_at', 'closes_at',
+        'id', 'title', 'description', 'status', 'save_and_resume', 'single_page_mode',
+        // M248 (`D232`) — what the thank-you page offers next, for the After submitting section.
+        'after_submit',
+        'opens_at', 'closes_at',
         'timezone', 'max_responses', 'confirmation_message', 'confirmation_message_translations',
         // M130 (`D76`) — the after-submit destination, with the Thank-you section it is saved from.
         'redirect_kind', 'redirect_form_id', 'redirect_url', 'redirect_targets',

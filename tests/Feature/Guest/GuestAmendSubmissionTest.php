@@ -394,11 +394,12 @@ it('opens the guest page from an amend link, and 404s a bad one', function (): v
     $f = amendFixture();
     $data = amendSubmit($this, $f->form, ['full_name' => 'Ana']);
 
-    $this->get("http://acme.meridian.test/f/amend/{$data['amend']['token']}")
+    // `withoutVite()`: the shell names built assets, and CI's Pest job builds none (FormSettingsPageTest's reason).
+    $this->withoutVite()->get("http://acme.meridian.test/f/amend/{$data['amend']['token']}")
         ->assertOk()
         ->assertSee('data-share-token', false);
 
-    $this->get('http://acme.meridian.test/f/amend/v1.forged.signature')->assertNotFound();
+    $this->withoutVite()->get('http://acme.meridian.test/f/amend/v1.forged.signature')->assertNotFound();
 });
 
 it('leaves /f/amend/manifest.webmanifest to the manifest route, for a form named "amend" before the reservation', function (): void {

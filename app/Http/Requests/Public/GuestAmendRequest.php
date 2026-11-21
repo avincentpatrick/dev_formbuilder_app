@@ -6,9 +6,11 @@ namespace App\Http\Requests\Public;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+// M248 (`D232`). Not in the docblock: Scramble publishes a request's docblock as its schema description in openapi.json.
+
 /**
- * A respondent's changed answers to the response they sent (M248, `D232`), with the content checksum their page was
- * given — the lost-update baseline, always claimed, because the respondent may have the link open on two devices.
+ * A respondent's changed answers to the response they sent, with the content checksum their page was given — the
+ * lost-update baseline, always claimed, because the respondent may have the link open on two devices.
  */
 final class GuestAmendRequest extends FormRequest
 {

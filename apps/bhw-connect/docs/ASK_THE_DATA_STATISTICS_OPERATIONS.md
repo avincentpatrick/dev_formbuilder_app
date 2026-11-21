@@ -2,6 +2,8 @@
 
 Phase 4 adds fixed, executable statistical methods to saved private projects. The assistant chooses a typed calculation after reading data definitions and the study design; it should ask only when missing design, units, pairing or denominator information changes what can be calculated. A request never supplies Python, shell commands, SQL or executable paths. Phase 5 geographic/spatial analysis and Phase 6 reports/presentations remain separate.
 
+For the operator’s step-by-step installation and acceptance procedure, see [Python verification guide for Vincent](PYTHON_WORKER_VERIFICATION_FOR_VINCENT.md).
+
 ## Runtime and release gate
 
 The separate Phase 2 Node worker remains necessary. Set server-owned `BHW_STATISTICS_PYTHON` to an **absolute executable path** in a dedicated, operator-managed Python environment. The setting is optional: absent/invalid configuration returns an explicit unavailable calculation rather than an invented result. Chat, sources and research retain their existing behavior. This phase adds no database migration, subscription, user quota or hard spending cap, and changes no shared deployment scripts.

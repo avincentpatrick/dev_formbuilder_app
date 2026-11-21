@@ -91,6 +91,7 @@ export async function NhfrDetails({
         total={counts.nFacilities}
         expectedCodes={barangays.map((g) => g.geoCode)}
         selection={selection}
+        mapState={mapState}
       />
       <div className="rounded-lg border border-border p-4 sm:p-6">
         <TypeBreakdown items={types} expectedCount={counts.nFacilities} />

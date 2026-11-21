@@ -16,7 +16,56 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer)
+## Status: ACTIVE CLAIM — `M248`, `R-8881210a`, `R-d37a38f9`, `R-e07273d1` (`respondent-edit-after-submit`) and `R-aec84b42`: reopening a form's link on the same device offers "Continue where you left off" or "Start over"; a form's "After submitting" setting offers another response, "Change my answers" until the form closes, or one response only (m248-respondent-keeps-answers)
+
+Taken 2026-11-21, from the plan the user approved in chat the same day (`~/.claude/plans/continue-with-nhete-recommenda-staged-stonebraker-of-a595e0ed-3d64-4d67-ab8f-df866cda2ed3.md`). NHETE recommendation 6a, the NHETE plan's next item after `M247` (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Its other half, 6b (`progress-chapters`, `dropdown-placeholder`), is not taken: it overlaps #610 and #568 and is planned in its own session as `M249`.
+Branch `m248-respondent-keeps-answers`, cut from origin/main at `1bf3bb87`, PR into main, held for a merge point on the user's word (`D137`). Not stacked: nothing here needs a held PR. **A change a tester sees: `VERSION` 0.21.0 → 0.27.0 (a feature) with its release notes**, kept on top when #545, #568, #580, #589, #597 and #610 merge first.
+Rows: `R-8881210a` (filed by `M170`, `D118` A), *"Reopening a public form's link on the same device starts a blank form"*; `R-d37a38f9` (filed by `M170`), *"A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload"*; `R-e07273d1` (filed by `M237`), *"A respondent cannot change their answers after Submit, even while the form is still open"*; `R-aec84b42` (filed by `M130`, tier `before-launch`, taken early by `D232` — not a retier), *"The single-response-only form that `docs/ux/form-filling-ux-flow.md` §9 specifies is not built"*. The user's "Continue with NHETE recommendation 6" is the explicit signal for the two not-live request rows.
+
+The user's answers in planning (2026-11-21), recorded on this branch as `D232`:
+- **The way back to a submitted response is the device plus a link**: reopening the form's link on that device offers "Change my answers", and the thank-you page gives a link to copy or email, which anyone holding can use, as "Save and finish later" links are.
+- **One form setting, "After submitting", with three choices**: another response (the default, as today), "Change my answers" until the form closes, or one response only. The last two hold for one device only.
+- **Only before review**: a respondent changes a response only while it is `submitted`.
+- **Continue carries on the same saved draft**, so a "Save and finish later" link and the device stay in step — on a shared phone the next person pressing Continue can change it too, extending `D118`'s accepted cost.
+
+### Evidence verified
+- `R-8881210a` and `R-d37a38f9`: **held** — the visit id is in `sessionStorage` (`lib/respondent-session.ts`); `useAutosave.restore()` and `App.vue`'s resume read both refuse a row `draftBelongsToVisit()` says another visit wrote, and leave it for the next save to overwrite. A reload after an idle visit mints a new id, so the respondent's own row reads as a stranger's.
+- `R-e07273d1`: **held** — `SubmissionAnswerEditService` takes a `User`; the guest draft save answers 409 `draft_already_finalized`, the resume read 404, and the submit is idempotent or 409 on a final row.
+- `R-aec84b42`: **held** — `ConfirmationScreen.vue` renders "Submit another response" unconditionally; no form column or setting names a single response.
+
+### Premise verified
+- The kiosk-mode row `R-968816fe` (`after-launch`) still exists as `D118`'s named off-switch for a shared device: **held**.
+- `DraftRow` carries no `client_submission_uuid`, baseline or resume token, so Continue cannot carry a server draft without new (un-indexed, no Dexie version bump) members: **held**, and `D232` answer 4 decides it.
+- The service worker has no `localStorage` and replays queued submits itself, so device memory of a sent response belongs in Dexie, not `localStorage`: **held**.
+- `/f/resume/{token}` exists as a reserved first segment (`FormSlug::RESERVED = ['resume']`); `/f/amend/{token}` takes `amend` the same way. A live form already named `amend` would lose only its manifest URL to the new route; this cannot be measured from the repository, so the route refuses that one value and the slug is reserved for new forms.
+- Guest API routes are in `routes/api.php`, under their own token-verifying middleware (`EstablishGuestDraftContext` for resume): **held**.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the rows' sketches:**
+1. `D118`'s choice must be asked in `App.vue` before `RuntimeSession` mounts: autosave's watcher and backstop start at creation and would overwrite the row first.
+2. "Start over" deletes nothing; the row is left for the first save to overwrite, as today, because a second tab or a parked submission may still reference its media.
+3. "Edit after Submit" reuses `SubmissionAnswerEditService` with a respondent actor, a separate one-state set (`submitted`) checked before the work and again under the lock, the stored `submitted_at` as the validation clock on both sides, and a 409 mapping for its refusals (an uncaught one is a 500 today).
+4. The amend link must never be cached under its token URL by the service worker (the `M140` resume-shell defect, one route over).
+
+Files:
+- **Migration and settings:** new `database/migrations/2026_08_17_000152_add_after_submit_to_forms_and_respondent_amended_at_to_submissions.php`; `app/Models/Form.php`, `Submission.php`; `app/Services/Forms/FormService.php`; a new after-submit request and controller; `app/Services/Forms/FormSettingsPresenter.php`; `routes/tenant.php`.
+- **Amend:** `app/Support/Guest/GuestShareTokenService.php`, `config/guest.php`, new `app/Http/Middleware/EstablishGuestAmendContext.php`, new `app/Http/Controllers/Public/GuestAmendController.php`, `GuestSubmissionController.php`, `GuestFormController.php`, `app/Services/Submissions/` `SubmissionAnswerEditService.php`, `FormAcceptanceGuard.php`, `PublicFormPresenter.php`, `SubmissionEditException.php` (wherever it lives), `app/Events/SubmissionUpdated.php`, `app/Services/Audit/` presenter and exporter, `app/Providers/AppServiceProvider.php`, `bootstrap/app.php`, `app/Support/Forms/FormSlug.php`, `routes/api.php`.
+- **Guest page:** `resources/public-runtime/` `App.vue`, `components/RuntimeSession.vue`, `ConfirmationScreen.vue`, new `ContinueOrStartOver.vue`, new `AlreadyAnswered.vue`, `FieldControl.vue`; `lib/` `db.ts`, `bootstrap.ts`, `api-client.ts`, `error-normalizer.ts`, `types.ts`, `resume-shell.ts`, `brand-cache.ts`, `replay.ts`, `outbox.ts`; `composables/useAutosave.ts`; `sw.ts`; `resources/views/public-runtime.blade.php`; `resources/js/components/submissions/FieldInput.vue` (respondent wording only).
+- **Builder and staff:** `resources/js/components/forms/FormSettingsSections.vue` and a new panel; `resources/js/pages/submissions/Show.vue`; `resources/js/components/help/manual.ts`.
+- **Tests:** the Pest, Vitest and unit files beside each of the above; new `tests/Feature/Guest/GuestAmendSubmissionTest.php`, `tests/Feature/Forms/AfterSubmitSettingTest.php`; `tests/Support/Nhete/` and `tests/Feature/Forms/Nhete/`; `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/`; `tests/e2e/` `nhete-walk.spec.ts`, `public-runtime-axe.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `openapi.json`, `docs/adr/` new `0026-…` and `0021-respondent-scoped-device-outbox.md` (a dated amendment), `docs/security-threat-model.md`, `docs/ux/form-filling-ux-flow.md`, `docs/data-dictionary.md`, `docs/webhook-integration-design.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D232`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, `openapi.json`, the two `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `M248`; migration prefix `2026_08_17_000152`, taken by hand — `state.php` on this main-cut branch reports `000150`, which #589 holds, and #610 holds `000151`; ADR `0026`; `D232`.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the guest submit's body, the webhook envelope's `edited_by`, the confirmation screen's buttons and the service worker's cached prefixes.
+- NHETE's walk closes and reopens its page, continues, submits, changes an answer and sees it kept.
+- The one most likely wrong: the amend session's validation clock and version pinning — a respondent whose form was republished after they sent it, or whose answers fail a date check against "today", is where client and server can disagree. Also at risk: `resume-boot.test.ts`, which mounts the whole app and will meet the new device-memory read.
+
+## HELD — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer) — BUILT AND HELD: PR #610, CI 44669259929 every job green with real step counts
 
 Taken 2026-11-20, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`, rewritten for 5b). NHETE recommendation 5b, the NHETE plan's next item after `M246` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m247-grid-wide-sticky-explorer`, cut from `origin/m246-grid-question-table` at `7ab0cc8d`, so it is **stacked on #597**: NHETE's tables (`NhetePlan`'s TABLE layout) and `MatrixGrid.vue`'s M246 rework exist only there, as `M240` stacked on #521. `origin/main` is merged in for the claim files. PR into main (CI runs only on pull requests into main), held after #597 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.25.0 → 0.26.0 (a feature) with its release notes.**

@@ -122,6 +122,11 @@ export function PointMap({
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       map.getCanvas().tabIndex = -1;
+      // Navigation buttons exist before the load event. Keep the decorative map
+      // out of keyboard navigation during loading too, not only after it finishes.
+      containerRef.current.querySelectorAll("button, a").forEach((el) => {
+        (el as HTMLElement).tabIndex = -1;
+      });
 
       map.on("load", () => {
         if (!map) return;

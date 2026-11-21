@@ -396,7 +396,7 @@ export const CATALOG: readonly DatasetSpec[] = [
   },
   {
     id: "nhfr",
-    title: "NHFR",
+    title: "Health facilities",
     category: "Health facilities",
     detailRoot: "/facilities",
     indicators: make(R.nhfr, "agg_nhfr_counts", "nhfr", [

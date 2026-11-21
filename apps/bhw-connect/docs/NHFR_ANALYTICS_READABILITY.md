@@ -188,3 +188,42 @@ portal navigation and facility search suites, including both 390/1440px history
 regressions. Final facility/type sections had zero axe WCAG 2 A/AA and 2.1 AA
 violations at both widths. Synthetic PNG export returned a successful image.
 CI, deployment and unmocked live verification are recorded in the follow-up PR.
+
+## One Health facilities entry — 21 November
+
+Owner requested one card instead of separate NHFR and Health facilities views.
+The catalog and map subject now use **Health facilities**, with **DOH NHFR ·
+September 2026** identifying the source. The portal's duplicate facilities-dashboard
+shortcut is removed. Search results and map detail links open the same selected
+catalog dataset; existing facilities routes remain compatible with saved URLs.
+
+The selected card now includes ownership, complete type tables, child-area links,
+and (for municipalities) the barangay map and searchable facility list, plus PNG
+export. It reuses the existing readers and components. Child-area links retain the
+catalog dataset, and GET search carries hidden scope fields so submission, Clear,
+reload and history do not lose the location. Search does not filter totals, maps
+or exports. Exact data and source notes remain available.
+
+All-locations remains an availability view with an explicit national exploration
+link. Barangay and district figures retain their existing attribution and partial
+states; full municipal detail is not substituted for these narrower selections.
+No new source, schema, dependency, licensing inference or live-data import is added.
+The detailed reader verifies its count against the accepted catalog total before
+rendering; failed/partial lists retain the existing guardrails.
+
+Local validation: lint and types passed, full unit suite 2,168 passed / 56 skipped,
+plus three new scope/completeness tests; 54 targeted tests passed. Both prefixed
+production builds and standalone extractor verification passed. Seventeen browser
+cases passed, including the combined and legacy facility list at 390/1440px,
+search/reload/history, catalog geography and portal search. An axe check identified
+navigation buttons briefly focusable inside the decorative map before its load
+event; the buttons are now removed from the tab order immediately when created.
+Final accessibility/build and CI/deploy/live evidence is recorded in the PR ledger.
+React review: parallel scoped reads, server-rendered tables, existing lazy map,
+URL-driven search, no new client state or dependencies.
+Final seeded build and extractor checks passed after the map fix. Nine affected
+catalog/list browser cases passed again, including one Health facilities heading
+and no duplicate NHFR heading or facilities-dashboard shortcut on the portal.
+Final axe WCAG 2 A/AA and 2.1 AA checks of the combined card passed at 390/1440px,
+including loaded map controls, with no page overflow. The phone detail view was
+visually reviewed using synthetic data.

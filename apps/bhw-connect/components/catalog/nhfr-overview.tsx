@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { countAndShare, shareOf } from "@/lib/format";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import {
   nhfrReading,
@@ -85,6 +86,51 @@ export function NhfrOverview({
         )}
         <p className="mt-4 text-sm">{NHFR_ATTRIBUTION}</p>
       </FigureCard>
+      {selection.mode !== "all" && (
+        <section
+          aria-label="Facility ownership"
+          className="rounded-lg border border-border p-4 sm:p-6"
+        >
+          <h3 className="font-semibold">Who owns the facilities?</h3>
+          <p className="mt-2 text-sm text-muted">
+            Government and private describe ownership, not cost or eligibility for care.
+          </p>
+          <dl className="mt-3 flex flex-wrap gap-6">
+            {["government", "private"].map((key) => {
+              const total = dataset.indicators.find((i) => i.id === "nhfr.facilities");
+              const item = dataset.indicators.find((i) => i.id === `nhfr.${key}`);
+              const reading = nhfrReading(item, selection);
+              const totalReading = nhfrReading(total, selection);
+              const canShare =
+                reading &&
+                totalReading &&
+                item!.state === "available" &&
+                total!.state === "available" &&
+                item!.values[0].value <= total!.values[0].value;
+              return (
+                <div key={key}>
+                  <dt className="text-sm text-muted">
+                    {key === "government" ? "Government" : "Private"}
+                  </dt>
+                  <dd className="mt-1 whitespace-nowrap font-semibold tabular-nums">
+                    {reading
+                      ? canShare
+                        ? countAndShare(
+                            item!.values[0].value,
+                            shareOf(item!.values[0].value, total!.values[0].value),
+                          )
+                        : reading.display
+                      : "Unavailable"}
+                  </dd>
+                  {reading?.partial && (
+                    <dd className="text-sm">Partial total — see exact data and coverage below.</dd>
+                  )}
+                </div>
+              );
+            })}
+          </dl>
+        </section>
+      )}
       <details className="rounded-lg border border-border p-4 text-sm">
         <summary className="cursor-pointer font-medium">
           How should I read the types, ownership and source?
@@ -93,8 +139,8 @@ export function NhfrOverview({
           <p>{NHFR_DEFINITION}</p>
           <p>
             Government and private describe facility ownership. The four headline types are selected
-            categories, not all facility types. Their exact counts remain below; the existing
-            dashboard has the full type breakdown.
+            categories, not all facility types. The full type breakdown is included below for
+            national, regional, provincial and municipal selections.
           </p>
           <p>
             Missing licence status means not stated, not unlicensed. This snapshot does not

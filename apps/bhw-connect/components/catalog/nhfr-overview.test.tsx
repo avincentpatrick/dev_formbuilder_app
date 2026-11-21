@@ -19,7 +19,7 @@ const indicator: CatalogIndicator = {
 };
 const dataset: CatalogDataset = {
   id: "nhfr",
-  title: "NHFR",
+  title: "Health facilities",
   category: "Health facilities",
   state: "available",
   availableIndicators: 1,
@@ -113,6 +113,7 @@ it("shares definitions and retains exact data, source disclosure and scoped link
   );
   expect(markup).toContain("Exact data, availability and sources");
   expect(markup).toContain("<table");
-  expect(markup).toContain("/facilities/citymun/0102801");
-  expect(markup).toContain("Open full NHFR map");
+  expect(markup).not.toContain("Open existing Health facilities dashboard");
+  expect(markup).toContain("Health facilities</h2>");
+  expect(markup).toContain("Open full Health facilities map");
 });

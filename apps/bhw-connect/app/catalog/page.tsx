@@ -1,3 +1,4 @@
+import { facilitySearchQuery } from "@/lib/facilities/search";
 import { restoredPopulationMapHref } from "@/lib/catalog/population-navigation";
 import { restoredPovertyMapHref } from "@/lib/catalog/poverty-navigation";
 import type { Metadata } from "next";
@@ -67,7 +68,11 @@ export default async function CatalogPage({
       )}
       {request ? (
         <Suspense key={JSON.stringify(request)} fallback={<CatalogLoading />}>
-          <CatalogContent request={request} mapState={returnMap?.split("?")[1]} />
+          <CatalogContent
+            request={request}
+            mapState={returnMap?.split("?")[1]}
+            facilitySearch={facilitySearchQuery(params.facilitySearch)}
+          />
         </Suspense>
       ) : (
         <section role="alert" className="rounded-xl border border-border bg-surface p-6">

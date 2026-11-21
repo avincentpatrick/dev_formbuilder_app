@@ -138,6 +138,9 @@ test("home starts with the catalog and every available card has consistent detai
 }) => {
   await page.goto("./");
   await expect(page.getByRole("region", { name: "Catalog overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Health facilities", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "NHFR", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Facilities dashboard", exact: true })).toHaveCount(0);
   const cards = page.locator("article");
   await expect(cards.first()).toBeVisible();
   const links = await cards

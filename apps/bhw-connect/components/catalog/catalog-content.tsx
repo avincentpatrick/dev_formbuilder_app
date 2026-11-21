@@ -1,3 +1,4 @@
+import { NhfrDetails } from "./nhfr-details";
 import { PovertyCoverage } from "./poverty-coverage";
 import { PovertyMunicipalities } from "./poverty-municipalities";
 import Link from "next/link";
@@ -14,9 +15,11 @@ import { getDistrictCatalog } from "@/lib/catalog/district-catalog";
 export async function CatalogContent({
   request,
   mapState,
+  facilitySearch = "",
 }: {
   request: CatalogRequest;
   mapState?: string;
+  facilitySearch?: string;
 }) {
   if (request.selection.mode === "district") {
     const geography = await getDistrictGeography(request.selection);
@@ -143,6 +146,16 @@ export async function CatalogContent({
           dataset={dataset}
           mapState={mapState}
           locationName={locationName}
+          facilityDetails={
+            dataset.id === "nhfr" ? (
+              <NhfrDetails
+                dataset={dataset}
+                selection={request.selection}
+                locationName={locationName}
+                query={facilitySearch}
+              />
+            ) : undefined
+          }
         />
       ) : (
         <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />

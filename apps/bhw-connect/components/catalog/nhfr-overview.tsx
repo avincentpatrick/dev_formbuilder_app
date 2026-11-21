@@ -61,6 +61,21 @@ export function NhfrOverview({
                           <p className="font-medium">Partial total — incomplete coverage</p>
                         )}
                         <StatValue value={reading.display} />
+                        {id === "nhfr.barangay-presence" &&
+                          indicator?.state === "available" &&
+                          (indicator.values[0].denominator ?? 0) > 0 && (
+                            <div
+                              aria-hidden="true"
+                              className="mt-3 h-3 overflow-hidden rounded bg-surface"
+                            >
+                              <div
+                                className="h-full bg-accent"
+                                style={{
+                                  width: `${(100 * indicator.values[0].value) / indicator.values[0].denominator!}%`,
+                                }}
+                              />
+                            </div>
+                          )}
                         {reading.denominatorNote && (
                           <p className="mt-2 text-sm">{reading.denominatorNote}</p>
                         )}

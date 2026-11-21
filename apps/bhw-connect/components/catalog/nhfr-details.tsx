@@ -1,3 +1,4 @@
+import { FacilityAnalysis } from "@/components/facilities/facility-analysis";
 import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
@@ -57,7 +58,7 @@ export async function NhfrDetails({
     getNhfrChildren(selection.code, selection.level),
     city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
     city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
-    city ? getChildGeos(selection.code, "citymun") : Promise.resolve([]),
+    getChildGeos(selection.code, selection.level),
   ]);
   if (!counts || counts.nFacilities !== indicator!.values[0].value)
     return (
@@ -84,6 +85,14 @@ export async function NhfrDetails({
         : "Cities / municipalities";
   return (
     <div className="space-y-5" data-testid="health-facilities-details">
+      <FacilityAnalysis
+        types={types}
+        areas={children}
+        total={counts.nFacilities}
+        expectedCodes={barangays.map((g) => g.geoCode)}
+        selection={selection}
+        mapState={mapState}
+      />
       <div className="rounded-lg border border-border p-4 sm:p-6">
         <TypeBreakdown items={types} expectedCount={counts.nFacilities} />
       </div>

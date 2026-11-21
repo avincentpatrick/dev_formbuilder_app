@@ -1,3 +1,4 @@
+import { FacilityContext } from "@/components/facilities/facility-context";
 import type { ReactNode } from "react";
 import { NhfrOverview } from "./nhfr-overview";
 import { PopulationOverview } from "./population-overview";
@@ -344,6 +345,7 @@ export function CatalogDetails({
       )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {facilityDetails}
+      {dataset.id === "nhfr" && <FacilityContext catalog={catalog} mapState={mapState} />}
       {dataset.detailHref && dataset.id !== "nhfr" && (
         <Link
           href={

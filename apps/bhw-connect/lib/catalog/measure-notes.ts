@@ -1,3 +1,4 @@
+import { NHFR_DEFINITION, NHFR_BEDS, NHFR_PRESENCE } from "./nhfr-reading";
 import { OFFICIAL_POVERTY_DEFINITION, OFFICIAL_POVERTY_INTERPRETATION } from "./poverty-official";
 import {
   POPULATION_DEFINITION,
@@ -28,14 +29,12 @@ const definitions: Record<string, string> = {
     "Average recorded years active as a BHW, using checked profiles with a usable value. Profiles without a usable value are excluded. Do not add averages from different places.",
   "bhw.any-honorarium":
     "The percentage of all checked profiles with an allowance (honorarium) record. This does not establish the amount received or whether it is enough.",
-  "nhfr.facilities":
-    "Registered facilities in the accepted NHFR snapshot, counted once per facility.",
+  "nhfr.facilities": NHFR_DEFINITION,
   "nhfr.government":
     "Registered facilities classified as government-owned in the accepted snapshot.",
   "nhfr.private": "Registered facilities classified as privately owned in the accepted snapshot.",
-  "nhfr.beds": "Sum of recorded bed capacity; missing capacity is not evidence of zero beds.",
-  "nhfr.barangay-presence":
-    "Distinct barangays with an attributed registered facility. The denominator describes service presence, not source reporting completeness.",
+  "nhfr.beds": NHFR_BEDS,
+  "nhfr.barangay-presence": NHFR_PRESENCE,
   "uuc.listed":
     "Barangays on the accepted final UUC-PHC list. At barangay level, 1 means listed and 0 means not listed; not listed does not mean assessed and well served.",
   "uuc.route.ip":

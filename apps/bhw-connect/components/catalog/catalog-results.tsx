@@ -1,3 +1,4 @@
+import { NhfrOverview } from "./nhfr-overview";
 import { PopulationOverview } from "./population-overview";
 import Link from "next/link";
 import { PovertyOverview } from "./poverty-overview";
@@ -289,7 +290,7 @@ export function CatalogDetails({
   mapState?: string;
   locationName?: string;
 }) {
-  const readable = dataset.id === "poverty" || dataset.id === "population";
+  const readable = dataset.id === "poverty" || dataset.id === "population" || dataset.id === "nhfr";
   const DetailContainer = readable ? "details" : "div";
   const available = dataset.indicators.filter((i) => hasAvailableValue(i.state));
   const missing = dataset.indicators.filter((i) => !hasAvailableValue(i.state));
@@ -330,6 +331,9 @@ export function CatalogDetails({
           selection={catalog.selection}
           locationName={locationName}
         />
+      )}
+      {dataset.id === "nhfr" && (
+        <NhfrOverview dataset={dataset} selection={catalog.selection} locationName={locationName} />
       )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {dataset.detailHref && (

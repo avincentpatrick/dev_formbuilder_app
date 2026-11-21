@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { assertClean, forceTheme } from './support/axe';
 
 // The guest public runtime (Increment F6b). A STANDALONE Vue 3 SPA (not Inertia) served at /f/{slug} on the
@@ -314,3 +314,60 @@ test('Public runtime — a URL-prefilled gate opens exactly one branch', async (
 
     await assertClean(page, 'Public runtime single branch');
 });
+
+// M248 (`D118` A, `D232`) — the three screens a respondent meets around their own answers, scanned in both themes.
+// The seeded forms all offer another response, so the guest page is told otherwise by answering its own schema and
+// submit reads here: a page-level fixture, not a seeder change, because the seeder's published-form count is pinned.
+async function offerChangeMyAnswers(page: Page): Promise<void> {
+    await page.route('**/api/v1/public/f/*', async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        body.data.form.after_submit = 'amend';
+        await route.fulfill({ response, json: body });
+    });
+    await page.route('**/api/v1/public/f/*/submissions', async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        body.data.amend = { token: 'v1.axe.fixture', url: `${new URL(page.url()).origin}/f/amend/v1.axe.fixture`, until: null };
+        await route.fulfill({ response, json: body });
+    });
+}
+
+for (const theme of themes) {
+    test(`Public runtime — Continue where you left off (${theme}) — accessible & no horizontal overflow`, async ({ page, context }) => {
+        await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+        await page.getByRole('heading', { name: 'Clinic Intake', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
+        await page.locator('section[data-section] input[type="text"]').first().fill('An answer left on this device');
+        await expect(page.locator('.saved-indicator')).toHaveText('Saved', { timeout: 15_000 });
+
+        // A new tab is a new visit: the answers are on the device, and the page asks before showing any of them.
+        const again = await context.newPage();
+        await page.close();
+        await again.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
+        await expect(again.locator('[data-continue-choice]')).toBeVisible({ timeout: 15_000 });
+        await forceTheme(again, theme);
+        await assertClean(again, 'Continue or start over');
+    });
+}
+
+for (const theme of themes) {
+    test(`Public runtime — change my answers after sending (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+        await offerChangeMyAnswers(page);
+        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+        await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
+        await forceTheme(page, theme);
+
+        await page.getByRole('button', { name: 'Submit' }).click();
+        await expect(page.locator('[data-amend-link]')).toBeVisible({ timeout: 15_000 });
+        // The link is on screen, so nothing counts down to the destination.
+        await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+        await assertClean(page, 'Thank-you with Change my answers');
+
+        // Reopening the link on this device: the device remembers it answered.
+        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+        await expect(page.locator('[data-already-answered]')).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('button', { name: 'Change my answers' })).toBeVisible();
+        await forceTheme(page, theme);
+        await assertClean(page, 'Already answered');
+    });
+}

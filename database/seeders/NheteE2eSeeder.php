@@ -72,7 +72,14 @@ final class NheteE2eSeeder extends Seeder
                 TenantContext::applyLocal((string) $tenant->id, $owner->id);
                 app(PermissionRegistrar::class)->setPermissionsTeamId((string) $tenant->id);
 
-                if (Form::withTrashed()->where('public_slug', self::SLUG)->exists()) {
+                $existing = Form::withTrashed()->where('public_slug', self::SLUG)->first();
+                if ($existing !== null) {
+                    // M248 — a database seeded before "After submitting" existed converges on it, so a local walk on a
+                    // long-lived dev database measures what CI's fresh one does. Nothing else of the form is touched.
+                    if (! $existing->trashed() && $existing->after_submit !== AfterSubmit::Amend) {
+                        $this->offerChangeUntilClose($existing, $owner);
+                    }
+
                     return;
                 }
 
@@ -95,12 +102,21 @@ final class NheteE2eSeeder extends Seeder
                 // M248 (`D232`, NHETE recommendation 6a): "Until the closing date, a person can come back on the same
                 // device and change answers." So the form lets respondents change their answers, and it closes — a
                 // month from the seed, through the real writers, so the walk measures what an author would set.
-                app(FormService::class)->setAfterSubmit($form->refresh(), AfterSubmit::Amend, $owner);
-                app(FormService::class)->setSchedule($form->refresh(), null, CarbonImmutable::now()->addMonth(), 'Asia/Manila', null, $owner);
+                $this->offerChangeUntilClose($form->refresh(), $owner);
             });
         } finally {
             @unlink($path);
         }
+    }
+
+    /**
+     * M248 (`D232`): respondents may change their answers until the form closes, and it closes a month out — through the
+     * real writers, as an author would set it.
+     */
+    private function offerChangeUntilClose(Form $form, User $owner): void
+    {
+        app(FormService::class)->setAfterSubmit($form, AfterSubmit::Amend, $owner);
+        app(FormService::class)->setSchedule($form->refresh(), null, CarbonImmutable::now()->addMonth(), 'Asia/Manila', null, $owner);
     }
 
     /**

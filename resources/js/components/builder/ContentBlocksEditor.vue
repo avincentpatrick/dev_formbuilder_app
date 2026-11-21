@@ -41,10 +41,16 @@ import {
     type ContentSpan,
 } from './content-blocks';
 import { linkLooksSafe, normalizeSpans, parseMarkup, serializeSpans } from './content-markup';
+import { GRID_ROW_DETAIL_LIMITS } from './grid-rules';
 
 const props = defineProps<{
     blocks: ContentBlock[];
     formId: string;
+    /**
+     * M246 (`grid-question-table`): `row` edits a grid row's details — shown under the row's label, with no picture (a
+     * guest is served a picture only from a note) and the row-details bound. `note` (the default) is a note's content.
+     */
+    purpose?: 'note' | 'row';
 }>();
 
 const emit = defineEmits<{ 'update:blocks': [blocks: ContentBlock[]] }>();
@@ -67,7 +73,9 @@ const levelOptions = [
 
 const LINK_NOTE = 'A link must start with https://, http://, mailto: or tel: — until it does, it is saved as plain text.';
 
-const atLimit = computed(() => props.blocks.length >= CONTENT_LIMITS.maxBlocks);
+// M246: a row's details hold fewer blocks than a note — the mirror of `GridRules::MAX_ROW_DETAIL_BLOCKS`.
+const maxBlocks = computed(() => (props.purpose === 'row' ? GRID_ROW_DETAIL_LIMITS.maxBlocks : CONTENT_LIMITS.maxBlocks));
+const atLimit = computed(() => props.blocks.length >= maxBlocks.value);
 
 function copyBlocks(): ContentBlock[] {
     return props.blocks.map((block) => ({ ...block })) as ContentBlock[];
@@ -309,12 +317,15 @@ function blockLabel(index: number, block: ContentBlock): string {
 <template>
     <div class="cbe">
         <!-- Two facts an author needs before composing anything, so both are there from first paint. -->
-        <p class="cbe__notice" data-content-notice="replaces-label">
+        <p v-if="purpose !== 'row'" class="cbe__notice" data-content-notice="replaces-label">
             Respondents see this content in place of the note's label.
         </p>
+        <p v-else class="cbe__notice" data-content-notice="row-details">Respondents see these details under the row's label.</p>
         <p class="cbe__hint">Shown in the form's default language only.</p>
 
-        <p v-if="blocks.length === 0" class="cbe__hint" data-content-empty>This note has no content yet. Add a block below.</p>
+        <p v-if="blocks.length === 0" class="cbe__hint" data-content-empty>
+            {{ purpose === 'row' ? 'This row has no details yet. Add a block below.' : 'This note has no content yet. Add a block below.' }}
+        </p>
 
         <ol v-else class="cbe__list">
             <li v-for="(block, index) in blocks" :key="index" class="cbe__block" :data-block-type="block.type">
@@ -430,6 +441,7 @@ function blockLabel(index: number, block: ContentBlock): string {
         </div>
 
         <MdsFormField
+            v-if="purpose !== 'row'"
             v-slot="{ id, describedby, invalid }"
             label="Add an image"
             help="PNG, JPEG or WebP, up to 2 MB. It is added at the end."
@@ -447,7 +459,7 @@ function blockLabel(index: number, block: ContentBlock): string {
             />
         </MdsFormField>
         <p v-if="uploading" class="cbe__hint" role="status">Uploading the image…</p>
-        <p v-if="atLimit" class="cbe__hint">A note can hold at most {{ CONTENT_LIMITS.maxBlocks }} blocks.</p>
+        <p v-if="atLimit" class="cbe__hint">{{ purpose === 'row' ? 'A row' : 'A note' }} can hold at most {{ maxBlocks }} blocks.</p>
     </div>
 </template>
 

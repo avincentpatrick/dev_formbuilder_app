@@ -12,7 +12,8 @@ use App\Exceptions\Expressions\ExpressionSyntaxException;
  * the comparison punctuation (`= != > < >= <=`, grammar v2.0), the arithmetic operators (`+ - * /`,
  * grammar v2.0), `${key}` references, single/double-quoted strings (no escapes), numbers (at most one dot;
  * no exponent/sign/bare-dot), the `.` self-reference, and lowercase words (keywords/functions). Any
- * unrecognised character is an `unexpected_token`.
+ * unrecognised character is an `unexpected_token`. M246 adds the grid cell references `${key.row.col}`,
+ * `${key.row}` and the row-relative `${.col}` (see lexReference()).
  *
  * Caller contract: a null or blank/whitespace-only expression means "always relevant / no constraint"
  * and MUST be short-circuited by the caller before tokenize() — so `empty_expression` is a genuine
@@ -158,6 +159,15 @@ final class ExpressionLexer
         return new Token(TokenType::String, $value, $start);
     }
 
+    /**
+     * `${key}` → FieldRef. M246 (`grid-question-table`, `R-ffd10da2`) adds two more shapes inside the same braces:
+     *  - `${key.row}` / `${key.row.col}` → CellRef, a Likert row or a Grid cell, at most two segments;
+     *  - `${.col}` → RowCellRef, this row's cell in a grid column's own rules.
+     * A segment is `[A-Za-z0-9_][A-Za-z0-9_-]*` (a row or column value; the key keeps its own production), so
+     * `${a.}`, `${a..b}`, `${.}`, `${a.b.c.d}` and `${a-b}` stay malformed. The CellRef and RowCellRef lexeme is the
+     * WHOLE text inside the braces, so a key rename splices `strlen(lexeme) + 3` bytes exactly as for a FieldRef.
+     * Mirrored byte for byte by `lexer.ts` and by `TemplateParser::readKey()`.
+     */
     private function lexReference(string $source, int $length, int &$i): Token
     {
         $start = $i;
@@ -169,6 +179,17 @@ final class ExpressionLexer
         $keyStart = $i + 2;
         $j = $keyStart;
 
+        // `${.col}` — a row-relative cell: exactly one segment after the dot.
+        if ($j < $length && $source[$j] === '.') {
+            $end = self::segmentEnd($source, $length, $j + 1);
+            if ($end === null || $end >= $length || $source[$end] !== '}') {
+                throw ExpressionSyntaxException::malformedReference($this->rawReference($source, $length, $start));
+            }
+            $i = $end + 1;
+
+            return new Token(TokenType::RowCellRef, substr($source, $keyStart, $end - $keyStart), $start);
+        }
+
         if ($j >= $length || ! (ctype_alpha($source[$j]) || $source[$j] === '_')) {
             throw ExpressionSyntaxException::malformedReference($this->rawReference($source, $length, $start));
         }
@@ -178,14 +199,43 @@ final class ExpressionLexer
             $j++;
         }
 
+        // At most two `.segment` parts after the key.
+        $segments = 0;
+        while ($j < $length && $source[$j] === '.' && $segments < 2) {
+            $end = self::segmentEnd($source, $length, $j + 1);
+            if ($end === null) {
+                throw ExpressionSyntaxException::malformedReference($this->rawReference($source, $length, $start));
+            }
+            $j = $end;
+            $segments++;
+        }
+
         if ($j >= $length || $source[$j] !== '}') {
             throw ExpressionSyntaxException::malformedReference($this->rawReference($source, $length, $start));
         }
 
-        $key = substr($source, $keyStart, $j - $keyStart);
+        $text = substr($source, $keyStart, $j - $keyStart);
         $i = $j + 1; // past the closing brace
 
-        return new Token(TokenType::FieldRef, $key, $start);
+        return new Token($segments === 0 ? TokenType::FieldRef : TokenType::CellRef, $text, $start);
+    }
+
+    /**
+     * M246: one path segment starting at `$at` — `[A-Za-z0-9_][A-Za-z0-9_-]*`, byte-wise `ctype_*`. Returns the
+     * offset just past it, or null when no segment starts there.
+     */
+    public static function segmentEnd(string $source, int $length, int $at): ?int
+    {
+        if ($at >= $length || ! (ctype_alnum($source[$at]) || $source[$at] === '_')) {
+            return null;
+        }
+
+        $j = $at + 1;
+        while ($j < $length && (ctype_alnum($source[$j]) || $source[$j] === '_' || $source[$j] === '-')) {
+            $j++;
+        }
+
+        return $j;
     }
 
     private function lexWord(string $source, int $length, int &$i): Token

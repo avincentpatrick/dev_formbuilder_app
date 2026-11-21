@@ -117,6 +117,13 @@ for (const theme of themes) {
         for (const head of await page.locator('[data-matrix-grid] .mds-grid__head').all()) {
             expect(await head.evaluate((el) => getComputedStyle(el).position)).toBe(wide ? 'static' : 'absolute');
         }
+        // M247 (`grid-wide-sticky-explorer`): in the table the first column is pinned, and opaque so nothing scrolls
+        // through it — in both themes; on the phone it is an ordinary card heading.
+        for (const label of await page.locator('[data-matrix-grid] .mds-grid__row-label').all()) {
+            const style = await label.evaluate((el) => ({ position: getComputedStyle(el).position, background: getComputedStyle(el).backgroundColor }));
+            expect(style.position).toBe(wide ? 'sticky' : 'static');
+            if (wide) expect(style.background).not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+        }
         await expect(page.locator('[data-likert-line]').first()).toBeVisible();
 
         // Likert matrix: pick a score in one row. Every control is named by its row and its column, in either
@@ -134,6 +141,25 @@ for (const theme of themes) {
         await page.getByRole('group', { name: 'Trace your route' }).getByRole('button', { name: 'Add point' }).click();
 
         await assertClean(page, 'Field Types Showcase (cascade + grids + geo interacted)');
+
+        // M246 (`grid-question-table`): the question table. B03's cut-off reads "Not needed"; C09 is hidden until the Likert
+        // grid rates Cleanliness Excellent; A01's comment is asked only once its cut-off says "Change it", and left blank
+        // it shows its own error on that cell — not one for the whole grid. A01 carries its details under its label.
+        const table = page.locator('[data-matrix-grid]').filter({ hasText: 'Indicators to review' });
+        await expect(table.getByText('Clinic visits per 1,000 people each year.')).toBeVisible();
+        await expect(table.locator('[data-grid-not-needed]').first()).toBeVisible();
+        await expect(table.getByText('C09 Follow-up')).toHaveCount(0);
+        await page.getByRole('combobox', { name: 'A01 Visits Cut-off', exact: true }).selectOption('change');
+        const why = page.getByRole('textbox', { name: 'A01 Visits Why', exact: true });
+        await expect(why).toBeVisible();
+        await why.focus();
+        await page.getByRole('combobox', { name: 'A01 Visits Cut-off', exact: true }).focus();
+        await expect(table.locator('[data-grid-cell-error]')).toHaveCount(1);
+        await expect(why).toHaveAttribute('aria-invalid', 'true');
+        await page.getByRole('radio', { name: 'Cleanliness Excellent', exact: true }).check();
+        await expect(table.getByText('C09 Follow-up')).toBeVisible();
+
+        await assertClean(page, 'Field Types Showcase (question table: a row shown, a cell not needed, a cell error)');
     });
 }
 

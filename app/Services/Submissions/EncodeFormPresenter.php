@@ -195,7 +195,7 @@ final class EncodeFormPresenter
                 'repeatable' => false,
                 'min_instances' => null,
                 'max_instances' => null,
-                'repeat_layout' => null,
+                'repeat_layout' => null, 'page_width' => null,
                 'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))->values()->all(),
             ];
         }
@@ -218,7 +218,7 @@ final class EncodeFormPresenter
                 'max_instances' => $section->is_repeatable ? $section->max_instances : null,
                 // M185 (`R-0a7275ce`): `table` when the author laid the section out as one; whether every question fits a
                 // cell is the page's to decide (`repeat-table.ts`), as the guest form decides it.
-                'repeat_layout' => $section->is_repeatable && $section->repeat_layout === 'table' ? 'table' : null,
+                'repeat_layout' => $section->is_repeatable && $section->repeat_layout === 'table' ? 'table' : null, 'page_width' => $section->page_width === 'wide' ? 'wide' : null,
                 'fields' => $sectionFields
                     ->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))
                     ->values()->all(),
@@ -563,7 +563,7 @@ final class EncodeFormPresenter
      * shared `cells` for a choice column, so the grid never resolves the fallback itself — and `required`; and both
      * grids carry `layout` (`table`, or `stacked` for cards at every width). Mirrors `schema-mapping.ts buildMatrix`.
      *
-     * @return array{rows: list<array{value: string, label: string}>, columns: list<array<string, mixed>>, cells: list<array{value: string, label: string}>, layout: string}|null
+     * @return array{rows: list<array{value: string, label: string}>, columns: list<array<string, mixed>>, cells: list<array{value: string, label: string}>, layout: string, rowDetails?: array<string, array<array-key, mixed>>}|null
      */
     private function matrix(FormField $field): ?array
     {
@@ -572,12 +572,22 @@ final class EncodeFormPresenter
             return null;
         }
 
-        return [
+        $matrix = [
             'rows' => $this->optionPairs($field, 'rows'),
             'columns' => $type === FieldType::Matrix ? $this->matrixColumns($field) : $this->optionPairs($field, 'columns'),
             'cells' => $type === FieldType::Matrix ? $this->optionPairs($field, 'cells') : [],
             'layout' => data_get($field->config, 'layout') === 'stacked' ? 'stacked' : 'table',
         ];
+
+        // M246 (`grid-question-table`): a row's details, only for a row that has any — the guest runtime's `rowDetails`.
+        $rowDetails = [];
+        foreach ((array) data_get($field->config, 'rows', []) as $row) {
+            if (is_array($row) && (string) ($row['value'] ?? '') !== '' && is_array($row['details'] ?? null) && $row['details'] !== []) {
+                $rowDetails[(string) $row['value']] = $row['details'];
+            }
+        }
+
+        return $rowDetails === [] ? $matrix : [...$matrix, 'rowDetails' => $rowDetails];
     }
 
     /**

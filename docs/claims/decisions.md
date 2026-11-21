@@ -28,6 +28,32 @@ _None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the
 
 
 ## ANSWERED
+### D231 — A big table needs room and its header in view, and a grid cannot be charted: what widens, and how is a grid charted? **Wide page: per section (A). Charting: by row (A).**
+
+**Asked and answered 2026-11-20 (user decision, in chat), in the planning of `M247` (NHETE recommendation 5b).** Two questions, each put with its options and the session's recommendation.
+
+1. **Every respondent page is capped at a reading width (44rem), so a 5-column table like NHETE's indicator tables cannot fit. When a table needs more room, what gets wider?**
+   - **A — the page, per section (chosen, the recommendation).** The author ticks "Wide page" on a section; while it is on screen the whole page widens, reusing the scanned-paper view's wide mode. Phones are unchanged (a grid is cards there). In single-page mode the page is wide when any shown section is wide.
+   - **B — only the table.** A "use the full width" switch on the grid lets just that table spill out of the reading column; nicer to read, harder to build right in the builder preview and the encode page.
+   - **C — the whole form.** One switch makes every page wide; simplest, but every page's text runs long.
+2. **Grid answers cannot be charted in the Data Explorer. How is a grid charted?**
+   - **A — by row (chosen, the recommendation).** Pick the grid itself as what to count; each answered row of each response counts once, so one chart shows, for every indicator, how many chose Keep, Close or Drop — the view NHETE's agreement report (recommendation 7) needs.
+   - **B — each cell separately.** Every cell joins the question list as "Grid — Row — Column", counted per response; NHETE's 35-row table would add 175 entries and need a chart per indicator.
+
+**What the answer files:** `M247` builds both and closes `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`. It files `repeat-table-sticky`, `wide-page-prose-measure`, `explorer-grid-row-order` and `xlsform-page-width`, each `during-testing`.
+
+### D230 — A grid becomes a question table: what may a rule elsewhere read of it, and how does NHETE lay out its parts? **Rules elsewhere: only an always-asked cell (A). NHETE's parts: one table per indicator (A).**
+
+**Asked and answered 2026-11-18 (user decision, in chat), in the planning of `M246` (NHETE recommendation 5a).** Two questions, each put with its options and the session's recommendation.
+
+1. **A grid now has rows shown only sometimes, cells "Not needed" and per-row "Required when". When a show-when or a calculation ELSEWHERE in the form reads a grid cell, which cells may it read?**
+   - **A — only always-asked cells (chosen, the recommendation).** A rule elsewhere may name a cell only if it never hides: its row has no show-when, its column no show-when or needed-when, and it is never "Not needed". A column's own rules still read any cell to its left in the same row. Both engines decide a grid's masks after everything else is settled, so they cannot drift and nothing loops; NHETE needs nothing more.
+   - **B — any cell.** Every cell can be read, so the engines' repeat-until-settled loop must include every cell: slower on big tables, more ways for the two engines to disagree, a larger change.
+2. **NHETE's parts tables list each kept indicator's parts. How should the test form lay them out?**
+   - **A — one table per indicator (chosen, the recommendation).** 35 small tables, each shown only when its indicator is kept and headed by its name, as the module reads; row show-when is then tested by the showcase form.
+   - **B — one table per domain.** 4 tables whose rows appear for each kept indicator; tests row show-when at NHETE's size, loses the per-indicator headings.
+
+**What the answer files:** `M246` builds both and closes `grid-question-table` (`R-8410b419`) and `R-ffd10da2`. It files `grid-row-details-on-paper`, `xlsform-grid-row-details`, `grid-column-answer-limits`, `grid-column-help-text`, `grid-value-rename-carries`, `grid-answers-labelled-table`, `runtime-engine-handshake`, `automation-grid-cell-conditions` and `grid-cell-operand-judge`, each `during-testing`. No retier.
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

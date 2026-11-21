@@ -26,6 +26,10 @@ enum TokenType: string
     case Number = 'number';
     case String = 'string';
     case FieldRef = 'field_ref';
+    /** M246: `${grid.row.col}` or `${grid.row}` — the lexeme is the whole text inside the braces. */
+    case CellRef = 'cell_ref';
+    /** M246: `${.col}` — this row's cell, inside a grid column's own rules; the lexeme keeps the leading dot. */
+    case RowCellRef = 'row_cell_ref';
     case SelfRef = 'self_ref';
     case Word = 'word';
     case Eof = 'eof';

@@ -24,6 +24,7 @@
 
 import { fieldRendersNothing } from '../../../public-runtime/engine';
 import { describe, type ConditionReading, type LabelLookup } from './condition-describer';
+import { gridHasRules, gridRuleSites, type GridRuleKind } from './grid-rules';
 import type { CanvasGroup, LocalField, LocalSection, Uid } from './types';
 
 /** A notice as `GET /forms/{form}/graph` ships it (`App\Support\Forms\GraphNotice::toArray()`). */
@@ -31,6 +32,15 @@ export interface GraphNotice {
     kind: 'forward_reference' | 'cycle' | 'empty_at_open';
     nodes: string[];
     message: string;
+}
+
+/** M246: one of a grid's own rules — a row's or column's condition — as the rail shows it. */
+export interface RailGridRule {
+    rule: GridRuleKind;
+    /** Which row or column, in the author's words: "Row “Row 2”", "Column “Comment”". */
+    target: string;
+    expression: string;
+    reading: ConditionReading;
 }
 
 /** A field inside a node that carries a condition of its own. */
@@ -41,6 +51,8 @@ export interface RailField {
     expression: string;
     reading: ConditionReading;
     notices: GraphNotice[];
+    /** M246: a grid's row and column conditions, in rows-then-columns order; [] for any other question. */
+    gridRules: RailGridRule[];
 }
 
 export interface RailNode {
@@ -128,11 +140,38 @@ function toRailField(field: LocalField, labels: LabelLookup, byNode: Map<string,
         expression,
         reading: describe(expression, labels),
         notices: byNode.get(field.key) ?? [],
+        gridRules: gridRulesOf(field, labels),
     };
 }
 
 function hasCondition(field: LocalField): boolean {
-    return (field.relevant_expression ?? '').trim() !== '';
+    // M246: a grid whose rows or columns carry conditions has logic even with no condition of its own.
+    return (field.relevant_expression ?? '').trim() !== '' || gridHasRules(field.field_type, field.config);
+}
+
+const GRID_RULE_LEAD: Record<GridRuleKind, string> = {
+    row: 'Shown when',
+    column: 'Shown when',
+    needed: 'In each row, needed when',
+    required: 'In each row, required when',
+};
+
+/** M246: a grid's own rules, each with the row or column it governs named by its label. */
+function gridRulesOf(field: LocalField, labels: LabelLookup): RailGridRule[] {
+    const config = field.config as { rows?: unknown; columns?: unknown };
+    const labelIn = (list: unknown, value: string | null): string => {
+        const match = Array.isArray(list) ? list.find((entry) => String((entry as { value?: unknown })?.value) === value) : undefined;
+        const label = (match as { label?: unknown } | undefined)?.label;
+
+        return typeof label === 'string' && label.trim() !== '' ? label : (value ?? '');
+    };
+
+    return gridRuleSites(field.field_type, field.config).map((site) => ({
+        rule: site.rule,
+        target: site.rule === 'row' ? `Row “${labelIn(config.rows, site.row)}”` : `Column “${labelIn(config.columns, site.column)}”`,
+        expression: site.expression,
+        reading: describe(site.expression, labels, GRID_RULE_LEAD[site.rule]),
+    }));
 }
 
 /**

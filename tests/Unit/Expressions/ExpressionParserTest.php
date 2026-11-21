@@ -6,6 +6,7 @@ use App\Enums\ComparisonOperator;
 use App\Enums\ExpressionKind;
 use App\Enums\LogicOperator;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
+use App\Services\Expressions\Ast\CellReferenceNode;
 use App\Services\Expressions\Ast\ComparisonNode;
 use App\Services\Expressions\Ast\FieldReferenceNode;
 use App\Services\Expressions\Ast\LogicalNode;
@@ -108,4 +109,27 @@ it('allows "." only in a constraint', function (): void {
     } catch (ExpressionSyntaxException $e) {
         expect($e->slug())->toBe('self_reference_in_non_constraint');
     }
+});
+
+it('M246: reads a grid cell, a Likert row and a row-relative cell as their own nodes', function (): void {
+    $parser = makeExpressionParser();
+    $ast = $parser->parse('${g.a01.keep} = "yes" and ${lk.r1} > 2 or ${.cut} = "change" or ${q} = 1');
+
+    expect($parser->referencedKeys($ast))->toBe(['g', 'lk', 'q'])
+        ->and(array_map(static fn (CellReferenceNode $c): string => $c->path(), $parser->referencedCells($ast)))->toBe(['g.a01.keep', 'lk.r1'])
+        ->and($parser->referencedCells($ast)[1]->column)->toBeNull()
+        ->and($parser->referencedRowColumns($ast))->toBe(['cut']);
+});
+
+it('M246: checks a cell key at publish, and refuses a row-relative cell outside a grid column rule', function (): void {
+    $parser = makeExpressionParser();
+    $known = ['g' => true];
+
+    $parser->assertReferencesResolve($parser->parse('${g.a.b} = 1'), $known, ExpressionKind::Relevant);
+    $parser->assertReferencesResolve($parser->parse('${.b} = 1 and ${g.a.b} = 1'), $known, ExpressionKind::Relevant, null, rowScope: true);
+
+    expect(fn () => $parser->assertReferencesResolve($parser->parse('${h.a.b} = 1'), $known, ExpressionKind::Relevant))
+        ->toThrow(fn (ExpressionSyntaxException $e) => expect($e->slug())->toBe('unknown_field_reference'))
+        ->and(fn () => $parser->assertReferencesResolve($parser->parse('not(${.b} = 1)'), $known, ExpressionKind::Relevant, 'q'))
+        ->toThrow(fn (ExpressionSyntaxException $e) => expect($e->slug())->toBe('row_reference_outside_grid_column'));
 });

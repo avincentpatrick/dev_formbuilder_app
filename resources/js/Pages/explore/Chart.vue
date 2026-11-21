@@ -91,6 +91,8 @@ function initial(): Definition {
 const definition = ref<Definition>(initial());
 const formFields = ref<Field[] | null>(null);
 const formNotice = ref<string | null>(null);
+/** M247 (`D231`): the chosen form's grids a "Rows of a grid" chart may count. */
+const formGrids = ref<Option[]>([]);
 
 const result = ref<Result | null>(null);
 const refusal = ref<Refusal | null>(null);
@@ -144,27 +146,41 @@ function setSource(key: string): void {
 
     formFields.value = null;
     formNotice.value = null;
+    formGrids.value = [];
     definition.value = newDefinition(next, definition.value.timezone, today);
 }
 
 async function setForm(formId: string): Promise<void> {
-    patch({ form_id: formId === '' ? null : formId });
+    // M247: another form has other grids, so the grid a chart named goes with the form.
+    patch({ form_id: formId === '' ? null : formId, ...(source.value?.requires_grid === true ? { grid: null } : {}) });
     await loadFormFields();
+}
+
+/** M247 (`D231`): a grid, counted row by row — grouped by its Row first, unless the chart already groups by the grid. */
+async function setGrid(grid: string): Promise<void> {
+    patch({ grid: grid === '' ? null : grid });
+    await loadFormFields();
+
+    const first = definition.value.dimensions[0]?.field ?? '';
+    if (definition.value.grid != null && fieldByKey.value.has('row') && first !== 'row' && !first.startsWith('column:') && first !== 'rating') {
+        patch({ dimensions: [{ field: 'row', bucket: null }, ...definition.value.dimensions.slice(1)] });
+    }
 }
 
 /** A form's questions arrive by fetch; whatever the chart named that this form does not have is dropped. */
 async function loadFormFields(): Promise<void> {
     const formId = definition.value.form_id;
+    const grid = definition.value.grid ?? null;
 
     formFields.value = null;
     formNotice.value = null;
 
     if (source.value === undefined || !source.value.requires_form || formId === null) return;
 
-    const { payload, message } = await fetchFields(source.value.key, formId);
+    const { payload, message } = source.value.requires_grid === true ? await fetchFields(source.value.key, formId, grid) : await fetchFields(source.value.key, formId);
 
-    // The reader may have moved on to another form while this one was loading.
-    if (definition.value.form_id !== formId) return;
+    // The reader may have moved on to another form, or another grid, while this one was loading.
+    if (definition.value.form_id !== formId || (definition.value.grid ?? null) !== grid) return;
 
     if (payload === null) {
         formNotice.value = message;
@@ -173,6 +189,7 @@ async function loadFormFields(): Promise<void> {
     }
 
     formFields.value = payload.fields;
+    formGrids.value = payload.grids ?? [];
     definition.value = dropUnknownFields(definition.value, payload.fields);
 }
 
@@ -422,6 +439,22 @@ function destroy(): void {
                                 placeholder="Choose a form"
                                 :disabled="forms.length === 0"
                                 @update:model-value="setForm"
+                            />
+                        </MdsFormField>
+
+                        <MdsFormField
+                            v-if="source?.requires_grid && definition.form_id !== null"
+                            label="Grid"
+                            input-id="explore-grid"
+                            :help="formGrids.length === 0 ? 'This form has no grid a chart can count row by row.' : undefined"
+                        >
+                            <MdsSelect
+                                id="explore-grid"
+                                :model-value="definition.grid ?? ''"
+                                :options="formGrids"
+                                placeholder="Choose a grid"
+                                :disabled="formGrids.length === 0"
+                                @update:model-value="setGrid"
                             />
                         </MdsFormField>
                     </div>

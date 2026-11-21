@@ -160,4 +160,14 @@ final class FormException extends RuntimeException
     {
         return new self($reason);
     }
+
+    /**
+     * M246 (`grid-question-table`): an XLSForm export would give two questions one name — a grid cell is named
+     * `{grid}_{row}_{col}`, so two rows' or columns' codes can meet another question's, and a condition naming one cell
+     * would then read the other. Thrown by {@see XlsformExporter}.
+     */
+    public static function xlsformNameClash(string $name): self
+    {
+        return new self("Two questions would both be named “{$name}” in the XLSForm file. A grid's cells are named by joining its code, its row's and its column's with “_”. Change one row or column code, then export again.");
+    }
 }

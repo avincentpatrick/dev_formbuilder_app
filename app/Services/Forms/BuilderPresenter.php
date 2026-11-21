@@ -254,6 +254,8 @@ final class BuilderPresenter
             'max_instances' => $section->max_instances,
             // M185 (`R-0a7275ce`): `table` or null (cards).
             'repeat_layout' => $section->repeat_layout,
+            // M247 (`D231`): `wide` or null (the reading width).
+            'page_width' => $section->page_width,
             'relevant_expression' => $section->relevant_expression,
             'sequence' => $section->sequence,
             'version' => FormBuilderService::rowVersion($section),

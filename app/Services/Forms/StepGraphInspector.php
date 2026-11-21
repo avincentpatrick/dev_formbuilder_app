@@ -16,6 +16,7 @@ use App\Services\Submissions\StructuralAnswerNormalizer;
 use App\Services\Templates\TemplateScopeResolver;
 use App\Services\Validation\SemanticValidator;
 use App\Support\Forms\GraphNotice;
+use App\Support\Forms\GridRules;
 use App\Support\Forms\StepProjection;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -232,8 +233,10 @@ final class StepGraphInspector
         /** @var array<string, GraphNotice> $pairs  keyed by fragment, which dedupes as the old array_unique did */
         $pairs = [];
 
-        foreach ($this->relevanceNodes($fields, $sections) as [$nodeKey, $expression, $hostPosition, $containedIn]) {
-            foreach ($this->referencesIn($expression) as $referenced) {
+        foreach ($this->relevanceNodes($fields, $sections) as [$nodeKey, $expression, $hostPosition, $containedIn, $gridRules]) {
+            // M246: a grid's row and column conditions are late in the same way, and hang on the grid.
+            $referencedKeys = array_values(array_unique(array_merge(...array_map($this->referencesIn(...), [$expression, ...$gridRules]))));
+            foreach ($referencedKeys as $referenced) {
                 $target = $positions[$referenced] ?? null;
                 if ($target === null) {
                     continue; // an unresolvable key is the expression gate's refusal, not ours
@@ -431,11 +434,15 @@ final class StepGraphInspector
 
     /**
      * Every node that carries a `relevant_expression`, as
-     * `[key, expression, position, owningSectionKeyOrNullForASection]`.
+     * `[key, expression, position, owningSectionKeyOrNullForASection, gridRules]`.
+     *
+     * M246: `gridRules` is a grid's own row and column conditions ({@see GridRules}), read by the forward-reference
+     * notice only. The cycle notice leaves them out on purpose: a rule elsewhere may read only a cell that is always
+     * asked (`D230`), so a grid's rules can never feed back into what they read.
      *
      * @param  Collection<int, FormField>  $fields
      * @param  Collection<int, FormSection>  $sections
-     * @return list<array{0: string, 1: string, 2: array{int, int}, 3: ?string}>
+     * @return list<array{0: string, 1: string, 2: array{int, int}, 3: ?string, 4: list<string>}>
      */
     private function relevanceNodes(Collection $fields, Collection $sections): array
     {
@@ -449,7 +456,7 @@ final class StepGraphInspector
         foreach ($sections as $section) {
             $expression = $section->relevant_expression;
             if ($expression !== null && trim($expression) !== '') {
-                $nodes[] = [$section->key, $expression, TemplateScopeResolver::sectionPosition($section->sequence), null];
+                $nodes[] = [$section->key, $expression, TemplateScopeResolver::sectionPosition($section->sequence), null, []];
             }
         }
 
@@ -460,7 +467,8 @@ final class StepGraphInspector
 
             // A field with no expression of its own still DEPENDS on its section, so it must appear as a
             // node for the containment edge — with an empty expression, which `referencesIn()` returns [] for.
-            $nodes[] = [$field->key, $expression ?? '', $position, $owning?->key];
+            $gridRules = array_map(static fn (array $site): string => $site['expression'], GridRules::sites($field->field_type, $field->config));
+            $nodes[] = [$field->key, $expression ?? '', $position, $owning?->key, $gridRules];
         }
 
         return $nodes;

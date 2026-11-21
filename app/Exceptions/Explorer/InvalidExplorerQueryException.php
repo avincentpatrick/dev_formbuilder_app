@@ -48,6 +48,24 @@ final class InvalidExplorerQueryException extends InvalidArgumentException
         return new self('The form this chart reads no longer exists, or you can no longer open it.', 'form_unavailable');
     }
 
+    /** M247 (`D231`): a chart that counts a grid's rows must say which grid. */
+    public static function gridRequired(): self
+    {
+        return new self('Choose the grid whose rows this chart counts.', 'grid_required');
+    }
+
+    /** M247: the grid is gone from the form, is marked personal or sensitive, or cannot be charted by row. */
+    public static function gridUnavailable(): self
+    {
+        return new self('The grid this chart counts is no longer in the form, or cannot be charted by row.', 'grid_unavailable');
+    }
+
+    /** M247: only a source that counts a grid's rows reads a grid. */
+    public static function gridNotAllowed(string $label): self
+    {
+        return new self("A chart of {$label} does not read a grid.", 'grid_not_allowed');
+    }
+
     public static function unknownField(string $field): self
     {
         return new self("'{$field}' is not a field of this data source any more.", 'unknown_field');

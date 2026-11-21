@@ -377,3 +377,20 @@ it('survives a draft whose FIELD condition does not parse either', function (): 
 
     expect($this->inspector->warnings($draft))->toBeArray();
 });
+
+it('M246: reports a grid row condition that depends on a later question, on the grid', function (): void {
+    $draft = inspectorDraft($this, function ($draft, $user): void {
+        addFormField($draft, $user, 'svc', FieldType::Matrix, 1, ['config' => [
+            'rows' => [['value' => 'r1', 'label' => 'One', 'relevant' => '${later} = \'yes\'']],
+            'columns' => [['value' => 'c1', 'label' => 'C1']],
+            'cells' => [['value' => 'x', 'label' => 'X']],
+        ]]);
+        addFormField($draft, $user, 'later', FieldType::ShortText, 2);
+    });
+
+    $notices = array_map(static fn ($notice): array => $notice->toArray(), $this->inspector->notices($draft));
+
+    expect($notices)->toHaveCount(1)
+        ->and($notices[0]['kind'])->toBe('forward_reference')
+        ->and($notices[0]['nodes'])->toBe(['svc', 'later']);
+});

@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\FieldType;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Support\Forms\GridRules;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -174,3 +176,61 @@ it('refuses a grid source in the wrong shape', function (array $config, string $
     'a source with a stray key' => [['cells_source' => ['form_id' => null, 'field_key' => null, 'kind' => 'form']], 'config.cells_source'],
     'a column list name with a dot' => [['columns' => [['value' => 'c', 'label' => 'C', 'options_list' => 'a.b']]], 'config.columns.0.options_list'],
 ]);
+
+it('M246: saves a grid row\'s show-when, details and "Not needed" cells, and a column\'s rules and long-text type', function (): void {
+    [$tenant, $admin, $form, $fieldId, $key] = matrixSaveAuthor('matrix');
+    $details = [['type' => 'paragraph', 'spans' => [['text' => 'What the indicator measures.']]]];
+
+    matrixSavePatch($admin, $form, $fieldId, $key, [
+        'rows' => [
+            ['value' => 'a01', 'label' => 'A01', 'relevant' => '${q0_4} != \'\'', 'not_needed' => ['cut'], 'details' => $details],
+        ],
+        'columns' => [
+            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'single_select', 'options' => [['value' => 'change', 'label' => 'Change it']]],
+            ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text', 'relevant' => '${q0_4} = \'whole\'', 'needed_when' => '${.cut} = \'change\'', 'required_when' => '${.cut} = \'change\''],
+        ],
+        'cells' => [],
+    ])->assertOk();
+
+    enterTenant($tenant->id, $admin->id);
+    $config = FormField::query()->findOrFail($fieldId)->config;
+    expect($config['rows'][0])->toMatchArray(['relevant' => '${q0_4} != \'\'', 'not_needed' => ['cut'], 'details' => $details])
+        ->and($config['columns'][1])->toMatchArray([
+            'type' => 'long_text',
+            'relevant' => '${q0_4} = \'whole\'',
+            'needed_when' => '${.cut} = \'change\'',
+            'required_when' => '${.cut} = \'change\'',
+        ]);
+});
+
+it('M246: refuses a row\'s details that hold a picture, and nothing reads a column rule on a Likert grid', function (): void {
+    [$tenant, $admin, $form, $fieldId, $key] = matrixSaveAuthor('matrix');
+
+    matrixSavePatch($admin, $form, $fieldId, $key, [
+        'rows' => [['value' => 'a', 'label' => 'A', 'details' => [['type' => 'image', 'attachment_id' => '0193b6a0-0000-7000-8000-000000000001', 'alt' => 'x']]]],
+        'columns' => [['value' => 'c', 'label' => 'C']],
+        'cells' => [],
+    ])->assertUnprocessable()->assertJsonValidationErrors(['config.rows.0.details']);
+
+    [$likertId, $likertKey] = matrixSaveLikert($admin, $form);
+    matrixSavePatch($admin, $form, $likertId, $likertKey, [
+        'rows' => [['value' => 'r1', 'label' => 'Statement', 'relevant' => '${x} = 1']],
+        'columns' => [['value' => '1', 'label' => 'Low', 'needed_when' => '${.a} = 1']],
+    ])->assertOk();
+
+    enterTenant($tenant->id, $admin->id);
+    $config = FormField::query()->findOrFail($likertId)->config;
+    // The save keeps `config` as sent, as for every other key; a column rule on a Likert grid is read by nothing.
+    expect($config['rows'][0]['relevant'])->toBe('${x} = 1')
+        ->and(array_column(GridRules::sites(FieldType::LikertMatrix, $config), 'rule'))->toBe(['row']);
+});
+
+/** @return array{0: string, 1: string} a Likert grid added to the same form */
+function matrixSaveLikert(User $admin, Form $form): array
+{
+    $add = test()->actingAs($admin)
+        ->postJson("http://acme.meridian.test/forms/{$form->id}/fields", ['field_type' => 'likert_matrix'])
+        ->assertOk();
+
+    return [$add->json('id'), $add->json('key')];
+}

@@ -90,8 +90,17 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
         // `type`, `options` (as `{value}` objects) and `required`, the shape the builder saves.
         if (isset($field['grid'])) {
             $specs = $field['grid']['column_specs'] ?? [];
+            // M246: a vector's `grid.row_rules` (keyed by row value) → that row object's `relevant` and `not_needed`,
+            // and a column spec's `relevant`, `needed_when` and `required_when` → that column object's own keys.
+            $rowRules = $field['grid']['row_rules'] ?? [];
             $gridConfig = [
-                'rows' => array_map(static fn (string $v): array => ['value' => $v], $field['grid']['rows'] ?? []),
+                'rows' => array_map(static fn (string $v): array => [
+                    'value' => $v,
+                    ...array_filter([
+                        'relevant' => $rowRules[$v]['relevant'] ?? null,
+                        'not_needed' => $rowRules[$v]['not_needed'] ?? null,
+                    ], static fn (mixed $x): bool => $x !== null),
+                ], $field['grid']['rows'] ?? []),
                 'columns' => array_map(static fn (string $v): array => [
                     'value' => $v,
                     ...array_filter([
@@ -100,6 +109,9 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
                             ? array_map(static fn (string $o): array => ['value' => $o], $specs[$v]['options'])
                             : null,
                         'required' => $specs[$v]['required'] ?? null,
+                        'relevant' => $specs[$v]['relevant'] ?? null,
+                        'needed_when' => $specs[$v]['needed_when'] ?? null,
+                        'required_when' => $specs[$v]['required_when'] ?? null,
                     ], static fn (mixed $x): bool => $x !== null),
                 ], $field['grid']['columns'] ?? []),
             ];
@@ -230,6 +242,10 @@ it('matches the golden semantic vector', function (array $case): void {
     expect($result->effectiveAnswers)->toEqual($expected['effective_answers'] ?? []);
     expect($result->computed)->toEqual($expected['computed'] ?? []);
     expect($result->repeatFieldRelevance)->toEqual($expected['repeat_relevance'] ?? []);
+    // M246: which of each grid's rows, columns and cells are asked — checked wherever a vector states it.
+    if (array_key_exists('grid_relevance', $expected)) {
+        expect($result->gridRelevance)->toEqual($expected['grid_relevance']);
+    }
 
     $actual = array_map(
         static fn (SemanticError $error): array => ['field' => $error->path(), 'rule' => $error->rule],

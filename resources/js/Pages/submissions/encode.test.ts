@@ -114,6 +114,7 @@ interface PayloadOptions {
         min_instances?: number | null;
         max_instances?: number | null;
         repeat_layout?: 'table' | null;
+        page_width?: 'wide' | null;
         fields: Array<Record<string, unknown>>;
     }>;
     singlePage?: boolean;
@@ -160,6 +161,7 @@ function payload(o: PayloadOptions): Record<string, unknown> {
             min_instances: b.min_instances ?? null,
             max_instances: b.max_instances ?? null,
             repeat_layout: b.repeat_layout ?? null,
+            page_width: b.page_width ?? null,
             fields: b.fields,
         })),
         // The server's first-paint projection. The store recomputes immediately, so these tests assert what
@@ -723,6 +725,24 @@ describe('encode page — repeat groups', () => {
         await table.findAll('tbody tr')[1].findAll('button').find((b) => b.text() === 'Remove')!.trigger('click');
         await nextTick();
         expect(wrapper.get('[data-repeat-table]').findAll('tbody tr')).toHaveLength(1);
+    });
+
+    it('M247: widens the page while a section marked wide is on it, and keeps the reading width when none is', async () => {
+        const widePayload = (pageWidth: 'wide' | null) =>
+            payload({
+                singlePage: true,
+                sections: [section({ key: 'ind', label: 'Indicators', sequence: 1, ...(pageWidth === 'wide' ? { page_width: 'wide' as const } : {}) })],
+                fields: [field({ key: 'note', section_key: 'ind', label: 'Note', sequence: 1 })],
+                blocks: [{ key: 'ind', label: 'Indicators', page_width: pageWidth, fields: [blockField({ key: 'note', label: 'Note' })] }],
+            });
+
+        const wide = mountEncode(widePayload('wide'));
+        await nextTick();
+        expect(wide.get('.encode').classes()).toContain('encode--wide');
+
+        const narrow = mountEncode(widePayload(null));
+        await nextTick();
+        expect(narrow.get('.encode').classes()).not.toContain('encode--wide');
     });
 
     it('keeps cards when a question cannot be a table column (M185)', async () => {

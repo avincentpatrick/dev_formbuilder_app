@@ -578,6 +578,13 @@ function onRestart(): void {
     rotateRespondentSession();
     window.location.reload();
 }
+
+// M247 (`grid-wide-sticky-explorer`, `D231`) — the session says when its page is wide (a section marked "Wide page" is on
+// screen), and the banner above it widens with it. A remount starts at the reading width until its session says otherwise.
+const sessionWide = ref(false);
+watch(sessionKey, () => {
+    sessionWide.value = false;
+});
 </script>
 
 <template>
@@ -595,7 +602,7 @@ function onRestart(): void {
         `assertClean` would NOT have caught, since it asserts horizontal overflow only.
     -->
     <div class="app-shell">
-        <div class="app-shell__banner" :class="{ 'app-shell__banner--wide': phase === 'ready' && paperReview !== null && paperReview.pages.length > 0 }">
+        <div class="app-shell__banner" :class="{ 'app-shell__banner--wide': phase === 'ready' && ((paperReview !== null && paperReview.pages.length > 0) || sessionWide) }">
             <OfflineIndicator v-if="!online" />
             <SyncStatus />
         </div>
@@ -653,6 +660,7 @@ function onRestart(): void {
             @discard="onDiscard"
             @unavailable="onUnavailable"
             @paper-received="onPaperReceived"
+            @wide="(wide: boolean) => (sessionWide = wide)"
         />
     </div>
 </template>

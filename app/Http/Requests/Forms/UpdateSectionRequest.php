@@ -32,6 +32,8 @@ final class UpdateSectionRequest extends FormRequest
             // M185 (`R-0a7275ce`, `D129`): a repeatable section as cards (null) or a table; whether its questions can be columns
             // is not refused here — a section that cannot be a table is drawn as cards, and the builder says why.
             'repeat_layout' => ['nullable', 'string', Rule::in(['cards', 'table'])],
+            // M247 (`grid-wide-sticky-explorer`, `D231`): `wide` widens the respondent's page while this section is on screen.
+            'page_width' => ['nullable', 'string', Rule::in(['wide'])],
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
             // M196 (`R-036f3226`, `D189`): required — a save without the token it last read is refused, not taken as an overwrite.
             'version' => ['required', 'string'],

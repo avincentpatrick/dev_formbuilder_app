@@ -16,7 +16,8 @@ use App\Services\Forms\TemplateValidationGate;
  *
  *     template  ::= ( literal | escape | hole )*
  *     hole      ::= '${' key '}'
- *     key       ::= [A-Za-z_] [A-Za-z0-9_]*
+ *     key       ::= [A-Za-z_] [A-Za-z0-9_]* ( '.' segment ( '.' segment )? )?   -- M246: a grid row or cell
+ *     segment   ::= [A-Za-z0-9_] [A-Za-z0-9_-]*
  *     escape    ::= '$${'                     -- yields the literal text "${"
  *     literal   ::= any character sequence containing no unescaped '${'
  *
@@ -129,12 +130,28 @@ final class TemplateParser
         $this->scan($template, false, $holes);
 
         foreach (array_reverse($holes) as [$at, $key]) {
-            if (isset($map[$key])) {
-                $template = substr_replace($template, '${'.$map[$key].'}', $at, strlen($key) + 3);
+            // M246: a cell hole `${grid.row.col}` renames only its key and keeps its path.
+            $dot = strpos($key, '.');
+            $base = $dot === false ? $key : substr($key, 0, $dot);
+            if (isset($map[$base])) {
+                $path = $dot === false ? '' : substr($key, $dot);
+                $template = substr_replace($template, '${'.$map[$base].$path.'}', $at, strlen($key) + 3);
             }
         }
 
         return $template;
+    }
+
+    /**
+     * M246: a hole's value split into its key and, for a grid cell, its row and column (a Likert row has no column).
+     *
+     * @return array{key: string, row: ?string, column: ?string}
+     */
+    public static function holeParts(string $value): array
+    {
+        $parts = explode('.', $value);
+
+        return ['key' => $parts[0], 'row' => $parts[1] ?? null, 'column' => $parts[2] ?? null];
     }
 
     /**
@@ -241,10 +258,15 @@ final class TemplateParser
     }
 
     /**
-     * The key production, byte-identical to `ExpressionLexer::lexReference()` (`:172`/`:177`): the first
+     * The key production, byte-identical to `ExpressionLexer::lexReference()`'s key: the first
      * character is `ctype_alpha` or `_`, the rest `ctype_alnum` or `_`, then a closing `}`. Byte-wise
      * `ctype_*` (never a `\w` regex, which admits Unicode). `$i` points at the `$`; returns null when the
      * hole is malformed, without moving the cursor.
+     *
+     * M246: the key may carry up to two `.segment` parts — a Likert row `${grid.row}` or a Grid cell
+     * `${grid.row.col}` — read exactly as `ExpressionLexer::segmentEnd()` reads them (a sibling copy, as the key is). The hole's value is the whole
+     * text inside the braces, so the segments every golden vector compares are unchanged in shape. A row-relative
+     * `${.col}` is not a hole: piped text has no current row.
      */
     private function readKey(string $template, int $length, int $i): ?string
     {
@@ -260,6 +282,16 @@ final class TemplateParser
             $j++;
         }
 
+        $segments = 0;
+        while ($j < $length && $template[$j] === '.' && $segments < 2) {
+            $end = self::segmentEnd($template, $length, $j + 1);
+            if ($end === null) {
+                return null;
+            }
+            $j = $end;
+            $segments++;
+        }
+
         if ($j >= $length || $template[$j] !== '}') {
             return null;
         }
@@ -267,7 +299,22 @@ final class TemplateParser
         return substr($template, $start, $j - $start);
     }
 
-    /** A 24-byte window from the offending `$`, mirroring `ExpressionLexer::rawReference()` (`:202-207`). */
+    /** M246: one grid path segment from `$at` (`[A-Za-z0-9_][A-Za-z0-9_-]*`), the offset past it, or null. */
+    private static function segmentEnd(string $template, int $length, int $at): ?int
+    {
+        if ($at >= $length || ! (ctype_alnum($template[$at]) || $template[$at] === '_')) {
+            return null;
+        }
+
+        $j = $at + 1;
+        while ($j < $length && (ctype_alnum($template[$j]) || $template[$j] === '_' || $template[$j] === '-')) {
+            $j++;
+        }
+
+        return $j;
+    }
+
+    /** A 24-byte window from the offending `$`, mirroring `ExpressionLexer::rawReference()`. */
     private function rawReference(string $template, int $length, int $start): string
     {
         return substr($template, $start, min($length - $start, self::RAW_WINDOW));

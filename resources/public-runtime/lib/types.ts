@@ -86,6 +86,7 @@ export interface RawSection {
      * every section drawn as cards since — is the cards.
      */
     repeat_layout?: 'table' | 'cards' | null;
+    page_width?: 'wide' | null; // M247 (`D231`): `wide` widens the page while the section is on screen; absent is the reading width.
     relevant_expression: string | null;
 }
 
@@ -272,6 +273,11 @@ export interface RenderMatrix {
     cells: RenderOption[];
     /** M183 (`R-1c1d7266`): `stacked` draws cards at every width; `table` (the default) a table wherever one fits. */
     layout: 'table' | 'stacked';
+    /**
+     * M246 (`grid-question-table`): a row's details — note content drawn under its label — keyed by row value. Optional
+     * because a manifest cached before M246 has none.
+     */
+    rowDetails?: Record<string, unknown[]>;
 }
 
 /**
@@ -372,6 +378,8 @@ export interface RenderSection {
     maxInstances: number | null;
     /** M185: the section is drawn as a table when it holds only questions a table can hold (`repeat-table.ts`). */
     repeatLayout: 'table' | 'cards';
+    /** M247 (`D231`): `wide` widens the respondent's page while this section is on screen (`page-width.ts`). */
+    pageWidth: 'wide' | 'normal';
     relevantExpression: string | null;
 }
 

@@ -17,6 +17,7 @@
  * ⛔ The scope half mirrors PHP and is pinned against it by `tests/fixtures/template-scope.json`, run by
  * `tests/Unit/Templates/TemplateScopeParityTest.php` and this module's test — the server stays the authority at publish.
  */
+import { gridCellEntries } from './grid-condition-cells';
 import type { OperandKindOption, PaletteType } from './types';
 
 export type ReferenceGrammar = 'expression' | 'template';
@@ -28,6 +29,8 @@ export interface ReferenceField {
     field_type: string;
     form_section_id: string | null;
     sequence: number;
+    /** M246: a grid's config, from which its cells are offered; absent, a grid offers no cell. */
+    config?: Record<string, unknown> | null;
 }
 
 /** The few columns of a section the picker reads. */
@@ -142,7 +145,32 @@ export function referenceCandidates(source: ReferenceSource, spot: ReferenceSpot
         };
     });
 
-    return spot.grammar === 'expression' ? [...candidates, ...DATES] : candidates;
+    return spot.grammar === 'expression' ? [...candidates, ...cellCandidates(ordered, source, spot, accepts), ...DATES] : [...candidates, ...cellCandidates(ordered, source, spot, accepts)];
+}
+
+/**
+ * M246 (`R-ffd10da2`): a grid's cells, after the questions — in a formula or a condition only a cell that is always
+ * asked (`D230`), in piped text any cell of a grid the text may show; never in a Default value's formula, which is worked
+ * out before anything is answered. Inserted by its whole path, `${grid.row.col}`.
+ */
+function cellCandidates(ordered: ReferenceField[], source: ReferenceSource, spot: ReferenceSpot, accepts: (field: ReferenceField) => boolean): ReferenceCandidate[] {
+    if (spot.grammar === 'expression' && spot.earlierOnly === true) return [];
+    // A grid is never `offered` or `pipeable` as a whole; a cell of it may be, where the grid itself sits in scope.
+    const inScope = ordered.filter((field) => (field.field_type === 'matrix' || field.field_type === 'likert_matrix') && (spot.grammar === 'expression' || acceptsPlace(field, accepts)));
+    const grids = inScope.map((field) => ({ key: field.key, label: field.label, field_type: field.field_type, config: field.config ?? null }));
+    const ownKey = spot.grammar === 'expression' ? spot.ownKey : null;
+
+    return gridCellEntries(grids, source.types, ownKey, spot.grammar === 'template').map((cell) => ({
+        key: cell.key,
+        label: cell.label,
+        group: 'Grid cells',
+        insert: `\${${cell.key}}`,
+    }));
+}
+
+/** Whether piped text at this spot may show something where this grid sits — its position and repeat scope, not its type. */
+function acceptsPlace(grid: ReferenceField, accepts: (field: ReferenceField) => boolean): boolean {
+    return accepts({ ...grid, field_type: 'short_text' });
 }
 
 function hostScope(
@@ -182,7 +210,8 @@ export function findTrigger(before: string): { from: number; query: string } | n
     const at = /(?:^|[^A-Za-z0-9_.@])@([A-Za-z0-9_]*)$/.exec(before);
     if (at !== null) return { from: before.length - at[1].length - 1, query: at[1] };
 
-    const brace = /(?:^|[^$])\$\{([A-Za-z0-9_]*)$/.exec(before);
+    // M246: a grid cell's path — `${grid.row.col}` — is typed with dots and hyphens.
+    const brace = /(?:^|[^$])\$\{([A-Za-z0-9_.-]*)$/.exec(before);
     if (brace !== null) return { from: before.length - brace[1].length - 2, query: brace[1] };
 
     return null;

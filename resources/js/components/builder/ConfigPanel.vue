@@ -52,12 +52,14 @@ import ValidationEditor from './ValidationEditor.vue';
 import FieldHistory from './FieldHistory.vue';
 import type { DiffWords } from './conflict-diff';
 import { referenceCandidates, type ReferenceSource } from './reference-candidates';
+import { cellNamesUsed, gridCellEntries } from './grid-condition-cells';
+import { gridRuleSites } from './grid-rules';
 import { TAKES_NO_DEFAULT } from '../../../public-runtime/lib/defaults';
 import type { ContentBlock } from './content-blocks';
 import { describeSavePath, freeKeyFor, sortFieldSaveErrors, tabForSavePath } from './field-save-errors';
 import { LABEL_COUNT_FROM, LABEL_MAX, oneLine } from './label-text';
 import type { BuilderStore } from './useBuilderStore';
-import type { BuilderValidation, ComparableField, ConditionCatalogue, EnumOption, LocalField, LocalSection } from './types';
+import type { BuilderValidation, ComparableField, ConditionCatalogue, ConditionFieldOption, EnumOption, LocalField, LocalSection } from './types';
 interface Choice {
     value: string;
     label: string;
@@ -384,18 +386,43 @@ const catalogue = computed<ConditionCatalogue>(() => {
     return {
         fields: props.store.flattenedFields()
             .filter((f) => f.key !== '' && f.key !== ownKey)
-            .map((f) => ({
+            .map((f): ConditionFieldOption => ({
                 key: f.key,
                 label: f.label.trim() === '' ? f.key : f.label,
                 numeric: NUMERIC_TYPES.has(f.field_type), operand_kind: props.store.palette.flatMap((g) => g.types).find((t) => t.value === f.field_type)?.operand_kind,
                 options: choicesOf(f),
-            })),
+            }))
+            // M246 (`R-ffd10da2`): every other grid's always-asked cells, each named by its whole path (`D230`).
+            .concat(gridCellEntries(props.store.flattenedFields(), props.store.palette.flatMap((g) => g.types), ownKey)),
         kinds: enums.operand_kinds, // M134 (`R-910d2286`) — what each question may be compared with, transmitted
         // `count()` needs a repeatable section: a non-repeating one has no instances (H21a seeds repeatables only).
         repeatables: props.store.sections.value
             .filter((s) => s.is_repeatable && s.key !== '' && s.key !== ownKey)
             .map((s) => ({ key: s.key, label: s.label.trim() === '' ? s.key : s.label })),
     };
+});
+
+// M246 (`grid-question-table`): what names each of this grid's rows and columns elsewhere — `${grid.row…}` in a
+// condition, a formula, a rule, piped text or another grid's rule — so renaming or removing one says so first.
+const gridNamedBy = computed<Map<string, string[]>>(() => {
+    const own = field.value;
+    if (own === null || (own.field_type !== 'matrix' && own.field_type !== 'likert_matrix') || own.key === '') return new Map();
+    const texts = props.store.flattenedFields().flatMap((f) => {
+        const owner = f.label.trim() === '' ? f.key : f.label.trim();
+        const config = (f.config ?? {}) as Record<string, unknown>;
+        return [
+            f.relevant_expression,
+            typeof config.calculated_formula === 'string' ? config.calculated_formula : null,
+            f.label,
+            f.hint,
+            f.placeholder,
+            ...f.validations.map((v) => v.expression ?? null),
+            ...gridRuleSites(f.field_type, f.config).map((site) => site.expression),
+        ].map((text) => ({ owner, text }));
+    });
+    const sectionTexts = props.store.sections.value.flatMap((sec) => [sec.relevant_expression, sec.label, sec.description].map((text) => ({ owner: sec.label.trim() === '' ? sec.key : sec.label.trim(), text })));
+
+    return cellNamesUsed(own.key, [...texts, ...sectionTexts]);
 });
 
 // The fields a validation row may compare against (M115). Same source as the catalogue above and the same
@@ -721,6 +748,7 @@ watch(librarySaved, (value) => {
 
                     <template v-else-if="activeTab === 'grid' && configEditor === 'matrix'">
                         <MatrixEditor :config="field.config" :sources="choiceSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
+                            :catalogue="catalogue" :references="formulaReferences" :palette="props.store.palette.flatMap((g) => g.types)" :named-by="gridNamedBy"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :cells="gridCells"
@@ -734,6 +762,7 @@ watch(librarySaved, (value) => {
 
                     <template v-else-if="activeTab === 'grid'">
                         <LikertMatrixEditor :config="field.config" :sources="choiceSources" :form-id="store.formId" @update:config="field.config = $event; props.store.touch(field.uid, 'field')"
+                            :catalogue="catalogue" :references="formulaReferences" :named-by="gridNamedBy"
                             :rows="gridRows"
                             :columns="gridColumns"
                             :layout="gridLayout"
@@ -995,7 +1024,7 @@ watch(librarySaved, (value) => {
                                     @update:model-value="setSection('max_instances', $event)"
                                 />
                             </MdsFormField>
-                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" />
+                        </div><RepeatLayoutSelect v-if="section.is_repeatable" :layout="section.repeat_layout" :members="props.store.fields.value.filter((f) => f.form_section_id === section?.id).sort((a, b) => a.sequence - b.sequence)" :palette="props.store.palette" @update:layout="setSection('repeat_layout', $event)" /><MdsCheckbox :model-value="section.page_width === 'wide'" label="Wide page — for big tables" data-section-page-width @update:model-value="setSection('page_width', $event ? 'wide' : null)" /><p class="config__note" data-section-page-width-note>While this section is on screen the page uses the whole width of a big screen, so a wide grid is drawn as a table. Phones, and the Preview pane here, are unchanged.</p>
                         <ConditionEditor
                             :key="`section-${section.uid}`"
                             :expression="section.relevant_expression"

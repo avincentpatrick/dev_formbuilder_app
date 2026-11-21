@@ -9,5 +9,10 @@
   {"name":"err_dot_key","template_version":"1.0","template":"${.}","expected_error":"malformed_reference"},
   {"name":"err_dollar_key","template_version":"1.0","template":"${$}","expected_error":"malformed_reference"},
   {"name":"err_hole_cap_twenty_one","template_version":"1.0","template_repeat":{"prefix":"${a}","times":21,"core":"","suffix":""},"expected_error":"too_many_holes"},
-  {"name":"err_byte_cap_exceeded","template_version":"1.0","template_repeat":{"prefix":"y","times":1998,"core":"${a}","suffix":""},"expected_error":"template_too_long"}
+  {"name":"err_byte_cap_exceeded","template_version":"1.0","template_repeat":{"prefix":"y","times":1998,"core":"${a}","suffix":""},"expected_error":"template_too_long"},
+  {"name":"err_cell_trailing_dot","template_version":"1.0","template":"${g.}","expected_error":"malformed_reference"},
+  {"name":"err_cell_double_dot","template_version":"1.0","template":"${g..r}","expected_error":"malformed_reference"},
+  {"name":"err_cell_four_parts","template_version":"1.0","template":"${g.r.c.d}","expected_error":"malformed_reference"},
+  {"name":"err_row_relative_is_not_a_hole","template_version":"1.0","template":"${.keep}","expected_error":"malformed_reference"},
+  {"name":"err_cell_segment_leading_hyphen","template_version":"1.0","template":"${g.-r}","expected_error":"malformed_reference"}
 ]

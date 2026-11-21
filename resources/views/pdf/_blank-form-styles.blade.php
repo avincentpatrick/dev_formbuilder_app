@@ -180,6 +180,8 @@ body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #00000
 .grid__cell .choice { margin: 0 6pt 2pt 0; font-size: 8.5pt; }
 .grid__cell .choice__box { width: 11pt; height: 11pt; margin-right: 3pt; }
 .grid__line { border: 0.75pt solid #333333; height: 18pt; }
+/* M246: a cell its row marks "Not needed" — greyed, in words, so a person writing on the paper skips it. */
+.grid__cell--not-needed { background: #eeeeee; color: #555555; font-style: italic; font-size: 8.5pt; }
 
 /* -- Page break ------------------------------------------------------------------------------- */
 /* An authored `page_break` field. The one structural field type that means MORE on paper than on a

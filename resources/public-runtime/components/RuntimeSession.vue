@@ -49,6 +49,7 @@ import { APP_VERSION } from '../lib/app-version';
 import type { ApiClient } from '../lib/api-client';
 import type { AnswerMap, Bootstrap, PaperReview, ScheduleAcceptance, SchemaResponse, SubmitRedirect } from '../lib/types';
 import { paperNotes } from '../lib/paper-notes';
+import { pageIsWide, stepsOnScreen } from '../lib/page-width';
 
 const props = defineProps<{
     schema: SchemaResponse;
@@ -107,7 +108,7 @@ const emit = defineEmits<{
     // find rather than one derived on the device from the id.
     // M130 (`D76`) — and where the respondent goes after the thank-you screen, from the same response.
     submitted: [id: string, reference: string, confirmation: string | null, redirect: SubmitRedirect | null];
-    queued: [clientUuid: string];
+    queued: [clientUuid: string]; wide: [wide: boolean]; // M247 (`D231`): whether the page on screen is drawn wide (`pageWide`).
     // Increment M14 — `conflictCode` names WHICH 409 caused the remount (null = the ordinary republish
     // drift), so App.vue can pick a true sentence instead of asserting a republish for all five causes.
     reschema: [payload: { schema: SchemaResponse; answers: AnswerMap; conflictCode: string | null }];
@@ -691,6 +692,13 @@ if (props.paperReview) {
 // session (App.vue remounts it), so a plain constant.
 const paperPages = props.paperReview && props.paperReview.pages.length > 0 ? props.paperReview.pages : null;
 
+// M247 (`grid-wide-sticky-explorer`, `D231`) — a section marked "Wide page" widens the page while it is on screen
+// (`page-width.ts`), and App.vue's banner widens with it. A scanned paper beside the form widens it regardless.
+const pageWide = computed(() =>
+    pageIsWide(runtime.renderModel.sections, stepsOnScreen(runtime.singlePageMode, runtime.visibleSteps.value, runtime.currentStep.value)),
+);
+watch(pageWide, (wide) => emit('wide', wide), { immediate: true });
+
 const title = computed(() => runtime.renderModel.form.title);
 const description = computed(() => runtime.renderModel.form.description);
 </script>
@@ -701,7 +709,7 @@ const description = computed(() => runtime.renderModel.form.description);
         :description="description"
         :saving="autosave.saving.value"
         :saved-at="autosave.savedAt.value"
-        :wide="paperPages !== null"
+        :wide="paperPages !== null || pageWide"
     >
         <template #notice>
             <WelcomeBackBanner

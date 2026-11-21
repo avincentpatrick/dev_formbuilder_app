@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Exceptions\Expressions\ExpressionSyntaxException;
+use App\Services\Expressions\Ast\CellReferenceNode;
 
 /**
  * The PHP half of H21d2's serializer guard (Doc #27 §8, amendment E1).
@@ -99,7 +100,16 @@ it('parses every canonical string the TypeScript serializer can emit', function 
 
     // …and the references land where the structured condition says they do. A printer that emitted a
     // syntactically valid expression naming the WRONG key would parse fine and pass a parse-only assertion.
-    expect($parser->referencedKeys($ast))->toEqualCanonicalizing(conditionFixtureKeys($case['condition']));
+    // M246: a grid cell is named by its whole path and this row's cell by `.col`, as the structure names them; a key
+    // only a cell named is not named on its own.
+    $cells = $parser->referencedCells($ast);
+    $cellOnlyKeys = array_diff(array_map(static fn (CellReferenceNode $c): string => $c->key, $cells), conditionFixtureKeys($case['condition']));
+    $named = [
+        ...array_values(array_diff($parser->referencedKeys($ast), $cellOnlyKeys)),
+        ...array_map(static fn (CellReferenceNode $c): string => $c->path(), $cells),
+        ...array_map(static fn (string $column): string => '.'.$column, $parser->referencedRowColumns($ast)),
+    ];
+    expect($named)->toEqualCanonicalizing(conditionFixtureKeys($case['condition']));
 })->with(array_combine(
     array_column(conditionSerializerCases(), 'name'),
     array_map(static fn (array $case): array => [$case], conditionSerializerCases()),

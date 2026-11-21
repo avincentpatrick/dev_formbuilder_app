@@ -346,3 +346,42 @@ group('railHasLogic', () => {
         expect(railHasLogic(onField)).toBe(true);
     });
 });
+
+group('M246 — a grid with rules of its own', () => {
+    it('shows the grid in the rail with each row and column condition named by its label, even with no condition of its own', () => {
+        const svc = field('svc', {
+            field_type: 'matrix',
+            config: {
+                rows: [
+                    { value: 'r1', label: 'First' },
+                    { value: 'r2', label: 'Second', relevant: "${gate} = 'yes'" },
+                ],
+                columns: [
+                    { value: 'agree', label: 'Agree' },
+                    { value: 'why', label: 'Why', needed_when: "${.agree} = 'no'" },
+                ],
+                cells: [],
+            },
+        });
+        const rail = buildRail({ groups: [{ section: null, fields: [field('gate'), svc] }], notices: [] });
+        const conditioned = rail[0].conditioned;
+
+        expect(conditioned.map((f) => f.key)).toEqual(['svc']);
+        expect(conditioned[0].expression).toBe('');
+        expect(conditioned[0].gridRules.map((rule) => [rule.rule, rule.target])).toEqual([
+            ['row', 'Row “Second”'],
+            ['needed', 'Column “Why”'],
+        ]);
+        expect(conditioned[0].gridRules[0].reading.status).toBe('described');
+        expect(railHasLogic(rail)).toBe(true);
+    });
+
+    it('counts a "Not needed" cell as a rule, and leaves a grid with none out of the rail', () => {
+        const plain = field('plain', { field_type: 'matrix', config: { rows: [{ value: 'a', label: 'A' }], columns: [{ value: 'c', label: 'C' }] } });
+        const marked = field('marked', { field_type: 'matrix', config: { rows: [{ value: 'a', label: 'A', not_needed: ['c'] }], columns: [{ value: 'c', label: 'C' }] } });
+        const rail = buildRail({ groups: [{ section: null, fields: [plain, marked] }], notices: [] });
+
+        expect(rail[0].conditioned.map((f) => f.key)).toEqual(['marked']);
+        expect(rail[0].conditioned[0].gridRules).toEqual([]);
+    });
+});

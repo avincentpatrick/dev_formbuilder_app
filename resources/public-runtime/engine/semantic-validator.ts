@@ -91,6 +91,8 @@ export class SemanticResult {
     readonly effectiveAnswers: EffectiveAnswers;
     readonly computed: Record<string, EngineValue>;
     readonly repeatFieldRelevance: Record<string, Record<string, boolean>[]>;
+    /** M246: each relevant grid's asked rows, columns and (a Grid's) cells — the mirror of PHP `SemanticResult::$gridRelevance`. */
+    readonly gridRelevance: Record<string, GridRelevance>;
 
     constructor(
         fieldRelevance: Record<string, boolean>,
@@ -99,6 +101,7 @@ export class SemanticResult {
         effectiveAnswers: EffectiveAnswers,
         computed: Record<string, EngineValue>,
         repeatFieldRelevance: Record<string, Record<string, boolean>[]> = {},
+        gridRelevance: Record<string, GridRelevance> = {},
     ) {
         this.fieldRelevance = fieldRelevance;
         this.sectionRelevance = sectionRelevance;
@@ -106,6 +109,7 @@ export class SemanticResult {
         this.effectiveAnswers = effectiveAnswers;
         this.computed = computed;
         this.repeatFieldRelevance = repeatFieldRelevance;
+        this.gridRelevance = gridRelevance;
     }
 
     passed(): boolean {
@@ -115,6 +119,22 @@ export class SemanticResult {
     errorsFor(fieldKey: string): SemanticError[] {
         return this.errors.filter((error) => error.fieldKey === fieldKey);
     }
+}
+
+/**
+ * M246: one relevant grid's asked rows, columns and (a Grid's) cells — `cells` holds a shown row's shown columns only.
+ * The mirror of PHP `SemanticResult::$gridRelevance`'s value shape.
+ */
+export type GridRelevance = { rows: Record<string, boolean>; columns: Record<string, boolean>; cells: Record<string, Record<string, boolean>> };
+
+/** M246: a grid rule's own entry, read on own properties only — a row named `constructor` has no rule. */
+function ownRule<T>(rules: Record<string, T> | null | undefined, key: string): T | undefined {
+    return rules !== null && rules !== undefined && Object.prototype.hasOwnProperty.call(rules, key) ? rules[key] : undefined;
+}
+
+/** M246: a rule's text, null when blank — the mirror of PHP `SemanticValidator::ruleText()`. */
+function ruleText(text: unknown): string | null {
+    return typeof text === 'string' && text.trim() !== '' ? text : null;
 }
 
 type RuleFamilies = { constraint: ValidationRow[][]; required: ValidationRow[][]; skip: ValidationRow[][] };
@@ -201,7 +221,9 @@ export class SemanticValidator {
         // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
         // through the scalar collectFieldErrors path (isEmpty diverges on an empty object between the engines:
         // PHP isEmpty([]) === true vs TS isEmpty({}) === false). The pruned object replaces the raw answer.
-        const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated);
+        // M246 (`grid-question-table`): which of each relevant grid's rows, columns and cells are asked, read by the runtime.
+        const gridRelevance: Record<string, GridRelevance> = {};
+        const compositeErrors = this.processComposites(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated, gridRelevance);
 
         // Geospatial fields (Increment G5b1) are validated in their own pass (same reason as composites: an
         // object answer must not hit scalar isEmpty). Structural geometry checks only — no grammar change; an
@@ -214,7 +236,7 @@ export class SemanticValidator {
         // ownership/scan are the server's PHP-only AttachmentReferenceValidator, not part of this mirror.
         const mediaErrors = this.processMedia(topLevelFields, fieldRelevance, effectiveAnswers, ruleSets, fieldKeyById, input.locale, now, calculated);
 
-        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors, ...mediaErrors], effectiveAnswers, computed, repeatRelevance);
+        return new SemanticResult(fieldRelevance, sectionRelevance, [...errors, ...repeatErrors, ...compositeErrors, ...geoErrors, ...mediaErrors], effectiveAnswers, computed, repeatRelevance, gridRelevance);
     }
 
     /**
@@ -696,6 +718,7 @@ export class SemanticValidator {
         locale: string,
         now: string | null,
         calculated: Calculated,
+        gridRelevance: Record<string, GridRelevance> = {},
     ): SemanticError[] {
         const errors: SemanticError[] = [];
         const context = new EvaluationContext(this.layered(effectiveAnswers, calculated), undefined, now);
@@ -715,9 +738,11 @@ export class SemanticValidator {
                 : DEFAULT_REQUIRED_MESSAGE;
 
             const raw = effectiveAnswers[field.key];
+            const relevance: GridRelevance = { rows: {}, columns: {}, cells: {} };
             const pruned = field.field_type === 'matrix'
-                ? this.processMatrix(field, raw, required, requiredMessage, errors)
-                : this.processLikertMatrix(field, raw, required, requiredMessage, errors);
+                ? this.processMatrix(field, raw, required, requiredMessage, errors, context, relevance)
+                : this.processLikertMatrix(field, raw, required, requiredMessage, errors, context, relevance);
+            gridRelevance[field.key] = relevance;
 
             if (Object.keys(pruned).length === 0) {
                 delete effectiveAnswers[field.key];
@@ -733,13 +758,19 @@ export class SemanticValidator {
      * Likert-matrix (`{row:score}`): each declared row must carry a score drawn from the column scale.
      * Returns the pruned `{row:score}` (empty when nothing survives). `cellPath = "<rowKey>"`.
      */
-    private processLikertMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): Record<string, EngineValue> {
+    private processLikertMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[], context: EvaluationContext, relevance: GridRelevance): Record<string, EngineValue> {
         const rowKeys = this.compositeValues(field, 'rows');
         const scoreSet = new Set(this.compositeValues(field, 'columns'));
         const rawMap = this.asObjectMap(raw);
+        const rowRules = field.grid?.row_rules ?? {};
 
         const pruned: Record<string, EngineValue> = {};
         for (const rowKey of rowKeys) {
+            // M246: a row whose show-when does not hold is not asked — pruned and never required.
+            relevance.rows[rowKey] = this.evaluateRelevance(ownRule(rowRules, rowKey)?.relevant ?? null, context);
+            if (!relevance.rows[rowKey]) {
+                continue;
+            }
             const has = Object.prototype.hasOwnProperty.call(rawMap, rowKey);
             const score = (has ? rawMap[rowKey] : ABSENT) as MaybeAbsent;
             if (!has || isEmpty(score)) {
@@ -769,24 +800,52 @@ export class SemanticValidator {
      * column's own list, else from `cells`; a multiple-choice cell is a list, each element from that list; a
      * whole-number cell refuses a fraction; a text, decimal or date cell keeps its value as sent.
      */
-    private processMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[]): Record<string, Record<string, EngineValue>> {
+    private processMatrix(field: SchemaField, raw: unknown, required: boolean, requiredMessage: string, errors: SemanticError[], context: EvaluationContext, relevance: GridRelevance): Record<string, Record<string, EngineValue>> {
         const rowKeys = this.compositeValues(field, 'rows');
         const colKeys = this.compositeValues(field, 'columns');
         const cells = this.compositeValues(field, 'cells');
         const specs = this.columnSpecs(field);
         const rawMap = this.asObjectMap(raw);
+        const rowRules = field.grid?.row_rules ?? {};
+        const columnRules = field.grid?.column_specs ?? {};
+
+        // M246 (mirror of PHP `processMatrix`): a grid's own rules decide which cells are asked, over the settled
+        // context. Columns first, then each shown row's shown cells left to right, `${.col}` reading the cells kept so far.
+        for (const colKey of colKeys) {
+            relevance.columns[colKey] = this.evaluateRelevance(ruleText(ownRule(columnRules, colKey)?.relevant), context);
+        }
 
         const pruned: Record<string, Record<string, EngineValue>> = {};
         for (const rowKey of rowKeys) {
+            const rowRule = ownRule(rowRules, rowKey);
+            relevance.rows[rowKey] = this.evaluateRelevance(ruleText(rowRule?.relevant), context);
+            if (!relevance.rows[rowKey]) {
+                continue;
+            }
+            relevance.cells[rowKey] = {};
+            const notNeeded = new Set((rowRule?.not_needed ?? []).filter((column): column is string => typeof column === 'string' && column !== ''));
             const rowMap = this.asObjectMap(rawMap[rowKey]);
             const prunedRow: Record<string, EngineValue> = {};
             for (const colKey of colKeys) {
+                if (!relevance.columns[colKey]) {
+                    continue;
+                }
+                const rules = ownRule(columnRules, colKey);
+                const rowContext = new EvaluationContext(context.answers, undefined, context.now, { ...prunedRow });
+                const needed = !notNeeded.has(colKey) && this.evaluateRelevance(ruleText(rules?.needed_when), rowContext);
+                relevance.cells[rowKey][colKey] = needed;
+                if (!needed) {
+                    continue;
+                }
+
                 const spec = specs.get(colKey) ?? { type: null, options: [], required: false };
                 const path = `${rowKey}.${colKey}`;
                 const has = Object.prototype.hasOwnProperty.call(rowMap, colKey);
                 const cell = (has ? rowMap[colKey] : ABSENT) as MaybeAbsent;
                 if (!has || isEmpty(cell)) {
-                    if (required || spec.required) {
+                    const requiredWhenText = ruleText(rules?.required_when);
+                    const requiredWhen = requiredWhenText !== null && this.evaluator.evaluateBoolean(requiredWhenText, rowContext);
+                    if (required || spec.required || requiredWhen) {
                         errors.push({ fieldKey: field.key, rule: 'field_required', message: requiredMessage, sectionKey: null, instanceIndex: null, cellPath: path });
                     }
 

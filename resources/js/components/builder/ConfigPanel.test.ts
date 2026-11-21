@@ -255,6 +255,23 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
         expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual(['Basics', 'Advanced']);
     });
 
+    it('M247: ticks a section’s page wide on its Advanced tab, and unticks it back to the reading width', async () => {
+        const target = section();
+        const touched: string[] = [];
+        const wrapper = mountPanel(makeStore({ section: target, touch: (uid, kind) => touched.push(`${uid}:${kind}`) }));
+
+        await wrapper.findAll('[role="tab"]').find((tab) => tab.text() === 'Advanced')!.trigger('click');
+        const box = wrapper.find('[data-section-page-width] input[type="checkbox"]');
+        expect(box.exists()).toBe(true);
+        expect(wrapper.find('[data-section-page-width-note]').text()).toContain('Phones');
+
+        await box.setValue(true);
+        expect(target.page_width).toBe('wide');
+        await box.setValue(false);
+        expect(target.page_width).toBeNull();
+        expect(touched).toEqual(['s1:section', 's1:section']);
+    });
+
     it('renders no switcher at all when nothing is selected', () => {
         const wrapper = mountPanel(makeStore());
 

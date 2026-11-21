@@ -51,7 +51,7 @@ final class UpdateFieldRequest extends FormRequest
         $field = $this->route('field');
 
         return [
-            ...$this->configRules($field->field_type),
+            ...($this->configRules($field->field_type) + self::answerLimitRules($field->field_type)),
             // M172 (`R-733eff09`, `D132`, closing `R-4c4e35ae`): NO uniqueness rule. A key another question holds is
             // adjusted by the service (`FormBuilderService::freeKey()`, a numbered suffix), never refused — the user's
             // "auto adjust the key naming to avoid conflicts". The rule this replaced read the form's CURRENT draft, so
@@ -269,7 +269,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.prefill_source' => 'value source',
             'config.url_param' => 'URL parameter',
             'config.content' => 'content',
-        ];
+        ] + self::ANSWER_LIMIT_ATTRIBUTES;
     }
 
     /**
@@ -521,5 +521,40 @@ final class UpdateFieldRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * M243 (`R-1da063f4`): the answer limits, named as the Validation tab and the Options tab name them. Kept at the end
+     * of the class, with {@see answerLimitRules()}, so the lines the backlog cites above do not move.
+     */
+    private const ANSWER_LIMIT_ATTRIBUTES = [
+        'config.options.*.exclusive' => 'Only answer',
+        'config.min_words' => 'fewest words',
+        'config.max_words' => 'most words',
+        'config.min_choices' => 'fewest choices',
+        'config.max_choices' => 'most choices',
+    ];
+
+    /**
+     * M243 (`R-1da063f4`): a question's answer limits — word limits on the types {@see FieldType::takesWordLimits()} names,
+     * choice limits and "only answer" choices on the types {@see FieldType::takesChoiceLimits()} names. Shape only: a
+     * minimum above the maximum, or more choices asked for than the question has, is the publish gate's, so a half-typed
+     * pair never refuses the optimistic PATCH.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private static function answerLimitRules(FieldType $type): array
+    {
+        $whole = ['nullable', 'integer', 'min:1', 'max:'.FieldType::ANSWER_LIMIT_CEILING];
+
+        return match (true) {
+            $type->takesWordLimits() => ['config.min_words' => $whole, 'config.max_words' => $whole],
+            $type->takesChoiceLimits() => [
+                'config.min_choices' => $whole,
+                'config.max_choices' => $whole,
+                'config.options.*.exclusive' => ['sometimes', 'nullable', 'boolean:strict'],
+            ],
+            default => [],
+        };
     }
 }

@@ -122,6 +122,21 @@ function buildSemanticInput(array $schema, array $answers, string $locale, ?stri
         if (isset($field['visibility'])) {
             $attributes['config'] = [...($attributes['config'] ?? []), 'visibility' => $field['visibility']];
         }
+        // M243 (`R-1da063f4`): answer limits — `words`/`choices` {min, max} → config.min_words/max_words and
+        // min_choices/max_choices, and `exclusive` (a list of option values) → `exclusive: true` on those options. MERGED,
+        // like visibility, so a vector pairs them with `options`. The TS mirror maps the same fragments to SchemaField.
+        if (isset($field['words'])) {
+            $attributes['config'] = [...($attributes['config'] ?? []), 'min_words' => $field['words']['min'] ?? null, 'max_words' => $field['words']['max'] ?? null];
+        }
+        if (isset($field['choices'])) {
+            $attributes['config'] = [...($attributes['config'] ?? []), 'min_choices' => $field['choices']['min'] ?? null, 'max_choices' => $field['choices']['max'] ?? null];
+        }
+        if (isset($field['exclusive'])) {
+            $attributes['config']['options'] = array_map(
+                static fn (array $option): array => in_array($option['value'], $field['exclusive'], true) ? [...$option, 'exclusive' => true] : $option,
+                $attributes['config']['options'] ?? [],
+            );
+        }
         $fields[] = makeSchemaField($attributes);
 
         foreach (($field['rules'] ?? []) as $ruleIndex => $rule) {

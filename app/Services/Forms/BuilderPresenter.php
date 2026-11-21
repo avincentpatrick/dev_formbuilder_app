@@ -407,6 +407,10 @@ final class BuilderPresenter
                 'orders_with' => array_map(static fn (OperandKind $other): string => $other->value, $kind->ordersWith()),
                 'literal_input' => $kind->literalInput(),
             ], OperandKind::cases()),
+            // M243 (`R-1da063f4`): the types whose Validation tab offers a word limit, and a choice limit with "only answer"
+            // choices on the Options tab — from `FieldType`'s own questions, never listed in the client.
+            'word_limit_types' => array_values(array_map(static fn (FieldType $type): string => $type->value, array_filter(FieldType::cases(), static fn (FieldType $type): bool => $type->takesWordLimits()))),
+            'choice_limit_types' => array_values(array_map(static fn (FieldType $type): string => $type->value, array_filter(FieldType::cases(), static fn (FieldType $type): bool => $type->takesChoiceLimits()))),
         ];
     }
 

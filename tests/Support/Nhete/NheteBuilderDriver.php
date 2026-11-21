@@ -258,8 +258,8 @@ final class NheteBuilderDriver
             'is_required' => $converted->json('is_required'),
             'relevant_expression' => $converted->json('relevant_expression'),
             'appearance' => null,
-            'config' => $converted->json('config') ?? [],
-            'validations' => $this->rules(['max_words' => $e['other_words'], 'max_choices' => null, 'exclusive' => null, 'required_when' => []], []),
+            'config' => [...($converted->json('config') ?? []), 'max_words' => $e['other_words']],
+            'validations' => [],
             'version' => $converted->json('version'),
         ], 'cap '.$child['key']);
         $this->fieldIds[(string) $child['key']] = (string) $child['id'];
@@ -271,9 +271,11 @@ final class NheteBuilderDriver
      */
     private function payload(array $e, string $version): array
     {
-        $config = [];
+        // M243: the word cap, "up to two" and "No view or opinion stands alone" are the question's own settings — the
+        // Validation tab's Words and Choices, and the Options tab's Only answer — not hand-written rules.
+        $config = array_filter(['max_words' => $e['max_words'], 'max_choices' => $e['max_choices']], static fn (mixed $v): bool => $v !== null);
         if ($e['options'] !== []) {
-            $config['options'] = array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1]], $e['options']);
+            $config['options'] = array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1]] + ($o[0] === $e['exclusive'] ? ['exclusive' => true] : []), $e['options']);
         }
         if ($e['type'] === 'note') {
             $config['content'] = $e['content'] === null ? [] : $this->withImages($e['content']);
@@ -298,7 +300,8 @@ final class NheteBuilderDriver
     }
 
     /**
-     * The answer rules a person sets in the Validation pane.
+     * The rules a person sets in the Validation pane. Since M243 that is only "Required when…": the word cap, "up to two"
+     * and the only answer are settings ({@see payload()}).
      *
      * @param  array<string, mixed>  $e
      * @param  array<string, string>  $ids
@@ -307,17 +310,6 @@ final class NheteBuilderDriver
     public function rules(array $e, array $ids): array
     {
         $rules = [];
-        if ($e['max_words'] !== null) {
-            $rules[] = self::rule(['rule_type' => 'pattern', 'rule_value' => self::wordCapPattern((int) $e['max_words']),
-                'error_message' => 'Please keep this to '.number_format((int) $e['max_words']).' words or fewer.']);
-        }
-        if ($e['max_choices'] !== null) {
-            $rules[] = self::rule(['expression' => "count(.) <= {$e['max_choices']}", 'error_message' => "You can choose up to {$e['max_choices']}."]);
-        }
-        if ($e['exclusive'] !== null) {
-            $rules[] = self::rule(['expression' => "not(selected(., '{$e['exclusive']}')) or count(.) = 1",
-                'error_message' => 'No view or opinion cannot be combined with another answer.']);
-        }
         foreach ($e['required_when'] as $n => [$relatedKey, $value]) {
             $rules[] = self::rule([
                 'rule_type' => 'required_if', 'operator' => 'eq', 'rule_value' => $value, 'related_field_key' => $relatedKey,
@@ -330,7 +322,10 @@ final class NheteBuilderDriver
         return $rules;
     }
 
-    /** A whole-answer pattern that admits at most `$max` words (the pattern rule is anchored, Unicode-aware). */
+    /**
+     * A whole-answer pattern that admits at most `$max` words — what a Kobo author writes inside `regex()`
+     * ({@see NheteWorkbook}). This product's own word cap is a setting since M243.
+     */
     public static function wordCapPattern(int $max): string
     {
         return '\s*(?:\S+(?:\s+\S+){0,'.($max - 1).'})?\s*';

@@ -10,7 +10,8 @@ import { showBuilderPane } from './support/navigate';
  * for ONE indicator block, the unit the module repeats 35 times (`NhetePlan`'s `indicator-block` workaround):
  *   - a note carrying the indicator's details as content blocks (a heading and a paragraph);
  *   - four dropdowns — "keep" with three typed choices, and three more (Yes and No);
- *   - a comment shown when "keep" is "change" (the condition editor), and required then too ("Required when…").
+ *   - a comment shown when "keep" is "change" (the condition editor), and required then too ("Required when…"), with the
+ *     module's 1,500-word cap set as the Validation tab's Words (M243), whose count the preview shows.
  * Then the preview proves the rules work: the comment appears only on "change", marked required. A reload keeps it all.
  *
  * `M240` (`builder-copy-section`, `D224`, `D225`) then copies the block the two ways NHETE's other 34 would be made: its
@@ -125,6 +126,10 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await page.getByLabel('Rule 1 operator').selectOption('eq');
         await page.getByLabel('Rule 1 value').fill('change');
         await settled(page);
+        // M243: the module's 1,500-word cap is the Validation tab's Words pair, not a hand-written pattern.
+        await configTab(page, 'Validation');
+        await page.locator('[data-answer-limits="words"] [data-answer-limit="max"]').fill('1500');
+        await settled(page);
 
         // The preview: the comment is not on the page until "change" is picked, and then it is required.
         await openPreview(page);
@@ -136,6 +141,8 @@ test('Builder — one NHETE indicator block clicked into being: note content, fo
         await keep.selectOption('change');
         await expect(comment.locator('textarea')).toBeVisible();
         await expect(comment).toContainText('(required)');
+        await comment.locator('textarea').fill('three short words');
+        await expect(comment.locator('[data-word-count]'), 'the word cap shows its count').toHaveText('3 of 1,500 words');
         await keep.selectOption('yes');
         await expect(comment.locator('textarea')).toHaveCount(0);
 

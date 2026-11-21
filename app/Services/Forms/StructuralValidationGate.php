@@ -179,6 +179,11 @@ final class StructuralValidationGate
                 }
                 $violations[] = $this->capture(fn () => $this->assertMediaConfigResolves($field));
             }
+            // M243 (`R-1da063f4`): answer limits no answer could meet, read through `FormField::answerLimits()` (the engines'
+            // whole-number rule) with no new import — an ADR cites this file's lines, and a `use` line would move them.
+            if ($field->field_type->takesWordLimits() || $field->field_type->takesChoiceLimits()) {
+                $violations[] = $this->capture(fn () => $this->assertAnswerLimitsResolve($field));
+            }
             // Increment H7: a hidden field is the one type the respondent can neither see nor repair, so it
             // must be incapable of producing an error; and neither prefill source can address one instance
             // of a repeat, so it may not sit in a repeatable section.
@@ -648,6 +653,38 @@ final class StructuralValidationGate
                     'block '.($index + 1).'’s image is missing, belongs to another form, or failed its virus check — upload it again',
                 );
             }
+        }
+    }
+
+    /**
+     * M243 (`R-1da063f4`): a question's answer limits must be meetable. A minimum above its maximum, for words or for
+     * choices, refuses every answer; and a multi-select cannot ask for more choices than it has choices that can be
+     * chosen together (its "only answer" choices stand alone, and a single one always meets the minimum). Choices that
+     * come from another form or a list file are counted only when the respondent sees them, so they are not judged here.
+     */
+    private function assertAnswerLimitsResolve(FormField $field): void
+    {
+        $limits = $field->answerLimits();
+        if ($limits === null) {
+            return;
+        }
+
+        foreach (['words' => $limits['words'], 'choices' => $limits['choices']] as $noun => $pair) {
+            if ($pair !== null && $pair['min'] !== null && $pair['max'] !== null && $pair['min'] > $pair['max']) {
+                throw PublishValidationException::answerLimitsInvalid($field->key, "at least {$pair['min']} {$noun} is more than at most {$pair['max']}");
+            }
+        }
+
+        $min = $limits['choices']['min'] ?? null;
+        $config = $field->config;
+        $typed = ($config['options_source'] ?? null) === null && ($config['options_list'] ?? null) === null;
+        if ($min === null || ! $typed || ! is_array($config['options'] ?? null)) {
+            return;
+        }
+
+        $together = count(array_filter($config['options'], static fn (mixed $option): bool => is_array($option) && ($option['exclusive'] ?? null) !== true));
+        if ($min > max(1, $together)) {
+            throw PublishValidationException::answerLimitsInvalid($field->key, "it asks for at least {$min} choices and has {$together} that can be chosen together");
         }
     }
 }

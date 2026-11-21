@@ -331,3 +331,97 @@ describe('FieldInput — a Signature is signed on a pad (M187, R-af2d278b)', () 
         expect(wrapper.text()).toContain('signature.png');
     });
 });
+
+/**
+ * M243 (`R-1da063f4`) — the answer limits on the one control every channel shares: a word count tied to the box, a
+ * multi-select that cannot take one choice too many, and an only answer that clears and locks the rest.
+ */
+describe('FieldInput — answer limits (M243)', () => {
+    function textField(fieldType: 'short_text' | 'long_text', max: number): EncodeField {
+        return {
+            key: 'why',
+            field_type: fieldType,
+            label: 'Why?',
+            hint: null,
+            placeholder: null,
+            required: false,
+            options: [],
+            limits: { words: { min: null, max }, choices: null, exclusive: [] },
+            supported: true,
+        };
+    }
+
+    function pickField(max: number | null): EncodeField {
+        return {
+            key: 'pick',
+            field_type: 'multi_select',
+            label: 'Pick',
+            hint: null,
+            placeholder: null,
+            required: false,
+            options: [
+                { value: 'a', label: 'A' },
+                { value: 'b', label: 'B' },
+                { value: 'c', label: 'C' },
+                { value: 'noview', label: 'No view or opinion' },
+            ],
+            limits: { words: null, choices: { min: null, max }, exclusive: ['noview'] },
+            supported: true,
+        };
+    }
+
+    function disabledBoxes(wrapper: ReturnType<typeof mount>): boolean[] {
+        return wrapper.findAll('input[type="checkbox"]').map((input) => (input.element as HTMLInputElement).disabled);
+    }
+
+    it.each(['short_text', 'long_text'] as const)('counts the words of a %s and ties the count to the box', (fieldType) => {
+        const wrapper = mount(FieldInput, { props: { field: textField(fieldType, 5), modelValue: 'one two three' } });
+        const count = wrapper.get('[data-word-count]');
+        const input = wrapper.get(fieldType === 'long_text' ? 'textarea' : 'input');
+
+        expect(count.text()).toBe('3 of 5 words');
+        expect(input.attributes('aria-describedby')?.split(' ')).toContain(count.attributes('id'));
+    });
+
+    it('says how many too many once over, and never cuts the text', () => {
+        const wrapper = mount(FieldInput, { props: { field: textField('long_text', 2), modelValue: 'one two three four' } });
+
+        expect(wrapper.get('[data-word-count]').text()).toBe('4 of 2 words: 2 too many');
+        expect(wrapper.get('[data-word-count]').classes()).toContain('encode-field__count--over');
+        expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('one two three four');
+    });
+
+    it('shows no count on a question with no word limit', () => {
+        const field = { ...textField('long_text', 2), limits: null };
+        const wrapper = mount(FieldInput, { props: { field, modelValue: 'one two three' } });
+
+        expect(wrapper.find('[data-word-count]').exists()).toBe(false);
+    });
+
+    it('locks the unticked boxes once the most are ticked, and never the only answer', () => {
+        const wrapper = mount(FieldInput, { props: { field: pickField(2), modelValue: ['a', 'b'] } });
+
+        expect(disabledBoxes(wrapper)).toEqual([false, false, true, false]);
+        expect(wrapper.text()).toContain('2 of 2 chosen. Untick one to choose another.');
+    });
+
+    it('clears every other choice when the only answer is ticked, then locks them', async () => {
+        const wrapper = mount(FieldInput, { props: { field: pickField(null), modelValue: ['a', 'b'] } });
+
+        await wrapper.findAll('input[type="checkbox"]')[3].setValue(true);
+        expect(wrapper.emitted('update:modelValue')).toEqual([[['noview']]]);
+
+        await wrapper.setProps({ modelValue: ['noview'] });
+        expect(disabledBoxes(wrapper)).toEqual([true, true, true, false]);
+        expect(wrapper.text()).toContain('“No view or opinion” is chosen on its own. Untick it to choose others.');
+    });
+
+    it('shows a saved answer that breaks a limit as it is, and lets a box be taken back', () => {
+        const wrapper = mount(FieldInput, { props: { field: pickField(1), modelValue: ['a', 'b'] } });
+        const checked = wrapper.findAll('input[type="checkbox"]').map((input) => (input.element as HTMLInputElement).checked);
+
+        expect(checked).toEqual([true, true, false, false]);
+        expect(disabledBoxes(wrapper)).toEqual([false, false, true, false]);
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    });
+});

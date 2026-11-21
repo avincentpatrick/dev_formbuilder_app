@@ -143,6 +143,8 @@ const CATEGORIES = 'app/Enums/FieldCategory.php';
 const PRESENTER = 'app/Services/Forms/BuilderPresenter.php';
 const CHOICES = 'resources/js/components/builder/ChoicesEditor.vue';
 const VALIDATION = 'resources/js/components/builder/ValidationEditor.vue';
+// M243: a question's word and choice limits, at the top of its Validation tab.
+const ANSWER_LIMITS = 'resources/js/components/builder/AnswerLimitsEditor.vue';
 const CONDITIONS = 'resources/js/components/builder/ConditionRows.vue';
 const PREVIEW = 'resources/js/components/builder/PreviewPane.vue';
 // M185: a grid edited where the Preview draws it, and a repeatable section's layout.
@@ -858,6 +860,11 @@ const reference: ChapterDraft[] = [
                 title: 'Validation',
                 blocks: [
                     p('Rules stop a wrong answer before the form is sent. Click ', ui('Add rule', VALIDATION), ', choose the kind of rule, fill in its value, and write the message respondents see when it fails in “', ui('Error message shown to the respondent', VALIDATION), '”.'),
+                    p(
+                        'Above the rules, a ', ui('Short text', FIELD_TYPES), ' or ', ui('Long text', FIELD_TYPES), ' question has ', ui('Words', ANSWER_LIMITS), ' — ', ui('At least', ANSWER_LIMITS), ' and ',
+                        ui('At most', ANSWER_LIMITS), ' — and people see a count of their words as they type. A ', ui('Multiple choice', FIELD_TYPES), ' question has ', ui('Choices', ANSWER_LIMITS),
+                        ' instead: once the most are ticked, the other boxes cannot be ticked. Leave a box empty for no limit.',
+                    ),
                     p('The kinds of rule, and the questions they suit:'),
                     list(
                         [ui('Minimum value', RULE_TYPES), ' and ', ui('Maximum value', RULE_TYPES), ' — numbers and ', ui('Likert scale', FIELD_TYPES), '. For example, an age from 0 to 120. For a number, set the rule to “', ui('Another question’s answer', VALIDATION), '” to use an answer instead of a fixed number — for example, “days off” at most “days worked”.'],
@@ -954,6 +961,7 @@ const reference: ChapterDraft[] = [
                     list(
                         ['Tabs: ', ui('Basics', CONFIG), ', ', ui('Validation', CONFIG), ', ', ui('Advanced', CONFIG), '.'],
                         ['Useful rules: ', ui('Minimum length', RULE_TYPES), ', ', ui('Maximum length', RULE_TYPES), ', ', ui('Must match a pattern', RULE_TYPES), '.'],
+                        ['A word limit: ', ui('Words', ANSWER_LIMITS), ' at the top of ', ui('Validation', CONFIG), '. People see a count of their words as they type.'],
                     ),
                     p(
                         'A Short text can suggest answers as people type: on ', ui('Basics', CONFIG), ', under ', ui('Suggestions come from', SUGGESTIONS), ', pick ',
@@ -1087,6 +1095,10 @@ const reference: ChapterDraft[] = [
                     p(
                         'Tick boxes; the respondent ticks every choice that applies. Its ', ui('Options', CONFIG), ' tab works like ', link('Single choice', '#type-single-choice'),
                         ', including ', ui('Choice layout', CONFIG), ' and where its choices come from: typed here, a list file, or another form’s answers. In a condition, check it with ', ui('includes', CONDITION_ROW), ' or ', ui('does not include', CONDITION_ROW), '.',
+                    ),
+                    p(
+                        ui('Choices', ANSWER_LIMITS), ' at the top of its ', ui('Validation', CONFIG), ' tab sets how many may be ticked: once the most are ticked, the other boxes cannot be ticked. On its ',
+                        ui('Options', CONFIG), ' tab, tick ', ui('Only answer', CHOICES), ' beside a choice such as “None of these”: ticking it clears and locks every other box.',
                     ),
                 ],
             },

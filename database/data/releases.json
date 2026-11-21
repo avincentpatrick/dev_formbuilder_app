@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.22.0",
+        "title": "Word limits, \"choose up to\", and a choice that stands alone",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Word limits: on a Short text or Long text question, open the Validation tab and set Words, at least and at most. People see a count of their words under the box as they type, and an answer that is too long says by how many words."
+            },
+            {
+                "kind": "new",
+                "text": "Choose up to a number: on a Multiple choice question, set Choices on the Validation tab. Once the most are ticked, the other boxes cannot be ticked until one is unticked. You can also set the fewest choices."
+            },
+            {
+                "kind": "new",
+                "text": "A choice that stands alone: on a Multiple choice question's Options tab, tick Only answer beside a choice such as \"None of these\" or \"No view or opinion\". Ticking it clears the other boxes and locks them until it is unticked."
+            },
+            {
+                "kind": "improved",
+                "text": "These settings are kept when a form is exported to an XLSForm file and imported again."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

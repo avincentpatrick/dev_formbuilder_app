@@ -881,7 +881,7 @@ const reference: ChapterDraft[] = [
                 title: 'Advanced',
                 blocks: [
                     list(
-                        [ui('Field key', CONFIG), ' — the question’s short name, used in exports, formulas and conditions. Lowercase and unique in the form: if another question already uses the key you type, the builder says so and saves the next free one (for example age_2).'],
+                        [ui('Field key', CONFIG), ' — the question’s short name, used in exports, formulas and conditions. Lowercase and unique in the form: if another question or section already uses the key you type, the builder says so and saves the next free one (for example age_2). Change a key and every condition, formula and piped label that uses it changes with it; the panel says how many did. The thank-you message changes too until the form is first published; after that, change it yourself just before you publish.'],
                         [ui('Section', CONFIG), ' — move the question into a section, or to ', ui('No section (top level)', CONFIG), '.'],
                         [
                             '“', ui('Show this question only when…', CONFIG), '” — ask the question only when earlier answers make it relevant. Click ', ui('Add condition', CONDITIONS),

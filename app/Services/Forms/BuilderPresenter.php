@@ -240,6 +240,31 @@ final class BuilderPresenter
     }
 
     /**
+     * M242 (`R-ade0b598`) — what a rename carried, for the builder to adopt without asking again: every rewritten question
+     * and section as the builder holds a row (each with its new token, so the author's next save of it is not refused as
+     * a conflict), the texts that named the old key but could not be read, and the thank-you message's outcome (`D227`).
+     * The id ⇒ key lookup is read after the rename, so a rule comparing with the renamed question names its new key.
+     *
+     * @return array{from: string, to: string, fields: list<array<string, mixed>>, sections: list<array<string, mixed>>, unread: list<array{kind: 'field'|'section', id: string, label: string, column: string}>, confirmation: ?string}
+     */
+    public function carried(CarriedReferences $carried): array
+    {
+        $fieldIds = array_map(static fn (FormField $field): string => $field->id, $carried->fields);
+        $keyById = $carried->fields === [] ? new Collection : FormField::query()->where('form_version_id', $carried->fields[0]->form_version_id)->pluck('key', 'id');
+        /** @var Collection<string, Collection<int, FormFieldValidation>> $rules */
+        $rules = FormFieldValidation::query()->whereIn('form_field_id', $fieldIds)->orderBy('sequence')->get()->groupBy('form_field_id');
+
+        return [
+            'from' => $carried->from,
+            'to' => $carried->to,
+            'fields' => array_map(fn (FormField $field): array => $this->field($field, $rules->get($field->id) ?? new Collection, $keyById), $carried->fields),
+            'sections' => array_map(fn (FormSection $section): array => $this->section($section), $carried->sections),
+            'unread' => $carried->unread,
+            'confirmation' => $carried->confirmation,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function section(FormSection $section): array

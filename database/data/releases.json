@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.21.1",
+        "title": "Changing a data name no longer breaks what uses it",
+        "items": [
+            {
+                "kind": "fixed",
+                "text": "Changing a question's data name (Field key, on the Advanced tab) now changes it everywhere the form uses it: conditions, calculations, default values, custom rules and answers shown in labels, hints and placeholders. Before, each of those kept the old name and the form would not publish until you fixed them one by one. The same goes for a section's key."
+            },
+            {
+                "kind": "improved",
+                "text": "Under the Field key, the builder now says how many other questions followed the new name, and names any condition or formula it could not read, so you know what to check. Undo puts everything back."
+            },
+            {
+                "kind": "improved",
+                "text": "The thank-you message follows a new data name too, until the form is first published. After that it is shared with the live form, so the builder tells you to change it yourself just before you publish."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

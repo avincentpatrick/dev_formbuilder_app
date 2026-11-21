@@ -97,8 +97,11 @@ final class NheteBuilderDriver
      * else — choices, required flags, the "Required when…" rules, the formula, the piped placeholder — is the COPY's, so a
      * link the copy failed to re-point arrives at the end still naming the source block, and the equivalence case sees it.
      *
-     * Until `R-ade0b598` (`D226`), renaming a key does not carry into text that names it, so the two text references are
-     * renamed here the way a person would retype them: the copy's own text, its counted-up keys swapped for the new ones.
+     * Since `M242` (`R-ade0b598`) a rename carries every text that names the key — the `_ph` formula, the comment's piped
+     * placeholder — so nothing is retyped here: each save sends the copy's text as the server last returned it. That is
+     * the carry's end-to-end proof, because a reference it missed arrives at the end still naming a counted-up key. The
+     * rows a rename rewrote come back in its reply with new tokens, and the next save of each sends that token. A rule
+     * comparing with a renamed sibling is stored by id; its key is re-pointed here as the builder's `repointRules()` does.
      *
      * @param  list<array{key: string, id: string}>  $source
      * @param  list<array<string, mixed>>  $block
@@ -119,25 +122,28 @@ final class NheteBuilderDriver
 
         $this->toSectionEnd($made->json('order'), array_map(static fn (array $c): string => (string) $c['field']['id'], $copies));
 
+        /** @var array<string, array<string, mixed>> $rows each copy as the server last returned it, by id */
+        $rows = [];
+        foreach ($copies as $copy) {
+            $rows[(string) $copy['field']['id']] = $copy['field'];
+        }
+
         $out = [];
         foreach ($copies as $n => $copy) {
-            $row = $copy['field'];
+            $row = $rows[(string) $copy['field']['id']];
             $e = $block[$n];
             $config = (array) $row['config'];
             if ($e['type'] === 'note') {
                 $config['content'] = $e['content'] === null ? [] : $this->withImages($e['content']);
             }
-            if (isset($config['calculated_formula'])) {
-                $config['calculated_formula'] = self::rekey((string) $config['calculated_formula'], $map);
-            }
 
-            $this->send('patch', "fields/{$row['id']}", [
+            $saved = $this->send('patch', "fields/{$row['id']}", [
                 'key' => $e['key'],
                 'label' => $e['label'],
                 'hint' => $e['hint'],
-                'placeholder' => $row['placeholder'] === null ? null : self::rekey((string) $row['placeholder'], $map),
+                'placeholder' => $row['placeholder'],
                 'is_required' => $row['is_required'],
-                'relevant_expression' => $row['relevant_expression'] === null ? null : self::rekey((string) $row['relevant_expression'], $map),
+                'relevant_expression' => $row['relevant_expression'],
                 'appearance' => $row['appearance'],
                 'config' => $config,
                 // As the builder's `repointRules()` does on a rename: a rule naming a renamed sibling names its new key.
@@ -149,6 +155,15 @@ final class NheteBuilderDriver
                 ], $row['validations']),
                 'version' => $row['version'],
             ], 'rename '.$e['key']);
+
+            // The rows this rename rewrote, each with its new token — the next save of each sends them.
+            /** @var list<array<string, mixed>> $carried */
+            $carried = $saved->json('carried.fields') ?? [];
+            foreach ($carried as $rewritten) {
+                if (isset($rows[(string) $rewritten['id']])) {
+                    $rows[(string) $rewritten['id']] = $rewritten;
+                }
+            }
 
             $this->fieldIds[(string) $e['key']] = (string) $row['id'];
             $out[] = ['key' => (string) $e['key'], 'id' => (string) $row['id']];
@@ -183,17 +198,6 @@ final class NheteBuilderDriver
                 'id' => $f['id'], 'form_section_id' => $f['form_section_id'], 'sequence' => $i, 'section_sequence' => null,
             ], [...$rest, ...$moved], array_keys([...$rest, ...$moved])),
         ], 'move the copies to the end');
-    }
-
-    /**
-     * @param  array<string, string>  $map
-     */
-    private static function rekey(string $text, array $map): string
-    {
-        return strtr($text, array_combine(
-            array_map(static fn (string $k): string => '${'.$k.'}', array_keys($map)),
-            array_map(static fn (string $k): string => '${'.$k.'}', array_values($map)),
-        ));
     }
 
     /** @param  array{key: string, label: string, relevant: ?string}  $section */

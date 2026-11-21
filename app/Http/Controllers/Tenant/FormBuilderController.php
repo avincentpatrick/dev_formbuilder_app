@@ -20,6 +20,7 @@ use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\User;
 use App\Services\Forms\BuilderPresenter;
+use App\Services\Forms\CarriedReferences;
 use App\Services\Forms\FieldHistoryPresenter;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\StepGraphInspector;
@@ -73,11 +74,20 @@ final class FormBuilderController extends Controller
         return $this->respond(fn (): array => $this->presenter->section($this->builder->addSection($form)));
     }
 
+    /** M242 (`R-ade0b598`): a rename's reply also carries every row it rewrote, under `carried` ({@see withCarried()}). */
     public function updateSection(UpdateSectionRequest $request, Form $form, FormSection $section): JsonResponse
     {
-        return $this->respond(fn (): array => $this->presenter->section(
-            $this->builder->updateSection($form, $section, $request->validated(), $request->string('version')->toString()),
-        ));
+        return $this->respond(function () use ($request, $form, $section): array {
+            [$written, $carried] = $this->builder->updateSectionCarrying(
+                $form,
+                $section,
+                $request->validated(),
+                $request->string('version')->toString(),
+                $this->actor($request),
+            );
+
+            return $this->withCarried($this->presenter->section($written), $carried);
+        });
     }
 
     public function destroySection(Request $request, Form $form, FormSection $section): JsonResponse
@@ -125,13 +135,30 @@ final class FormBuilderController extends Controller
      */
     public function updateField(UpdateFieldRequest $request, Form $form, FormField $field): JsonResponse
     {
-        return $this->respond(fn (): array => $this->presenter->field($this->builder->updateField(
-            $form,
-            $field,
-            $this->actor($request),
-            $request->payload(),
-            $request->string('version')->toString(),
-        )));
+        return $this->respond(function () use ($request, $form, $field): array {
+            [$written, $carried] = $this->builder->updateFieldCarrying(
+                $form,
+                $field,
+                $this->actor($request),
+                $request->payload(),
+                $request->string('version')->toString(),
+            );
+
+            return $this->withCarried($this->presenter->field($written), $carried);
+        });
+    }
+
+    /**
+     * M242 (`R-ade0b598`) — the row a save wrote, and, after a rename, `carried`: every other question and section the
+     * rename rewrote (each with its new token), what it could not read, and the thank-you message's outcome. Absent
+     * when the key did not change, so every other reply keeps its shape.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function withCarried(array $row, ?CarriedReferences $carried): array
+    {
+        return $carried === null ? $row : [...$row, 'carried' => $this->presenter->carried($carried)];
     }
 
     public function destroyField(Form $form, FormField $field): JsonResponse

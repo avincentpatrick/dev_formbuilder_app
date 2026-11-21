@@ -13,7 +13,6 @@ import { computed, reactive, ref, type Ref } from 'vue';
 import { builderFor, BuilderRequestError, DraftSupersededError, type BuilderResult, type SupersedingDraft } from './builderClient';
 import { editJournal } from './edit-journal';
 import { canonical } from './row-compare';
-import { otherSpecifyCondition } from './other-specify';
 import type {
     BuilderPageProps,
     CanvasGroup,
@@ -67,6 +66,37 @@ interface CopyMade {
     copyUids: Uid[];
 }
 
+/** M242 (`R-ade0b598`) — a text that named a renamed key but could not be read, so the server left it as written. */
+export interface CarryUnread {
+    kind: 'field' | 'section';
+    id: string;
+    label: string;
+    column: string;
+}
+
+/**
+ * M242 — what a rename's reply carries beside the saved row: every row of the draft whose text named the old key and now
+ * names the new one, each with its new token; what could not be read; and the thank-you message's outcome (`D227`).
+ */
+interface CarriedReply {
+    from: string;
+    to: string;
+    fields: ServerField[];
+    sections: ServerSection[];
+    unread: CarryUnread[];
+    confirmation: 'carried' | 'left' | null;
+}
+
+/** M242 — what the panel says under the key after a rename carried its references: how many OTHER rows followed. */
+export interface CarryNotice {
+    from: string;
+    to: string;
+    fields: number;
+    sections: number;
+    unread: CarryUnread[];
+    confirmation: 'carried' | 'left' | null;
+}
+
 export interface ConflictState {
     kind: 'field' | 'section';
     uid: Uid;
@@ -96,6 +126,14 @@ export function useBuilderStore(props: BuilderPageProps) {
     const superseded = ref<{ draft: SupersedingDraft | null } | null>(null);
     // M172 (`R-733eff09`, `D132`): the key a save asked for and the one the server kept instead, per row, while they differ.
     const keyNotices = ref<Record<Uid, { wanted: string; kept: string }>>({});
+    // M242 (`R-ade0b598`): after a rename, what it carried into the rest of the draft, per renamed row, until its next save.
+    const carryNotices = ref<Record<Uid, CarryNotice>>({});
+    // M242: the server's copy of a saved row whose OWN text the rename rewrote (`${age} > 0` on `age`), for the commit or
+    // replay that sent it to take as what the server holds. Consumed by that caller; cleared at every send.
+    const ownCarried = new Map<Uid, FieldSnapshot | SectionSnapshot>();
+    // M242 (`D227`): bumped when a rename rewrote the thank-you message, so the page reloads the settings it holds — a
+    // later save of the message from a stale copy would otherwise put the old key back.
+    const confirmationCarried = ref(0);
     // M176 (`R-c4802b60`): every payload this page sent for a row since the server last confirmed one — so a 409 whose
     // `current` is one of them is read as THIS page's own landed write (its reply lost), never as someone else's.
     // In memory, not the journal: the journal's storage can be refused, and this is about the page's own requests.
@@ -226,6 +264,8 @@ export function useBuilderStore(props: BuilderPageProps) {
     const saving = computed(() => save.inFlight > 0);
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
+    // M242: what the next undo reverses, read-only ("Edit Age and 3 that named its key"); nothing on screen reads it yet.
+    const undoLabel = computed(() => undoStack.value[undoStack.value.length - 1]?.label ?? null);
 
     /** The canvas model: the implicit ungrouped bucket first, then sections in order, each with its fields. */
     const groups = computed<CanvasGroup[]>(() => {
@@ -345,6 +385,8 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function persistField(uid: Uid, resent = false): Promise<boolean> {
         const field = findField(uid);
         if (!field) return false;
+        ownCarried.delete(uid);
+        const sentSnapshot = fieldSnapshot(field); // M242: what the row held when sent, for a carried own text to replace
         const sent = fieldPayload(field);
         const earlier = noteSent(uid, sent);
         // M176 (`R-5554c526`): which editor row each sent rule is, so a refusal of `validations.N` names the row on screen.
@@ -353,7 +395,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         // which every comparison below reads.
         const putBackOf = putBacks.get(uid);
         const body = putBackOf === undefined ? sent : { ...sent, put_back_of: putBackOf };
-        const result = await guard(() => client.patch<ServerField>(`${base}/fields/${field.id}`, body), { uid });
+        const result = await guard(() => client.patch<ServerField & { carried?: CarriedReply }>(`${base}/fields/${field.id}`, body), { uid });
         if (!result) return false;
         // M170 — a 409 whose question already holds exactly this edit is not a conflict. It is how the put-back after a
         // refresh meets the save sent as the page went, when that save landed after the server rendered the reload: the
@@ -381,6 +423,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         sentSinceHeld.delete(uid);
         delete save.fieldErrors[uid]; // the server holds this field now: its marks are answered
         adoptKeptKey(uid, field, String(sent.key), result.data.key);
+        takeCarried(uid, sentSnapshot, result.data.carried);
         return true;
     }
 
@@ -399,36 +442,83 @@ export function useBuilderStore(props: BuilderPageProps) {
         const previous = (baselines.get(uid) as { key?: string } | undefined)?.key;
         if ('validations' in row && previous !== undefined && previous !== keptKey) {
             repointRules(uid, previous, keptKey);
-            repointOtherPair(row, previous, keptKey);
         }
     }
 
     /**
-     * M177 (`R-71509975`) — a key renamed on either side of an "Other, please specify" pair keeps the pair linked. Unlike a
-     * rule's comparison (stored by id), both halves are TEXT the server holds as sent, so the other row is changed AND
-     * saved: the Please specify condition names the choice question's new key (only while it is still the condition the
-     * switch wrote), and the choice question's link names the Please specify question's new key.
+     * M242 (`R-ade0b598`) — a rename's reply carries every row whose TEXT named the old key, rewritten by the server: a
+     * condition, a formula, a piped label, a custom rule, the "Other, please specify" pair (M177's `repointOtherPair()`,
+     * which re-saved the partner from here, is gone: the server's carry covers both halves, and that re-save would now
+     * meet a token the carry moved). Each row is taken in place, token and all, so the author's next save of it is not a
+     * conflict. A row the author has typed into since its last save keeps every setting they changed and takes the rest.
+     * The saved row's own carried text is kept for the commit that sent it (`ownCarried`).
      */
-    function repointOtherPair(row: LocalField, oldKey: string, newKey: string): void {
-        const childKey = row.config.other_specify_key;
-        const child = typeof childKey === 'string' ? fields.value.find((field) => field.key === childKey) : undefined;
-        if (child && child.relevant_expression === otherSpecifyCondition(oldKey)) {
-            child.relevant_expression = otherSpecifyCondition(newKey);
-            resave(child.uid);
+    function takeCarried(uid: Uid, sentSnapshot: FieldSnapshot | SectionSnapshot, carried: CarriedReply | undefined): void {
+        if (carried === undefined) {
+            delete carryNotices.value[uid];
+            return;
         }
-        const parent = fields.value.find((field) => field.uid !== row.uid && field.config.other_specify_key === oldKey);
-        if (parent) {
-            parent.config = { ...parent.config, other_specify_key: newKey };
-            resave(parent.uid);
+        let others = { fields: 0, sections: 0 };
+        for (const row of carried.fields) {
+            const local = fields.value.find((f) => f.id === row.id);
+            if (!local) continue;
+            if (local.uid === uid) {
+                ownCarried.set(uid, takeOwnText(local, sentSnapshot, fieldSnapshot({ ...clone(row), uid } as LocalField)));
+                continue;
+            }
+            takeCarriedRow(local, row, 'field');
+            others = { ...others, fields: others.fields + 1 };
         }
+        for (const row of carried.sections) {
+            const local = sections.value.find((s) => s.id === row.id);
+            if (!local) continue;
+            if (local.uid === uid) {
+                ownCarried.set(uid, takeOwnText(local, sentSnapshot, sectionSnapshot({ ...clone(row), uid } as LocalSection)));
+                continue;
+            }
+            takeCarriedRow(local, row, 'section');
+            others = { ...others, sections: others.sections + 1 };
+        }
+        carryNotices.value[uid] = { from: carried.from, to: carried.to, ...others, unread: carried.unread, confirmation: carried.confirmation };
+        if (carried.confirmation === 'carried') confirmationCarried.value++;
     }
 
-    /** Save a row the store changed on the author's behalf — after the save in flight, never as an undo step of its own. */
-    function resave(uid: Uid): void {
-        void enqueue(async () => {
-            const row = findField(uid);
-            if (row && (await persistField(uid))) baselines.set(uid, fieldSnapshot(row));
-        });
+    /** M242 — one OTHER row a rename rewrote: taken whole, or setting by setting where the author has typed since. */
+    function takeCarriedRow(local: LocalField | LocalSection, row: ServerField | ServerSection, kind: 'field' | 'section'): void {
+        const snap = (r: LocalField | LocalSection) => (kind === 'field' ? fieldSnapshot(r as LocalField) : sectionSnapshot(r as LocalSection));
+        const base = baselines.get(local.uid);
+        const mine = snap(local) as unknown as Record<string, unknown>;
+        if (base === undefined || snapshotsEqual(mine, base)) {
+            Object.assign(local, { ...clone(row), uid: local.uid });
+            baselines.set(local.uid, snap(local));
+            return;
+        }
+        const server = snap({ ...clone(row), uid: local.uid } as LocalField | LocalSection) as unknown as Record<string, unknown>;
+        const held = base as unknown as Record<string, unknown>;
+        for (const setting of Object.keys(server)) {
+            if (snapshotsEqual(mine[setting], held[setting])) (local as unknown as Record<string, unknown>)[setting] = clone(server[setting]);
+        }
+        local.version = row.version;
+        baselines.set(local.uid, server as unknown as FieldSnapshot | SectionSnapshot);
+        remember(local.uid, kind); // its kept edit is now based on the token the carry gave it
+    }
+
+    /** M242 — the saved row's own carried text, taken where the author has not typed since it was sent; returns what the server holds. */
+    function takeOwnText<S extends FieldSnapshot | SectionSnapshot>(local: LocalField | LocalSection, sentSnapshot: S, server: S): S {
+        const sentValues = sentSnapshot as unknown as Record<string, unknown>;
+        const serverValues = server as unknown as Record<string, unknown>;
+        const now = (('validations' in local ? fieldSnapshot(local as LocalField) : sectionSnapshot(local as LocalSection)) as unknown) as Record<string, unknown>;
+        for (const setting of Object.keys(serverValues)) {
+            if (snapshotsEqual(now[setting], sentValues[setting])) (local as unknown as Record<string, unknown>)[setting] = clone(serverValues[setting]);
+        }
+        return server;
+    }
+
+    /** M242 — the history line of an edit whose rename carried into other rows: "Edit Age and 3 that named its key". */
+    function carriedLabel(label: string, uid: Uid): string {
+        const notice = carryNotices.value[uid];
+        const count = notice ? notice.fields + notice.sections : 0;
+        return count === 0 ? label : `${label} and ${count} that named its key`;
     }
 
     /**
@@ -484,9 +574,11 @@ export function useBuilderStore(props: BuilderPageProps) {
     async function persistSection(uid: Uid, resent = false): Promise<boolean> {
         const section = findSection(uid);
         if (!section) return false;
+        ownCarried.delete(uid);
+        const sentSnapshot = sectionSnapshot(section); // M242: as `persistField()`
         const sent = sectionPayload(section);
         const earlier = noteSent(uid, sent);
-        const result = await guard(() => client.patch<ServerSection>(`${base}/sections/${section.id}`, sent));
+        const result = await guard(() => client.patch<ServerSection & { carried?: CarriedReply }>(`${base}/sections/${section.id}`, sent));
         if (!result) return false;
         if (result.conflict && samePayload(sectionPayload(result.current as unknown as LocalSection), sent)) {
             section.version = result.current.version; // M170: as `persistField()` — the same edit, landed twice
@@ -504,6 +596,7 @@ export function useBuilderStore(props: BuilderPageProps) {
         section.version = result.data.version;
         sentSinceHeld.delete(uid);
         adoptKeptKey(uid, section, String(sent.key), result.data.key); // M172: as `persistField()`
+        takeCarried(uid, sentSnapshot, result.data.carried); // M242: a section's key is named too (`count(${roster})`)
         return true;
     }
 
@@ -1357,7 +1450,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const field = findField(uid);
             if (!field) return;
             const before = baselines.get(uid) as FieldSnapshot | undefined;
-            const after = fieldSnapshot(field);
+            let after = fieldSnapshot(field);
             if (before && snapshotsEqual(before, after)) {
                 settled(uid, 'field', field.id, true); // M170: typed back to what the server holds — nothing is owed
                 return;
@@ -1366,6 +1459,9 @@ export function useBuilderStore(props: BuilderPageProps) {
             const held = await persistField(uid);
             if (conflict.value) return;
             if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: the kept key is what the server holds
+            const own = held ? ownCarried.get(uid) : undefined;
+            if (own) after = clone(own as FieldSnapshot); // M242: the rename rewrote this row's own text, and that is what the server holds
+            ownCarried.delete(uid);
             settled(uid, 'field', field.id, held, snapshotsEqual(fieldSnapshot(field), after));
             // M155 (`R-0aa94dce`): the baseline and the undo entry move only once the server holds the edit. A refused
             // one stays on screen, marked, and its baseline stays where the server is — so its next commit sends it
@@ -1374,7 +1470,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             baselines.set(uid, clone(after));
             if (!before) return;
             pushHistory(
-                `Edit ${after.label || 'field'}`,
+                carriedLabel(`Edit ${after.label || 'field'}`, uid), // M242: says when the rename carried into other rows
                 async () => {
                     const current = sameTypeField(uid, before, 'undo');
                     if (!current) return;
@@ -1394,7 +1490,7 @@ export function useBuilderStore(props: BuilderPageProps) {
             const section = findSection(uid);
             if (!section) return;
             const before = baselines.get(uid) as SectionSnapshot | undefined;
-            const after = sectionSnapshot(section);
+            let after = sectionSnapshot(section);
             if (before && snapshotsEqual(before, after)) {
                 settled(uid, 'section', section.id, true);
                 return;
@@ -1403,12 +1499,15 @@ export function useBuilderStore(props: BuilderPageProps) {
             const held = await persistSection(uid);
             if (conflict.value) return;
             if (held && keyNotices.value[uid]?.wanted === after.key) after.key = keyNotices.value[uid].kept; // M172: as for a field
+            const own = held ? ownCarried.get(uid) : undefined;
+            if (own) after = clone(own as SectionSnapshot); // M242: as for a field
+            ownCarried.delete(uid);
             settled(uid, 'section', section.id, held, snapshotsEqual(sectionSnapshot(section), after));
             if (!held) return; // M155: as `commitFieldEdit()` — only an edit the server holds moves the baseline
             baselines.set(uid, clone(after));
             if (!before) return;
             pushHistory(
-                `Edit section “${after.label}”`,
+                carriedLabel(`Edit section “${after.label}”`, uid),
                 async () => {
                     const current = findSection(uid);
                     if (!current) return;
@@ -1436,7 +1535,10 @@ export function useBuilderStore(props: BuilderPageProps) {
             delete save.fieldErrors[current.uid]; // the screen is back on what the server holds: nothing on it is refused
             throw new HistoryStepFailed(save.error ?? HISTORY_STEP_FAILED);
         }
-        baselines.set(current.uid, clone(to));
+        // M242: an undone or redone rename that rewrote the row's own text leaves the server holding that text, not `to`.
+        const own = ownCarried.get(current.uid) as FieldSnapshot | undefined;
+        ownCarried.delete(current.uid);
+        baselines.set(current.uid, clone(own ?? to));
     }
 
     async function replaySection(current: LocalSection, to: SectionSnapshot, from: SectionSnapshot): Promise<void> {
@@ -1445,7 +1547,9 @@ export function useBuilderStore(props: BuilderPageProps) {
             applySectionSnapshot(current, from);
             throw new HistoryStepFailed(save.error ?? HISTORY_STEP_FAILED);
         }
-        baselines.set(current.uid, clone(to));
+        const own = ownCarried.get(current.uid) as SectionSnapshot | undefined; // M242: as `replayField()`
+        ownCarried.delete(current.uid);
+        baselines.set(current.uid, clone(own ?? to));
     }
 
     // ── Conflict resolution (409) — never silently discard either side ──────────
@@ -1957,9 +2061,14 @@ export function useBuilderStore(props: BuilderPageProps) {
         superseded: computed(() => superseded.value),
         // M172 (`R-733eff09`): a key the server kept instead of the one typed, per row; and one per failure (`R-d85d51d2`)
         keyNotices: computed(() => keyNotices.value),
+        // M242 (`R-ade0b598`): what a rename carried into the rest of the draft, per row; and a bump when it rewrote the
+        // thank-you message, for the page to reload the settings it holds (`D227`)
+        carryNotices: computed(() => carryNotices.value),
+        confirmationCarried: computed(() => confirmationCarried.value),
         saveFailures: computed(() => save.failures),
         canUndo,
         canRedo,
+        undoLabel,
         palette: props.palette,
         enums: props.enums,
         // M129: the note's Content tab uploads images against the form, and the panel takes no page props.

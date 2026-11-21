@@ -24,10 +24,19 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D227`, the last filed, was asked and answered on 2026-11-16 in the planning of `M242`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D227 — A renamed key now carries into every condition, formula and piped answer of the draft (`R-ade0b598`). The form's thank-you message names keys too, but it is form-level and the live version reads it. What does a rename do with it? **A — it follows only while the form has never been published; on a live form it is left as written, and the builder says to change it just before publishing.**
+
+**Asked and answered 2026-11-16 (user decision, in chat), in the planning of `M242`.**
+- **A — only while nothing is live (chosen, the session's recommendation).** The live thank-you page stays right; on a live form the author changes the message by hand, and publish refuses it until then, as it does today.
+- **B — always at once.** Simplest, but on a live form the thank-you page shows that answer blank until the draft is published.
+- **C — at publish.** On a live form, publishing rewrites the message from the keys that changed. Nothing blank and nothing by hand, but it touches the publish step.
+
+**What it creates:** `M242`'s `KeyRenameCarrier` (`confirmation`: `carried` or `left`). The live case not following on its own is filed as its own row, `after-launch`.
+
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

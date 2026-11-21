@@ -138,7 +138,8 @@ describe('a key another question holds (D132)', () => {
         const height = store.fields.value[1];
         expect(height.key).toBe('age_2');
         expect(store.keyNotices.value[height.uid]).toEqual({ wanted: 'age', kept: 'age_2' });
-        expect(wrapper.find('[data-key-notice]').text()).toContain('“age” is used by another question, so this one was saved as “age_2”.');
+        // M242: a question's key and a section's share one space on a rename, so the notice names both.
+        expect(wrapper.find('[data-key-notice]').text()).toContain('“age” is used by another question or section, so this one was saved as “age_2”.');
 
         // Weight's rule compared with "height": it now names the key the server kept — the server stores it by id.
         expect(store.fields.value[2].validations[0].related_field_key).toBe('age_2');

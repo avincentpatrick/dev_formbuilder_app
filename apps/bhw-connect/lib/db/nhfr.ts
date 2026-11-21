@@ -220,6 +220,11 @@ export const getNhfrCounts = cache(
   },
 );
 
+/** Request-local roster shared by the breakdown and its completeness check. */
+export const getNhfrChildGeos = cache((parentCode: string, parentLevel: GeoLevel) =>
+  getChildGeos(parentCode, parentLevel),
+);
+
 /**
  * The child units of `parentCode` one level down, each with its counts, for the breakdown table.
  * Ordered as `getChildGeos` orders them (by name), joined in memory rather than by a nested
@@ -234,7 +239,7 @@ export const getNhfrChildren = cache(
     const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.nhfr);
     if (datasetId === null) return [];
 
-    const children = await getChildGeos(parentCode, parentLevel);
+    const children = await getNhfrChildGeos(parentCode, parentLevel);
     if (children.length === 0) return [];
 
     const supabase = createSupabaseServerClient();

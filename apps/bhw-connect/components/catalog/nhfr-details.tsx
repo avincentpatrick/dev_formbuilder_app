@@ -3,8 +3,14 @@ import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { nhfrReading } from "@/lib/catalog/nhfr-reading";
-import { getNhfrCounts, getNhfrTypes, getNhfrChildren, getNhfrFacilities } from "@/lib/db/nhfr";
-import { getChildGeos, getGeoAncestors } from "@/lib/db/geo";
+import {
+  getNhfrCounts,
+  getNhfrTypes,
+  getNhfrChildren,
+  getNhfrFacilities,
+  getNhfrChildGeos,
+} from "@/lib/db/nhfr";
+import { getGeoAncestors } from "@/lib/db/geo";
 import { getProvinceBarangayCentroids } from "@/lib/geo/barangay-centroids";
 import { buildFacilityPoints } from "@/lib/geo/facility-points";
 import { withBasePath } from "@/lib/base-path";
@@ -58,7 +64,7 @@ export async function NhfrDetails({
     getNhfrChildren(selection.code, selection.level),
     city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
     city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
-    getChildGeos(selection.code, selection.level),
+    getNhfrChildGeos(selection.code, selection.level),
   ]);
   if (!counts || counts.nFacilities !== indicator!.values[0].value)
     return (

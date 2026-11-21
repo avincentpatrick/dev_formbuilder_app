@@ -18,8 +18,9 @@ Type comparisons require unique categories, nonnegative integer counts, reconcil
 ownership partitions and agreement with the accepted area total. Geographic
 comparisons require the complete child roster, matching totals and valid presence
 numerators/denominators. Failed/incomplete inputs retain exact detail and a status
-message; they do not manufacture a ranking. Child geographies reuse the cached
-reader already used by the breakdown.
+message; they do not manufacture a ranking. Child geographies share `getNhfrChildGeos`, a request-local cached wrapper
+used by both the breakdown and the completeness check. Final review added this
+wrapper because the generic geography reader itself is not cached.
 
 Counts are not adjusted for population or need. Registry categories are not proof
 of available services. Presence is not travel access, care quality or adequacy.

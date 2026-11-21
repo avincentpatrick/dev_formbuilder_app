@@ -1,10 +1,10 @@
+import { NHFR_DEFINITION } from "@/lib/catalog/nhfr-reading";
 import { StatValue } from "@/components/home/stat-value";
 import { countAndShare, shareOf } from "@/lib/format";
 import type { NhfrCounts } from "@/lib/db/nhfr";
 
 /**
- * The headline figures for an area: how many facilities, split by ownership, and the four types
- * the section leads with.
+ * The headline count and ownership split. Types appear once in the full breakdown.
  *
  * **No "% licensed" tile, deliberately.** 63% of the register carries no licensing status at all
  * — overwhelmingly Barangay Health Stations, which are not a licensed facility type — so any
@@ -12,22 +12,11 @@ import type { NhfrCounts } from "@/lib/db/nhfr";
  * compliance figure. The facility list states each facility's status where the source states one.
  */
 export function FacilityStats({ counts }: { counts: NhfrCounts }) {
-  const tiles = [
-    { label: "Barangay health stations", value: counts.nBarangayHealthStation },
-    { label: "Rural health units", value: counts.nRuralHealthUnit },
-    { label: "Hospitals", value: counts.nHospital },
-    { label: "Birthing homes", value: counts.nBirthingHome },
-  ];
-
   return (
-    <div className="flex flex-col gap-5">
-      <p className="text-xs text-muted">
-        Counts and percentages of all health facilities in this area.
-      </p>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-3xl font-semibold tabular-nums sm:text-4xl">
-          {countAndShare(counts.nFacilities, shareOf(counts.nFacilities, counts.nFacilities))}
-        </span>
+    <div role="group" aria-label="Facility totals" className="flex flex-col gap-5">
+      <p className="text-xs text-muted">{NHFR_DEFINITION}</p>
+      <div className="space-y-1">
+        <StatValue value={counts.nFacilities.toLocaleString("en-PH")} />
         <span className="text-muted">
           {counts.nFacilities === 1 ? "health facility" : "health facilities"}
         </span>
@@ -37,7 +26,7 @@ export function FacilityStats({ counts }: { counts: NhfrCounts }) {
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-accent" />
           <dt className="text-muted">Government</dt>
-          <dd className="font-semibold tabular-nums">
+          <dd className="whitespace-nowrap font-semibold tabular-nums">
             {countAndShare(counts.nGovernment, shareOf(counts.nGovernment, counts.nFacilities))}
           </dd>
         </div>
@@ -47,23 +36,10 @@ export function FacilityStats({ counts }: { counts: NhfrCounts }) {
             className="h-2.5 w-2.5 rounded-full bg-surface ring-1 ring-border"
           />
           <dt className="text-muted">Private</dt>
-          <dd className="font-semibold tabular-nums">
+          <dd className="whitespace-nowrap font-semibold tabular-nums">
             {countAndShare(counts.nPrivate, shareOf(counts.nPrivate, counts.nFacilities))}
           </dd>
         </div>
-      </dl>
-
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {tiles.map((t) => (
-          <div key={t.label} className="rounded-md border border-border bg-surface/40 p-3">
-            <dd>
-              <StatValue
-                value={countAndShare(t.value, shareOf(t.value, counts.nFacilities), "multiple")}
-              />
-            </dd>
-            <dt className="mt-0.5 text-xs text-muted">{t.label}</dt>
-          </div>
-        ))}
       </dl>
     </div>
   );

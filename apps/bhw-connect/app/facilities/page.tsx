@@ -46,8 +46,6 @@ export default async function FacilitiesLanding() {
     );
   }
 
-  const withoutFacility = Math.max(0, counts.nBarangays - counts.nBarangaysWithFacility);
-
   // Title-slide facts for presentation mode (serializable, server → client). brandLabel keeps the
   // deck from presenting this dataset under the BHW Census's name (UUC_PHC_BRAND_LABEL's
   // precedent).
@@ -67,11 +65,10 @@ export default async function FacilitiesLanding() {
             Where are the health facilities?
           </h1>
           <p className="max-w-2xl text-muted">
-            The Department of Health maintains a{" "}
-            <strong>National Health Facility Registry</strong> — every hospital, rural health
-            unit, barangay health station, clinic and laboratory it registers, with the barangay
-            each one sits in. This is the September 2026 snapshot, shown alongside the BHW
-            workforce that staffs much of it.
+            The Department of Health maintains a <strong>National Health Facility Registry</strong>{" "}
+            — every hospital, rural health unit, barangay health station, clinic and laboratory it
+            registers, with the barangay each one sits in. This is the September 2026 snapshot, an
+            inventory of registered places, not evidence of where BHWs are assigned.
           </p>
           <PresentButton variant="secondary" />
         </section>
@@ -87,10 +84,6 @@ export default async function FacilitiesLanding() {
               <div className="mt-3">
                 <CoverageBar counts={counts} />
               </div>
-              <p className="mt-3 text-xs text-muted">
-                {formatCount(withoutFacility)} barangays have no registered health facility at
-                all.
-              </p>
             </div>
             <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
               <DownloadLinks geoLevel="national" geoCode={NATIONAL_GEO_CODE} />
@@ -100,7 +93,7 @@ export default async function FacilitiesLanding() {
 
         <PresentationSlide id="types" title="Facility types">
           <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
-            <TypeBreakdown items={types} />
+            <TypeBreakdown items={types} expectedCount={counts.nFacilities} />
           </div>
         </PresentationSlide>
 

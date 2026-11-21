@@ -33,19 +33,28 @@ for (const [section, Page] of [
   describe(section, () => {
     it("opens the stored municipality rather than deriving a parent from the code", async () => {
       await expect(
-        Page({ params: Promise.resolve({ geoLevel: "barangay", geoCode: "test-barangay" }) }),
+        Page({
+          searchParams: Promise.resolve({}),
+          params: Promise.resolve({ geoLevel: "barangay", geoCode: "test-barangay" }),
+        }),
       ).rejects.toThrow(`REDIRECT:/${section}/citymun/stored-parent`);
     });
     it("does not redirect an unknown barangay", async () => {
       mocks.geo.mockResolvedValue(null);
       await expect(
-        Page({ params: Promise.resolve({ geoLevel: "barangay", geoCode: "unknown" }) }),
+        Page({
+          searchParams: Promise.resolve({}),
+          params: Promise.resolve({ geoLevel: "barangay", geoCode: "unknown" }),
+        }),
       ).rejects.toThrow("NOT_FOUND");
     });
     it("does not invent a municipality when ancestry is missing", async () => {
       mocks.ancestors.mockResolvedValue({ citymun: null });
       await expect(
-        Page({ params: Promise.resolve({ geoLevel: "barangay", geoCode: "test-barangay" }) }),
+        Page({
+          searchParams: Promise.resolve({}),
+          params: Promise.resolve({ geoLevel: "barangay", geoCode: "test-barangay" }),
+        }),
       ).rejects.toThrow("NOT_FOUND");
     });
   });

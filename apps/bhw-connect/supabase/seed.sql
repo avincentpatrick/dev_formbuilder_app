@@ -54282,4 +54282,42 @@ SELECT setval(pg_get_serial_sequence('"public"."fact_honorarium"', 'id'), GREATE
 SELECT setval(pg_get_serial_sequence('"public"."fact_nhfr_facility"', 'id'), GREATEST(COALESCE((SELECT max("id") FROM "public"."fact_nhfr_facility"), 0), 1));
 SELECT setval(pg_get_serial_sequence('"public"."fact_uuc_phc_barangay"', 'id'), GREATEST(COALESCE((SELECT max("id") FROM "public"."fact_uuc_phc_barangay"), 0), 1));
 SELECT setval(pg_get_serial_sequence('"public"."fact_uuc_phc_indicators"', 'id'), GREATEST(COALESCE((SELECT max("id") FROM "public"."fact_uuc_phc_indicators"), 0), 1));
+-- Synthetic NHFR list/search fixture. Not a production source observation.
+INSERT INTO public.fact_nhfr_facility
+(dataset_id, facility_code, facility_name, facility_major_type, facility_type,
+ ownership_major, geo_code, barangay_geo_code, source_barangay_name, bed_capacity)
+SELECT dataset_id, 'SYNTHETIC-NHFR-SEARCH-2', 'Synthetic Station 2 with a long complete facility name',
+ 'Health Facility', 'Clinic', 'Government', '0102801', '0102801001', 'Synthetic North', 0
+FROM public.dim_dataset WHERE slug = 'nhfr-2026-09'
+ON CONFLICT (dataset_id, facility_code) DO NOTHING;
+INSERT INTO public.fact_nhfr_facility
+(dataset_id, facility_code, facility_name, facility_major_type, facility_type,
+ ownership_major, geo_code, barangay_geo_code, source_barangay_name, bed_capacity)
+SELECT dataset_id, 'SYNTHETIC-NHFR-SEARCH-10', 'Synthetic Station 10',
+ 'Health Facility', 'Hospital', 'Private', '0102801', NULL, NULL, 5
+FROM public.dim_dataset WHERE slug = 'nhfr-2026-09'
+ON CONFLICT (dataset_id, facility_code) DO NOTHING;
+INSERT INTO public.agg_nhfr_counts
+(dataset_id, geo_code, geo_level, n_facilities, n_government, n_private,
+ n_barangay_health_station, n_rural_health_unit, n_hospital, n_birthing_home,
+ total_bed_capacity, n_barangays_with_facility, n_barangays)
+SELECT f.dataset_id, '0102801', 'citymun', count(*),
+ count(*) FILTER (WHERE ownership_major = 'Government'), count(*) FILTER (WHERE ownership_major = 'Private'),
+ count(*) FILTER (WHERE facility_type = 'Barangay Health Station'), count(*) FILTER (WHERE facility_type = 'Rural Health Unit'),
+ count(*) FILTER (WHERE facility_type = 'Hospital'), count(*) FILTER (WHERE facility_type = 'Birthing Home'),
+ sum(bed_capacity), count(DISTINCT g.geo_code),
+ (SELECT count(*) FROM public.dim_geo WHERE parent_code = '0102801' AND geo_level = 'barangay')
+FROM public.fact_nhfr_facility f
+JOIN public.dim_dataset d ON d.dataset_id = f.dataset_id AND d.slug = 'nhfr-2026-09'
+LEFT JOIN public.dim_geo g ON g.geo_code = f.barangay_geo_code AND g.geo_level = 'barangay' AND g.parent_code = f.geo_code
+WHERE f.geo_code = '0102801' GROUP BY f.dataset_id
+ON CONFLICT (dataset_id, geo_code, geo_level) DO NOTHING;
+INSERT INTO public.agg_nhfr_by_type
+(dataset_id, geo_code, geo_level, facility_type, n_facilities, n_government, n_private)
+SELECT f.dataset_id, '0102801', 'citymun', facility_type, count(*),
+ count(*) FILTER (WHERE ownership_major = 'Government'), count(*) FILTER (WHERE ownership_major = 'Private')
+FROM public.fact_nhfr_facility f JOIN public.dim_dataset d ON d.dataset_id = f.dataset_id AND d.slug = 'nhfr-2026-09'
+WHERE f.geo_code = '0102801' GROUP BY f.dataset_id, facility_type
+ON CONFLICT (dataset_id, geo_code, geo_level, facility_type) DO NOTHING;
+
 COMMIT;

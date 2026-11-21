@@ -1,3 +1,4 @@
+import { NHFR_PRESENCE, NHFR_ATTRIBUTION } from "@/lib/catalog/nhfr-reading";
 import { formatPct } from "@/lib/format";
 import { formatCount } from "@/lib/format";
 import type { NhfrCounts } from "@/lib/db/nhfr";
@@ -31,7 +32,7 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
         role="img"
         aria-label={`${formatCount(nBarangaysWithFacility)} of ${formatCount(
           nBarangays,
-        )} barangays have at least one health facility${
+        )} barangays have an attributed health facility${
           coveragePct === null ? "" : ` (${formatPct(coveragePct, "single")})`
         }`}
       >
@@ -40,8 +41,8 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
       <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-accent" />
-          <dt className="text-muted">Barangays with a facility</dt>
-          <dd className="font-semibold tabular-nums">
+          <dt className="text-muted">Barangays with an attributed facility</dt>
+          <dd className="whitespace-nowrap font-semibold tabular-nums">
             {formatCount(nBarangaysWithFacility)}
             {coveragePct !== null && (
               <span className="text-muted"> · {formatPct(coveragePct)}</span>
@@ -53,8 +54,8 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
             aria-hidden="true"
             className="h-2.5 w-2.5 rounded-full bg-surface ring-1 ring-border"
           />
-          <dt className="text-muted">Barangays with none</dt>
-          <dd className="font-semibold tabular-nums">
+          <dt className="text-muted">Barangays without an attributed facility</dt>
+          <dd className="whitespace-nowrap font-semibold tabular-nums">
             {formatCount(without)}
             {coveragePct !== null && (
               <span className="text-muted"> · {formatPct(100 - coveragePct)}</span>
@@ -62,6 +63,9 @@ export function CoverageBar({ counts }: { counts: NhfrCounts }) {
           </dd>
         </div>
       </dl>
+      <p className="mt-3 text-xs text-muted">
+        {NHFR_PRESENCE} {NHFR_ATTRIBUTION}
+      </p>
     </div>
   );
 }

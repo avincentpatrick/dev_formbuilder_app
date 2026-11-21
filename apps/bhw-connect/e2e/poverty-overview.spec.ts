@@ -7,12 +7,18 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("catalog?mode=all&dataset=poverty");
     const overview = page.getByTestId("poverty-overview");
-    await expect(overview).toContainText("No national estimate is shown");
-    await expect(overview).toContainText("people, not households");
+    await expect(
+      overview.getByRole("link", { name: /View the Philippines national estimate/ }),
+    ).toBeVisible();
+    await expect(overview.getByRole("heading", { name: "Municipal poverty estimate" })).toHaveCount(
+      0,
+    );
     await page.locator('select[name="location"]').selectOption("region:01");
     await page.getByRole("button", { name: "Show datasets", exact: true }).click();
     await expect(page).toHaveURL(/dataset=poverty.*location=region%3A01/);
-    await expect(overview).toContainText("no local value is replaced");
+    await expect(overview.getByRole("heading", { name: "Municipal poverty estimate" })).toHaveCount(
+      0,
+    );
     await page.locator('select[name="location"]').selectOption("province:01028");
     await page.getByRole("button", { name: "Show datasets", exact: true }).click();
     await page.locator('select[name="location"]').selectOption("citymun:0102801");

@@ -32,6 +32,18 @@ for (const width of [390, 1440]) {
     await page.goto("catalog?mode=psgc&location=province%3A01028&dataset=poverty");
     const list = page.getByTestId("poverty-municipalities");
     await expect(list).toContainText("3 of 3 places shown");
+    await expect(list.getByRole("button", { name: "Chart", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      list.getByRole("img", { name: /Adams.*0%.*90% confidence interval: -0.2% to 4.7%/ }),
+    ).toBeVisible();
+    await expect(list.getByRole("listitem").nth(1)).toContainText(
+      "Unavailable — no usable accepted estimate",
+    );
+    await list.getByRole("button", { name: "Table", exact: true }).focus();
+    await page.keyboard.press("Enter");
     await expect(list.getByRole("row").nth(1)).toContainText("Adams");
     await expect(list.getByRole("row").nth(1)).toContainText("0%");
     await expect(list.getByRole("row").nth(1)).toContainText("-0.2% to 4.7%");
@@ -41,6 +53,8 @@ for (const width of [390, 1440]) {
     const search = list.getByRole("searchbox");
     await search.fill("0102801");
     await expect(list).toContainText("1 of 3 places shown");
+    await list.getByRole("button", { name: "Chart", exact: true }).click();
+    await expect(list.getByRole("img", { name: /Adams/ })).toBeVisible();
     await page.reload();
     await expect(search).toHaveValue("0102801");
     const place = list.getByRole("link", { name: /Adams/ });

@@ -1,5 +1,8 @@
 # Poverty analytics and readability
 
+For the next dataset card, use the [replication handoff](DATASET_CARD_REPLICATION_HANDOFF.md)
+for the source-audit worksheet, reuse map, verification gates and carried-forward open work.
+
 19 November 2026. Baseline: main `2bcf33ab` (#606). Follows the historical
 analytics roadmap #525, Phase 0 audit #527, BHW acceptance records and
 `BHW_READABILITY_INCREMENT.md`. Those historical draft PRs remain unmerged.

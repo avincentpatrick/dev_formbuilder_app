@@ -23,6 +23,11 @@ final class AwardPointsForSubmissionUpdated
 
     public function handle(SubmissionUpdated $event): void
     {
+        // M248 — a respondent's own change has no user to award (`editedByUserId` is null).
+        if ($event->editedByUserId === null) {
+            return;
+        }
+
         $this->points->award(
             PointRule::SubmissionEdited,
             $event->editedByUserId,

@@ -61,6 +61,9 @@ final class PublicFormPresenter
                 // read it; that submission is refused with a 403, and solving the check and retrying once
                 // recovers it.
                 'bot_challenge' => $form->bot_challenge->value,
+                // What the thank-you page offers next: `another` (submit another response), `amend` (change the answers
+                // sent, until the form closes) or `once` (one response from this device).
+                'after_submit' => $form->after_submit->value,
                 // The author-editable confirmation copy (Increment H6a, Doc #26 §6.2), emitted RAW — as a
                 // template, with its `${key}` holes unfilled — plus its locale variants. Two reasons it is
                 // not rendered here: `version.schema` below travels VERBATIM with a checksum the runtime

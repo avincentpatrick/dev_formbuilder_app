@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AfterSubmit;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormThemePreset;
@@ -68,7 +69,7 @@ afterEach(fn () => app(PermissionRegistrar::class)->setPermissionsTeamId(null));
 function formSettingsLockingLockers(): array
 {
     return [
-        'updateMetadata', 'assignScope', 'assignFolder', 'setTheme', 'setSaveAndResume', 'setSinglePageMode',
+        'updateMetadata', 'assignScope', 'assignFolder', 'setTheme', 'setSaveAndResume', 'setAfterSubmit', 'setSinglePageMode',
         'setOcrScanning', 'setShareSettings', 'setConfirmationMessage', 'setSchedule', 'setDataSharing', 'archive',
     ];
 }
@@ -149,6 +150,19 @@ function formSettingsLockingStage(string $setter, Tenant $tenant, User $actor): 
                 'expected' => true,
                 'auditKey' => 'save_and_resume',
                 'auditOld' => false,
+            ];
+        })(),
+        // M248 (`D232`) — the "After submitting" setting.
+        'setAfterSubmit' => (function () use ($service, $form, $actor): array {
+            $service->setAfterSubmit($form, AfterSubmit::Amend, $actor);
+
+            return [
+                'behind' => ['after_submit' => AfterSubmit::Once->value],
+                'call' => fn (Form $stale): Form => $service->setAfterSubmit($stale, AfterSubmit::Amend, $actor),
+                'read' => fn (Form $f): mixed => $f->after_submit->value,
+                'expected' => AfterSubmit::Amend->value,
+                'auditKey' => 'after_submit',
+                'auditOld' => AfterSubmit::Once->value,
             ];
         })(),
         'setSinglePageMode' => [

@@ -345,3 +345,32 @@ describe('submissions/Show — an answer to a question the form no longer asks (
         });
     });
 });
+
+describe('a respondent\'s own change (M248, D232)', () => {
+    it('says when the respondent changed their answers, and says nothing when they never did', () => {
+        const never = mountAt('submitted');
+        expect(never.find('[data-respondent-amended]').exists()).toBe(false);
+        never.unmount();
+
+        const changed = mount(Show, {
+            props: {
+                ...(mountAt('submitted').props() as Record<string, unknown>),
+                submission: {
+                    ...((mountAt('submitted').props() as { submission: Record<string, unknown> }).submission),
+                    respondent_amended_at: '2026-11-21T03:04:05Z',
+                },
+            },
+            global: {
+                stubs: {
+                    MdsBadge: true,
+                    MdsCard: { template: '<div><slot name="header" /><slot /></div>' },
+                    MdsFormField: { template: '<div><slot /></div>' },
+                    MdsModal: { template: '<div><slot /></div>' },
+                    MdsTextarea: true,
+                },
+            },
+        });
+
+        expect(changed.find('[data-respondent-amended]').text()).toContain('Changed by the respondent');
+    });
+});

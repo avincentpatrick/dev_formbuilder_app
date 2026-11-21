@@ -597,7 +597,7 @@ it('publishes the guest submit\'s and draft save\'s success bodies as objects, o
     // Each answers 201 when it creates the row and 200 when it updates one. A status chosen by a ternary
     // left Scramble unable to infer either, and it published a bare string.
     $bodies = [
-        '/public/f/{shareToken}/submissions' => ['id', 'reference', 'status', 'redirect'],
+        '/public/f/{shareToken}/submissions' => ['id', 'reference', 'status', 'redirect', 'amend'],
         '/public/f/{shareToken}/draft' => ['id', 'completeness_percent', 'resume_token', 'resume_url', 'expires_at', 'content_checksum'],
     ];
 

@@ -273,6 +273,8 @@ final class SubmissionInboxPresenter
                 'locale' => $submission->locale,
                 'submitted_at' => $submission->submitted_at?->toIso8601String(),
                 'finalized_at' => $submission->finalized_at?->toIso8601String(),
+                // M248 (`D232`) — when the respondent last changed their own response through the amend link, or null.
+                'respondent_amended_at' => $submission->respondent_amended_at?->toIso8601String(),
                 'review' => [
                     'validator' => $submission->validator?->name,
                     'validated_at' => $submission->validated_at?->toIso8601String(),

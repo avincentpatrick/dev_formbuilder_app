@@ -13,6 +13,9 @@
 import { encodeSolution, solveChallenge, type Challenge } from './challenge';
 import { ApiError, normalizeError } from './error-normalizer'; import { hasLinkedChoices, linkedChoicesUrl, mergeLinkedChoices, type ChoiceFilterSet, type LinkedChoiceLists } from './linked-choices'; import { choiceListsUrl, hasChoiceLists, mergeChoiceLists, type ChoiceLists } from './choice-lists';
 import type {
+    AmendLink,
+    AmendRead,
+    AmendResult,
     AnswerMap,
     MintResponse,
     PaperCopyReceipt,
@@ -323,15 +326,18 @@ export function createApiClient(options: { token: string; slug: string; fetch?: 
             if (!response.ok) {
                 throw toError(response, body);
             }
-            const data = (body as { data: { id: string; reference: string; status: string; redirect?: unknown } }).data;
+            const data = (body as { data: { id: string; reference: string; status: string; redirect?: unknown; amend?: unknown } }).data;
             // M130 — present only when there is somewhere to go; absent reads as null (`SubmitResult.redirect`).
             const redirect = parseRedirect(data.redirect, globalThis.location?.origin ?? '');
+            // M248 — present only when the form offers "Change my answers".
+            const amend = parseAmendLink(data.amend);
             return {
                 id: data.id,
                 reference: data.reference,
                 status: data.status,
                 created: response.status === 201,
                 ...(redirect !== null ? { redirect } : {}),
+                ...(amend !== null ? { amend } : {}),
             };
         },
 
@@ -460,6 +466,85 @@ export async function resumeDraft(
         shareTokenExpiresAt: data.share_token_expires_at,
         contentChecksum: data.content_checksum,
     };
+}
+
+/** M248 — the submit response's `amend` link, or null when it has none or it is malformed. */
+export function parseAmendLink(raw: unknown): AmendLink | null {
+    if (typeof raw !== 'object' || raw === null) {
+        return null;
+    }
+    const { token, url, until } = raw as { token?: unknown; url?: unknown; until?: unknown };
+    if (typeof token !== 'string' || token === '' || typeof url !== 'string' || url === '') {
+        return null;
+    }
+
+    return { token, url, until: typeof until === 'string' ? until : null };
+}
+
+/**
+ * M248 (`D232`) — read the response a respondent SENT, to change it. Like `resumeDraft()`, a bare fetch under the amend
+ * token, which is the whole credential; `submissions/amend/` is outside every service-worker cache.
+ */
+export async function readAmend(amendToken: string, options: { fetch?: typeof fetch } = {}): Promise<AmendRead> {
+    const doFetch = options.fetch ?? fetch;
+    const response = await doFetch(`/api/v1/public/submissions/amend/${encodeURIComponent(amendToken)}`, {
+        headers: { Accept: 'application/json' },
+    });
+    const body = await parseBody(response);
+    if (!response.ok) {
+        throw toError(response, body);
+    }
+    const data = (
+        body as {
+            data: {
+                id: string;
+                reference: string;
+                form_version_id: string;
+                answers: AnswerMap;
+                content_checksum: string | null;
+                submitted_at: string | null;
+                locale: string | null;
+                amend_until: string | null;
+                amended_at: string | null;
+                share_token: string;
+            };
+        }
+    ).data;
+
+    return {
+        id: data.id,
+        reference: data.reference,
+        formVersionId: data.form_version_id,
+        answers: data.answers ?? {},
+        contentChecksum: data.content_checksum,
+        submittedAt: data.submitted_at,
+        locale: data.locale,
+        until: data.amend_until,
+        amendedAt: data.amended_at,
+        shareToken: data.share_token,
+    };
+}
+
+/** M248 — send a respondent's changed answers, with the baseline their page was given. */
+export async function sendAmend(
+    amendToken: string,
+    answers: AnswerMap,
+    baseContentChecksum: string | null,
+    options: { fetch?: typeof fetch } = {},
+): Promise<AmendResult> {
+    const doFetch = options.fetch ?? fetch;
+    const response = await doFetch(`/api/v1/public/submissions/amend/${encodeURIComponent(amendToken)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ answers, base_content_checksum: baseContentChecksum }),
+    });
+    const body = await parseBody(response);
+    if (!response.ok) {
+        throw toError(response, body);
+    }
+    const data = (body as { data: { id: string; reference: string; content_checksum: string | null; amended_at: string | null } }).data;
+
+    return { id: data.id, reference: data.reference, contentChecksum: data.content_checksum, amendedAt: data.amended_at };
 }
 
 export { ApiError } from './error-normalizer';

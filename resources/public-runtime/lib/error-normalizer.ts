@@ -118,6 +118,11 @@ function classify(status: number, code: string): ErrorKind {
             return 'challenge';
         }
 
+        // M248 — "Change my answers" was switched off, or the form stopped taking guests.
+        if (code === 'amend_not_allowed') {
+            return 'amend';
+        }
+
         return 'terminal';
     }
     if (status === 409) {
@@ -139,6 +144,10 @@ function classify(status: number, code: string): ErrorKind {
         }
         if (code === 'submission_conflict') {
             return 'conflict';
+        }
+        // M248 — a respondent's change to a sent response: staff have acted on it, or it changed elsewhere.
+        if (code === 'response_under_review' || code === 'response_changed') {
+            return 'amend';
         }
 
         // `form_updated`, `submission_version_superseded`, and anything unrecognised — including the synthetic

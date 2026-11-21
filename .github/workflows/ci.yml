@@ -814,6 +814,12 @@ jobs:
       CACHE_STORE: file
       QUEUE_CONNECTION: sync
       MAIL_MAILER: log
+      # M248 — every spec opens guest links from ONE address, and each open mints a share token on
+      # `throttle:guest-mint` (30 a minute per address by default, `config/guest.php`). The guest-heavy files run back
+      # to back, so the per-address ceiling a real respondent never nears was the thing the suite measured: run
+      # 44918997179 answered a 429 to `repeat-table.spec.ts` right after the two public-runtime files. No spec tests the
+      # mint limit itself (Pest pins it), so this run lifts it rather than every spec learning to wait it out.
+      GUEST_MINT_PER_IP: 600
     steps:
       - uses: actions/checkout@v4
 

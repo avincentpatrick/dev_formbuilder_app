@@ -33,6 +33,14 @@ return [
         'key' => env('SUBMISSION_RESUME_TOKEN_KEY'),
     ],
 
+    // The amend token (M248, `D232`, App\Support\Guest\GuestShareTokenService::mintAmend) — a respondent's handle on the
+    // response they SENT, for "Change my answers". Signed under a key derived from the resume key, so it needs no secret
+    // of its own. Long-lived on purpose: whether the response may still change is decided live on every request (the form
+    // open, "Change my answers" on, the response still `submitted`), so the lifetime is only an upper bound (default 365d).
+    'amend_token' => [
+        'ttl' => (int) env('SUBMISSION_AMEND_TOKEN_TTL', 31536000),
+    ],
+
     // Rate limits (requests/minute). The submit + schema endpoints are limited per token AND per IP
     // (technical-architecture.md §7.2); the mint endpoint is limited per IP.
     'rate_limit' => [

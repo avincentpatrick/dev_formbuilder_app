@@ -216,6 +216,12 @@ const props = defineProps<{
      * applies: the server has to say no too, or it is not a no.
      */
     readOnly?: boolean;
+    /**
+     * M248 (`D232`) — who is reading a read-only media question, for the one sentence that tells them what to do: staff
+     * correcting a response are pointed at an administrator; a respondent changing their own sent response is told a
+     * file cannot be changed after sending. Absent means staff, every caller before M248.
+     */
+    readOnlyAudience?: 'staff' | 'respondent';
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue] }>();
 
@@ -769,8 +775,12 @@ function setCascadeLevel(index: number, value: string): void {
         <p class="encode-readonly-media__note">
             {{
                 readOnlyFiles.length > 0
-                    ? 'Files cannot be changed here.'
-                    : 'No file was captured. Files cannot be added here.'
+                    ? readOnlyAudience === 'respondent'
+                        ? 'Files you sent cannot be changed.'
+                        : 'Files cannot be changed here.'
+                    : readOnlyAudience === 'respondent'
+                      ? 'No file was sent. Files cannot be added after sending.'
+                      : 'No file was captured. Files cannot be added here.'
             }}
         </p>
         <!-- ⚠️ THE ERROR IS RENDERED HERE OR IT IS RENDERED NOWHERE, and "nowhere" is a dead end rather than
@@ -781,8 +791,12 @@ function setCascadeLevel(index: number, value: string): void {
              With it, the message names the only escape. `aria-live` because the summary jump moves the
              reader here and the block holds no focusable element to announce on arrival. -->
         <p v-if="error" class="encode-readonly-media__error" role="alert" aria-live="polite">
-            {{ error }} Files cannot be added on this screen — undo the change that made this question apply,
-            or ask an administrator.
+            {{ error }}
+            {{
+                readOnlyAudience === 'respondent'
+                    ? 'Files cannot be added after sending — undo the change that made this question apply.'
+                    : 'Files cannot be added on this screen — undo the change that made this question apply, or ask an administrator.'
+            }}
         </p>
     </div>
 

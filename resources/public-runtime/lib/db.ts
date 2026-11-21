@@ -83,6 +83,18 @@ export interface DraftRow {
      * See `docs/adr/0021-respondent-scoped-device-outbox.md`.
      */
     respondent_session_id: string | null;
+    /**
+     * M248 (`D232` answer 4) — the SERVER draft this local one shadows, once "Save and finish later" has made one: its
+     * `client_submission_uuid`, the lost-update baseline this device last held, and the resume token the last save
+     * returned. "Continue where you left off" reads them so the session carries on that same server draft — one response,
+     * and the emailed link and the device in step — rather than starting a second under a fresh uuid.
+     *
+     * Optional and un-indexed, so no `db.version()` bump (the rule `respondent_session_id` above states); absent on a row
+     * written before M248 or by a fill that never saved to the server, which Continue restores as a local draft only.
+     */
+    client_submission_uuid?: string | null;
+    base_content_checksum?: string | null;
+    resume_token?: string | null;
 }
 
 /**
@@ -123,6 +135,65 @@ export function draftBelongsToVisit(
  * that govern this table live next to the table, so its readers cannot drift apart.
  */
 export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * M248 (`D118` A, `R-8881210a`, `R-d37a38f9`) — the draft an EARLIER visit on this device left for this form version and
+ * link, which the respondent may pick back up: "Continue where you left off" or "Start over", asked BEFORE any answer
+ * appears. Null when there is none to offer.
+ *
+ * Offered only when it is worth a question: another visit wrote it (this visit's own row restores silently, as
+ * before), it is inside the seven-day window `restore()` honours, it was written against this very schema (a republish
+ * discards it, as `restore()` does), and it holds at least one answer.
+ *
+ * ⚠️ This relaxes M21's silent refusal BEHIND A CHOICE, which is `D118`'s decision, and nothing here reads the row's
+ * answers into a page: `draftBelongsToVisit()` still guards both readers, and only {@see adoptDraft} — the Continue
+ * button — makes the row this visit's. Lives here, beside that predicate, for the reason its docblock gives.
+ */
+export async function earlierVisitDraft(
+    db: MeridianDb,
+    key: { formVersionId: string; slug: string; checksum: string },
+    sessionId: string,
+    now: number = Date.now(),
+): Promise<DraftRow | null> {
+    try {
+        const row = await db.draft_answers.get([key.formVersionId, key.slug]);
+        if (row === undefined || draftBelongsToVisit(row, sessionId) || row.checksum !== key.checksum) {
+            return null;
+        }
+        const age = now - Date.parse(row.updated_at);
+        if (!Number.isFinite(age) || age > DRAFT_TTL_MS) {
+            return null;
+        }
+
+        return hasAnyAnswer(row.answers) ? row : null;
+    } catch {
+        return null; // a refused read offers nothing, and the form starts blank as it always has
+    }
+}
+
+/**
+ * M248 — "Continue where you left off": make the earlier visit's row this visit's, so `restore()` and the resume read
+ * accept it. Only the stamp moves; answers, step and server identity are left exactly as written.
+ */
+export async function adoptDraft(db: MeridianDb, key: { formVersionId: string; slug: string }, sessionId: string): Promise<void> {
+    await db.draft_answers.update([key.formVersionId, key.slug], { respondent_session_id: sessionId });
+}
+
+function hasAnyAnswer(answers: AnswerMap): boolean {
+    return Object.values(answers).some((value) => {
+        if (value === null || value === undefined || value === '') {
+            return false;
+        }
+        if (Array.isArray(value)) {
+            return value.length > 0;
+        }
+        if (typeof value === 'object') {
+            return Object.keys(value).length > 0;
+        }
+
+        return true;
+    });
+}
 
 export type OutboxStatus = 'pending' | 'synced' | 'conflict' | 'needs_attention';
 

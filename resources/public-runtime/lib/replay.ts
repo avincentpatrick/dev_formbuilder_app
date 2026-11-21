@@ -18,6 +18,7 @@ import type { MeridianDb, MediaQueueRow, OutboxRow } from './db';
 import type { ErrorKind, SchemaResponse } from './types';
 import { listPending, markConflict, markNeedsAttention, markSynced, pruneSynced, recordAttempt, setAnswers } from './outbox';
 import { reapAbandoned } from './reap';
+import { rememberAnswered } from './answered';
 import {
     collectLocalMediaIds,
     listForSubmission,
@@ -72,6 +73,11 @@ const REPLAY_OUTCOME: Record<ErrorKind, 'needsAttention' | 'conflict' | 'retry'>
     // 200. `needsAttention` is the honest entry regardless: it would mean the response is already recorded,
     // which no amount of retrying improves.
     finalized: 'needsAttention',
+
+    // M248 — UNREACHABLE ON THIS CHANNEL TOO: only a respondent's change to a SENT response is refused this way, and
+    // that change never enters the outbox (`RuntimeSession`'s `submitAmend()` sends it live). Mapped as `finalized` is,
+    // because no retry can turn such a refusal into a delivery.
+    amend: 'needsAttention',
 };
 
 const MAX_ATTEMPTS = 5;
@@ -339,6 +345,13 @@ async function replayRow(
         // code it derived was stored nowhere, so a respondent quoting it to the tenant got nothing. The
         // local code is now labelled a provisional queue tag and this is the real handle that replaces it.
         await markSynced(db, uuid, result.id, result.reference);
+
+        // M248 (`D232`) — a queued response on a form that offers "Change my answers" gets its amend link only now,
+        // from the server; remember it for this device, as the page does for a response sent online. A worker has no
+        // `localStorage`, which is why the memory lives in Dexie (`lib/answered.ts`).
+        if (result.amend) {
+            await rememberAnswered(db, row.slug, { reference: result.reference, at: new Date().toISOString(), amendToken: result.amend.token });
+        }
 
         return { outcome: 'synced', reference: result.reference };
     } catch (error) {

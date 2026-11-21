@@ -218,7 +218,10 @@ final class AuditExporter
             // Same three-state resolution the viewer uses — see AuditLogPresenter::actorLabel(). A
             // non-null user_id whose row is invisible under the users join-shape policy is a departed
             // member, not the platform.
-            $audit->user_id === null ? 'System' : (is_string($name = data_get($audit, 'user.name')) ? $name : 'Unknown user'),
+            // M248 — and a respondent's own change through the amend link is "Respondent", not the platform.
+            $audit->user_id === null
+                ? ($audit->isRespondentAct() ? 'Respondent' : 'System')
+                : (is_string($name = data_get($audit, 'user.name')) ? $name : 'Unknown user'),
             // I11a — empty on every ordinary row, and a FIXED label otherwise. Never the operator's name:
             // that is a deliberate disclosure policy, not a limit of what is readable here. See
             // AuditLogPresenter::actingAsLabel() for why the original "RLS hides them anyway" reasoning was

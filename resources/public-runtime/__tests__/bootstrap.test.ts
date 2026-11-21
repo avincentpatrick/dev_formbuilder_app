@@ -44,6 +44,8 @@ describe('readBootstrap', () => {
             slug: 'intake',
             defaultLocale: 'en',
             resumeToken: '',
+            // M248 (`D232`) — read from an `/f/amend/{token}` address only, so empty on an ordinary entry.
+            amendToken: '',
             brandVersion: 'abc',
         });
         expect(readBootstrap(mountNode({}), '/f/intake').brandVersion).toBe('none');

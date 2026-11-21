@@ -445,7 +445,8 @@ class AppServiceProvider extends ServiceProvider
         // for every live route bound to `throttle:guest` and fails if any of them cannot tell two tokens
         // apart — which is the question, and which no list of parameter names in a test could keep answering.
         RateLimiter::for('guest', function (Request $request): array {
-            $token = $request->route('shareToken') ?? $request->route('resumeToken');
+            // M248 — and `{amendToken}`, the respondent's amend link (`routes/api.php`'s amend group).
+            $token = $request->route('shareToken') ?? $request->route('resumeToken') ?? $request->route('amendToken');
 
             return [
                 Limit::perMinute((int) config('guest.rate_limit.submit_per_token'))

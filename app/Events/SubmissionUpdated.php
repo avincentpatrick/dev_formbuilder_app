@@ -52,9 +52,10 @@ final class SubmissionUpdated extends DomainEvent
         public readonly string $submissionId,
         public readonly string $formId,
         public readonly ?string $respondentUserId,
-        public readonly string $editedByUserId,
+        public readonly ?string $editedByUserId,
         public readonly string $status,
         public readonly bool $wasDemoted,
+        public readonly bool $editedByRespondent = false,
     ) {
         parent::__construct();
     }
@@ -82,6 +83,27 @@ final class SubmissionUpdated extends DomainEvent
         );
     }
 
+    /**
+     * M248 (`D232`) — the respondent changed their own response through the amend link. There is no user: `edited_by` is
+     * null and `edited_by_respondent` says who it was, so a webhook consumer never reads a missing editor as a system
+     * write. An approval cannot be withdrawn here — a respondent may amend only a `submitted` response.
+     */
+    public static function forRespondent(Submission $submission): self
+    {
+        return new self(
+            tenantId: (string) $submission->tenant_id,
+            submissionId: (string) $submission->id,
+            formId: (string) $submission->form_id,
+            respondentUserId: $submission->respondent_user_id === null
+                ? null
+                : (string) $submission->respondent_user_id,
+            editedByUserId: null,
+            status: $submission->status->value,
+            wasDemoted: false,
+            editedByRespondent: true,
+        );
+    }
+
     public function eventType(): DomainEventType
     {
         return DomainEventType::SubmissionUpdated;
@@ -102,6 +124,7 @@ final class SubmissionUpdated extends DomainEvent
             'submission_id' => $this->submissionId,
             'form_id' => $this->formId,
             'edited_by' => $this->editedByUserId,
+            'edited_by_respondent' => $this->editedByRespondent,
             'status' => $this->status,
             'approval_withdrawn' => $this->wasDemoted,
         ];

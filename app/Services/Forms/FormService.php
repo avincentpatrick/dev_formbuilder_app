@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\AfterSubmit;
 use App\Enums\AuditEvent;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormStatus;
@@ -323,6 +324,31 @@ final class FormService
             $new = ['save_and_resume' => $enabled];
 
             $locked->forceFill($new)->save();
+
+            $this->recordFormUpdate($locked, $old, $new, $actor);
+
+            return $form->refresh();
+        });
+    }
+
+    /**
+     * Set what a form offers a respondent after Submit — its "After submitting" setting (M248, `D232`) — the only
+     * writer of `forms.after_submit`.
+     *
+     * `forceFill` with an explicit key, like {@see self::setSaveAndResume()}, and for a sharper reason: the column is
+     * NOT fillable, because `amend` lets an anonymous holder of a link change a response that was sent. No version or
+     * pipeline effect: it governs the thank-you page, the device's memory of a sent response, and whether the amend
+     * routes accept a change — every one of which reads it off the form row, live, so a change applies at once.
+     */
+    public function setAfterSubmit(Form $form, AfterSubmit $afterSubmit, ?User $actor = null): Form
+    {
+        return DB::transaction(function () use ($form, $afterSubmit, $actor): Form {
+            $locked = Form::query()->whereKey($form->id)->lockForUpdate()->firstOrFail();
+
+            $old = ['after_submit' => $locked->after_submit->value];
+            $new = ['after_submit' => $afterSubmit->value];
+
+            $locked->forceFill(['after_submit' => $afterSubmit])->save();
 
             $this->recordFormUpdate($locked, $old, $new, $actor);
 

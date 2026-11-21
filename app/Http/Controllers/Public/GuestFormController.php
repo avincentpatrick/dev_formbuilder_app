@@ -149,4 +149,38 @@ final class GuestFormController extends Controller
             'brand' => $branding->forGuest($form),
         ]);
     }
+
+    /**
+     * M248 (`D232`) — the "Change my answers" entry: the page a respondent's amend link opens. The token is verified here
+     * (404 on a bad or expired one) and a share token for the response's own version is embedded so the page boots on the
+     * schema the answers belong to; the page then reads the response through `GET api/v1/public/submissions/amend/{token}`,
+     * which decides whether it may still change. The token reaches the page through its address, like a resume link's.
+     */
+    public function amend(string $amendToken, GuestShareTokenService $tokens, GuestBrandingPresenter $branding): View
+    {
+        try {
+            $token = $tokens->verifyAmend($amendToken);
+        } catch (InvalidShareTokenException|ExpiredShareTokenException) {
+            abort(404);
+        }
+
+        $form = Form::query()->whereKey($token->formId)->first();
+
+        abort_if($form === null, 404);
+        abort_unless($form->allowsGuestAccess(), 404);
+
+        $minted = $tokens->mint($token->tenantId, $token->formId, $token->formVersionId);
+
+        return view('public-runtime', [
+            'shareToken' => $minted->token,
+            'expiresAt' => gmdate('c', $minted->expiresAt),
+            'form' => [
+                'id' => $form->id,
+                'title' => $form->title,
+            ],
+            'slug' => $form->public_slug,
+            'locale' => $form->default_locale,
+            'brand' => $branding->forGuest($form),
+        ]);
+    }
 }

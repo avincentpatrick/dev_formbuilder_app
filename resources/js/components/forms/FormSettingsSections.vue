@@ -61,6 +61,7 @@
  * prop as present and mounts `SharePanel` with nothing to show. Every optional section here is tested loosely.
  */
 import { computed, ref, watch } from 'vue';
+import AfterSubmitPanel from '@/components/builder/AfterSubmitPanel.vue';
 import ConfirmationPanel from '@/components/builder/ConfirmationPanel.vue';
 import GeneralPanel from '@/components/builder/GeneralPanel.vue';
 import PageModePanel from '@/components/builder/PageModePanel.vue';
@@ -77,7 +78,7 @@ import SharePanel from '@/components/forms/SharePanel.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 import type { ReferenceCandidate } from '@/components/builder/reference-candidates';
 
-type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'choice-lists' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
+type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'choice-lists' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'after-submit' | 'save-resume' | 'automations' | 'sharing' | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -124,6 +125,8 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
         { key: 'scanning', label: 'Scanning', available: props.ocrScanning != null },
         { key: 'schedule', label: 'Schedule', available: true },
         { key: 'confirmation', label: 'Thank-you message', available: true },
+        // M248 (`D232`): what the thank-you page offers next — beside the message it ends.
+        { key: 'after-submit', label: 'After submitting', available: true },
         { key: 'save-resume', label: 'Save and finish later', available: props.saveResumeAvailable },
         // M132 (`R-b7bc5149`): what happens after a response arrives, so it sits after the sections about collecting one.
         { key: 'automations', label: 'Automations', available: props.automations != null },
@@ -248,6 +251,11 @@ watch(
                 <template v-if="mounted.has('confirmation')">
                     <div v-show="active === 'confirmation'" class="form-settings__section" :data-section="'confirmation'">
                         <ConfirmationPanel :open="props.open" :form-id="props.formId" :form="props.form" :references="props.confirmationReferences" />
+                    </div>
+                </template>
+                <template v-if="mounted.has('after-submit')">
+                    <div v-show="active === 'after-submit'" class="form-settings__section" :data-section="'after-submit'">
+                        <AfterSubmitPanel :open="props.open" :form-id="props.formId" :after-submit="props.form.after_submit" />
                     </div>
                 </template>
                 <template v-if="props.saveResumeAvailable && mounted.has('save-resume')">

@@ -30,6 +30,7 @@ const FORM = {
     title: 'Clinic Visit',
     description: null,
     save_and_resume: false,
+    after_submit: 'another',
     single_page_mode: false,
     opens_at: null,
     closes_at: null,
@@ -100,7 +101,7 @@ describe('forms/Settings', () => {
 
         expect(railLabels(wrapper)).toEqual([
             'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Scanning', 'Schedule', 'Thank-you message',
-            'Save and finish later', 'Automations', 'Data sharing', 'Scope',
+            'After submitting', 'Save and finish later', 'Automations', 'Data sharing', 'Scope',
         ]);
     });
 

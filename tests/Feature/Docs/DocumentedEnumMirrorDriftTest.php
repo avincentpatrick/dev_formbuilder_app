@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\AccentToken;
+use App\Enums\AfterSubmit;
 use App\Enums\AnalyticsAxis;
 use App\Enums\AnalyticsFormSelection;
 use App\Enums\AnalyticsGranularity;
@@ -120,6 +121,10 @@ const ENUM_MIRRORS = [
     // M130 — the choice layouts the renderer honours, declared in a `.ts` beside FieldInput.vue on purpose:
     // `appearance` is also a CSS property, and the `property` grammar is first-match-wins across an SFC.
     ['resources/js/components/submissions/choice-layout.ts', 'ChoiceAppearance', FieldAppearance::class, 'type'],
+    // M248 (`D232`) — the "After submitting" setting, in the settings page's type, the builder page's, and the guest page's.
+    ['resources/js/components/forms/types.ts', 'AfterSubmit', AfterSubmit::class, 'type'],
+    ['resources/js/components/builder/types.ts', 'after_submit', AfterSubmit::class, 'property'],
+    ['resources/public-runtime/lib/types.ts', 'after_submit', AfterSubmit::class, 'property'],
 ];
 
 /**

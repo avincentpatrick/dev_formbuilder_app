@@ -513,3 +513,29 @@ before this increment an orphan was already unreachable from every UI. What it w
 - **the conflict-review session gains durable state of its own** — the grace window's stated reason
   disappears with it and the number should shrink.
 - **kiosk mode is built** — both constants become operator settings there, per §*Ten minutes*.
+
+## ⚠️ AMENDED IN INCREMENT M248 (2026-11-21) — AN EARLIER VISIT'S DRAFT IS OFFERED BACK, BEHIND A CHOICE (`D118` A, `D232`)
+
+**What changes.** M21's refusal of another visit's draft stays the rule for a *silent* restore. It is no longer the end of the matter:
+- When a fresh load finds a draft an earlier visit left on this form — fresh, on the same schema, holding at least one answer — the page asks **"Continue where you left off"** or **"Start over"** before the form renders.
+- **Continue** re-stamps the row with the current visit. `draftBelongsToVisit()` is unchanged and then accepts it.
+- **Start over** leaves the row for the first save to overwrite, as M21 already did. Nothing is deleted for privacy.
+
+This closes `R-8881210a`, and `R-d37a38f9` with it: a respondent whose visit lapsed mid-fill is now asked on the next reload, instead of being refused their own answers.
+
+**Why it does not undo M21.**
+- M21's harm was a stranger's answers appearing *silently*: on screen, in a new server draft and in an emailed link. Here nothing appears until someone presses Continue.
+- The user accepted, by name, that on a shared phone the next person could press it (`D118`). The kiosk-mode row is where that switches off.
+- The three exposures M21 named become the *intended* behaviour once a person chooses Continue, because they are claiming the draft as theirs:
+  - the "Saved" pill;
+  - "Save and finish later" writing those answers;
+  - queued media being re-pointed.
+
+**Continue carries on the same server draft** (`D232` answer 4):
+- The row now also records the server draft it shadows — `client_submission_uuid`, `base_content_checksum` and `resume_token`. These are optional and un-indexed, so there is no Dexie version bump.
+- Continue reads that draft through the resume path, so the device and the emailed link stay in step.
+- The accepted cost: the next person at a shared device can change that server draft too.
+
+**The device also remembers a SENT response** on a form that allows one per device (`D232`). It lives in `app_state`, under `answered:{slug}`, written by the page or by the service worker's replay. On a shared device the next person is told the form was already answered, and in `amend` mode can open the previous respondent's sent answers. That is the same accepted cost, switched off in the same place. See `0026-respondent-changes-own-response.md`.
+
+**Known and unchanged.** Two tabs of one form share the row's primary key, as they always have. A second tab is now offered Continue for the first tab's live draft, where before it silently overwrote it.

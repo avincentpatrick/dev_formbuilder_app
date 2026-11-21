@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Submissions;
 
+use App\Enums\AfterSubmit;
 use App\Exceptions\Submissions\FormNotAcceptingSubmissionException;
 use App\Models\Form;
 use App\Models\Submission;
@@ -41,6 +42,23 @@ final class FormAcceptanceGuard
         if ($form->closes_at !== null && FormSchedule::isAfterClose($form, $now)) {
             throw FormNotAcceptingSubmissionException::closed($form->closes_at);
         }
+    }
+
+    /**
+     * M248 (`D232`) — a respondent may change a response they sent only while the form still takes responses: inside its
+     * open window, with "Change my answers" chosen, and open to guests. No capacity check — an amendment adds no response.
+     * Called before the work and again under the submission's lock, against a freshly read form row, so a setting or a
+     * close that lands mid-request is honoured.
+     *
+     * @throws FormNotAcceptingSubmissionException
+     */
+    public function assertCanAmend(Form $form): void
+    {
+        if ($form->after_submit !== AfterSubmit::Amend || ! $form->allowsGuestAccess()) {
+            throw FormNotAcceptingSubmissionException::amendNotAllowed();
+        }
+
+        $this->assertCanStart($form);
     }
 
     /**

@@ -148,7 +148,8 @@ final class AuditLogPresenter
     private function actorLabel(Audit $audit): string
     {
         if ($audit->user_id === null) {
-            return 'System';
+            // M248 — a fourth state: a respondent's own change through the amend link has no user either.
+            return $audit->isRespondentAct() ? 'Respondent' : 'System';
         }
 
         $name = data_get($audit, 'user.name');

@@ -156,6 +156,7 @@ const THEME = 'resources/js/components/builder/ThemePanel.vue';
 const SCHEDULE = 'resources/js/components/builder/SchedulePanel.vue';
 const THANKS = 'resources/js/components/builder/ConfirmationPanel.vue';
 const SAVE_RESUME = 'resources/js/components/builder/SaveResumePanel.vue';
+const AFTER_SUBMIT = 'resources/js/components/builder/AfterSubmitPanel.vue';
 const SHARE = 'resources/js/components/forms/SharePanel.vue';
 const PUBLISH = 'app/Http/Controllers/Tenant/FormPublishController.php';
 const INBOX = 'resources/js/Pages/submissions/Inbox.vue';
@@ -506,6 +507,11 @@ const guide: ChapterDraft[] = [
                             ' is also the day the form’s formulas call today: a new form starts on Asia/Manila.',
                         ],
                         [ui('Thank-you message', SETTINGS), ' — what respondents see after they submit, and where they go next. Click ', ui('Save thank-you screen', THANKS), '.'],
+                        [
+                            ui('After submitting', SETTINGS), ' — ', ui('Let them submit another response', AFTER_SUBMIT), ', ',
+                            ui('Let them change their answers until the form closes', AFTER_SUBMIT), ' (on the same device, or with the link the thank-you page gives), or ',
+                            ui('One response only', AFTER_SUBMIT), '. Respondents do not sign in, so the last two hold for one device. Saves as soon as you choose.',
+                        ],
                         [ui('Save and finish later', SETTINGS), ' — tick ', ui('Allow respondents to save and finish later', SAVE_RESUME), ' to let respondents come back to a half-finished form.'],
                     ),
                     p('Some sections appear only on some plans, or only to some roles.'),

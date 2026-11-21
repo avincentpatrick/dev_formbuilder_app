@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\TenantApiController;
 use App\Http\Controllers\Api\V1\WebhookDeliveryController;
 use App\Http\Controllers\Api\V1\WebhookEndpointController;
 use App\Http\Controllers\Api\V1\WhoamiController;
+use App\Http\Controllers\Public\GuestAmendController;
 use App\Http\Controllers\Public\GuestAttachmentController;
 use App\Http\Controllers\Public\GuestChallengeController;
 use App\Http\Controllers\Public\GuestContentImageController;
@@ -37,6 +38,7 @@ use App\Http\Middleware\EnforceApiRequestQuota;
 use App\Http\Middleware\EnforceGuestFormRateLimit;
 use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EnforceTenantTwoFactor;
+use App\Http\Middleware\EstablishGuestAmendContext;
 use App\Http\Middleware\EstablishGuestDraftContext;
 use App\Http\Middleware\EstablishGuestTenantContext;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
@@ -677,4 +679,25 @@ Route::prefix('api/v1/public')
         // "Sync now" — which for a respondent who only ever opened an emailed link is their ONLY cached
         // navigation. That is the real trade, and it is an open decision rather than a settled rationale.
         Route::get('drafts/{resumeToken}', [GuestDraftResumeController::class, 'show'])->name('drafts.resume');
+    });
+
+// ── Group D (amend): a respondent changes the response they SENT — M248 (`D232`). UNAUTHENTICATED; tenant + the target
+//    submissions.id resolved from the signed amend token, verified pre-RLS by EstablishGuestAmendContext. No plan feature:
+//    the form's own "After submitting" setting is the gate, judged live by RespondentAmendService.
+//
+//    ⛔ THE `submissions/amend/` PREFIX KEEPS THIS OUT OF THE SERVICE WORKER'S CACHE, as `drafts/` does for the resume
+//    read above: the GET answers with the respondent's full answers and a fresh share token, and sw.ts caches GETs under
+//    `/api/v1/public/f/` only. `ServiceWorkerCachePrefixRouteTest` and `__tests__/sw.test.ts` hold it.
+Route::prefix('api/v1/public')
+    ->name('api.v1.public.')
+    ->middleware([
+        'throttle:guest',
+        EstablishGuestAmendContext::class,
+        // Same guard, same slot as the groups above (I5 / PRD #10).
+        EnforceTenantMaintenance::class,
+        SubstituteBindings::class,
+    ])
+    ->group(function (): void {
+        Route::get('submissions/amend/{amendToken}', [GuestAmendController::class, 'show'])->name('submissions.amend.show');
+        Route::put('submissions/amend/{amendToken}', [GuestAmendController::class, 'update'])->name('submissions.amend.update');
     });

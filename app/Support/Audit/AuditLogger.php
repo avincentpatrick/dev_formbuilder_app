@@ -57,6 +57,9 @@ final class AuditLogger
      * @param  ?array<string, mixed>  $new
      * @param  list<string>  $erasedKeys  keys erased by a GDPR erasure (§2.1 — both sides placeholdered)
      * @param  list<string>  $piiAnswerKeys  answer keys whose field is is_pii/is_sensitive
+     * @param  bool  $withoutActor  M248 — record NO user, even when a session is signed in: a respondent changing their
+     *                              own response through an amend link is not whoever happens to be signed in to the
+     *                              same browser (a staff member testing their own form, say)
      */
     public function record(
         AuditEvent $event,
@@ -68,6 +71,7 @@ final class AuditLogger
         array $erasedKeys = [],
         array $piiAnswerKeys = [],
         ?string $connection = null,
+        bool $withoutActor = false,
     ): Audit {
         $redacted = $this->redactor->redact($auditableType, $old, $new, $erasedKeys, $piiAnswerKeys);
 
@@ -85,7 +89,7 @@ final class AuditLogger
             'old_values' => $redacted['old'],
             'new_values' => $redacted['new'],
             'redacted_fields' => $redacted['redacted_fields'],
-            'user_id' => $actorId ?? Auth::id(),
+            'user_id' => $withoutActor ? null : ($actorId ?? Auth::id()),
             // I11a — the REAL human, when that is not the effective actor above. Read ambiently, exactly
             // like the request metadata below and for the same reason: this is the single write path, and a
             // tenth parameter would be a thing to forget at fifteen call sites, silently. `user_id` stays

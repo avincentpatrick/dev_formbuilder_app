@@ -66,6 +66,37 @@ export function resumeTokenFromPath(pathname: string): string {
     }
 }
 
+/**
+ * M248 (`D232`) — the amend token a `/f/amend/{token}` address carries, or '' for any other address. The amend page is
+ * never cached (`sw.ts` leaves `/f/amend/` to the network), so the address is its only source.
+ */
+export function amendTokenFromPath(pathname: string): string {
+    const match = /^\/f\/amend\/([^/]+)\/?$/.exec(pathname);
+
+    if (match === null) {
+        return '';
+    }
+
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * M248 — a respondent's amend page. ⛔ NEVER CACHED: its address is the whole credential for a SENT response's answers,
+ * so the shell route in `sw.ts` leaves it to the network, and no route claims it. Offline the respondent cannot change
+ * a sent response anyway — the change needs the server.
+ */
+export function isAmendShell(url: string): boolean {
+    try {
+        return new URL(url).pathname.startsWith('/f/amend/');
+    } catch {
+        return false;
+    }
+}
+
 /** A resume shell stored under its own token-bearing URL — what every worker before M140 wrote. */
 function isTokenKeyed(url: string): boolean {
     return isResumeShell(url) && new URL(url).pathname !== RESUME_SHELL_PATH;

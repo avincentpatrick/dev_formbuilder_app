@@ -144,6 +144,10 @@ export interface SchemaResponse {
         // called fetchSchema(). Optional for the usual reason — the service worker can serve a manifest
         // cached before I8b shipped, and absent must mean "off", which is what every form defaults to.
         bot_challenge?: 'off' | 'proof_of_work';
+        // M248 (`D232`) — what the thank-you page offers next: another response, "Change my answers" until the form
+        // closes, or one response from this device. Optional for the usual reason: a manifest cached before M248 has
+        // none, and absent means `another`, what every form did before.
+        after_submit?: 'another' | 'amend' | 'once';
         // M165 (`R-7173c02c`, `D106`) — whether to offer "Upload a filled paper copy", with the limits the picker
         // checks before sending. A HINT: `POST f/{shareToken}/scans` decides every upload. Optional for the usual
         // reason — a manifest cached before M165 has none, and absent means the upload is not offered.
@@ -394,6 +398,9 @@ export interface Bootstrap {
     // Increment H10 — present (non-empty) only when the SPA was opened via the `/f/resume/{token}` web shell.
     // Drives the resume-and-restore flow (App.vue `load()`); empty on a normal `/f/{slug}` entry.
     resumeToken: string;
+    // M248 (`D232`) — present (non-empty) only when the SPA was opened from a respondent's `/f/amend/{token}` link, to
+    // change the response they sent. Read from the address, like the resume token.
+    amendToken: string;
     // Increment H23b — the fingerprint of the tenant brand ramp THIS document was rendered with (`none`
     // when the tenant renders unbranded). Nothing in the UI reads it; it exists so the SPA can notice that
     // OTHER guest shells cached on this device are showing a superseded brand. See lib/brand-cache.ts.
@@ -424,6 +431,10 @@ export type ErrorKind =
     | 'conflict' // 409 submission_conflict — a content conflict; park it for the G8c review flow
     | 'uuid_claimed' // 409 submission_uuid_claimed (M11 cause, own code since M14) — mint a fresh uuid
     | 'finalized' // 409 draft_already_finalized (H9a) — already submitted; stop saving, do not re-read
+    // M248 (`D232`) — a respondent's change to a sent response was refused: 403 amend_not_allowed, 409
+    // response_under_review or response_changed. Its own kind so no 409 here can fall to `refresh`, whose re-mint
+    // would move the page to the form's CURRENT version in the middle of changing an answer to an older one.
+    | 'amend'
     | 'terminal' // 401 invalid / 403 disabled / 404 — unrecoverable
     | 'unknown';
 
@@ -463,6 +474,43 @@ export interface SubmitResult {
      * never move. Optional so a test double that predates it still type-checks; absent reads as null.
      */
     redirect?: SubmitRedirect | null;
+    /**
+     * M248 (`D232`) — the link a respondent keeps to change this response, when the form offers "Change my answers"
+     * and the response was finalized as `submitted`. Optional so a test double that predates it still type-checks.
+     */
+    amend?: AmendLink | null;
+}
+
+/** M248 — a respondent's way back to the response they sent: the token the device remembers, its page, and the close. */
+export interface AmendLink {
+    token: string;
+    url: string;
+    /** When the form stops taking changes (ISO), or null when it has no closing date. */
+    until: string | null;
+}
+
+/** M248 — `GET /api/v1/public/submissions/amend/{token}`: the sent response, to change it. */
+export interface AmendRead {
+    id: string;
+    reference: string;
+    formVersionId: string;
+    answers: AnswerMap;
+    /** The lost-update baseline the change carries back. */
+    contentChecksum: string | null;
+    /** The clock the form's date rules are checked against — the day it was sent, as the server checks it. */
+    submittedAt: string | null;
+    locale: string | null;
+    until: string | null;
+    amendedAt: string | null;
+    shareToken: string;
+}
+
+/** M248 — `PUT /api/v1/public/submissions/amend/{token}`'s answer. */
+export interface AmendResult {
+    id: string;
+    reference: string;
+    contentChecksum: string | null;
+    amendedAt: string | null;
 }
 
 /** A destination after the thank-you screen (M130, `D76`): where, and a name the screen can say it by. */

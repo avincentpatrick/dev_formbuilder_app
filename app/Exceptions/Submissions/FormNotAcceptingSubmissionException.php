@@ -62,6 +62,19 @@ final class FormNotAcceptingSubmissionException extends RuntimeException
         );
     }
 
+    /**
+     * M248 (`D232`) — the form no longer lets a respondent change a sent response: "Change my answers" was switched off,
+     * or the form stopped taking guests. Not a schedule reason, so the guest page says it in its own words.
+     */
+    public static function amendNotAllowed(): self
+    {
+        return new self(
+            'This form no longer lets you change your answers.',
+            'amend_not_allowed',
+            [],
+        );
+    }
+
     /** The stable, machine-readable error code (never the HTTP status text, never translated). */
     public function code(): string
     {

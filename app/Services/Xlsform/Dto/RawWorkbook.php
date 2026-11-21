@@ -17,7 +17,10 @@ use App\Services\Xlsform\XlsformWorkbookReader;
 final class RawWorkbook
 {
     /**
-     * @param  array<string, array{headers: list<string>, rows: list<array<string, ?string>>}>  $sheets  keyed by lowercased sheet name
+     * `row_numbers` (M244) holds each data row's row number in the sheet, where the header is wherever it was. A
+     * workbook built in memory (the unit tests) may leave it out, and then a row's number is its index plus two.
+     *
+     * @param  array<string, array{headers: list<string>, rows: list<array<string, ?string>>, row_numbers?: list<int>}>  $sheets  keyed by lowercased sheet name
      */
     public function __construct(private readonly array $sheets) {}
 
@@ -34,6 +37,15 @@ final class RawWorkbook
     public function rows(string $name): array
     {
         return $this->sheets[strtolower($name)]['rows'] ?? [];
+    }
+
+    /**
+     * The row number the author sees for the sheet's `$index`-th data row (M244, `R-24ec82a6`): the real one when the
+     * reader recorded it, else `$index + 2` (a header in row 1 and no blank rows).
+     */
+    public function rowNumber(string $name, int $index): int
+    {
+        return $this->sheets[strtolower($name)]['row_numbers'][$index] ?? $index + 2;
     }
 
     /**

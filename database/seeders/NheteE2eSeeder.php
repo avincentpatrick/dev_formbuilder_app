@@ -78,12 +78,9 @@ final class NheteE2eSeeder extends Seeder
                 app(XlsformImporter::class)->import($form, $workbook, $owner);
                 app(PublishService::class)->publish($form->refresh(), $owner);
 
+                // The workbook says `default_language: English`; since M244 the import stores it as `en`
+                // (`R-49262cca`), so the walk's axe scans read the locale the import set, not one set here.
                 $form->update([
-                    // `xlsform-default-language-name`: the import stores the workbook's `default_language` NAME
-                    // ("English") as the locale, and the guest page then writes `<html lang="English">`, which axe
-                    // refuses on every page. Set to the code here, so the walk measures the respondent app, not
-                    // the import; `NheteXlsformImportTest` pins what the import stores until the row is fixed.
-                    'default_locale' => 'en',
                     'public_slug' => self::SLUG,
                     'allow_guest_submissions' => true,
                     'save_and_resume' => true,

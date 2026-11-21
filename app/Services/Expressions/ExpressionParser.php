@@ -583,4 +583,39 @@ final class ExpressionParser
 
         return ExpressionSyntaxException::unexpectedToken($token->lexeme, $token->position);
     }
+
+    /**
+     * The first call written with a hyphen in its name (`count-selected(…)`, `string-length(…)`), as written, or null
+     * (M244, `R-bb470c3a`). Such a name is ODK's spelling; this grammar's words have no hyphen, so it lexes as a
+     * subtraction and fails as `unexpected_token`. Only for naming that failure: nothing is evaluated.
+     */
+    public function hyphenatedCall(string $expression): ?string
+    {
+        try {
+            $tokens = $this->lexer->tokenize($expression);
+        } catch (ExpressionSyntaxException) {
+            return null;
+        }
+
+        $count = count($tokens);
+        for ($i = 0; $i < $count; $i++) {
+            if ($tokens[$i]->type !== TokenType::Word) {
+                continue;
+            }
+            $name = $tokens[$i]->lexeme;
+            $end = $tokens[$i]->position + strlen($name);
+            $j = $i + 1;
+            while ($j + 1 < $count && $tokens[$j]->type === TokenType::Minus && $tokens[$j]->position === $end
+                && $tokens[$j + 1]->type === TokenType::Word && $tokens[$j + 1]->position === $end + 1) {
+                $name .= '-'.$tokens[$j + 1]->lexeme;
+                $end = $tokens[$j + 1]->position + strlen($tokens[$j + 1]->lexeme);
+                $j += 2;
+            }
+            if ($j > $i + 1 && ($tokens[$j]->type ?? null) === TokenType::LParen) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
 }

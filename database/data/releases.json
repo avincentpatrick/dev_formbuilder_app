@@ -1,5 +1,35 @@
 [
     {
+        "version": "0.23.0",
+        "title": "Kobo and ODK forms come in whole",
+        "items": [
+            {
+                "kind": "new",
+                "text": "Importing a form from Kobo or ODK (Import XLSForm) now keeps a note's formatting: headings, bold and italic words, and links show as they did in Kobo. A note too long for one box comes in whole."
+            },
+            {
+                "kind": "new",
+                "text": "A question that must be answered only when another answer is given (\"Required when\") now comes in from Kobo, and goes out in this app's own XLSForm export, instead of becoming required every time or never."
+            },
+            {
+                "kind": "improved",
+                "text": "Kobo's \"choose up to\" checks and its text checks (character limits and patterns) now work after import. A formula part this app does not have is named in the import's warnings and again when publishing."
+            },
+            {
+                "kind": "improved",
+                "text": "A Kobo form whose language is written \"English\" or \"English (en)\" now gets the language code en, so screen readers read it correctly, and its questions take their words from the English column."
+            },
+            {
+                "kind": "improved",
+                "text": "A picture, sound or video a Kobo file names is listed in the import's warnings, so you know to upload it in the builder."
+            },
+            {
+                "kind": "fixed",
+                "text": "A Kobo file with a cell too long for this app is now refused with a message naming each cell's sheet, row and column, instead of an error page. Rows are counted as the spreadsheet shows them, even after blank rows."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

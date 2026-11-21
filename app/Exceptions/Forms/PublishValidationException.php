@@ -64,9 +64,14 @@ final class PublishValidationException extends RuntimeException
      * An authored `relevant`/`constraint` expression that will not parse or references an unknown field
      * (F3's publish-time expression gate). `$detail` is the wrapped {@see ExpressionException::slug()}.
      */
-    public static function expressionInvalid(?string $fieldKey, string $detail): self
+    public static function expressionInvalid(?string $fieldKey, string $detail, ?string $function = null): self
     {
         $where = $fieldKey !== null ? "on “{$fieldKey}” " : '';
+
+        // M244 (`R-bb470c3a`): a function the grammar does not have is named, so a Kobo author can read the refusal.
+        if ($function !== null) {
+            return self::one($fieldKey, $detail, "The expression {$where}uses “{$function}”, which this app does not have ({$detail}).");
+        }
 
         return self::one($fieldKey, $detail, "The expression {$where}is invalid ({$detail}).");
     }

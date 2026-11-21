@@ -28,6 +28,15 @@ _None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the
 
 
 ## ANSWERED
+### D228 — Kobo forms check typed text with `regex(…)` and `string-length(…)`, which this product's formula language does not have, so such a form imported and then could not publish (`R-bb470c3a`). How does the import handle them? **A — a whole check becomes this product's Pattern or length rule; any other use is kept as written, with a warning naming it.**
+
+**Asked and answered 2026-11-17 (user decision, in chat), in the planning of `M244`.** Reserved on `M244`'s branch; `D227` is held PR #545's.
+- **A — convert the common shapes (chosen, the session's recommendation).** `regex(., '…')` and `string-length(.) <= N` as a whole constraint, or one `and`-part of it, become the Pattern and length rules both engines already run. No new formula functions.
+- **B — add both to the formula language**, so they work anywhere (show-when, calculations), in both engines with golden vectors. Bigger, and the browser and the server read some patterns differently.
+- **C — warn only.** Import keeps them as written and names each one; the author rewrites them before publishing.
+
+**What it creates:** `M244`'s `XlsformExpressionTranslator::constraint()`, and the export writing Pattern and length rules as `regex()`/`string-length()`. B's work is filed as `xlsform-expression-text-functions`, `during-testing`.
+
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

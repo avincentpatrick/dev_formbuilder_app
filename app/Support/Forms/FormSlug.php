@@ -93,8 +93,10 @@ final class FormSlug
         $candidate = $base;
         $n = 2;
 
+        // M244: the suffix fits inside `MAX_LENGTH` with it, so a taken slug of full length never overflows the column.
         while (self::isTaken($candidate, $form->id)) {
-            $candidate = $base.'-'.$n;
+            $suffix = '-'.$n;
+            $candidate = rtrim(substr($base, 0, self::MAX_LENGTH - strlen($suffix)), '-').$suffix;
             $n++;
         }
 

@@ -12,6 +12,14 @@ namespace App\Exceptions\Expressions;
  */
 final class ExpressionSyntaxException extends ExpressionException
 {
+    /** M244: what the error is about, by the author's name for it — the function an `unknown_function` names. */
+    private ?string $subject = null;
+
+    public function subject(): ?string
+    {
+        return $this->subject;
+    }
+
     public static function emptyExpression(): self
     {
         return new self('The expression is empty.', 'empty_expression');
@@ -44,7 +52,10 @@ final class ExpressionSyntaxException extends ExpressionException
 
     public static function unknownFunction(string $name): self
     {
-        return new self("Unknown function “{$name}”.", 'unknown_function');
+        $exception = new self("Unknown function “{$name}”.", 'unknown_function');
+        $exception->subject = $name;
+
+        return $exception;
     }
 
     public static function arityMismatch(string $name, int $expected, int $got): self

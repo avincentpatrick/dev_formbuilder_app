@@ -12,10 +12,12 @@ use App\Models\SubmissionAnswer;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
+use App\Services\Xlsform\XlsformMarkdown;
 use App\Support\Tenancy\TenantContext;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\Nhete\NheteAnswers;
 use Tests\Support\Nhete\NheteBuilderDriver;
@@ -288,20 +290,44 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
     ];
     $flush();
 
-    // Every question comes back by key, but every note comes back with no content (`xlsform-export-note-content`), and
-    // every "Required when…" comment comes back ALWAYS required: export writes `conditional` as `required = yes` and puts
-    // the condition nowhere (`XlsformExporter`; `xlsform-export-required-when`). So a response the original takes, the
-    // copy refuses — on exactly the comment boxes the scenario leaves empty.
-    $conditional = array_values(array_map(
-        static fn (array $e): string => $e['key'],
-        array_filter($plan->elements(), static fn (array $e): bool => $e['required'] === 'conditional'),
-    ));
-    $answeredComments = array_keys(array_intersect_key($base, array_flip($conditional)));
+    // M244: every question comes back by key, every note with its content as the markdown the export wrote
+    // (`R-7e134c37`), and every rule the original refuses with: "Required when…" as a `required` formula (`R-ea0cc482`,
+    // `R-0ceefbb4`), the word cap's Pattern as `regex()` (`D228`), "up to two" as written. Until M244 every note came back
+    // empty and every comment box always required, so the copy refused the response the original takes.
+    $notesOf = static fn (string $versionId): Collection => FormField::query()->where('form_version_id', $versionId)
+        ->where('field_type', 'note')->get()->keyBy('key');
+    $shape = static function (FormField $note): array {
+        $blocks = array_values(array_filter($note->config['content'] ?? [], static fn (array $block): bool => $block['type'] !== 'image'));
+
+        return [array_column($blocks, 'type'), XlsformMarkdown::plainText($blocks)];
+    };
+    enterTenant($tenant->id, $admin->id);
+    $originalNotes = $notesOf((string) $form->current_published_version_id);
+    $copiedNotes = $notesOf((string) $reimport->current_published_version_id);
+    $withContent = $originalNotes->filter(static fn (FormField $note): bool => ($note->config['content'] ?? []) !== []);
+
     expect($report['export_reimport']['import_status'])->toBe(302)
         ->and($report['export_reimport']['fields'])->toBe($report['fields'])
-        ->and($report['export_reimport']['notes_with_content'])->toBe(0)
         ->and($report['export_reimport']['published'])->toBeTrue()
-        ->and($report['export_reimport']['full_response'])->toBe(422)
-        ->and(array_column($report['export_reimport']['full_response_refused_on'], 'field'))
-        ->toEqualCanonicalizing(array_values(array_diff($conditional, $answeredComments)));
+        ->and($report['export_reimport']['full_response'])->toBe(201, json_encode($report['export_reimport']['full_response_refused_on']))
+        ->and($report['export_reimport']['word_cap_refuses'])->toBeTrue()
+        ->and($report['export_reimport']['required_when_refuses'])->toBeTrue()
+        ->and($report['export_reimport']['up_to_two_refuses'])->toBeTrue();
+
+    // A note whose content, once its picture is left out, is one paragraph of plain words comes back as that label,
+    // which shows the same words (a plain short note stays a label on import); every other comes back as content.
+    $asLabel = [];
+    foreach ($withContent as $key => $note) {
+        [$types, $words] = $shape($note);
+        if (($copiedNotes[$key]->config['content'] ?? []) === [] && $types === ['paragraph']) {
+            expect($copiedNotes[$key]->label)->toBe($words, "the note {$key} came back with other words");
+            $asLabel[] = $key;
+
+            continue;
+        }
+        expect($shape($copiedNotes[$key]))->toBe([$types, $words], "the note {$key} came back changed");
+    }
+    $report['export_reimport']['notes_back_as_label'] = $asLabel;
+    $flush();
+    expect($report['export_reimport']['notes_with_content'])->toBe($withContent->count() - count($asLabel));
 })->group('nhete');

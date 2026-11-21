@@ -151,7 +151,7 @@ final class ExpressionValidationGate
             $ast = $this->parser->parse($expression);
             $this->parser->assertReferencesResolve($ast, $knownKeys, $kind, $ownerKey);
         } catch (ExpressionSyntaxException $exception) {
-            throw PublishValidationException::expressionInvalid($exception->fieldKey() ?? $ownerKey, $exception->slug());
+            throw PublishValidationException::expressionInvalid($exception->fieldKey() ?? $ownerKey, $exception->slug(), $this->missingFunction($expression, $exception));
         }
 
         // A grid (G4b) or geo (G5b1) value is object-shaped and has no valid scalar use — reject any
@@ -401,5 +401,19 @@ final class ExpressionValidationGate
         } catch (ExpressionSyntaxException) {
             return [];
         }
+    }
+
+    /**
+     * The function an expression calls that the grammar does not have, by the name the author wrote (M244,
+     * `R-bb470c3a`), or null. The parser names it for `unknown_function`; a name in ODK's spelling (`string-length`)
+     * lexes as a subtraction and fails as `unexpected_token`, so the parser is asked for it then.
+     */
+    private function missingFunction(string $expression, ExpressionSyntaxException $exception): ?string
+    {
+        if ($exception->subject() !== null) {
+            return $exception->subject();
+        }
+
+        return $exception->slug() === 'unexpected_token' ? $this->parser->hyphenatedCall($expression) : null;
     }
 }

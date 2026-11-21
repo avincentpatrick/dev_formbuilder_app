@@ -3077,6 +3077,383 @@
                 }
             }
         },
+        "/public/submissions/amend/{amendToken}": {
+            "get": {
+                "operationId": "v1.public.submissions.amend.show",
+                "summary": "Read a sent response to change it",
+                "tags": [
+                    "GuestAmend"
+                ],
+                "parameters": [
+                    {
+                        "name": "amendToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "reference": {
+                                                    "type": "string",
+                                                    "description": "The short reference the respondent can quote to the form's owner. A display handle, never a credential."
+                                                },
+                                                "form_version_id": {
+                                                    "type": "string"
+                                                },
+                                                "answers": {
+                                                    "type": "string"
+                                                },
+                                                "content_checksum": {
+                                                    "type": "string",
+                                                    "description": "The baseline the change must carry back, so a change made meanwhile on another device is not overwritten."
+                                                },
+                                                "submitted_at": {
+                                                    "type": "string",
+                                                    "description": "The clock the form's date rules are checked against: the day the response was sent, as the server checks it."
+                                                },
+                                                "locale": {
+                                                    "type": "string"
+                                                },
+                                                "amend_until": {
+                                                    "type": "string",
+                                                    "description": "When the form stops taking changes, or null when it has no closing date."
+                                                },
+                                                "amended_at": {
+                                                    "type": "string",
+                                                    "description": "When the respondent last changed it, or null when they never did."
+                                                },
+                                                "share_token": {
+                                                    "type": "string"
+                                                },
+                                                "share_token_expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "reference",
+                                                "form_version_id",
+                                                "answers",
+                                                "content_checksum",
+                                                "submitted_at",
+                                                "locale",
+                                                "amend_until",
+                                                "amended_at",
+                                                "share_token",
+                                                "share_token_expires_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "response_changed"
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "const": "These answers were changed somewhere else. Open the link again to see the latest answers."
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "response_under_review"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "response_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This response is no longer available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            },
+            "put": {
+                "operationId": "v1.public.submissions.amend.update",
+                "summary": "Change a sent response",
+                "tags": [
+                    "GuestAmend"
+                ],
+                "parameters": [
+                    {
+                        "name": "amendToken",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GuestAmendRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "reference": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "content_checksum": {
+                                                    "type": "string",
+                                                    "description": "The baseline for a further change from this page."
+                                                },
+                                                "amended_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "reference",
+                                                "status",
+                                                "content_checksum",
+                                                "amended_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "response_changed"
+                                                        },
+                                                        "message": {
+                                                            "type": "string",
+                                                            "const": "These answers were changed somewhere else. Open the link again to see the latest answers."
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "error": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "code": {
+                                                            "type": "string",
+                                                            "const": "response_under_review"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "details": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "code",
+                                                        "message",
+                                                        "details"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "error"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "object",
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "const": "response_not_found"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "This response is no longer available."
+                                                },
+                                                "details": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "code",
+                                                "message",
+                                                "details"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                },
+                "security": []
+            }
+        },
         "/public/f/{shareToken}/attachments": {
             "post": {
                 "operationId": "v1.public.attachments.store",
@@ -4245,13 +4622,37 @@
                                                             ]
                                                         }
                                                     ]
+                                                },
+                                                "amend": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "description": "When the form lets a respondent change their answers until it closes: the link to do so, its token for\nthe device to remember, and when the form closes (null for no closing date). Null otherwise.",
+                                                    "properties": {
+                                                        "token": {
+                                                            "type": "string"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        },
+                                                        "until": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "token",
+                                                        "url",
+                                                        "until"
+                                                    ]
                                                 }
                                             },
                                             "required": [
                                                 "id",
                                                 "reference",
                                                 "status",
-                                                "redirect"
+                                                "redirect",
+                                                "amend"
                                             ]
                                         }
                                     },
@@ -4330,13 +4731,37 @@
                                                             ]
                                                         }
                                                     ]
+                                                },
+                                                "amend": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "description": "When the form lets a respondent change their answers until it closes: the link to do so, its token for\nthe device to remember, and when the form closes (null for no closing date). Null otherwise.",
+                                                    "properties": {
+                                                        "token": {
+                                                            "type": "string"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        },
+                                                        "until": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "token",
+                                                        "url",
+                                                        "until"
+                                                    ]
                                                 }
                                             },
                                             "required": [
                                                 "id",
                                                 "reference",
                                                 "status",
-                                                "redirect"
+                                                "redirect",
+                                                "amend"
                                             ]
                                         }
                                     },
@@ -4518,6 +4943,10 @@
                                                             "type": "string",
                                                             "description": "Whether this form requires a proof-of-work spam check before it will accept a submission\n(I8b). A hint, not a gate: the submit route decides, and this only saves the client a\nrejected round trip. A client replaying queued submissions may send one without having\nread it; that submission is refused with a 403, and solving the check and retrying once\nrecovers it."
                                                         },
+                                                        "after_submit": {
+                                                            "type": "string",
+                                                            "description": "What the thank-you page offers next: `another` (submit another response), `amend` (change the answers\nsent, until the form closes) or `once` (one response from this device)."
+                                                        },
                                                         "confirmation_message": {
                                                             "type": [
                                                                 "string",
@@ -4614,6 +5043,7 @@
                                                         "single_page_mode",
                                                         "save_and_resume",
                                                         "bot_challenge",
+                                                        "after_submit",
                                                         "confirmation_message",
                                                         "confirmation_message_translations",
                                                         "schedule",
@@ -7213,6 +7643,32 @@
                     "updated_at"
                 ],
                 "title": "FormVersionResource"
+            },
+            "GuestAmendRequest": {
+                "type": "object",
+                "description": "A respondent's changed answers to the response they sent (M248, `D232`), with the content checksum their page was\ngiven \u2014 the lost-update baseline, always claimed, because the respondent may have the link open on two devices.",
+                "properties": {
+                    "answers": {
+                        "type": "array",
+                        "description": "The respondent's answers, keyed by question; the same shape a guest submit sends.",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "base_content_checksum": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The `content_checksum` the amend read returned. Null only for a response stored before checksums existed.",
+                        "maxLength": 128
+                    }
+                },
+                "required": [
+                    "answers",
+                    "base_content_checksum"
+                ],
+                "title": "GuestAmendRequest"
             },
             "GuestDraftRequest": {
                 "type": "object",

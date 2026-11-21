@@ -76,6 +76,7 @@ const form = {
     timezone: 'UTC',
     max_responses: null,
     save_and_resume: false,
+    after_submit: 'another',
     single_page_mode: false,
 };
 
@@ -147,7 +148,7 @@ group('FormSettingsModal — the rail', () => {
         wrapper.unmount();
     });
 
-    it('offers exactly the seven sections, and names none of them after a builder pane', () => {
+    it('offers exactly the eight sections, and names none of them after a builder pane', () => {
         const wrapper = mountModal();
 
         // M131 added Theme, after Pages: the other section about how the form looks to a respondent.
@@ -158,6 +159,8 @@ group('FormSettingsModal — the rail', () => {
             'Share',
             'Schedule',
             'Thank-you message',
+            // M248 (`D232`): what the thank-you page offers next, beside the message it ends.
+            'After submitting',
             'Save and finish later',
         ]);
 
@@ -222,7 +225,7 @@ group('FormSettingsModal — gated sections', () => {
         const wrapper = mountModal({ saveResumeAvailable: false });
 
         expect(railLabels(wrapper)).not.toContain('Save and finish later');
-        expect(railLabels(wrapper)).toHaveLength(6);
+        expect(railLabels(wrapper)).toHaveLength(7);
 
         wrapper.unmount();
     });
@@ -235,7 +238,7 @@ group('FormSettingsModal — gated sections', () => {
         const wrapper = mountModal({ saveResumeAvailable: false, share: null });
 
         // Theme too: `D81` puts presets on every plan, so its route carries `can:update,form` alone.
-        expect(railLabels(wrapper)).toEqual(['Details', 'Pages', 'Theme', 'Schedule', 'Thank-you message']);
+        expect(railLabels(wrapper)).toEqual(['Details', 'Pages', 'Theme', 'Schedule', 'Thank-you message', 'After submitting']);
 
         wrapper.unmount();
     });
@@ -316,7 +319,7 @@ group('the Scanning section (M129)', () => {
         });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'Save and finish later',
+            'Details', 'Pages', 'Theme', 'Share', 'Scanning', 'Schedule', 'Thank-you message', 'After submitting', 'Save and finish later',
         ]);
 
         await railButton(wrapper, 'Scanning').trigger('click');
@@ -351,7 +354,7 @@ group('the Reference files section (M132)', () => {
         const wrapper = mountWith([]);
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later',
+            'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Schedule', 'Thank-you message', 'After submitting', 'Save and finish later',
         ]);
 
         await railButton(wrapper, 'Reference files').trigger('click');
@@ -387,7 +390,7 @@ group('the Automations section (M132)', () => {
         const wrapper = mountWith({ can_webhook: false, max: 10, items: [] });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations',
+            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'After submitting', 'Save and finish later', 'Automations',
         ]);
 
         await railButton(wrapper, 'Automations').trigger('click');
@@ -428,7 +431,7 @@ group('the Data sharing section (M133)', () => {
         });
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later', 'Automations', 'Data sharing',
+            'Details', 'Pages', 'Theme', 'Share', 'Schedule', 'Thank-you message', 'After submitting', 'Save and finish later', 'Automations', 'Data sharing',
         ]);
 
         await railButton(wrapper, 'Data sharing').trigger('click');

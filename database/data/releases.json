@@ -1,5 +1,31 @@
 [
     {
+        "version": "0.27.0",
+        "title": "Come back to your answers, and change them after you send",
+        "items": [
+            {
+                "kind": "new",
+                "text": "If you close a form before finishing and open its link again on the same phone or computer, the form now asks: Continue where you left off, or Start over. Your answers stay hidden until you choose. On a shared device, choose Start over."
+            },
+            {
+                "kind": "new",
+                "text": "Form settings have a new section, After submitting. Choose what respondents can do once they press Submit: send another response (as before), change their answers until the form closes, or send one response only."
+            },
+            {
+                "kind": "new",
+                "text": "When a form lets respondents change their answers, the thank-you page shows Change my answers and a link to copy or email. Opening the form's link again on the same device also offers Change my answers. Changes stop once the form closes, or once staff start reviewing the response."
+            },
+            {
+                "kind": "new",
+                "text": "A response the respondent changed shows \"Changed by the respondent\" with the date on its page, and the change is listed in the audit log as made by the Respondent."
+            },
+            {
+                "kind": "improved",
+                "text": "Respondents do not sign in, so \"one response\" and \"change my answers\" work on one device. Someone on another phone or browser can still send a new response."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

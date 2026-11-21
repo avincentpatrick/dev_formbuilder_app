@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\AuditEvent;
+use App\Enums\SubmissionStatus;
+use App\Models\Audit;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -155,6 +158,49 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
     expect(SubmissionAnswer::query()->findOrFail($response->json('data.id'))->answers)->not->toHaveKey('d01_p1_keep');
 
     expect(Submission::query()->count())->toBe(5);
+
+    // ── 5b. Change a sent response until the form closes (M248, `D232`, NHETE recommendation 6a) ──────────────
+    // "Until the closing date, a person can come back on the same device and change answers." The author chooses it in
+    // the form's settings; each submit then returns the respondent's link, which reads and changes the response.
+    $this->actingAs($admin)->patchJson("http://acme.meridian.test/forms/{$form->id}/after-submit", ['after_submit' => 'amend'])
+        ->assertSessionHasNoErrors();
+    $sent = $submit($base);
+    expect($sent->status())->toBe(201)
+        ->and($sent->json('data.amend.token'))->toBeString();
+    $amendUrl = 'http://acme.meridian.test/api/v1/public/submissions/amend/'.$sent->json('data.amend.token');
+    $change = fn (array $answers, ?string $baseline) => $this->putJson($amendUrl, ['answers' => $answers, 'base_content_checksum' => $baseline]);
+
+    $read = $this->getJson($amendUrl)->assertOk()->json('data');
+    $started = hrtime(true);
+    $changed = $change([...$read['answers'], 'q1_1' => 'Changed after sending.'], $read['content_checksum']);
+    $report['timings_ms']['amend'] = (int) ((hrtime(true) - $started) / 1e6);
+    expect($changed->status())->toBe(200, 'amend: '.mb_substr((string) $changed->getContent(), 0, 1500));
+
+    enterTenant($tenant->id);
+    $amended = Submission::query()->findOrFail($sent->json('data.id'));
+    expect(SubmissionAnswer::query()->findOrFail($amended->id)->answers['q1_1'])->toBe('Changed after sending.')
+        ->and($amended->respondent_amended_at)->not->toBeNull()
+        ->and(Audit::query()->where('auditable_id', $amended->id)->where('event', AuditEvent::Updated)->whereNull('user_id')->count())->toBe(1);
+
+    // The module's rules still bind a change: the word cap refuses, at the question.
+    $baseline = $changed->json('data.content_checksum');
+    $capped = $change([...$read['answers'], 'q1_1' => NheteAnswers::words(1501)], $baseline);
+    expect($capped->status())->toBe(422)
+        ->and(array_column($capped->json('error.details.fields') ?? [], 'field'))->toContain('q1_1');
+
+    // Once staff take it up, it is theirs; once the form closes, nothing changes.
+    enterTenant($tenant->id);
+    Submission::query()->whereKey($amended->id)->update(['status' => SubmissionStatus::UnderReview]);
+    expect($change($read['answers'], $baseline)->json('error.code'))->toBe('response_under_review');
+    enterTenant($tenant->id);
+    Submission::query()->whereKey($amended->id)->update(['status' => SubmissionStatus::Submitted]);
+    Form::query()->whereKey($form->id)->update(['closes_at' => now()->subMinute()]);
+    expect($change($read['answers'], $baseline)->json('error.code'))->toBe('form_closed');
+    enterTenant($tenant->id);
+    Form::query()->whereKey($form->id)->update(['closes_at' => null]);
+
+    // A change adds no response.
+    expect(Submission::query()->count())->toBe(6);
 
     // ── 6. The other ways to make it: a template, the question library, and export → re-import ─────────────
     $flush = function () use (&$report): void {

@@ -7561,7 +7561,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the comment opening at `config/permission.php:20`. ⚠️ **The one near-miss is a circular pointer, not a
   deferral**: `docs/multi-tenancy-rbac-design.md:745` defers the request/response *shapes* to Doc #14, and
   `docs/api-specification.md:13` points straight back at §7.1 as the authoritative inventory. Neither
-  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:789` says
+  defers the build. This repository builds `/api/v1` twins deliberately — `routes/tenant.php:796` says
   so — so the web surface does not discharge it. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ⛔ **THIS IS THE ROW THAT MADE THE ANSWER `C` RATHER THAN `A`.** `D38`'s premise sentence *"nothing shipped depends on them"* is false here: the documented `GET /api/v1/roles` is the stated reason roles use UUIDv7 primary keys rather than Spatie's bigints, cited at `docs/multi-tenancy-rbac-design.md:56`, `app/Models/Role.php:13` and `config/permission.php:20-21`. **That schema shipped**, so a plain trim orphans the rationale for a decision already paid for. ✅ **CLOSED BY `M193` (2026-10-28), on its branch, under `D13` exception #6 (the six `D38` rows together, allowed by the user in chat):** §7.1's Users & roles row is marked **not built (`D38`)** in place and keeps the forward reference as the reason roles use UUIDv7 keys (`docs/multi-tenancy-rbac-design.md` §4). That document's §11 line, which `M190` ended in a `Queued` disposition naming this row, now ends *Not planned* (owed only if the endpoints are built), and `config/permission.php`'s present-tense "addressable via `GET /api/v1/roles`" now says the endpoint is documented and not built; `Role.php` and the permission-tables migration already said "forward-referenced". Drift: the member routes are now `routes/tenant.php:429-454`, with a two-factor reset beside them, and the "/api/v1 twins" sentences moved.
 
 - ✅ **CLOSED BY `M193` (2026-10-28) — ****`minor` · §7.1's `Form draft` row pins four `/api/v1` builder endpoints registered nowhere, and the
@@ -7583,7 +7583,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `app/Services/Forms/FormBuilderService.php:252`, `:276`, `:316-318` and `:572` — so nothing in the tree implements
   them as an addressable resource at all. ⚠️ Adjacent and deliberately in scope of the same repair:
   `docs/architecture/technical-architecture.md:441` also pins `POST /api/v1/forms` and
-  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ✅ **CLOSED BY `M193` (2026-10-28), on its branch, under `D13` exception #6 (the six `D38` rows together, allowed by the user in chat):** §7.1's Form draft row is marked **not built (`D38`)** — sections and fields have tenant-web twins only, the draft is read through the builder page, and validations are saved inline with their field — and the Forms row says the two `GET`s are implemented (Increment E) and `POST`, `PATCH` and `DELETE` are not, the tenant-web app creating, editing and archiving forms. `FormApiController`'s class docblock, which said the writes "extend this same pattern in Phase 1", now says only the reads are built; `openapi.json` exported byte-identical. Drift: the forms family is one line lower (`:169` to `:201`), the builder block is `routes/tenant.php:621-680` and no longer all on `FormBuilderController`, and `FormBuilderService` writes validations at `:276`, `:319` and `:993`.
+  `PATCH/DELETE /api/v1/forms/{form}`, and only the two GETs exist. **Live.** Filed by `M80`. **Tier: during-testing.** **Retiered down from `early-testing` 2026-10-03 by `M127`: it is neither one of the user's 19 builder comments nor a builder defect found while fixing one, and `D72` puts everything else after the Oct 12 testing.** ⚠️ **`D38` ANSWERED 2026-09-20 (`M105`) — mark the six as not built, in place, rather than trimming the documentation.** ✅ **CLOSED BY `M193` (2026-10-28), on its branch, under `D13` exception #6 (the six `D38` rows together, allowed by the user in chat):** §7.1's Form draft row is marked **not built (`D38`)** — sections and fields have tenant-web twins only, the draft is read through the builder page, and validations are saved inline with their field — and the Forms row says the two `GET`s are implemented (Increment E) and `POST`, `PATCH` and `DELETE` are not, the tenant-web app creating, editing and archiving forms. `FormApiController`'s class docblock, which said the writes "extend this same pattern in Phase 1", now says only the reads are built; `openapi.json` exported byte-identical. Drift: the forms family is one line lower (`:169` to `:201`), the builder block is `routes/tenant.php:622-681` and no longer all on `FormBuilderController`, and `FormBuilderService` writes validations at `:276`, `:319` and `:993`.
 
 - **`minor` · The parity matrix scores API/programmatic import as Phase-1 shipped, and the code's own enum
   docblock calls it a later channel.** Measured by `M79`'s sweeps (2026-09-06), joined and refuted by
@@ -7613,7 +7613,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - **`minor` · §7.1's flat webhook-delivery paths and §7.4's per-tenant delivery-log UI both contradict the
   same document's per-endpoint spec, and only the per-endpoint form was built.** Measured by `M79`'s sweeps
   (2026-09-06), joined and refuted by `M80`. Every delivery listing in the tree is parent-scoped —
-  `routes/api.php:323`, `routes/api.php:328`, `routes/tenant.php:790`, and the query chains opening at
+  `routes/api.php:325`, `routes/api.php:328`, `routes/tenant.php:790`, and the query chains opening at
   `app/Http/Controllers/Api/V1/WebhookDeliveryController.php:31` and
   `app/Services/Webhooks/WebhookEndpointPresenter.php:105`, whose `webhook_endpoint_id` predicates sit on
   the following line in each — and `openapi.json` carries the nested pair only. ⛔ **DO NOT TAKE THIS AS
@@ -7852,7 +7852,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `lockForUpdate()` appears about twenty times, and one is a pointed counterexample:
   `app/Services/Submissions/FormAcceptanceGuard.php:89` is a per-form lock that already serialises
   concurrent finalizers on the same form, on the submit path rather than the export path. (b) The export
-  routes are **not** unthrottled: `routes/api.php:187` and `routes/api.php:402` sit in the group whose
+  routes are **not** unthrottled: `routes/api.php:189` and `routes/api.php:402` sit in the group whose
   middleware array carries `throttle:api` at `routes/api.php:152`, so they inherit the 600/min burst
   limiter. What is genuinely absent is an export-scoped or per-form guard — and a per-minute limiter cannot
   express a concurrency ceiling at all, which is the row's real point. ⚠️ Note the shape difference from
@@ -12015,7 +12015,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
-  `FieldInput.vue:252,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
+  `FieldInput.vue:258,246,253,254`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
@@ -13094,11 +13094,12 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   work. The race is older than M130; the heavier page only widened it. **Live.** Filed by `M130`.
   **Tier: during-testing.** ✅ **CLOSED BY `M130` (2026-10-04) — NO SEND ATTEMPT WHILE THE BROWSER REPORTS OFFLINE.** `registerBackgroundSync()` still registers the Background Sync tag but posts `replay-outbox` only when `navigator.onLine` is not false; `sync-outbox.test.ts` holds both arms, and the spec's case then passed 12 of 12.
 
-- **`minor` · The single-response-only form that `docs/ux/form-filling-ux-flow.md` §9 specifies is not built: every guest
+- ✅ **CLOSED BY `M248` (2026-11-21) — ****`minor` · The single-response-only form that `docs/ux/form-filling-ux-flow.md` §9 specifies is not built: every guest
   confirmation offers "Submit another response".** Found by `M130` while verifying `R-db169c29`. The §9 table makes the
   option tenant-configurable ("submit another" vs. a single-response-only form); `ConfirmationScreen.vue` always shows the
   button and no setting exists. A form meant to be answered once per respondent therefore invites a second response.
   **Not live**. Filed by `M130`. **Tier: before-launch.**
+  ✅ **CLOSED BY `M248` (2026-11-21), on its branch, held for the merge point (`D232` answer 2), taken early — its tier is `before-launch` and it was not retiered.** The form's "After submitting" setting has **One response only**: the thank-you page offers nothing more, and reopening the form's link on that device says it was already answered. Guests do not sign in, so it holds for one device; the setting says so before the author chooses.
 
 - ✅ **CLOSED BY `M225` (2026-11-08) — ****`minor` · `openapi.json` documents the guest submit's success as a bare string, so its body — `id`, `reference`,
   `status` and, since M130, `redirect` — is in no contract.** Found by `M130` while regenerating the document for
@@ -14268,7 +14269,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the server copies the question as it is stored, so the library item misses the last change. **Live.** Filed by `M170`.
   **Tier: during-testing.** ✅ **CLOSED BY `M170` (2026-10-14):** `saveFieldToLibrary()` sends the waiting edit before the copy. Proof: `settings-save-matrix.test.ts`, red on the trunk.
 
-- **`minor` · A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload.**
+- ✅ **CLOSED BY `M248` (2026-11-21) — ****`minor` · A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload.**
   Found by `M170` checking the public form's autosave for the user's report. `touchRespondentSession()` in
   `resources/public-runtime/lib/respondent-session.ts` never revives an expired visit, by design for kiosks, so after a pause past
   `IDLE_MS` every later keystroke leaves the visit expired while `useAutosave` keeps stamping the old visit on the saved answers.
@@ -14276,13 +14277,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   overwrites them. A person filling a long form who leaves to find a document is the case. The remedy has to keep the kiosk
   protection: tell an expired visit that is still on screen and typing from a new person at the device. **Live.** Filed by `M170`.
   **Tier: during-testing.**
+  ✅ **CLOSED BY `M248` (2026-11-21), on its branch, held for the merge point (`D118` A, `D232`).** The next reload no longer refuses the respondent's own answers: a draft an earlier visit left — a lapsed visit included — is offered back behind "Continue where you left off" or "Start over", asked before any answer appears (`earlierVisitDraft()`, `ContinueOrStartOver.vue`). The kiosk protection holds, because nothing is shown until someone chooses; the accepted shared-device cost is `D118`'s, recorded in `docs/adr/0021-respondent-scoped-device-outbox.md`'s M248 amendment.
 
-- **`minor` · Reopening a public form's link on the same device starts a blank form; it should offer "Continue where you left off" or "Start over".**
+- ✅ **CLOSED BY `M248` (2026-11-21) — ****`minor` · Reopening a public form's link on the same device starts a blank form; it should offer "Continue where you left off" or "Start over".**
   `D118` A (the user, 2026-10-14). Since `M21` the guest autosave restores answers only in the same tab and visit
   (`resources/public-runtime/composables/useAutosave.ts`, `lib/respondent-session.ts`), so a respondent who closes the tab, or opens
   the link again from a messaging app, starts blank. The user chose to offer the answers back on the same device behind a choice
   shown before any answer appears, accepting that on a shared phone the next person could choose Continue. The kiosk-mode row this
   file already parks is the place to switch it off for a shared device. **Live.** Filed by `M170`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M248` (2026-11-21), on its branch, held for the merge point (`D118` A, `D232` answer 4).** `App.vue` asks before `RuntimeSession` mounts; Continue re-stamps the row with this visit and, when the row shadows a "Save and finish later" draft (autosave now records its uuid, baseline and resume token), carries on that same server draft through the resume read; Start over opens a blank form and leaves the row for the first save to overwrite. Measured by `respondent-answers-boot.test.ts` and by NHETE's walk, which closes its tab on the first indicator page and continues there.
 
 - **`minor` · A staff member who continues a colleague's draft on the encoding page has every autosave refused, and saving stops for good.**
   Found by `M170` checking the staff autosave for the user's report. The resume page is gated on `SubmissionPolicy::promote()`, which
@@ -14681,7 +14684,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
   exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:185` reads them by
-  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:376` says a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
   barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
@@ -16324,12 +16327,41 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `respondent-edit-after-submit` — A respondent cannot change their answers after Submit, even while the form is still open.**
+- ✅ **CLOSED BY `M248` (2026-11-21) — ****`minor` · `respondent-edit-after-submit` — A respondent cannot change their answers after Submit, even while the form is still open.**
   Found by `M237` (2026-11-14). NHETE says *"Until the closing date, a person can come back on the same device and change answers"*. Only staff can edit a submission (`SubmissionAnswerEditService`), and a finalized draft cannot be saved again. It pairs with the single-response-only row filed by `M130` and with `D118`'s same-device "Continue where you left off" row.
 
   The remedy, when taken: a per-form setting that lets the respondent who submitted reopen and amend their response until `closes_at`, with the amendment recorded in the submission's history.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M248` (2026-11-21), on its branch, held for the merge point (`D232`, ADR `0026-respondent-changes-own-response.md`).** A form's "After submitting" setting can be **Change my answers until the form closes**: each guest submit returns an amend link (`/f/amend/{token}`, a signed `typ: 'amend'` token), the device remembers it, and reopening the form's link offers "Change my answers". `RespondentAmendService` decides live that the response is a guest's on its own form, the form still offers it, takes guests and is open, and the response is still `submitted` (`D232` answer 3); `SubmissionAnswerEditService::amendAsRespondent()` writes it as a staff correction is written, re-checked under the lock, with one audit row by the respondent and `submissions.respondent_amended_at`. Left out, each filed below: `respondent-amend-media`, `respondent-amend-offline`, `respondent-amend-notify`, `submission-history-panel`.
+
+- **`nit` · `respondent-amend-media` — A respondent changing a sent response cannot replace a photo, file or signature.**
+  Found by `M248` (2026-11-21). The change goes through the staff correction's write, which keeps every media answer from the stored document (`SubmissionAnswerEditService::mergeMedia()`), so the page draws them read-only with "Files you sent cannot be changed." A respondent who sent the wrong photo has to ask the form's owner.
+
+  The remedy, when taken: the media-editing vertical the backlog already names for staff ('Post-submission MEDIA editing') — attachment ownership, displaced files and scan status — opened to the respondent's change too.
+
+  **Not live** — a request. Filed by `M248`. **Tier: during-testing.**
+
+- **`nit` · `respondent-amend-offline` — Changing a sent response needs a connection.**
+  Found by `M248` (2026-11-21). The change is sent live, never through the outbox: a queued change cannot carry the amend token, and one that reached the server later than the respondent believed could land after staff began a review. Offline the page says "Connect to the internet to send your changes" and keeps the answers on screen, but not in storage, so closing the tab loses them.
+
+  The remedy, when taken: keep an in-progress change on the device (its own draft row, keyed apart from a fill's) and send it once online, refusing it then if the response has since been taken up.
+
+  **Not live** — a request. Filed by `M248`. **Tier: during-testing.**
+
+- **`nit` · `respondent-amend-notify` — Nobody is told when a respondent changes a sent response.**
+  Found by `M248` (2026-11-21). The respondent gets no email confirming the change, and the form's owner gets nothing either: automations listen to `SubmissionCreated` only, and `submission.updated` reaches webhooks and connectors but no notification. Staff see "Changed by the respondent" on the response and a "Respondent" row in the audit log.
+
+  The remedy, when taken: an optional receipt to the respondent's own address, and an automation trigger or notification for the owner when a response changes.
+
+  **Not live** — a request. Filed by `M248`. **Tier: during-testing.**
+
+- **`nit` · `submission-history-panel` — A response's history is only in the workspace audit log.**
+  Found by `M248` (2026-11-21). A response changed by its respondent, or corrected by staff, records each change as an audit row, but the response's own page shows only the last time the respondent changed it; seeing what changed means filtering the audit log.
+
+  The remedy, when taken: a history panel on the response's page listing each change, who made it and what it changed, read from the audit rows it already has.
+
+  **Not live** — a request. Filed by `M248`. **Tier: during-testing.**
 
 - **`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
   Found by `M237` (2026-11-14). NHETE has 10 named stops over about 45 screens, each screen with its own small progress label. `ProgressIndicator.vue` draws one numbered dot per visible step, and `useFormRuntime` labels a step *"Step X of N: {section title}"*. Sections have no parent.

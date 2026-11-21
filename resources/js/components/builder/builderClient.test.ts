@@ -180,6 +180,7 @@ function pageProps(): BuilderPageProps {
             description: null,
             status: 'draft',
             save_and_resume: false,
+            after_submit: 'another',
             opens_at: null,
             closes_at: null,
             timezone: 'UTC',

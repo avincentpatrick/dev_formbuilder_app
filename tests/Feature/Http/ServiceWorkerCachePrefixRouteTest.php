@@ -58,7 +58,9 @@ function swCachedGetAllowList(): array
         // The shell. The manifest is not a navigation, and is listed because this gate counts every GET under the
         // prefix rather than modelling the navigate-only predicate. `guest.form.resume` sits under this prefix too;
         // since M140 the shell route leaves it to the route below by `isResumeShell()`, which this gate does not model.
-        'f/' => ['guest.form.manifest', 'guest.form.mint', 'guest.form.resume'],
+        // M248 (`D232`): `guest.form.amend` sits under it too, and the shell route leaves it to the NETWORK by
+        // `isAmendShell()` — no route caches an amend page at all; this gate does not model the predicate either.
+        'f/' => ['guest.form.amend', 'guest.form.manifest', 'guest.form.mint', 'guest.form.resume'],
         // The resume shell (M140, `R-68656155`, `D20` = 2): cached in the shell cache under ONE token-free key with
         // the token blanked, so the device keeps the offline surface and holds no resume link. `guest.form.mint` and
         // the manifest are listed because their URIs start with a parameter whose static head `f/` is a prefix of this
@@ -135,6 +137,19 @@ it('finds the resume READ by name, and it answers under no cached prefix', funct
     foreach (swCachePrefixLiterals() as $prefix) {
         expect(in_array('api.v1.public.drafts.resume', swGetRouteNamesUnder($prefix), true))
             ->toBeFalse("the resume READ answers under the cached prefix {$prefix}");
+    }
+});
+
+it("finds the respondent's amend READ by name, and it answers under no cached prefix (M248, D232)", function (): void {
+    // The read answers a SENT response's every answer and a fresh share token, reached with the amend token in the path.
+    $amend = Route::getRoutes()->getByName('api.v1.public.submissions.amend.show');
+
+    expect($amend)->not->toBeNull()
+        ->and($amend?->methods())->toContain('GET');
+
+    foreach (swCachePrefixLiterals() as $prefix) {
+        expect(in_array('api.v1.public.submissions.amend.show', swGetRouteNamesUnder($prefix), true))
+            ->toBeFalse("the amend READ answers under the cached prefix {$prefix}");
     }
 });
 

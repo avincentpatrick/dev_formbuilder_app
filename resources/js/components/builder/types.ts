@@ -346,6 +346,8 @@ export interface BuilderPageProps {
         description: string | null;
         status: string;
         save_and_resume: boolean;
+        // M248 (`D232`) — what the thank-you page offers next (`FormSettingsPresenter`).
+        after_submit: 'another' | 'amend' | 'once';
         // Presentation mode (`D35`): true renders every section in one scroll, false one section per step.
         // Read by the Pages settings section and by `PreviewPane`, which feeds it into the projection so
         // the preview renders the mode the author actually chose.

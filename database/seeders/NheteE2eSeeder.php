@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AfterSubmit;
 use App\Models\Form;
 use App\Models\Tenant;
 use App\Models\User;
@@ -12,6 +13,7 @@ use App\Services\Forms\PublishService;
 use App\Services\Xlsform\XlsformImporter;
 use App\Services\Xlsform\XlsformWorkbookWriter;
 use App\Support\Tenancy\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +91,12 @@ final class NheteE2eSeeder extends Seeder
                     'save_and_resume' => true,
                     'single_page_mode' => false,
                 ]);
+
+                // M248 (`D232`, NHETE recommendation 6a): "Until the closing date, a person can come back on the same
+                // device and change answers." So the form lets respondents change their answers, and it closes — a
+                // month from the seed, through the real writers, so the walk measures what an author would set.
+                app(FormService::class)->setAfterSubmit($form->refresh(), AfterSubmit::Amend, $owner);
+                app(FormService::class)->setSchedule($form->refresh(), null, CarbonImmutable::now()->addMonth(), 'Asia/Manila', null, $owner);
             });
         } finally {
             @unlink($path);

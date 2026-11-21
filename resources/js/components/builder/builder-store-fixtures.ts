@@ -165,6 +165,7 @@ export function pageProps(overrides: Partial<BuilderPageProps> = {}): BuilderPag
             description: null,
             status: 'draft',
             save_and_resume: false,
+            after_submit: 'another',
             single_page_mode: false,
             opens_at: null,
             closes_at: null,

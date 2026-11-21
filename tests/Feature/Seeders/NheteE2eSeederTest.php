@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AfterSubmit;
 use App\Models\Form;
 use App\Models\FormSection;
 use App\Models\Tenant;
@@ -62,6 +63,9 @@ it('publishes the NHETE module once, one screen per page with save-and-resume, a
         ->and($form->allow_guest_submissions)->toBeTrue()
         ->and($form->save_and_resume)->toBeTrue()
         ->and($form->single_page_mode)->toBeFalse()
+        // M248 (`D232`): respondents may change their answers until the form closes, and it does close.
+        ->and($form->after_submit)->toBe(AfterSubmit::Amend)
+        ->and($form->closes_at?->isFuture())->toBeTrue()
         ->and($form->default_locale)->toBe('en')
         ->and(FormSection::query()->where('form_version_id', $form->current_published_version_id)->count())
         ->toBe(count((new NhetePlan)->sections()));

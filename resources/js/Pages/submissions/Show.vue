@@ -50,6 +50,8 @@ type Submission = {
     locale: string | null;
     submitted_at: string | null;
     finalized_at: string | null;
+    /** M248 (`D232`) — when the respondent last changed their own response, or null. Absent on an older payload. */
+    respondent_amended_at?: string | null;
     review: {
         validator: string | null;
         validated_at: string | null;
@@ -272,6 +274,9 @@ function formatDate(iso: string | null): string {
                         <div class="detail__meta-row"><dt>Source</dt><dd>{{ submission.source_label }}</dd></div>
                         <div class="detail__meta-row"><dt>Respondent</dt><dd>{{ submission.respondent }}</dd></div>
                         <div class="detail__meta-row"><dt>Submitted</dt><dd>{{ formatDate(submission.submitted_at) }}</dd></div>
+                        <div v-if="submission.respondent_amended_at" class="detail__meta-row" data-respondent-amended>
+                            <dt>Changed by the respondent</dt><dd>{{ formatDate(submission.respondent_amended_at) }}</dd>
+                        </div>
                         <div v-if="submission.finalized_at" class="detail__meta-row">
                             <dt>Finalized</dt><dd>{{ formatDate(submission.finalized_at) }}</dd>
                         </div>

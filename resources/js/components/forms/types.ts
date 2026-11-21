@@ -41,11 +41,16 @@ export interface ShareProps {
  * settings" modal and on the hub's Settings tab, from one server presenter, `FormSettingsPresenter`, so the two
  * entry points can never show a section different values.
  */
+/** M248 (`D232`) — what a form offers a respondent after Submit; mirrors `App\Enums\AfterSubmit`. */
+export type AfterSubmit = 'another' | 'amend' | 'once';
+
 export interface FormSettingsForm {
     title: string;
     description: string | null;
     save_and_resume: boolean;
     single_page_mode: boolean;
+    // M248 (`D232`) — another response, "Change my answers" until the form closes, or one response.
+    after_submit: AfterSubmit;
     opens_at: string | null;
     closes_at: string | null;
     timezone: string;

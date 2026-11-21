@@ -22,7 +22,7 @@ it("keeps scoped data, unrelated datasets and invalid requests in the catalog", 
   for (const params of [
     { mode: "psgc", location: "region:01", dataset: "bhw" },
     { mode: "district", district: "example", dataset: "bhw" },
-    { mode: "all", dataset: "nhfr" },
+    { mode: "psgc", location: "region:01", dataset: "nhfr" },
     { mode: "all", location: "region:01", dataset: "bhw" },
   ])
     await expect(CatalogPage({ searchParams: Promise.resolve(params) })).resolves.toBeDefined();
@@ -38,4 +38,12 @@ it("retains an invalid-map notice without forwarding untrusted context", async (
       }),
     }),
   ).rejects.toThrow("redirect:/bhw?mapState=");
+});
+
+it("opens national facilities directly from legacy all-location entries", async () => {
+  for (const mode of [undefined, "all"]) {
+    await expect(
+      CatalogPage({ searchParams: Promise.resolve({ mode, dataset: "nhfr" }) }),
+    ).rejects.toThrow("redirect:/catalog?mode=psgc&location=national%3APH&dataset=nhfr");
+  }
 });

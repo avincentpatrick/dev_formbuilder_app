@@ -153,6 +153,7 @@ export async function CatalogContent({
                 selection={request.selection}
                 locationName={locationName}
                 query={facilitySearch}
+                mapState={mapState}
               />
             ) : undefined
           }

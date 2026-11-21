@@ -1,5 +1,7 @@
 "use client";
+
 import { catalogHref } from "@/lib/catalog/navigation";
+import { mapDetailsHref } from "@/lib/catalog/map-details-navigation";
 import {
   POPULATION_MAP,
   populationCatalogReturnHref,
@@ -1352,7 +1354,7 @@ export function DatasetMapCard({
           <Link
             href={
               dataset === "nhfr-2026-09"
-                ? catalogHref({ mode: "psgc", level: choice.level, code: choice.code }, "nhfr")
+                ? mapDetailsHref(choice, "nhfr")
                 : dashboard === "/bhw"
                   ? (bhwOverviewReturnHref(choice) ?? dashboard)
                   : dashboard

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
-import { catalogHref } from "@/lib/catalog/navigation";
+import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { nhfrReading } from "@/lib/catalog/nhfr-reading";
 import { getNhfrCounts, getNhfrTypes, getNhfrChildren, getNhfrFacilities } from "@/lib/db/nhfr";
 import { getChildGeos, getGeoAncestors } from "@/lib/db/geo";
@@ -19,17 +19,19 @@ export async function NhfrDetails({
   selection,
   locationName,
   query,
+  mapState,
 }: {
   dataset: CatalogDataset;
   selection: CatalogSelection;
   locationName: string;
   query: string;
+  mapState?: string;
 }) {
   if (selection.mode === "all")
     return (
       <Link
         className="inline-block underline"
-        href={catalogHref({ mode: "psgc", level: "national", code: "PH" }, "nhfr")}
+        href={catalogJourneyHref({ mode: "psgc", level: "national", code: "PH" }, "nhfr", mapState)}
       >
         Explore health facilities in the Philippines →
       </Link>
@@ -111,7 +113,7 @@ export async function NhfrDetails({
               facilities={facilities}
               expectedCount={counts.nFacilities}
               query={query}
-              areaHref={catalogHref(selection, "nhfr")}
+              areaHref={catalogJourneyHref(selection, "nhfr", mapState)}
             />
           </div>
         </>
@@ -121,7 +123,11 @@ export async function NhfrDetails({
             heading={heading}
             items={children}
             areaHref={(c) =>
-              catalogHref({ mode: "psgc", level: c.geoLevel, code: c.geoCode }, "nhfr")
+              catalogJourneyHref(
+                { mode: "psgc", level: c.geoLevel, code: c.geoCode },
+                "nhfr",
+                mapState,
+              )
             }
           />
         </div>

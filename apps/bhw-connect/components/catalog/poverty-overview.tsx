@@ -1,3 +1,4 @@
+import { PovertyIntervalChart } from "./poverty-interval-chart";
 import { PovertyOfficialOverview } from "./poverty-official-overview";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import {
@@ -36,37 +37,58 @@ export function PovertyOverview({
             : "No usable accepted poverty estimate is available for this place. Missing estimates are not zero.";
   return (
     <div className="space-y-4" data-testid="poverty-overview">
-      <PovertyOfficialOverview dataset={dataset} selection={selection} mapState={mapState} />
-      <FigureCard
-        title="What does the poverty estimate tell us?"
-        caption={`${locationName} · PSA Small Area Estimates · 2023 · people`}
-        headline="Use the estimate together with its uncertainty and source coverage. It does not identify individual households or explain why poverty occurs."
-      >
-        <p className="mb-4 text-sm">{POVERTY_DEFINITION}</p>
-        {reading ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted">
-              Estimated share of people below the poverty threshold
-            </p>
-            <StatValue value={reading.estimate} />
-            <p className="text-sm font-medium">
-              {reading.interval
-                ? `Published 90% confidence interval: ${reading.interval}`
-                : "The published 90% confidence interval is unavailable or unusable."}
-            </p>
-            {indicator?.reason && (
-              <p role="status" className="text-sm">
-                {indicator.reason}
+      <PovertyOfficialOverview
+        dataset={dataset}
+        selection={selection}
+        mapState={mapState}
+        locationName={locationName}
+      />
+      {(local ||
+        selection.mode === "district" ||
+        (selection.mode === "psgc" && selection.level === "barangay")) && (
+        <FigureCard
+          title="Municipal poverty estimate"
+          caption={`${locationName} · PSA Small Area Estimates · 2023 · people`}
+          headline={
+            reading
+              ? "The dot shows the estimate; the line shows its 90% confidence interval. A wider interval means less precision."
+              : "Missing estimates are not zero. No higher-area rate is substituted."
+          }
+        >
+          {reading ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">
+                Estimated share of people below the poverty threshold
               </p>
-            )}
-          </div>
-        ) : (
-          <p role="status" className="rounded border border-border bg-surface p-4">
-            {status}
-          </p>
-        )}
-        <p className="mt-4 text-sm text-muted">{POVERTY_UNCERTAINTY}</p>
-      </FigureCard>
+              <StatValue value={reading.estimate} />
+              <PovertyIntervalChart
+                point={indicator!.values[0]}
+                confidence={90}
+                label={locationName}
+              />
+              {indicator?.reason && (
+                <p role="status" className="text-sm">
+                  {indicator.reason}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p role="status" className="rounded border border-border bg-surface p-4">
+              {status}
+            </p>
+          )}
+          <details className="mt-4 text-sm text-muted">
+            <summary className="cursor-pointer font-medium">How to read this estimate</summary>
+            <div className="mt-3 space-y-3">
+              <p>{POVERTY_DEFINITION}</p>
+              <p>{POVERTY_UNCERTAINTY}</p>
+              <p>
+                This estimate does not identify individual households or explain why poverty occurs.
+              </p>
+            </div>
+          </details>
+        </FigureCard>
+      )}
       <p className="text-sm">{POVERTY_SCOPE}</p>
       <details className="rounded-lg border border-border p-4 text-sm">
         <summary className="cursor-pointer font-medium">

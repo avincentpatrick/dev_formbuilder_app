@@ -350,24 +350,31 @@ for (const theme of themes) {
     });
 }
 
-for (const theme of themes) {
-    test(`Public runtime — change my answers after sending (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-        await offerChangeMyAnswers(page);
-        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
-        await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
-        await forceTheme(page, theme);
+// ⚠️ SERVICE WORKERS BLOCKED, and the reason is measured: `page.route()` never sees a request the worker makes, so the
+// reload below — served through the worker that the first visit installed — read the real schema, which offers another
+// response, and "Already answered" never appeared. Blocked, every request is the page's own and the fixture holds.
+test.describe('change my answers after sending', () => {
+    test.use({ serviceWorkers: 'block' });
 
-        await page.getByRole('button', { name: 'Submit' }).click();
-        await expect(page.locator('[data-amend-link]')).toBeVisible({ timeout: 15_000 });
-        // The link is on screen, so nothing counts down to the destination.
-        await expect(page.getByText(/Continuing in/)).toHaveCount(0);
-        await assertClean(page, 'Thank-you with Change my answers');
+    for (const theme of themes) {
+        test(`Public runtime — change my answers after sending (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
+            await offerChangeMyAnswers(page);
+            await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+            await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
+            await forceTheme(page, theme);
 
-        // Reopening the link on this device: the device remembers it answered.
-        await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
-        await expect(page.locator('[data-already-answered]')).toBeVisible({ timeout: 15_000 });
-        await expect(page.getByRole('button', { name: 'Change my answers' })).toBeVisible();
-        await forceTheme(page, theme);
-        await assertClean(page, 'Already answered');
-    });
-}
+            await page.getByRole('button', { name: 'Submit' }).click();
+            await expect(page.locator('[data-amend-link]')).toBeVisible({ timeout: 15_000 });
+            // The link is on screen, so nothing counts down to the destination.
+            await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+            await assertClean(page, 'Thank-you with Change my answers');
+
+            // Reopening the link on this device: the device remembers it answered.
+            await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
+            await expect(page.locator('[data-already-answered]')).toBeVisible({ timeout: 15_000 });
+            await expect(page.getByRole('button', { name: 'Change my answers' })).toBeVisible();
+            await forceTheme(page, theme);
+            await assertClean(page, 'Already answered');
+        });
+    }
+});

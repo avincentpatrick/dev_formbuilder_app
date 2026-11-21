@@ -24,10 +24,29 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D232`, the last filed, was asked and answered on 2026-11-21 in the planning of `M248`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D232 — A respondent's own answers: how do they come back after the tab is closed, and after Submit? **The way back: the device plus a link (A). After Submit: one setting with three choices (A). Only before review (A). Continue carries on the same saved draft (A).**
+
+**Asked and answered 2026-11-21 (user decision, in chat), in the planning of `M248` (NHETE recommendation 6a).** Four questions, each put with its options and the session's recommendation.
+
+1. **NHETE says a person can come back on the same device and change their answers until the closing date. How does a respondent get back to a response they already sent?**
+   - **A — the device and a link (chosen, the recommendation).** Reopening the form's link on that device offers "Change my answers"; the thank-you page also gives a link to copy or email, which works on another phone. Anyone holding the link can see and change the answers, as with "Save and finish later" links.
+   - **B — the same device only.** NHETE's own words; no link to leak, but a cleared browser or another phone loses the way back for good.
+   - **C — the link only.** Reopening the form's own link starts a new response, as today.
+2. **The thank-you page always offers "Submit another response", and a backlog row asks for a one-response form. What should it offer?**
+   - **A — one form setting, "After submitting", with three choices (chosen, the recommendation):** another response (the default, as today); "Change my answers" until the form closes; or nothing more — one response. The last two stop a second response from the same device only, since guests do not sign in. It closes the one-response row too.
+   - **B — a single tick** for changing answers until the form closes; "Submit another response" stays as it is.
+3. **Once staff put a response under review, approve it or return it, can the respondent still change it?**
+   - **A — no, only while it is just "Submitted" (chosen, the recommendation).** The link then says it is being reviewed and can no longer be changed; nothing staff acted on changes under them.
+   - **B — yes**, and an approved response drops back to review, as a staff edit does.
+4. **"Continue where you left off": if the respondent had pressed "Save and finish later" before closing the tab, should Continue carry on that same saved draft?**
+   - **A — the same draft (chosen, the recommendation).** The emailed link and the device stay in step, and one response is sent. On a shared phone the next person pressing Continue can also change that saved draft — an extension of the shared-phone cost `D118` accepted.
+   - **B — a fresh copy.** The earlier draft and its link stay untouched but fall out of step: a second save makes a second draft and a second email.
+
+**What the answer files:** `M248` builds all four and closes `R-8881210a` (`D118` A), `R-d37a38f9`, `R-e07273d1` (`respondent-edit-after-submit`) and `R-aec84b42` — the last `before-launch`, taken early here, not retiered. The shared-device costs of answers 1, 2 and 4 are recorded in `docs/adr/0021-respondent-scoped-device-outbox.md`, and the kiosk-mode row `R-968816fe` stays where they are switched off. Rows `M248` decides not to build are filed `during-testing` in its push.
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**

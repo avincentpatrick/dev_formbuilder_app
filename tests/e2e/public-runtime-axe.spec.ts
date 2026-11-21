@@ -318,6 +318,19 @@ test('Public runtime — a URL-prefilled gate opens exactly one branch', async (
 // M248 (`D118` A, `D232`) — the three screens a respondent meets around their own answers, scanned in both themes.
 // The seeded forms all offer another response, so the guest page is told otherwise by answering its own schema and
 // submit reads here: a page-level fixture, not a seeder change, because the seeder's published-form count is pinned.
+//
+// ⚠️ BOTH THEMES ARE SCANNED ON ONE PAGE, AND A 429 IS WAITED OUT, because every load of a guest link mints a token on
+// `throttle:guest-mint` (30 a minute per address by default) and this file already loads guest links back to back: CI
+// run 44914567216 answered a 429 to the first of these cases. Fewer loads, and the server's own Retry-After honoured once.
+async function gotoGuest(page: Page, path: string): Promise<void> {
+    const response = await page.goto(path, { waitUntil: 'networkidle' });
+    if (response?.status() === 429) {
+        const wait = Number.parseInt(response.headers()['retry-after'] ?? '60', 10);
+        await page.waitForTimeout((Number.isFinite(wait) ? wait : 60) * 1000 + 1000);
+        await page.goto(path, { waitUntil: 'networkidle' });
+    }
+}
+
 async function offerChangeMyAnswers(page: Page): Promise<void> {
     await page.route('**/api/v1/public/f/*', async (route) => {
         const response = await route.fetch();
@@ -333,22 +346,26 @@ async function offerChangeMyAnswers(page: Page): Promise<void> {
     });
 }
 
-for (const theme of themes) {
-    test(`Public runtime — Continue where you left off (${theme}) — accessible & no horizontal overflow`, async ({ page, context }) => {
-        await page.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
-        await page.getByRole('heading', { name: 'Clinic Intake', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
-        await page.locator('section[data-section] input[type="text"]').first().fill('An answer left on this device');
-        await expect(page.locator('.saved-indicator')).toHaveText('Saved', { timeout: 15_000 });
-
-        // A new tab is a new visit: the answers are on the device, and the page asks before showing any of them.
-        const again = await context.newPage();
-        await page.close();
-        await again.goto('/f/clinic-intake', { waitUntil: 'networkidle' });
-        await expect(again.locator('[data-continue-choice]')).toBeVisible({ timeout: 15_000 });
-        await forceTheme(again, theme);
-        await assertClean(again, 'Continue or start over');
-    });
+async function scanBothThemes(page: Page, label: string): Promise<void> {
+    for (const theme of themes) {
+        await forceTheme(page, theme);
+        await assertClean(page, `${label} (${theme})`);
+    }
 }
+
+test('Public runtime — Continue where you left off — accessible & no horizontal overflow, light and dark', async ({ page, context }) => {
+    await gotoGuest(page, '/f/clinic-intake');
+    await page.getByRole('heading', { name: 'Clinic Intake', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
+    await page.locator('section[data-section] input[type="text"]').first().fill('An answer left on this device');
+    await expect(page.locator('.saved-indicator')).toHaveText('Saved', { timeout: 15_000 });
+
+    // A new tab is a new visit: the answers are on the device, and the page asks before showing any of them.
+    const again = await context.newPage();
+    await page.close();
+    await gotoGuest(again, '/f/clinic-intake');
+    await expect(again.locator('[data-continue-choice]')).toBeVisible({ timeout: 15_000 });
+    await scanBothThemes(again, 'Continue or start over');
+});
 
 // ⚠️ SERVICE WORKERS BLOCKED, and the reason is measured: `page.route()` never sees a request the worker makes, so the
 // reload below — served through the worker that the first visit installed — read the real schema, which offers another
@@ -356,25 +373,21 @@ for (const theme of themes) {
 test.describe('change my answers after sending', () => {
     test.use({ serviceWorkers: 'block' });
 
-    for (const theme of themes) {
-        test(`Public runtime — change my answers after sending (${theme}) — accessible & no horizontal overflow`, async ({ page }) => {
-            await offerChangeMyAnswers(page);
-            await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
-            await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
-            await forceTheme(page, theme);
+    test('Public runtime — change my answers after sending — accessible & no horizontal overflow, light and dark', async ({ page }) => {
+        await offerChangeMyAnswers(page);
+        await gotoGuest(page, '/f/visit-guide');
+        await page.getByRole('heading', { name: 'Before Your Visit', level: 1 }).waitFor({ state: 'visible', timeout: 15_000 });
 
-            await page.getByRole('button', { name: 'Submit' }).click();
-            await expect(page.locator('[data-amend-link]')).toBeVisible({ timeout: 15_000 });
-            // The link is on screen, so nothing counts down to the destination.
-            await expect(page.getByText(/Continuing in/)).toHaveCount(0);
-            await assertClean(page, 'Thank-you with Change my answers');
+        await page.getByRole('button', { name: 'Submit' }).click();
+        await expect(page.locator('[data-amend-link]')).toBeVisible({ timeout: 15_000 });
+        // The link is on screen, so nothing counts down to the destination.
+        await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+        await scanBothThemes(page, 'Thank-you with Change my answers');
 
-            // Reopening the link on this device: the device remembers it answered.
-            await page.goto('/f/visit-guide', { waitUntil: 'networkidle' });
-            await expect(page.locator('[data-already-answered]')).toBeVisible({ timeout: 15_000 });
-            await expect(page.getByRole('button', { name: 'Change my answers' })).toBeVisible();
-            await forceTheme(page, theme);
-            await assertClean(page, 'Already answered');
-        });
-    }
+        // Reopening the link on this device: the device remembers it answered.
+        await gotoGuest(page, '/f/visit-guide');
+        await expect(page.locator('[data-already-answered]')).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('button', { name: 'Change my answers' })).toBeVisible();
+        await scanBothThemes(page, 'Already answered');
+    });
 });

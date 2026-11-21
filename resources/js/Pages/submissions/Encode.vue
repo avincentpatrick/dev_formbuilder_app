@@ -524,6 +524,21 @@ function fieldError(fieldKey: string): string | undefined {
     return cellKey !== undefined ? errors[cellKey] : undefined;
 }
 
+/**
+ * M246 (`grid-question-table`): a grid's refusals, each on its own cell — `answers.<field>.<row>[.<col>]` keyed by the
+ * cell's path in the grid. The whole-field line above still carries the first of them, so the page's own summary is
+ * unchanged; the grid then counts them in place of repeating one.
+ */
+function cellErrorsOf(fieldKey: string): Record<string, string> {
+    const prefix = `answers.${fieldKey}.`;
+    const out: Record<string, string> = {};
+    for (const [key, message] of Object.entries(pageErrors.value)) {
+        if (key.startsWith(prefix) && typeof message === 'string') out[key.slice(prefix.length)] = message;
+    }
+
+    return out;
+}
+
 function instanceError(sectionKey: string, index: number, fieldKey: string): string | undefined {
     return pageErrors.value[`answers.${sectionKey}[${index}].${fieldKey}`];
 }
@@ -1707,6 +1722,8 @@ function onConflictKeydown(event: KeyboardEvent): void {
                                             :model-value="flatValue(field.key)"
                                             :error="fieldError(field.key)"
                                             :read-only="isEditing"
+                                            :grid-relevance="runtime.gridRelevanceFor(field.key)"
+                                            :cell-errors="cellErrorsOf(field.key)"
                                             @update:model-value="setFlatValue(field.key, $event)"
                                         />
                                         <p v-if="scanNotes[field.key]" class="encode__scan-note">{{ scanNotes[field.key].text }}</p>

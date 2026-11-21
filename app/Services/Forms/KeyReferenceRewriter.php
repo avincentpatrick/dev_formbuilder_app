@@ -9,6 +9,7 @@ use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Services\Expressions\ExpressionKeyRewriter;
 use App\Services\Templates\TemplateParser;
+use App\Support\Forms\GridRules;
 use App\Support\Forms\OtherSpecify;
 
 /**
@@ -20,7 +21,8 @@ use App\Support\Forms\OtherSpecify;
  * - a field's and a section's `relevant_expression`;
  * - a Calculated field's `config.calculated_formula`;
  * - `default_value`, but ONLY when `default_value_is_expression` — otherwise it is a literal answer;
- * - a validation row's `expression` (a custom constraint; `.` is the field itself and has no key).
+ * - a validation row's `expression` (a custom constraint; `.` is the field itself and has no key);
+ * - M246: a grid's own rules in `config` ({@see GridRules}) — its rows' and columns' conditions.
  *
  * Templates, through {@see TemplateParser::rewriteKeys()} — exactly the columns `TemplateValidationGate` reads:
  * a field's `label`, `hint`, `placeholder` and the label and hint translations; a section's `label` and
@@ -72,6 +74,9 @@ final class KeyReferenceRewriter
             if (is_string($partner) && isset($map[$partner])) {
                 $config[OtherSpecify::CONFIG_KEY] = $map[$partner];
             }
+
+            // M246: a grid's own rules — its rows' and columns' conditions — name other questions too.
+            $config = GridRules::mapExpressions($field->field_type, $config, fn (string $expression): ?string => $this->expressions->rewrite($expression, $map));
 
             $field->config = $config;
         }

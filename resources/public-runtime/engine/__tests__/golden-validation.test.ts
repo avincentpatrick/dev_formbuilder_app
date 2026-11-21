@@ -71,6 +71,7 @@ type SemanticVector = {
         effective_answers?: VectorAnswers;
         computed?: Record<string, EngineValue>;
         repeat_relevance?: Record<string, Record<string, boolean>[]>;
+        grid_relevance?: Record<string, unknown>;
     };
 };
 
@@ -167,6 +168,10 @@ describe('golden semantic-validation vectors (PHP ⇄ TS drift contract)', () =>
             expect(result.effectiveAnswers).toEqual(expected.effective_answers ?? {});
             expect(result.computed).toEqual(expected.computed ?? {});
             expect(result.repeatFieldRelevance).toEqual(expected.repeat_relevance ?? {});
+            // M246: which of each grid's rows, columns and cells are asked — checked wherever a vector states it.
+            if (expected.grid_relevance !== undefined) {
+                expect(result.gridRelevance).toEqual(expected.grid_relevance);
+            }
 
             const actual = result.errors.map((error) => ({ field: errorPath(error), rule: error.rule }));
             expect(sortErrors(actual)).toEqual(sortErrors(expected.errors ?? []));

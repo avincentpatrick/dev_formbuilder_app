@@ -363,10 +363,10 @@ it('prints each matrix cell by its column: tick boxes for its choices, a writing
     $fields = $this->present->present($form, $version)['blocks'][0]['fields'];
 
     expect($fields[0]['grid']['columns'])->toBe([
-        ['value' => 'staff', 'label' => 'Staff', 'kind' => 'write', 'options' => []],
-        ['value' => 'svc', 'label' => 'Services', 'kind' => 'choices', 'options' => [['value' => 'lab', 'label' => 'Lab']]],
-        ['value' => 'rate', 'label' => 'Rating', 'kind' => 'choices', 'options' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']]],
-    ])->and($fields[1]['grid']['columns'])->toBe([['value' => '1', 'label' => 'Low', 'kind' => 'tick', 'options' => []]]);
+        ['value' => 'staff', 'label' => 'Staff', 'kind' => 'write', 'options' => [], 'conditional' => false],
+        ['value' => 'svc', 'label' => 'Services', 'kind' => 'choices', 'options' => [['value' => 'lab', 'label' => 'Lab']], 'conditional' => false],
+        ['value' => 'rate', 'label' => 'Rating', 'kind' => 'choices', 'options' => [['value' => 'poor', 'label' => 'Poor'], ['value' => 'good', 'label' => 'Good']], 'conditional' => false],
+    ])->and($fields[1]['grid']['columns'])->toBe([['value' => '1', 'label' => 'Low', 'kind' => 'tick', 'options' => [], 'conditional' => false]]);
 });
 it('resolves field labels and option labels into the form default locale', function (): void {
     [$form, $version] = printFixture([
@@ -838,4 +838,30 @@ it('counts a language found only in a choice label, a hint or a section descript
 
     // A blank variant is no translation (`LocaleVariant::from()`), so Waray is not offered.
     expect($this->present->languages($form, $version))->toBe(['en', 'ceb', 'fil', 'ilo']);
+});
+
+it('M246: prints every grid row and column, marking a conditional one, "Not needed" where a row says so, and long-text lines', function (): void {
+    [$form, $version] = printFixture([
+        'sections' => [],
+        'fields' => [
+            printField('mx', 'matrix', ['label' => 'Indicators', 'config' => [
+                'rows' => [
+                    ['value' => 'a01', 'label' => 'A01'],
+                    ['value' => 'b03', 'label' => 'B03', 'relevant' => '${gate} = "yes"', 'not_needed' => ['cut']],
+                ],
+                'columns' => [
+                    ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'short_text'],
+                    ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text', 'required_when' => '${.cut} != ""'],
+                ],
+                'cells' => [],
+            ]]),
+        ],
+    ]);
+
+    $grid = $this->present->present($form, $version)['blocks'][0]['fields'][0]['grid'];
+
+    expect(array_map(static fn (array $row): array => [$row['value'], $row['conditional'], $row['not_needed']], $grid['rows']))
+        ->toBe([['a01', false, []], ['b03', true, ['cut']]])
+        ->and(array_map(static fn (array $column): array => [$column['value'], $column['kind'], $column['conditional']], $grid['columns']))
+        ->toBe([['cut', 'write', false], ['comment', 'long', true]]);
 });

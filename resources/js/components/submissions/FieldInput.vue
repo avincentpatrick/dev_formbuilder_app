@@ -71,6 +71,15 @@ export interface MatrixConfig {
     columns: MatrixColumn[];
     cells: MatrixOption[];
     layout?: 'table' | 'stacked';
+    /** M246: a row's details — note content shown under its label — keyed by row value; absent rows have none. */
+    rowDetails?: Record<string, unknown[]>;
+}
+
+/** M246: which of a grid's rows, columns and cells its own rules ask, as the engine reports it (`GridRelevance`). */
+export interface GridRelevanceView {
+    rows: Record<string, boolean>;
+    columns: Record<string, boolean>;
+    cells: Record<string, Record<string, boolean>>;
 }
 
 // A GeoJSON geometry envelope (Increment G5b2): coordinates in [lon, lat(, alt)] order (the frozen G5b1
@@ -216,8 +225,11 @@ const props = defineProps<{
      * applies: the server has to say no too, or it is not a no.
      */
     readOnly?: boolean;
+    /** M246: which of a grid's rows, columns and cells its own rules ask (the engine's), and each cell's own error. */
+    gridRelevance?: GridRelevanceView | null;
+    cellErrors?: Record<string, string>;
 }>();
-const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: AnswerValue]; cellTouched: [path: string] }>();
 
 const marker = computed<RequiredMarker>(() => props.requiredMarker ?? (props.field.required ? 'required' : 'none'));
 const showRequiredMarker = computed<boolean>(() => marker.value === 'required');
@@ -723,7 +735,10 @@ function setCascadeLevel(index: number, value: string): void {
         :model-value="props.modelValue"
         :error="error"
         :required-marker="marker"
+        :relevance="gridRelevance ?? null"
+        :cell-errors="cellErrors"
         @update:model-value="emit('update:modelValue', $event)"
+        @cell-touched="emit('cellTouched', $event)"
     />
 
     <!-- Geospatial capture (Increment G5b2): geopoint / geotrace / geoshape (lazy Leaflet + a11y baseline) -->

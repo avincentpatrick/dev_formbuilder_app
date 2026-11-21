@@ -28,6 +28,11 @@ final class NheteAnswers
         array $cutChange = ['C14'],
         array $worryOther = ['D12'],
     ): array {
+        // M246: the table layout is answered as the block layout is, then moved into its grids' cells.
+        if ($plan->layout === NhetePlan::TABLE) {
+            return self::asTables($plan, self::scenario(new NhetePlan($plan->fixture()), $kept, $region, $cutChange, $worryOther));
+        }
+
         $answers = [
             'q0_0' => ['yes'], 'q0_1' => 'other', 'q0_1_other' => self::words(12), 'q0_2' => 'technical', 'q0_3' => 'own', 'q0_4' => $region,
             'q1_1' => self::words(60), 'q1_2' => 'need', 'q1_3' => 'depends', 'q1_3_text' => self::words(25), 'q1_4' => 'b', 'q1_5' => 'preventable',
@@ -89,6 +94,52 @@ final class NheteAnswers
             }
         }
         $answers['q9_1'] = self::words(15);
+
+        return $answers;
+    }
+
+    /**
+     * M246: the same response for the table layout — each block question's answer moved into its grid's cell, by the
+     * one renaming the two layouts share: `{grid}_{row}` and `{grid}_{row}_why` → `{grid}[row][agree|why]`,
+     * `{indicator}_{col}` → `mx_{domain}_table[indicator][col]`, and `{indicator}_p{n}_{col}` → `{indicator}_parts[p{n}][col]`.
+     * Spelled out from the block-layout scenario rather than worked out anew, so the two layouts are answered alike.
+     *
+     * @param  array<string, mixed>  $blocks
+     * @return array<string, mixed>
+     */
+    private static function asTables(NhetePlan $tablePlan, array $blocks): array
+    {
+        $answers = $blocks;
+        $move = static function (string $from, string $grid, string $row, string $column) use (&$answers): void {
+            if (array_key_exists($from, $answers)) {
+                $answers[$grid][$row][$column] = $answers[$from];
+                unset($answers[$from]);
+            }
+        };
+
+        foreach ($tablePlan->elements() as $e) {
+            $config = is_array($e['config'] ?? null) ? $e['config'] : [];
+            foreach ($config['rows'] ?? [] as $row) {
+                $r = (string) $row['value'];
+                switch ($e['role']) {
+                    case 'grid_table':
+                        $move("{$e['key']}_{$r}", (string) $e['key'], $r, 'agree');
+                        $move("{$e['key']}_{$r}_why", (string) $e['key'], $r, 'why');
+                        break;
+                    case 'ind_table':
+                        foreach (['use', 'cut', 'worry', 'keep', 'comment'] as $column) {
+                            $move("{$r}_{$column}", (string) $e['key'], $r, $column);
+                        }
+                        break;
+                    case 'parts_table':
+                        $indicator = strtolower((string) $e['indicator']);
+                        foreach (['keep', 'close', 'area', 'cov_r', 'cov_n'] as $column) {
+                            $move("{$indicator}_{$r}_{$column}", (string) $e['key'], $r, $column);
+                        }
+                        break;
+                }
+            }
+        }
 
         return $answers;
     }

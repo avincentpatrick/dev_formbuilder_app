@@ -372,3 +372,28 @@ it('keeps a single violation byte-identical to the pre-collection message', func
             ->and($e->getMessage())->toBe($e->violations()[0]['message']);
     }
 });
+
+it('M246: publishes a label that pipes a cell of a grid before it, and refuses one of a grid after it', function (): void {
+    $grid = ['config' => [
+        'rows' => [['value' => 'a01', 'label' => 'A01']],
+        'columns' => [['value' => 'keep', 'label' => 'Keep', 'type' => 'short_text']],
+        'cells' => [],
+    ]];
+
+    $form = $this->forms->create($this->tenant, $this->user, 'Survey');
+    addFormField($form->draftVersion, $this->user, 'mx', FieldType::Matrix, 1, $grid);
+    addFormField($form->draftVersion, $this->user, 'echo', FieldType::ShortText, 2, ['label' => 'You kept ${mx.a01.keep}']);
+    expect($this->publisher->publish($form->refresh(), $this->user)->status)->toBe(FormVersionStatus::Published);
+
+    $later = $this->forms->create($this->tenant, $this->user, 'Later');
+    addFormField($later->draftVersion, $this->user, 'echo', FieldType::ShortText, 1, ['label' => 'You kept ${mx.a01.keep}']);
+    addFormField($later->draftVersion, $this->user, 'mx', FieldType::Matrix, 2, $grid);
+    expect(fn () => $this->publisher->publish($later->refresh(), $this->user))
+        ->toThrow(PublishValidationException::class, 'template_forward_reference');
+
+    $unknown = $this->forms->create($this->tenant, $this->user, 'Unknown');
+    addFormField($unknown->draftVersion, $this->user, 'mx', FieldType::Matrix, 1, $grid);
+    addFormField($unknown->draftVersion, $this->user, 'echo', FieldType::ShortText, 2, ['label' => 'You kept ${mx.z99.keep}']);
+    expect(fn () => $this->publisher->publish($unknown->refresh(), $this->user))
+        ->toThrow(PublishValidationException::class, 'unknown_template_reference');
+});

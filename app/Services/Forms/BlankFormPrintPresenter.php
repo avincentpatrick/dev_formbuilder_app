@@ -443,7 +443,7 @@ final class BlankFormPrintPresenter
                 'lines' => $area === PrintAnswerArea::Ruled ? $this->ruledLines($field) : null,
                 'options' => $area === PrintAnswerArea::Choices ? $this->choiceOptions($type, $config, $locale) : [],
                 'grid' => $area === PrintAnswerArea::Grid ? [
-                    'rows' => $this->optionList($config, 'rows', $locale),
+                    'rows' => $this->gridRows($type, $config, $locale),
                     'columns' => $this->gridColumns($type, $config, $locale),
                 ] : null,
             ];
@@ -644,16 +644,54 @@ final class BlankFormPrintPresenter
             $kind = match (true) {
                 $type === FieldType::LikertMatrix => 'tick',
                 MatrixColumns::isChoice(MatrixColumns::type($object)) => 'choices',
+                // M246: a long-text column is written on several lines.
+                MatrixColumns::type($object) === FieldType::LongText => 'long',
                 default => 'write',
             };
             $columns[] = [
                 ...$column,
                 'kind' => $kind,
                 'options' => $kind === 'choices' ? $this->formatter->options(['options' => MatrixColumns::choices($object, $config)], $locale) : [],
+                // M246: a column with a rule of its own is marked as a conditional question is — nothing on paper is hidden.
+                'conditional' => $type === FieldType::Matrix && array_filter(
+                    array_map(static fn (string $key): mixed => $object[$key] ?? null, ['relevant', 'needed_when', 'required_when']),
+                    static fn (mixed $rule): bool => is_string($rule) && trim($rule) !== '',
+                ) !== [],
             ];
         }
 
         return $columns;
+    }
+
+    /**
+     * M246 (`grid-question-table`): a printed grid's rows — every row, as every question prints: a row with a show-when
+     * is marked "(if applicable)", and (a Grid's) the cells its row marks "Not needed" print so. A row's details are not
+     * printed here: paper prints no note content on this branch's base (`grid-row-details-on-paper`).
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<array{value: string, label: string, conditional: bool, not_needed: list<string>}>
+     */
+    private function gridRows(FieldType $type, array $config, ?string $locale): array
+    {
+        $rules = [];
+        foreach ((array) ($config['rows'] ?? []) as $row) {
+            if (is_array($row) && (string) ($row['value'] ?? '') !== '') {
+                $rules[(string) $row['value']] = $row;
+            }
+        }
+
+        return array_map(static function (array $row) use ($rules, $type): array {
+            $rule = $rules[$row['value']] ?? [];
+            $notNeeded = $type === FieldType::Matrix && is_array($rule['not_needed'] ?? null)
+                ? array_values(array_filter($rule['not_needed'], is_string(...)))
+                : [];
+
+            return [
+                ...$row,
+                'conditional' => is_string($rule['relevant'] ?? null) && trim($rule['relevant']) !== '',
+                'not_needed' => $notNeeded,
+            ];
+        }, $this->optionList($config, 'rows', $locale));
     }
 
     /**

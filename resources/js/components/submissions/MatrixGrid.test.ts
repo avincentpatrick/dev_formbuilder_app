@@ -282,3 +282,93 @@ describe('MatrixGrid — the builder Preview’s editing (M185, R-7418e6bd)', ()
         wrapper.unmount();
     });
 });
+
+describe('M246 — a grid as a question table', () => {
+    function questionTable(): EncodeField {
+        return {
+            key: 'mx',
+            field_type: 'matrix',
+            label: 'Indicators',
+            hint: null,
+            placeholder: null,
+            required: false,
+            options: [],
+            supported: true,
+            matrix: {
+                rows: [{ value: 'a01', label: 'A01' }, { value: 'b03', label: 'B03' }, { value: 'c09', label: 'C09' }],
+                columns: [
+                    { value: 'cut', label: 'Cut-off', type: 'single_select', options: [{ value: 'change', label: 'Change it' }], required: false },
+                    { value: 'comment', label: 'Comment', type: 'long_text', options: [], required: false },
+                    { value: 'cov', label: 'Coverage', type: 'short_text', options: [], required: false },
+                ],
+                cells: [],
+                layout: 'table',
+                rowDetails: { a01: [{ type: 'heading', level: 2, text: 'About A01' }, { type: 'paragraph', spans: [{ text: 'What it measures.' }] }] },
+            },
+        };
+    }
+
+    const relevance = {
+        rows: { a01: true, b03: true, c09: false },
+        columns: { cut: true, comment: true, cov: false },
+        cells: { a01: { cut: true, comment: true }, b03: { cut: false, comment: true } },
+    };
+
+    it('draws only the rows and columns the rules ask, and "Not needed" in place of a cell they do not', () => {
+        const wrapper = mount(MatrixGrid, { props: { field: questionTable(), kind: 'matrix', modelValue: null, relevance } });
+
+        expect(wrapper.findAll('tbody tr').length).toBe(2);
+        expect(wrapper.findAll('thead th').map((th) => th.text())).toEqual(['Cut-off', 'Comment']);
+        expect(wrapper.findAll('[data-grid-not-needed]').length).toBe(1);
+        expect(wrapper.findAll('tbody tr')[1].find('[data-grid-not-needed]').exists()).toBe(true);
+        // A long-text column is a text area.
+        expect(wrapper.findAll('textarea').length).toBe(2);
+    });
+
+    it('puts a row\'s details under its label, in a row header that may hold a heading', () => {
+        const wrapper = mount(MatrixGrid, { props: { field: questionTable(), kind: 'matrix', modelValue: null, relevance } });
+        const header = wrapper.findAll('tbody tr')[0].find('.mds-grid__row-label');
+
+        expect(header.element.tagName).toBe('TD');
+        expect(header.attributes('role')).toBe('rowheader');
+        expect(header.find('[data-grid-row-details]').text()).toContain('What it measures.');
+        // A row with no details keeps its `th`.
+        expect(wrapper.findAll('tbody tr')[1].find('.mds-grid__row-label').element.tagName).toBe('TH');
+    });
+
+    it('shows each cell its own error, ties the control to it, counts them on the grid, and says when a cell is left', async () => {
+        const wrapper = mount(MatrixGrid, {
+            props: { field: questionTable(), kind: 'matrix', modelValue: null, relevance, cellErrors: { 'a01.comment': 'Say why.' } },
+        });
+        const error = wrapper.find('[data-grid-cell-error]');
+
+        expect(error.text()).toBe('Say why.');
+        const area = wrapper.findAll('textarea')[0];
+        expect(area.attributes('aria-invalid')).toBe('true');
+        expect(area.attributes('aria-describedby')).toContain(error.attributes('id'));
+        expect(wrapper.find('.mds-grid__error').text()).toBe('1 answer in this grid needs your attention.');
+
+        await wrapper.findAll('tbody tr')[0].findAll('td.mds-grid__cell')[1].trigger('focusout');
+        expect(wrapper.emitted('cellTouched')).toEqual([['a01.comment']]);
+    });
+
+    it('draws every row and column in the builder Preview, asked or not, so a hidden one can still be renamed', () => {
+        const authoring = { editor: defineComponent({ render: () => h('span') }), editing: ref<GridEdit | null>(null), rowsFrom: () => null, open: vi.fn(), commit: vi.fn(), cancel: vi.fn(), add: vi.fn() } as unknown as GridAuthoring;
+        const wrapper = mount(MatrixGrid, {
+            props: { field: questionTable(), kind: 'matrix', modelValue: null, relevance },
+            global: { provide: { [GridAuthoringKey as symbol]: authoring } },
+        });
+
+        expect(wrapper.findAll('tbody tr').length).toBe(3);
+        expect(wrapper.findAll('thead th').length).toBe(3);
+    });
+
+    it('says there is nothing to answer when every row is hidden', () => {
+        const wrapper = mount(MatrixGrid, {
+            props: { field: questionTable(), kind: 'matrix', modelValue: null, relevance: { rows: { a01: false, b03: false, c09: false }, columns: {}, cells: {} } },
+        });
+
+        expect(wrapper.find('table').exists()).toBe(false);
+        expect(wrapper.find('[data-grid-nothing]').text()).toBe('Nothing in this grid applies to you.');
+    });
+});

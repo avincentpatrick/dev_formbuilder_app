@@ -17,6 +17,7 @@ import type {
     ComparisonOperator,
     GridColumnSpec,
     GridConfig,
+    GridRowRule,
     LogicOperator,
     RenderSources,
     SchemaField,
@@ -282,7 +283,7 @@ export interface ResolvedMatrixColumn {
 export function resolveMatrix(
     matrix: RenderMatrix | null,
     locale: string,
-): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked' } | null {
+): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked'; rowDetails?: Record<string, unknown[]> } | null {
     if (matrix === null) {
         return null;
     }
@@ -296,7 +297,8 @@ export function resolveMatrix(
         ...(column.type !== undefined ? { type: column.type, options: resolve(column.options ?? []), required: column.required === true } : {}),
     }));
 
-    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout };
+    // M246: row details are note content, shown in the form's base language as a note's is (`D70`).
+    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout, ...(matrix.rowDetails !== undefined ? { rowDetails: matrix.rowDetails } : {}) };
 }
 
 /** A `config.<key>` option-value list (as strings) the engine grid membership check reads. */
@@ -325,7 +327,7 @@ function optionValues(raw: unknown): string[] {
 }
 
 /** The types a matrix column may take (M183, `R-5033e87e`; mirror of PHP `MatrixColumns::TYPES`). */
-const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'integer', 'decimal', 'date'];
+const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'long_text', 'integer', 'decimal', 'date'];
 
 /** A grid's stored column objects, skipping anything that is not one. */
 function rawColumns(field: RawField): Record<string, unknown>[] {
@@ -345,8 +347,23 @@ function engineGridConfig(field: RawField): GridConfig {
         columns: configValueList(field, 'columns'),
         cells: configValueList(field, 'cells'),
     };
+    // M246 (`grid-question-table`): a row's own show-when and (a Grid's) "Not needed" columns, only where a row has one.
+    const rowRules: Record<string, GridRowRule> = {};
+    const rawRows = Array.isArray(field.config?.rows) ? (field.config.rows as unknown[]) : [];
+    for (const row of rawRows) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) continue;
+        const entry = row as Record<string, unknown>;
+        const relevant = ruleText(entry.relevant);
+        const notNeeded = field.field_type === 'matrix' && Array.isArray(entry.not_needed)
+            ? entry.not_needed.filter((column): column is string => typeof column === 'string' && column !== '')
+            : [];
+        if (entry.value === undefined || entry.value === null || (relevant === null && notNeeded.length === 0)) continue;
+        rowRules[String(entry.value)] = { relevant, not_needed: notNeeded };
+    }
+    const withRows: GridConfig = Object.keys(rowRules).length > 0 ? { ...grid, row_rules: rowRules } : grid;
+
     if (field.field_type !== 'matrix') {
-        return grid;
+        return withRows;
     }
 
     const specs: Record<string, GridColumnSpec> = {};
@@ -354,13 +371,24 @@ function engineGridConfig(field: RawField): GridConfig {
         const type = typeof column.type === 'string' && column.type !== '' ? column.type : null;
         const options = optionValues(column.options);
         const required = column.required === true;
-        if (column.value === undefined || column.value === null || (type === null && options.length === 0 && !required)) {
+        const relevant = ruleText(column.relevant);
+        const neededWhen = ruleText(column.needed_when);
+        const requiredWhen = ruleText(column.required_when);
+        const hasRule = relevant !== null || neededWhen !== null || requiredWhen !== null;
+        if (column.value === undefined || column.value === null || (type === null && options.length === 0 && !required && !hasRule)) {
             continue;
         }
-        specs[String(column.value)] = { type, options, required };
+        specs[String(column.value)] = hasRule
+            ? { type, options, required, relevant, needed_when: neededWhen, required_when: requiredWhen }
+            : { type, options, required };
     }
 
-    return Object.keys(specs).length > 0 ? { ...grid, column_specs: specs } : grid;
+    return Object.keys(specs).length > 0 ? { ...withRows, column_specs: specs } : withRows;
+}
+
+/** M246: a grid rule's text, or null when blank. */
+function ruleText(text: unknown): string | null {
+    return typeof text === 'string' && text.trim() !== '' ? text : null;
 }
 
 /** A `config.<key>` option list projected to render {value,label} pairs (labels/translations kept). */
@@ -419,11 +447,22 @@ function buildMatrix(field: RawField): RenderMatrix | null {
             return [{ ...pair, type, options, required: column.required === true }];
         });
 
+    // M246: a row's details, only for a row that has any.
+    const rowDetails: Record<string, unknown[]> = {};
+    for (const row of Array.isArray(field.config?.rows) ? (field.config.rows as unknown[]) : []) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) continue;
+        const entry = row as Record<string, unknown>;
+        if (entry.value !== undefined && entry.value !== null && Array.isArray(entry.details) && entry.details.length > 0) {
+            rowDetails[String(entry.value)] = entry.details as unknown[];
+        }
+    }
+
     return {
         rows: configOptionPairs(field, 'rows'),
         columns,
         cells,
         layout: field.config?.layout === 'stacked' ? 'stacked' : 'table',
+        ...(Object.keys(rowDetails).length > 0 ? { rowDetails } : {}),
     };
 }
 /** Read a `config.<key>` value coerced to a finite number, or null. */

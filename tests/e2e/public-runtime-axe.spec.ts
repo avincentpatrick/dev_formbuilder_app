@@ -134,6 +134,25 @@ for (const theme of themes) {
         await page.getByRole('group', { name: 'Trace your route' }).getByRole('button', { name: 'Add point' }).click();
 
         await assertClean(page, 'Field Types Showcase (cascade + grids + geo interacted)');
+
+        // M246 (`grid-question-table`): the question table. B03's cut-off reads "Not needed"; C09 is hidden until the Likert
+        // grid rates Cleanliness Excellent; A01's comment is asked only once its cut-off says "Change it", and left blank
+        // it shows its own error on that cell — not one for the whole grid. A01 carries its details under its label.
+        const table = page.locator('[data-matrix-grid]').filter({ hasText: 'Indicators to review' });
+        await expect(table.getByText('Clinic visits per 1,000 people each year.')).toBeVisible();
+        await expect(table.locator('[data-grid-not-needed]').first()).toBeVisible();
+        await expect(table.getByText('C09 Follow-up')).toHaveCount(0);
+        await page.getByRole('combobox', { name: 'A01 Visits Cut-off', exact: true }).selectOption('change');
+        const why = page.getByRole('textbox', { name: 'A01 Visits Why', exact: true });
+        await expect(why).toBeVisible();
+        await why.focus();
+        await page.getByRole('combobox', { name: 'A01 Visits Cut-off', exact: true }).focus();
+        await expect(table.locator('[data-grid-cell-error]')).toHaveCount(1);
+        await expect(why).toHaveAttribute('aria-invalid', 'true');
+        await page.getByRole('radio', { name: 'Cleanliness Excellent', exact: true }).check();
+        await expect(table.getByText('C09 Follow-up')).toBeVisible();
+
+        await assertClean(page, 'Field Types Showcase (question table: a row shown, a cell not needed, a cell error)');
     });
 }
 

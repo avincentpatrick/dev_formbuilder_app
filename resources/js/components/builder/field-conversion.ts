@@ -191,6 +191,9 @@ export function censusOwner(entry: ConversionCensusEntry, ctx: Pick<ConsequenceC
             return own ? 'A custom check on this question' : `A custom check on “${fieldName}”`;
         case 'rule':
             return `A rule on “${fieldName}”`;
+        // M246: a grid's own row or column condition.
+        case 'grid_rule':
+            return `A row or column condition in the grid “${fieldName}”`;
         case 'template': {
             const candidates: string[] = [];
             if (field !== undefined) candidates.push(`The text of “${named(field.label, entry.key)}”`);

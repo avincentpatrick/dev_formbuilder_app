@@ -309,6 +309,18 @@ it('refuses a condition that names a question the form does not have, or does no
     expect(FormAutomation::query()->count())->toBe(1);
 });
 
+it('M246: refuses a condition that reads a grid cell, which an automation cannot read yet', function (): void {
+    addFormField($this->form->draftVersion, $this->owner, 'mx', FieldType::Matrix, 1, ['config' => [
+        'rows' => [['value' => 'a01', 'label' => 'A01']],
+        'columns' => [['value' => 'keep', 'label' => 'Keep', 'type' => 'short_text']],
+        'cells' => [],
+    ]]);
+
+    $this->actingAs($this->owner)->postJson(automationUrl($this->form), automationEmail(['condition' => '${mx.a01.keep} = "yes"']))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.condition.0', 'This condition can’t be used: an automation cannot read a grid’s cell yet.');
+});
+
 it('offers the form’s answerable questions to the condition editor, with their choices (M142)', function (): void {
     addFormField($this->form->draftVersion, $this->owner, 'age', FieldType::Integer, 1);
     addFormField($this->form->draftVersion, $this->owner, 'sex', FieldType::Dropdown, 2, ['config' => ['options' => [

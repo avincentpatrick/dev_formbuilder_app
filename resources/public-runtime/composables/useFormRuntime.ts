@@ -1266,6 +1266,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
             const errorKeys = relevantKeys.filter((k) => result.value.errorsFor(k).length > 0);
             if (errorKeys.length > 0) {
                 markManyTouched(relevantKeys);
+                markGridsAttempted(relevantKeys);
                 return { advanced: false, errorCount: errorKeys.length };
             }
         }
@@ -1372,6 +1373,63 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return 'first-incomplete';
     }
 
+    // ── Grids' own rules (M246, `grid-question-table`) ───────────────────────────────────────────
+    // Declared here, after every function above, so that no line the backlog cites by number moves; `attemptNext()`
+    // reads `gridAttempted` only when it runs, long after this has been set up.
+    /** A grid whose page the person tried to leave with an error on it: every one of its cells' errors shows. */
+    const gridAttempted = reactive<Record<string, true>>({});
+
+    function markGridsAttempted(keys: string[]): void {
+        for (const key of keys) {
+            gridAttempted[key] = true;
+        }
+    }
+
+    /** Which of a grid's rows, columns and cells its own rules ask — null for a hidden grid or a degraded engine (all shown). */
+    function gridRelevanceFor(key: string): GridRelevanceOf | null {
+        const relevance = result.value.gridRelevance;
+
+        return Object.prototype.hasOwnProperty.call(relevance, key) ? relevance[key] : null;
+    }
+
+    /**
+     * Each cell's own error, keyed by its path in the grid (`row.col`, or `row` for a Likert grid). A server refusal at
+     * the cell's address always shows — no screen showed one before M246. The engine's own shows once that cell has been
+     * left, once the person tried to leave the page, or on Submit, so a 35-row table does not light up after its first
+     * answer.
+     */
+    function cellErrorsFor(key: string): Record<string, string> {
+        const out: Record<string, string> = {};
+        const prefix = `${key}.`;
+        for (const [address, messages] of Object.entries(serverErrors)) {
+            if (address.startsWith(prefix) && messages.length > 0) {
+                out[address.slice(prefix.length)] = messages[0];
+            }
+        }
+        if (fieldRelevance.value[key] !== true) {
+            return out;
+        }
+        const showAll = gridAttempted[key] === true || submitAttempted.value;
+        for (const error of result.value.errorsFor(key)) {
+            const path = error.cellPath;
+            if (path === null || path === undefined || out[path] !== undefined) {
+                continue;
+            }
+            if (showAll || touched[`${prefix}${path}`] === true) {
+                out[path] = error.message;
+            }
+        }
+
+        return out;
+    }
+
+    /** A grid's own error that is not a cell's — a server refusal at the grid's key itself. */
+    function gridErrorFor(key: string): string | undefined {
+        const server = serverErrors[key];
+
+        return server !== undefined && server.length > 0 ? server[0] : undefined;
+    }
+
     return {
         renderModel,
         singlePageMode: schema.form.single_page_mode,
@@ -1437,5 +1495,24 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         goToStep,
         reconcileCurrentStep,
         hasVisited,
+        gridRelevanceFor,
+        cellErrorsFor,
+        gridErrorFor,
     };
+}
+
+/** M246: one relevant grid's asked rows, columns and cells, as the engine reports it. */
+type GridRelevanceOf = SemanticResult['gridRelevance'][string];
+
+/**
+ * M246 (`grid-question-table`) — a grid's own rules, merged onto {@link FormRuntime} here rather than written into it
+ * above, so that no line the backlog cites by number moves.
+ */
+export interface FormRuntime {
+    /** Which of a grid's rows, columns and cells its own rules ask; null when the grid is hidden or the engine failed. */
+    gridRelevanceFor(key: string): GridRelevanceOf | null;
+    /** Each cell's own error that should show now, keyed by its path in the grid. */
+    cellErrorsFor(key: string): Record<string, string>;
+    /** A grid's own error that is not a cell's — a server refusal at the grid's key. */
+    gridErrorFor(key: string): string | undefined;
 }

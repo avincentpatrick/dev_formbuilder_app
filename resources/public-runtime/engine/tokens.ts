@@ -22,6 +22,9 @@ export type TokenType =
     | 'number'
     | 'string'
     | 'field_ref'
+    // M246: `${grid.row.col}` / `${grid.row}` and the row-relative `${.col}` — see ExpressionLexer::lexReference().
+    | 'cell_ref'
+    | 'row_cell_ref'
     | 'self_ref'
     | 'word'
     | 'eof';

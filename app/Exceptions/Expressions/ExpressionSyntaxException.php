@@ -75,6 +75,13 @@ final class ExpressionSyntaxException extends ExpressionException
             ->withField($fieldKey);
     }
 
+    /** M246: `${.col}` — this row's cell — outside a grid column's own rules, where there is no row. */
+    public static function rowReferenceOutsideGridColumn(string $column, ?string $fieldKey): self
+    {
+        return (new self('“${.'.$column.'}” reads a cell of the same row, so it can only be used in a grid column’s own rules.', 'row_reference_outside_grid_column'))
+            ->withField($fieldKey);
+    }
+
     public static function selfReferenceInNonConstraint(?string $fieldKey): self
     {
         return (new self('The “.” self-reference is only valid in a constraint expression.', 'self_reference_in_non_constraint'))

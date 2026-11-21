@@ -19,16 +19,23 @@ namespace App\Services\Expressions;
  * int/float for integer/decimal; ALWAYS a `list<string>` for multi_select (never a space-delimited
  * scalar — the Phase-2 XLSForm layer translates the wire form before an answer reaches here); null or an
  * absent key for unanswered. A repeatable section's key resolves to its `list<instanceMap>` (for `count()`).
+ *
+ * M246: a grid's key resolves to its answer object, read only through a cell reference (`${key.row.col}`); and
+ * `row` is the current row's cells while a grid column's own rule runs, read by `${.col}` — null everywhere else.
  */
 final readonly class EvaluationContext
 {
     private const UNSET = "\0__unset__\0";
 
-    /** @param array<string, mixed> $answers relevance-pruned effective answers, key => value */
+    /**
+     * @param  array<string, mixed>  $answers  relevance-pruned effective answers, key => value
+     * @param  array<array-key, mixed>|null  $row  M246: the current grid row's cells, for `${.col}`
+     */
     public function __construct(
         public array $answers,
         public mixed $self = self::UNSET,
         public ?string $now = null,
+        public ?array $row = null,
     ) {}
 
     public function has(string $key): bool
@@ -54,7 +61,7 @@ final readonly class EvaluationContext
     /**
      * Golden-runner factory.
      *
-     * @param  array{answers?: array<string, mixed>, self?: mixed, now?: string}  $vector
+     * @param  array{answers?: array<string, mixed>, self?: mixed, now?: string, row?: array<array-key, mixed>}  $vector
      */
     public static function fromVector(array $vector): self
     {
@@ -62,6 +69,7 @@ final readonly class EvaluationContext
             $vector['answers'] ?? [],
             array_key_exists('self', $vector) ? $vector['self'] : self::UNSET,
             $vector['now'] ?? null,
+            $vector['row'] ?? null,
         );
     }
 }

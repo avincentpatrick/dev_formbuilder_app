@@ -336,7 +336,7 @@
                 "pdf": "Yes",
                 "spreadsheet": "A column, and one per cell",
                 "analytics": "No",
-                "conditions": "No"
+                "conditions": "Its cells"
             }
         },
         {
@@ -528,7 +528,7 @@
                 "pdf": "Yes",
                 "spreadsheet": "A column, and one per cell",
                 "analytics": "No",
-                "conditions": "No"
+                "conditions": "Its cells"
             }
         }
     ]

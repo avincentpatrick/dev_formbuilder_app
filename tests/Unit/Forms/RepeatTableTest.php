@@ -47,7 +47,8 @@ it('draws a table only for a repeatable section set to one, with a column, and n
 it('holds a grid column\'s types and the three text kinds and a dropdown beside them, never Yes / No', function (): void {
     $types = array_map(static fn (FieldType $t): string => $t->value, RepeatTable::TYPES);
 
-    expect(array_diff(array_map(static fn (FieldType $t): string => $t->value, MatrixColumns::TYPES), $types))->toBe([])
+    // M246: a grid column may be a long text; a table cell may not — a long text keeps a repeat as cards (`D129`).
+    expect(array_values(array_diff(array_map(static fn (FieldType $t): string => $t->value, MatrixColumns::TYPES), $types)))->toBe(['long_text'])
         ->and($types)->toContain('email', 'phone', 'url', 'dropdown')
         ->and($types)->not->toContain('yes_no');
 });

@@ -54,3 +54,14 @@ it('does nothing for null, an empty map or text with no reference', function ():
         ->and($rewriter->rewrite('${a} = 1', []))->toBe('${a} = 1')
         ->and($rewriter->rewriteReporting('. > 3', ['a' => 'b']))->toBe(['. > 3', false]);
 });
+
+it('M246: renames a grid cell reference by its key and keeps its row and column', function (): void {
+    $rewriter = new ExpressionKeyRewriter;
+
+    // The whole `${grid.row.col}` is one token, so the splice covers it exactly; only the key changes.
+    expect($rewriter->rewrite('${g.a01.keep} = \'yes\' and ${lk.r1} > 2 and ${g} != \'\'', ['g' => 'grid_copy', 'lk' => 'l']))
+        ->toBe('${grid_copy.a01.keep} = \'yes\' and ${l.r1} > 2 and ${grid_copy} != \'\'')
+        // A row-relative `${.col}` names no key, and a cell whose key is not in the map is left as written.
+        ->and($rewriter->rewrite('${.keep} = \'close\' or ${other.r.c} = 1', ['keep' => 'x', 'other' => 'other', 'g' => 'h']))
+        ->toBe('${.keep} = \'close\' or ${other.r.c} = 1');
+});

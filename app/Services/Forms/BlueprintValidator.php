@@ -8,6 +8,7 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\FormException;
 use App\Rules\ContentBlocks;
 use App\Services\Xlsform\XlsformImportParser;
+use App\Support\Forms\GridRules;
 
 /**
  * Fail-closed structural validation of a schema blueprint BEFORE any row is written (Increment G9a) — the
@@ -130,6 +131,8 @@ final class BlueprintValidator
      */
     private function assertNoteContent(array $field, string $subject): void
     {
+        $this->assertGridRowDetails($field, $subject);
+
         $content = is_array($field['config'] ?? null) ? ($field['config']['content'] ?? null) : null;
         if (($field['field_type'] ?? null) !== FieldType::Note->value || $content === null) {
             return;
@@ -138,6 +141,32 @@ final class BlueprintValidator
         $problem = ContentBlocks::problem($content, strict: false);
         if ($problem !== null) {
             throw FormException::invalidBlueprint("{$subject} is a note whose content is invalid: {$problem}.");
+        }
+    }
+
+    /**
+     * M246 (`grid-question-table`): a grid row's details are note content too, written verbatim by the same two doors, so
+     * they are checked here as leniently as the builder's save checks them ({@see GridRules::detailsProblem()}).
+     *
+     * @param  array<string, mixed>  $field
+     */
+    private function assertGridRowDetails(array $field, string $subject): void
+    {
+        $type = FieldType::tryFrom((string) ($field['field_type'] ?? ''));
+        $rows = is_array($field['config'] ?? null) ? ($field['config']['rows'] ?? null) : null;
+        if ($type === null || ! $type->isComposite() || ! is_array($rows)) {
+            return;
+        }
+
+        foreach (array_values($rows) as $index => $row) {
+            $details = is_array($row) ? ($row[GridRules::DETAILS] ?? null) : null;
+            if ($details === null) {
+                continue;
+            }
+            $problem = GridRules::detailsProblem($details, strict: false);
+            if ($problem !== null) {
+                throw FormException::invalidBlueprint("{$subject} is a grid whose row ".($index + 1)."'s details are invalid: {$problem}.");
+            }
         }
     }
 

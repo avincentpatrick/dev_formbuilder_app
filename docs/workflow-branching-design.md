@@ -429,7 +429,7 @@ Nothing, and that is itself the finding worth recording. H12a's grace window pro
 > the parser is left-associative and the describer already renders it flat.
 >
 > **THREE SHAPES ARE REFUSED RATHER THAN MANGLED, and each is a real limit of the language.** (a) A string
-> containing BOTH `'` and `"`: `lexString` (`resources/public-runtime/engine/lexer.ts:151`) has **no escape
+> containing BOTH `'` and `"`: `lexString` (`resources/public-runtime/engine/lexer.ts`) has **no escape
 > sequences at all** — a backslash is an ordinary character and a literal ends at the first matching
 > delimiter — so a value carrying both quote characters is not expressible, and printing it with either one
 > would produce a *different string*, silently. (b) A number whose shortest decimal form needs exponent

@@ -13,6 +13,7 @@ use App\Enums\RequiredMode;
 use App\Enums\ValidationRuleType;
 use App\Models\FormField;
 use App\Rules\ContentBlocks;
+use App\Rules\GridRowDetails;
 use App\Services\Expressions\DateMath;
 use App\Services\Expressions\Rounding;
 use App\Services\Forms\LinkedChoiceService;
@@ -269,7 +270,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.prefill_source' => 'value source',
             'config.url_param' => 'URL parameter',
             'config.content' => 'content',
-        ];
+        ] + self::gridRuleAttributes(); // M246, appended on the closing line so no line below it moves
     }
 
     /**
@@ -369,7 +370,7 @@ final class UpdateFieldRequest extends FormRequest
                 // form — shape only, as for a choice question's; whether each can serve is publish's (`GridSources`).
                 ...self::gridSourceRules('config.rows'),
                 ...self::gridSourceRules('config.cells'),
-                ...self::gridSourceRules('config.columns.*.options'),
+                ...self::gridSourceRules('config.columns.*.options'), ...self::gridRuleRules(matrix: true),
             ];
         }
 
@@ -387,7 +388,7 @@ final class UpdateFieldRequest extends FormRequest
                 'config.columns.*.label_translations.*' => ['nullable', 'string', 'max:500'],
                 'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
                 // M185: a Likert matrix's statements may come from a list or a form; its scale stays typed.
-                ...self::gridSourceRules('config.rows'),
+                ...self::gridSourceRules('config.rows'), ...self::gridRuleRules(matrix: false),
             ];
         }
 
@@ -521,5 +522,51 @@ final class UpdateFieldRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * M246 (`grid-question-table`) — a grid's own rules: a row's show-when, details and "Not needed" cells, and a Grid
+     * column's show-when, needed-when and required-when. Shape only; what each may name is publish's
+     * (`ExpressionValidationGate`, `StructuralValidationGate`). Spread onto the end of the two grid arms.
+     *
+     * @return array<string, mixed>
+     */
+    private static function gridRuleRules(bool $matrix): array
+    {
+        $rules = [
+            'config.rows.*.relevant' => ['nullable', 'string', 'max:2000'],
+            'config.rows.*.details' => ['sometimes', 'nullable', new GridRowDetails],
+        ];
+
+        if (! $matrix) {
+            return $rules;
+        }
+
+        return [
+            ...$rules,
+            'config.rows.*.not_needed' => ['sometimes', 'array', 'max:100'],
+            'config.rows.*.not_needed.*' => ['string', 'max:255'],
+            'config.columns.*.relevant' => ['nullable', 'string', 'max:2000'],
+            'config.columns.*.needed_when' => ['nullable', 'string', 'max:2000'],
+            'config.columns.*.required_when' => ['nullable', 'string', 'max:2000'],
+        ];
+    }
+
+    /**
+     * M246: the plain names of a grid's own rules, for the messages a refused save shows.
+     *
+     * @return array<string, string>
+     */
+    private static function gridRuleAttributes(): array
+    {
+        return [
+            'config.rows.*.relevant' => 'row condition',
+            'config.rows.*.details' => 'row details',
+            'config.rows.*.not_needed' => 'cells not needed in this row',
+            'config.rows.*.not_needed.*' => 'cell not needed in this row',
+            'config.columns.*.relevant' => 'column condition',
+            'config.columns.*.needed_when' => 'when this column is needed',
+            'config.columns.*.required_when' => 'when this column is required',
+        ];
     }
 }

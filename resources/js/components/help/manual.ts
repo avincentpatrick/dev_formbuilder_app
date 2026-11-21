@@ -691,6 +691,10 @@ const CHOICE_FILTER = 'resources/js/components/builder/ChoiceFilterEditor.vue';
 const DATA_SHARING = 'resources/js/components/forms/DataSharingPanel.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
+// M246 (`grid-question-table`): a grid row's settings and a Grid column's rules.
+const GRID_ROW = 'resources/js/components/builder/GridRowRules.vue';
+const GRID_COLUMN = 'resources/js/components/builder/GridColumnRules.vue';
+const GRID_CELLS = 'resources/js/components/builder/grid-condition-cells.ts';
 const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
 const GEO = 'resources/js/components/builder/GeoEditor.vue';
 const MEDIA = 'resources/js/components/builder/MediaEditor.vue';
@@ -1160,7 +1164,7 @@ const reference: ChapterDraft[] = [
                     p('Several statements, each rated on the same scale, in one table: the scale’s words across the top and one round button for each statement and point. On a phone each statement becomes a card with its scale on one line. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' or ', ui("Another form's answers", LINKED), '. Rows from a list or a form are copied in when you publish; publish again to pick up new answers.'],
-                        [ui('Rows', LIKERT_MATRIX), ' — the statements to rate.'],
+                        [ui('Rows', LIKERT_MATRIX), ' — the statements to rate. Under each one, ', ui('Row settings', GRID_ROW), ': ', ui('Show this row only when…', GRID_ROW), ' and ', ui('Details under the row’s label', GRID_ROW), '.'],
                         [ui('Scale points', LIKERT_MATRIX), ' — the rating scale shared by every row, from lowest to highest.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
@@ -1274,13 +1278,14 @@ const reference: ChapterDraft[] = [
                     p('A table of questions: each row is asked in every column, and each column takes its own kind of answer. It is a table on a wide screen and a card per row on a phone. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' (each row of the file a row of the grid, up to 200) or ', ui("Another form's answers", LINKED), '.'],
-                        [ui('Rows', MATRIX), ' — each row is a question.'],
-                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', and for a choice column where its choices come from — typed, a list file or another form’s answers.'],
+                        [ui('Rows', MATRIX), ' — each row is a question. Under each one, ', ui('Row settings', GRID_ROW), ': ', ui('Show this row only when…', GRID_ROW), ', ', ui('Not needed in this row', GRID_ROW), ' (those cells read “Not needed” and are never asked), and ', ui('Details under the row’s label', GRID_ROW), ' — text shown under the row, with no pictures.'],
+                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short or long text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', for a choice column where its choices come from — typed, a list file or another form’s answers — and its ', ui('Column rules', GRID_COLUMN), ': ', ui('Show this column only when…', GRID_COLUMN), ', ', ui('In each row, this cell is needed only when…', GRID_COLUMN), ' and ', ui('In each row, this cell is required when…', GRID_COLUMN), '. The two in-each-row rules can read ', ui('This row’s', GRID_CELLS), ' cells to the left.'],
                         [ui('Cell choices come from', LINKED), ' and ', ui('Cell choices', MATRIX), ' — the choices of every choice column with no list of its own.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
                     tip('info', 'Rows and choices from a list file or another form are copied into the grid when you publish, so the paper form, the PDF and every export show them. Publish again to pick up new answers.'),
-                    tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
+                    tip('info', 'A condition, a formula or a label elsewhere can use one cell of a grid: pick it as “Grid — Row — Column”. A condition or a formula can only use a cell that is always asked — its row and column have no condition, and it is never “Not needed” — and a label can show any cell of a grid before it. A row or column whose code has a space or a full stop cannot be picked.'),
+                    tip('info', 'A grid cannot sit inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
                 ],
             },
         ],

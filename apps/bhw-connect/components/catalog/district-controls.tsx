@@ -1,3 +1,4 @@
+import { restoredNhfrMapHref } from "@/lib/catalog/nhfr-navigation";
 import Link from "next/link";
 import { withBasePath } from "@/lib/base-path";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
@@ -16,7 +17,11 @@ export function DistrictControls({
 }) {
   const { selection, current, scope } = geography;
   const snapshot =
-    !dataset || dataset === "bhw" ? restoredBhwMapHref(mapState)?.split("?")[1] : undefined;
+    dataset === "nhfr"
+      ? restoredNhfrMapHref(mapState)?.split("?")[1]
+      : !dataset || dataset === "bhw"
+        ? restoredBhwMapHref(mapState)?.split("?")[1]
+        : undefined;
   const href = (scope: CatalogSelection) =>
     catalogJourneyHref(
       scope,

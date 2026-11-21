@@ -138,9 +138,13 @@ test("home starts with the catalog and every available card has consistent detai
 }) => {
   await page.goto("./");
   await expect(page.getByRole("region", { name: "Catalog overview" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Health facilities", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Health facilities", exact: true })).toHaveCount(
+    1,
+  );
   await expect(page.getByRole("heading", { name: "NHFR", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Facilities dashboard", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Facilities dashboard", exact: true })).toHaveCount(
+    0,
+  );
   const cards = page.locator("article");
   await expect(cards.first()).toBeVisible();
   const links = await cards
@@ -152,6 +156,19 @@ test("home starts with the catalog and every available card has consistent detai
     await page.goto(href);
     if (new URL(page.url()).pathname.endsWith("/bhw")) {
       await expect(page.getByTestId("bhw-first-visual")).toBeVisible();
+      await page.goto("./");
+      continue;
+    }
+    if (new URL(page.url()).searchParams.get("dataset") === "nhfr") {
+      await expect(page).toHaveURL(/location=national%3APH/);
+      await expect(page.getByTestId("nhfr-overview")).toBeVisible();
+      await openReadableDetails(page);
+      await expect(
+        page.getByText("Exact data, availability and sources", { exact: true }),
+      ).toBeVisible();
+      // National acceptance is independent of availability elsewhere. The stock
+      // seed has no accepted national NHFR row; a table must not be invented.
+      await expect(page.getByTestId("nhfr-overview")).toContainText("not show staffing");
       await page.goto("./");
       continue;
     }

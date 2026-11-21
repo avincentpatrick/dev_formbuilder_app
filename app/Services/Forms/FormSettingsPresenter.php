@@ -66,6 +66,8 @@ final class FormSettingsPresenter
             // live preview, which until this row had no way to know and was therefore always stepped.
             // The preview reads it off the RENDER model, never off the engine: see `PreviewRuntime`.
             'single_page_mode' => $form->single_page_mode,
+            // M248 (`D232`) — what the thank-you page offers next: `another`, `amend` or `once`.
+            'after_submit' => $form->after_submit->value,
             // Raw schedule values (Increment H12b) — the Schedule section prefills from these (the ISO instants
             // are rendered back into `timezone` for the datetime-local inputs). Enforcement uses `acceptance`
             // on the runtime presenters; the settings only need the raw window + cap to round-trip a PATCH.

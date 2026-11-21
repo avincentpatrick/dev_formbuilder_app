@@ -46,6 +46,7 @@ use Illuminate\Support\Carbon;
  * @property ?int $completeness_percent
  * @property Carbon|null $last_saved_at
  * @property Carbon|null $draft_expires_at
+ * @property Carbon|null $respondent_amended_at when the respondent last changed their own sent response (M248, `D232`); written only by SubmissionAnswerEditService
  * @property ?string $draft_current_step
  * @property ?string $validated_by
  * @property Carbon|null $validated_at
@@ -152,6 +153,7 @@ class Submission extends Model implements TenantScoped
             'completeness_percent' => 'integer',
             'last_saved_at' => 'datetime',
             'draft_expires_at' => 'datetime',
+            'respondent_amended_at' => 'datetime',
             'validated_at' => 'datetime',
             'submitted_at' => 'datetime',
             'finalized_at' => 'datetime',

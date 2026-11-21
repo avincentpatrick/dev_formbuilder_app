@@ -22,6 +22,18 @@ use RuntimeException;
 final class SubmissionEditException extends RuntimeException
 {
     /**
+     * M248 — the machine-readable reason, for the one caller that answers JSON: the respondent's amend route
+     * (`GuestAmendController`) turns it into a 409 the guest page can put into words. The staff controller still reads
+     * only the message.
+     */
+    private string $reason = 'illegal_state';
+
+    public function reason(): string
+    {
+        return $this->reason;
+    }
+
+    /**
      * The two refusals carry different reasons and say so, because "this cannot be edited" with no cause is
      * the message that generates a support ticket.
      *
@@ -46,6 +58,18 @@ final class SubmissionEditException extends RuntimeException
     }
 
     /**
+     * M248 (`D232` answer 3) — a respondent may change their own response only while it is still `submitted`. Once staff
+     * put it under review, approve it or return it, the answers they are acting on stay as they were.
+     */
+    public static function respondentLocked(): self
+    {
+        $e = new self('Your response is being reviewed, so it can no longer be changed.');
+        $e->reason = 'response_under_review';
+
+        return $e;
+    }
+
+    /**
      * Somebody else's edit landed between this editor loading the page and pressing Save.
      *
      * The alternative is a SILENT lost update: the write is a whole-document replace, so accepting this would
@@ -58,9 +82,12 @@ final class SubmissionEditException extends RuntimeException
      */
     public static function concurrentlyModified(): self
     {
-        return new self(
+        $e = new self(
             'Someone else changed this submission while you were editing it. '
             .'Reload the page to see their changes, then make your correction again.'
         );
+        $e->reason = 'concurrently_modified';
+
+        return $e;
     }
 }

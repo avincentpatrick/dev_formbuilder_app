@@ -19,6 +19,7 @@ use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\DomainController;
 use App\Http\Controllers\Tenant\FeedbackController;
 use App\Http\Controllers\Tenant\FeedbackThreadController;
+use App\Http\Controllers\Tenant\FormAfterSubmitController;
 use App\Http\Controllers\Tenant\FormAnalyticsController;
 use App\Http\Controllers\Tenant\FormBuilderController;
 use App\Http\Controllers\Tenant\FormConfirmationMessageController;
@@ -743,6 +744,12 @@ Route::middleware([
     // being built and tested. That is the whole of `R-f1332829`.
     Route::patch('/forms/{form}/page-mode', [FormPageModeController::class, 'update'])
         ->middleware('can:update,form')->name('forms.page-mode');
+
+    // What a form offers after Submit (M248, `D232`) — another response, "Change my answers" until the form closes, or one
+    // response. `can:update,form` alone, like page mode: no plan feature covers it. Its own endpoint and a guarded
+    // FormService::setAfterSubmit write, because the column is not fillable.
+    Route::patch('/forms/{form}/after-submit', [FormAfterSubmitController::class, 'update'])
+        ->middleware('can:update,form')->name('forms.after-submit');
 
     // A form's preset theme (M131, `R-6017d6d8`). `can:update,form` alone, like page mode: `D81` puts presets
     // on every plan, so there is no `feature:` gate — the workspace's own brand colour stays Starter+.
@@ -1501,6 +1508,13 @@ Route::middleware([
     // verified in the controller (404 on bad/expired); the SPA then restores the draft (restore itself is H10).
     Route::get('/f/resume/{resumeToken}', [GuestFormController::class, 'resume'])
         ->middleware('throttle:guest-mint')->name('guest.form.resume');
+
+    // M248 (`D232`) — "Change my answers": the page a respondent's amend link opens. A static "amend" segment, reserved in
+    // FormSlug like "resume", and the token pattern (`v1.<payload>.<signature>`) keeps `/f/amend/manifest.webmanifest`
+    // — the manifest of any form named "amend" before the reservation — on the manifest route below.
+    Route::get('/f/amend/{amendToken}', [GuestFormController::class, 'amend'])
+        ->where('amendToken', 'v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+')
+        ->middleware('throttle:guest-mint')->name('guest.form.amend');
 
     // Increment G8a — per-form web manifest linked from the guest shell (installability). Same slug
     // resolution + 404 gates as the mint route; no share token needed.

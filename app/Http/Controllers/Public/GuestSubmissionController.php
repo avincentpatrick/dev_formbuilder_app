@@ -18,6 +18,7 @@ use App\Services\Forms\FormRedirectResolver;
 use App\Services\Ocr\GuestPaperReview;
 use App\Services\Ocr\OcrScanConfirmation;
 use App\Services\Submissions\ClientUuidResolver;
+use App\Services\Submissions\RespondentAmendService;
 use App\Services\Submissions\SubmissionDraftService;
 use App\Services\Submissions\SubmissionPayload;
 use App\Services\Submissions\SubmissionPipeline;
@@ -85,6 +86,7 @@ final class GuestSubmissionController extends Controller
         FormRedirectResolver $redirects,
         GuestPaperReview $papers,
         OcrScanConfirmation $confirmations,
+        RespondentAmendService $amends,
     ): JsonResponse {
         $token = $this->shareToken($request);
 
@@ -150,6 +152,9 @@ final class GuestSubmissionController extends Controller
                 // to stay. Resolved when the response is accepted, so it reflects the form's settings now, and a
                 // destination that has stopped taking responses is null rather than a dead end.
                 'redirect' => $redirects->resolve($form),
+                // When the form lets a respondent change their answers until it closes: the link to do so, its token for
+                // the device to remember, and when the form closes (null for no closing date). Null otherwise.
+                'amend' => $paperScan === null ? $amends->linkFor($form, $result->submission) : null,
             ],
         ];
 

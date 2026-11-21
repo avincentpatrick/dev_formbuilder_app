@@ -304,4 +304,62 @@ final class GuestShareTokenService
     {
         return hash_hmac('sha256', 'guest-paper-scan-token.v1', $this->key);
     }
+
+    /**
+     * Mint an AMEND token (M248, `D232`): the respondent's handle on the one response they SENT, so they can change it
+     * while the form allows it — from the same device, which remembers it, or from the link the thank-you page gives.
+     * Carries `sid` = the submission's id and `typ: 'amend'`, and is signed under a key DERIVED from the resume key with
+     * its own label, as the paper token derives from the share key, so it cannot validate as any other kind of token.
+     *
+     * Long-lived (`guest.amend_token.ttl`) on purpose: nothing about the form is baked in. Whether the response may still
+     * change — the form open, "Change my answers" on, the response still `submitted` — is decided live on every read and
+     * write, so an author extending the closing date never kills a link early. ⚠️ Below the private helpers, like
+     * `mintPaper()`: `decodeAndVerify()` is cited by line from an ADR.
+     */
+    public function mintAmend(
+        string $tenantId,
+        string $formId,
+        string $formVersionId,
+        string $submissionId,
+        ?int $now = null,
+    ): MintedShareToken {
+        $now ??= time();
+        $expiresAt = $now + (int) config('guest.amend_token.ttl', 31536000);
+
+        return $this->encode(
+            ['tid' => $tenantId, 'fid' => $formId, 'vid' => $formVersionId, 'sid' => $submissionId, 'typ' => 'amend', 'exp' => $expiresAt],
+            $this->amendKey(),
+            $expiresAt,
+        );
+    }
+
+    /**
+     * Verify an AMEND token: the signature under the derived amend key, then expiry, then `typ === 'amend'` and a
+     * well-formed submission id. Returns the payload with `submissionId` populated.
+     *
+     * @throws InvalidShareTokenException malformed structure, a bad/forged signature, or another kind of token
+     * @throws ExpiredShareTokenException authentic but past its `exp`
+     */
+    public function verifyAmend(string $token, ?int $now = null): GuestShareToken
+    {
+        $payload = $this->decodeAndVerify($token, $this->amendKey(), $now);
+
+        if (($payload['typ'] ?? null) !== 'amend' || ! self::isUuid($payload['sid'] ?? null)) {
+            throw InvalidShareTokenException::malformed();
+        }
+
+        return new GuestShareToken(
+            (string) $payload['tid'],
+            (string) $payload['fid'],
+            (string) $payload['vid'],
+            (int) $payload['exp'],
+            $token,
+            (string) $payload['sid'],
+        );
+    }
+
+    private function amendKey(): string
+    {
+        return hash_hmac('sha256', 'guest-amend-token.v1', $this->resumeKey);
+    }
 }

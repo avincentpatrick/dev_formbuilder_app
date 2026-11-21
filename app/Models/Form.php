@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AfterSubmit;
 use App\Enums\FormBotChallenge;
 use App\Enums\FormScheduleState;
 use App\Enums\FormStatus;
@@ -40,6 +41,7 @@ use Illuminate\Support\Carbon;
  * @property bool $allow_guest_submissions
  * @property bool $single_page_mode
  * @property bool $save_and_resume
+ * @property AfterSubmit $after_submit what the thank-you page offers next (M248, `D232`); written only by setAfterSubmit()
  * @property FormBotChallenge $bot_challenge
  * @property ?int $guest_rate_limit_per_minute
  * @property ?string $confirmation_message
@@ -129,6 +131,9 @@ class Form extends Model implements TenantScoped
             // the ability to switch a public form's spam protection off as a side effect of an unrelated
             // update(). They are written by FormService::setShareSettings() through forceFill(), audited.
             'bot_challenge' => FormBotChallenge::class,
+            // M248 (`D232`) — the "After submitting" setting. Deliberately NOT in $fillable, like `bot_challenge`: it decides
+            // whether a respondent may change a sent response, so its only writer is FormService::setAfterSubmit(), audited.
+            'after_submit' => AfterSubmit::class,
             'guest_rate_limit_per_minute' => 'integer',
             // Increment H6a — the confirmation template (Doc #26 §6.2). Deliberately NOT in $fillable:
             // the only writer is FormService::setConfirmationMessage()'s forceFill, so mass-assignment
@@ -171,6 +176,7 @@ class Form extends Model implements TenantScoped
         'allow_guest_ocr' => false,
         'guest_ocr_window_minutes' => 10,
         'guest_ocr_daily_cap' => 20,
+        'after_submit' => 'another',
     ];
 
     /**

@@ -33,7 +33,7 @@ use Illuminate\Support\Str;
 final class FormSlug
 {
     /** Slugs the share surface refuses, because `/f/{slug}` has a sibling literal segment. */
-    public const RESERVED = ['resume'];
+    public const RESERVED = ['resume', 'amend'];
 
     /** Shortest slug the share request accepts — long enough not to collide by accident in a URL bar. */
     public const MIN_LENGTH = 3;

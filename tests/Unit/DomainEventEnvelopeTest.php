@@ -175,8 +175,11 @@ it('builds the SubmissionUpdated envelope to a metadata-only shape that cannot w
 
     expect($env['event_type'])->toBe('submission.updated')
         ->and(array_keys($env['data']))
-        ->toBe(['submission_id', 'form_id', 'edited_by', 'status', 'approval_withdrawn'])
+        ->toBe(['submission_id', 'form_id', 'edited_by', 'edited_by_respondent', 'status', 'approval_withdrawn'])
         ->and($env['data']['approval_withdrawn'])->toBeTrue()
+        // M248 — a staff edit names its editor, and says it was not the respondent.
+        ->and($env['data']['edited_by'])->toBe($editor->id)
+        ->and($env['data']['edited_by_respondent'])->toBeFalse()
         ->and($env['data']['status'])->toBe('under_review')
         // A webhook body and a Slack message are not places for respondent data — nor for the KEY NAMES,
         // which are schema information a form author may treat as sensitive on their own.

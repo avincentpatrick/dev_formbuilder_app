@@ -100,4 +100,15 @@ class Audit extends Model implements TenantScoped
     {
         return $this->belongsTo(User::class, 'acting_as_user_id');
     }
+
+    /**
+     * M248 (`D232`) — a respondent changed the response they sent, through the amend link: no user, and the `by` marker
+     * `SubmissionAnswerEditService` writes beside the status snapshot. The audit log and its export name it "Respondent"
+     * rather than "System", which would credit the software with a person's change. Named rather than `{@see}`-linked,
+     * so this docblock owes no runtime-unused import.
+     */
+    public function isRespondentAct(): bool
+    {
+        return $this->user_id === null && ($this->new_values['by'] ?? null) === 'respondent';
+    }
 }

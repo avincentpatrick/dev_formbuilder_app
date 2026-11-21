@@ -22,6 +22,7 @@ use App\Services\Validation\SemanticValidator;
 use App\Support\Audit\AuditLogger;
 use App\Support\Audit\AuditRedactor;
 use App\Support\Submissions\FinalizedStatus;
+use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -76,6 +77,16 @@ final class SubmissionAnswerEditService
         SubmissionStatus::Returned,
     ];
 
+    /**
+     * M248 (`D232` answer 3) — the states a RESPONDENT may change their own response in: `submitted` alone. Kept apart from
+     * {@see self::EDITABLE}, which `SubmissionAnswerEditTest` pins at exactly four, so neither list can widen the other.
+     *
+     * @var list<SubmissionStatus>
+     */
+    public const RESPONDENT_AMENDABLE = [
+        SubmissionStatus::Submitted,
+    ];
+
     public function __construct(
         private readonly StructuralAnswerNormalizer $normalizer,
         private readonly SemanticValidator $semantic,
@@ -104,9 +115,50 @@ final class SubmissionAnswerEditService
      */
     public function edit(Submission $submission, FormVersion $version, array $answers, User $editor, bool $checkBaseline = false, ?string $baseline = null): Submission
     {
+        return $this->apply($submission, $version, $answers, $editor, $checkBaseline, $baseline, null);
+    }
+
+    /**
+     * M248 (`D232`) — the respondent changes the response they sent, through the amend link.
+     *
+     * The same write as a staff correction — the same baseline, lock, validation, `submitted_at` clock, media kept from
+     * the stored document, projections and one audit row — with three differences, each the user's answer or its
+     * consequence:
+     *   - only a `submitted` response may change ({@see self::RESPONDENT_AMENDABLE}), checked here and again under the
+     *     lock, because a reviewer picking it up between the respondent opening the link and pressing Submit is the
+     *     ordinary race (`D232` answer 3). So the approval demotion below can never run for a respondent;
+     *   - `$stillAllowed` runs under that lock, so the form's own conditions (still open, "Change my answers" still on)
+     *     are judged at the moment of the write, not when the page was opened;
+     *   - there is no user: the audit row has no actor and says `by: respondent`, the event says so too, and
+     *     `respondent_amended_at` is stamped for staff to see.
+     *
+     * The baseline is always checked: every respondent PUT carries the checksum its page was given.
+     *
+     * @param  array<string, mixed>  $answers  the respondent's answers (media answers are ignored — see mergeMedia())
+     * @param  Closure(): void  $stillAllowed  throws when the form no longer lets this respondent amend
+     *
+     * @throws SubmissionEditException the response is no longer `submitted`, or changed since the page was given it
+     * @throws SubmissionValidationException Stage 1 (malformed) or Stage 3 (semantic) rejected the change
+     */
+    public function amendAsRespondent(Submission $submission, FormVersion $version, array $answers, ?string $baseline, Closure $stillAllowed): Submission
+    {
+        return $this->apply($submission, $version, $answers, null, true, $baseline, $stillAllowed);
+    }
+
+    /**
+     * The one write behind both doors. `$editor` null means the respondent ({@see self::amendAsRespondent()}), and then
+     * `$stillAllowed` is never null.
+     *
+     * @param  array<string, mixed>  $answers
+     * @param  ?Closure(): void  $stillAllowed
+     */
+    private function apply(Submission $submission, FormVersion $version, array $answers, ?User $editor, bool $checkBaseline, ?string $baseline, ?Closure $stillAllowed): Submission
+    {
+        $respondent = $editor === null;
+
         // Cheap pre-check on the passed-in row so an obviously illegal edit fails before Stage 3 runs. The
         // authoritative check is the identical one under the lock below — this one only spares the work.
-        $this->assertEditable($submission->status);
+        $this->assertEditable($submission->status, $respondent);
 
         $fields = $version->fields()->get();
         $sections = $version->sections()->get();
@@ -182,13 +234,18 @@ final class SubmissionAnswerEditService
         // mutation. Reading `$submission->status` out here would read the caller's stale copy.
         $demoted = false;
 
-        $fresh = DB::transaction(function () use ($submission, $version, $fields, $storedAnswers, $final, $checksum, $readChecksum, $editor, $piiKeys, &$demoted): Submission {
+        $fresh = DB::transaction(function () use ($submission, $version, $fields, $storedAnswers, $final, $checksum, $readChecksum, $editor, $respondent, $stillAllowed, $piiKeys, &$demoted): Submission {
             $row = Submission::query()->whereKey($submission->id)->lockForUpdate()->firstOrFail();
 
             // The authoritative gate. Re-asserted under the lock because the pre-check above read the row
             // before it was held: a reviewer archiving this submission between the editor opening the page
             // and pressing Save is an ordinary race, not an exotic one.
-            $this->assertEditable($row->status);
+            $this->assertEditable($row->status, $respondent);
+
+            // M248 — the form's own conditions for a respondent's change, judged while the row is held.
+            if ($stillAllowed !== null) {
+                $stillAllowed();
+            }
 
             // The SECOND half of the concurrency guard, and it closes a different window from the baseline
             // check above: that one catches a stale PAGE, this one catches a write that landed between this
@@ -222,6 +279,11 @@ final class SubmissionAnswerEditService
                 $row->validated_by = null;
                 $row->validated_at = null;
                 $row->finalized_at = null;
+            }
+
+            // M248 — the one fact about a respondent's own change that staff see on the response itself.
+            if ($respondent) {
+                $row->respondent_amended_at = now();
             }
 
             $row->save();
@@ -268,12 +330,14 @@ final class SubmissionAnswerEditService
                 // ledger that described a write different from the one that happened would be worse than no
                 // ledger, and this is the shape that keeps the two identical by construction.
                 old: [...$before, ...$this->answerDiff($storedAnswers, $final, keep: 'old')],
-                new: [...$this->statusSnapshot($row), ...$this->answerDiff($storedAnswers, $final, keep: 'new')],
+                // M248 — a respondent's change says so at the top level (`by`), beside the status snapshot rather than in
+                // it: `AuditReplayMap` reads the snapshot's keys, and the audit log names a null actor "Respondent" from this.
+                new: [...$this->statusSnapshot($row), ...($respondent ? ['by' => 'respondent'] : []), ...$this->answerDiff($storedAnswers, $final, keep: 'new')],
                 // Explicit, never AuditLogger's Auth::id() fallback — the reasoning is written out at
                 // SubmissionReviewService::apply(). Here it is doubly true: the demotion above clears
                 // `validated_by`, so a ledger that guessed its actor could contradict the very row it
-                // describes.
-                actorId: (string) $editor->getKey(),
+                // describes. A respondent has no account, and a guest request has no signed-in user to fall back to.
+                actorId: $editor === null ? null : (string) $editor->getKey(),
                 piiAnswerKeys: $piiKeys,
             );
 
@@ -284,7 +348,7 @@ final class SubmissionAnswerEditService
         // (technical-architecture.md §7.4). `DB::afterCommit` is verified never to fire under the suite's
         // uncommitted outer transaction, so it is not an option. The audit row above is the ledger and is
         // atomic with the change; this is the announcement, and it must not fire for an edit that rolled back.
-        event(SubmissionUpdated::for($fresh, $editor, $demoted));
+        event($editor === null ? SubmissionUpdated::forRespondent($fresh) : SubmissionUpdated::for($fresh, $editor, $demoted));
 
         return $fresh;
     }
@@ -292,8 +356,16 @@ final class SubmissionAnswerEditService
     /**
      * @throws SubmissionEditException
      */
-    private function assertEditable(SubmissionStatus $status): void
+    private function assertEditable(SubmissionStatus $status, bool $respondent = false): void
     {
+        if ($respondent) {
+            if (! in_array($status, self::RESPONDENT_AMENDABLE, true)) {
+                throw SubmissionEditException::respondentLocked();
+            }
+
+            return;
+        }
+
         if (! in_array($status, self::EDITABLE, true)) {
             throw SubmissionEditException::illegalState($status);
         }

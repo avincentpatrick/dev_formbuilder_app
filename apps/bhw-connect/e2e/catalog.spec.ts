@@ -1,7 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function openReadableDetails(page: Page) {
-  if (!["poverty", "population"].includes(new URL(page.url()).searchParams.get("dataset") ?? ""))
+  if (
+    !["poverty", "population", "nhfr"].includes(
+      new URL(page.url()).searchParams.get("dataset") ?? "",
+    )
+  )
     return;
   const summary = page.getByText("Exact data, availability and sources", { exact: true });
   const details = page.locator("details").filter({ has: summary });

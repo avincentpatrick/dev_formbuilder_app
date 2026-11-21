@@ -65,6 +65,101 @@ Prediction:
 - NHETE's walk closes and reopens its page, continues, submits, changes an answer and sees it kept.
 - The one most likely wrong: the amend session's validation clock and version pinning — a respondent whose form was republished after they sent it, or whose answers fail a date check against "today", is where client and server can disagree. Also at risk: `resume-boot.test.ts`, which mounts the whole app and will meet the new device-memory read.
 
+**BUILT AND HELD (2026-11-22): PR #625, cut from `origin/main`.**
+- **Version.** `VERSION` 0.27.0 with its notes.
+- **Merge order.** Held after #545, #568, #580, #589, #597 and #610, which go first at the merge point. The PR body lists the merge-time steps:
+  - recheck the migration prefix after #589's `000150` and #610's `000151`;
+  - the expected conflicts;
+  - re-export `openapi.json`;
+  - recheck the cache-prefix gate's `f/` list.
+
+- **CI:** run 44922909203 on `a6a66e90`, every job green with real step counts:
+  - Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5;
+  - Boundary 44922907385 green (5);
+  - E2E 930 passed in 33.5 min.
+
+  Three earlier runs each found something, fixed before this one (below).
+
+- **The setting.** Migration `2026_08_17_000152` (additive) adds `forms.after_submit` (`another` | `amend` | `once`, CHECK, default `another`) and `submissions.respondent_amended_at`.
+  - `App\Enums\AfterSubmit`; the column is not fillable.
+  - Written by `PATCH /forms/{form}/after-submit` → `FormService::setAfterSubmit()`, locked and audited.
+  - Read by both presenters; the builder's "After submitting" panel; the manual.
+  - The enum's three TypeScript mirrors are registered with the drift gate.
+
+- **Changing a sent response.**
+  - **Token:** `GuestShareTokenService::mintAmend()`/`verifyAmend()`, signed with a key derived from the resume key, 365 days at most. The server decides live; the token decides nothing.
+  - **Context:** `EstablishGuestAmendContext`.
+  - **Routes:** `GET`/`PUT api/v1/public/submissions/amend/{amendToken}`, outside every cached prefix, and the `/f/amend/{amendToken}` page. The page's token pattern keeps `/f/amend/manifest.webmanifest` on the manifest route. `amend` is reserved as a slug.
+  - **Rules:** `RespondentAmendService` requires a guest row on its own form, the mode on, guests allowed and the form open; `FormAcceptanceGuard::assertCanAmend()` enforces those.
+  - **Write:** `SubmissionAnswerEditService::amendAsRespondent()` uses a separate `RESPONDENT_AMENDABLE` set (`submitted` alone). The status and the form are re-checked under the lock. The audit row has no actor (`AuditLogger` `withoutActor`) and carries `by: respondent`, which the log names "Respondent". It stamps `respondent_amended_at` and consumes no capacity.
+  - **Event:** `SubmissionUpdated` gains `edited_by_respondent`, and no points are awarded.
+  - **Submit response:** the guest submit returns `amend` (token, url, until).
+
+- **Guest page.**
+  - **Continue or Start over** is asked in `App.vue` before `RuntimeSession` mounts (`earlierVisitDraft()`, `adoptDraft()`). Autosave writes the server draft's uuid, baseline and resume token, so Continue resumes that draft through the resume read.
+  - **Device memory** of a sent response sits in Dexie `app_state` (`lib/answered.ts`), written by the page and by the service worker's replay. `AlreadyAnswered.vue` shows it.
+  - **Amend mode:**
+    - the response's own version, its sent day as the clock;
+    - autosave, the outbox, "Save and finish later", the paper upload and URL prefill all off;
+    - sent media read-only, with respondent wording;
+    - Submit as a PUT whose refusals are sentences (error kind `amend`, never a re-mint).
+  - **Thank-you page** by mode; no countdown while the link shows.
+  - `sw.ts` leaves `/f/amend/` to the network.
+
+- **NHETE.**
+  - The seeder sets amend and a closing date a month out, and converges an older seed.
+  - The walk closes its tab on the first indicator page and continues there, then changes `s1a` after Submit through "Change my answers" and finds the change kept, at all three widths. The change part takes about 49 s at 1440 px.
+  - The route test changes a sent response through the token. It is refused by the word cap, once under review and once closed.
+
+- **Docs.**
+  - ADR `0026-respondent-changes-own-response.md`, and a dated amendment to `0021`.
+  - The threat model's amend-link row, the UX flow §9 and the webhook doc.
+  - The data dictionary, `openapi.json` and `D232`.
+  - The four rows closed and four filed.
+  - ADR `0009-oauth-connector-token-custody.md`'s stale `routes/api.php` line cite became the group's name, and six ledger citations this branch's insertions moved are re-pointed.
+
+- **Local runs.**
+  - **Pest:**
+    - Guest, Submissions, Audit, Gamification, Webhooks and Unit: 3,118 passed;
+    - every other Feature folder: 3,553 passed, 6 skipped, and only `SuiteCollectionFloorTest` red — the bind-mount truncation, 79 files unseen locally, which CI runs;
+    - the NHETE suite.
+  - **Vitest:** all 295 files.
+  - **Static checks:** the type-check; Pint, every lint gate and `preflight --with-gates --with-pint` on the host.
+  - **PHPStan** in the container reports 54 "undefined property" errors, the identical set on `origin/main` in the same container; CI's static analysis is green.
+  - **E2E:** NHETE and the new guest axe cases at all three widths; `public-runtime-axe`, `public-runtime-offline` and `form-settings-axe` on desktop.
+
+- **Mutants: 9 of 9 caught.**
+  - Six through `mutate.php`:
+    - the status re-check under the lock;
+    - the form re-read under the lock;
+    - guest rows only;
+    - the limiter's `{amendToken}` key;
+    - the audit's `by: respondent`;
+    - the amend-mode gate.
+  - Three in Vitest through a byte-restoring harness:
+    - Continue's adopt;
+    - the service worker's amend exclusion;
+    - the earlier-visit predicate.
+
+**How the prediction fared.**
+- **Churn in tests that pin the guest submit body, the webhook envelope's `edited_by`, the confirmation screen's buttons and the service worker's cached prefixes: right, and it was wider.**
+  - The ones I ran locally were updated before the first push: the envelope, the cache-prefix gate, the submitted event's arguments, the boot object's shape and the settings rail's count.
+  - CI found five more in folders I had not run:
+    - `OpenApiContractTest` twice — the guest body's keys, and a request docblock that Scramble published with an increment mark;
+    - `FormSettingsLockingTest` (a new writer must be listed and staged);
+    - `FormSettingsPageTest`'s pinned builder keys;
+    - my own page case, which needed `withoutVite()` on CI.
+  - Its E2E found the settings rail pinned in `form-settings-axe.spec.ts`.
+- **NHETE's walk closes, continues, submits, changes and keeps: right first time** once the dev database was seeded (locally the e2e setup seeds nothing; CI seeds it as a step).
+- **The one most likely wrong — the amend session's validation clock and version pinning: right.** The sent-day clock and the response's own version were built in from the start, and a republish case pins the version. What actually went wrong was elsewhere:
+  - **The audit's actor.** NHETE's route test is signed in as its admin when it changes the response, and `AuditLogger`'s `Auth::id()` fallback credited the admin. It is fixed with `withoutActor` and pinned by its own case.
+  - **The guest mint limit.** Every E2E spec opens guest links from one address, at 30 mints a minute. The new axe cases first met a 429 themselves (run 44914567216), then pushed `repeat-table.spec.ts` into one (run 44918997179). The cases now scan both themes on one page and wait out a 429, and CI's E2E job sets `GUEST_MINT_PER_IP: 600`. So **`.github/workflows/ci.yml` WAS touched** — one env line in the E2E job — contrary to this claim's premise; `.github/` is ours (CODEOWNERS), and the boundary map asks a label only of jongsky25.
+- **What it did not see:**
+  - **Windows tooling:** Python on Windows writes CRLF unless told otherwise (two models were converted back); the tool layer collapses an escaped quote inside a heredoc (twice); the Windows console's encoding killed the Vitest harness until it printed UTF-8.
+  - **Docker:** Docker Desktop was stopped at the session's start.
+  - **Interception:** `page.route()` cannot see a request a service worker makes, so the amend axe case blocks workers.
+  - **Insertions moved citations:** the branch's insertions moved six ledger citations past the citation lint's ceiling of 16, and they were re-pointed.
+
 ## HELD — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer) — BUILT AND HELD: PR #610, CI 44669259929 every job green with real step counts
 
 Taken 2026-11-20, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`, rewritten for 5b). NHETE recommendation 5b, the NHETE plan's next item after `M246` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).

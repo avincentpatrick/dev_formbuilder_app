@@ -200,6 +200,23 @@ it('names a respondent\'s change "Respondent" in the audit log, never "System"',
         ->and($rows->pluck('actor')->all())->toContain('System');
 });
 
+it('never credits the change to someone who happens to be signed in to the same browser', function (): void {
+    // Measured by NHETE's route test: the logger's `Auth::id()` fallback put the signed-in admin on a respondent's change.
+    $f = amendFixture();
+    $data = amendSubmit($this, $f->form, ['full_name' => 'Ana']);
+    $read = $this->getJson(amendUrl($data['amend']['token']))->json('data');
+
+    $this->actingAs($f->owner)->putJson(amendUrl($data['amend']['token']), [
+        'answers' => ['full_name' => 'Ana Cruz'],
+        'base_content_checksum' => $read['content_checksum'],
+    ])->assertOk();
+
+    enterTenant($f->tenant->id);
+    $audit = Audit::query()->where('auditable_id', $data['id'])->where('event', AuditEvent::Updated)->firstOrFail();
+    expect($audit->user_id)->toBeNull()
+        ->and($audit->isRespondentAct())->toBeTrue();
+});
+
 it('takes no capacity: a full form still lets its respondents change their answers', function (): void {
     $f = amendFixture();
     $f->form->forceFill(['max_responses' => 1])->save();

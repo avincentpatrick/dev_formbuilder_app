@@ -339,6 +339,9 @@ final class SubmissionAnswerEditService
                 // describes. A respondent has no account, and a guest request has no signed-in user to fall back to.
                 actorId: $editor === null ? null : (string) $editor->getKey(),
                 piiAnswerKeys: $piiKeys,
+                // M248 — and never AuditLogger's `Auth::id()` fallback for a respondent: a staff member signed in to the
+                // same browser did not make the respondent's change. Measured: NHETE's route test, signed in, credited it.
+                withoutActor: $editor === null,
             );
 
             return $row;

@@ -99,9 +99,11 @@ logs must be recorded after merge before the next implementation increment.
 
 ## Delivery ledger
 
-Assessment prepared; first implementation in progress. No merge/deploy/import or
-representative-reader acceptance is claimed. Record local results, PR/CI, merge
-and actual release SHA, then bounded live navigation/figure checks here.
+Assessment and first implementation prepared in
+[#617](https://github.com/avincentpatrick/dev_formbuilder_app/pull/617).
+No merge/deploy/import or representative-reader acceptance is claimed here.
+The PR delivery ledger records CI, merge and actual release/live evidence as
+those events complete; do not infer deployment from these local results.
 
 ## Remaining work
 
@@ -123,5 +125,16 @@ performance and Headcount reuse prerequisites and Poverty import #615 remain ope
   an exact table, without page overflow. No production observations committed.
 - React review: server-rendered overview, native disclosures, direct imports,
   no additional fetches/client state/dependencies. Shared formatting and definitions.
-- Production build and seeded browser verification in progress; CI/deployment
-  remain pending. These results do not establish human comprehension acceptance.
+- Both prefixed production builds passed: no-data and seeded PostgreSQL/PostgREST.
+  Standalone extractor verification passed for CSV, XLSX, PDF and GeoJSON.
+- Seven browser cases passed: `e2e/nhfr-overview.spec.ts` (390/1440px) and
+  `e2e/catalog.spec.ts`, covering disclosure keyboard access, scope/reload/history
+  and overflow. The configured browser path was absent locally; a scratch config
+  selected installed Chromium without changing repository browser settings.
+- A separate local-only synthetic NHFR aggregate exercised populated figures at
+  both widths: count/bed/presence display, raw denominator, exact-table agreement
+  and no page overflow passed. The stock seed lacks compatible NHFR rows for the
+  sampled scopes, so it alone does not prove populated presentation. The added
+  synthetic row and screenshots were not committed. Phone figure visually reviewed.
+- CI and deployment remain pending in the implementing PR. These results do not
+  establish human comprehension or physical-device acceptance.

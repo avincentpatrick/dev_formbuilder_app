@@ -47,7 +47,7 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $model['form_title'] }}</title>
-    <style>@include('pdf._blank-form-styles')</style>
+    <style>@include('pdf._blank-form-styles') @include('pdf._note-content-styles')</style>
 </head>
 <body>
     {{-- Repeated on every page. Identifies the schema AND the layout a loose scanned sheet came from.
@@ -141,8 +141,13 @@
                 @elseif ($field['area'] === 'prose')
                     {{-- A note: instructions, a consent paragraph, a section preamble. Printed
                          because the person filling the form has to read it; no answer area, because
-                         it asks for nothing. --}}
-                    <p class="q__note">{{ $field['label'] }}</p>
+                         it asks for nothing. M245 (`R-c083b711`): a note with content blocks prints them
+                         in place of its label, as every screen does (`D69`), details open. --}}
+                    @if (($field['content'] ?? []) !== [])
+                        <div class="q__content">@include('pdf._note-content', ['blocks' => $field['content']])</div>
+                    @else
+                        <p class="q__note">{{ $field['label'] }}</p>
+                    @endif
                 @else
                     <div class="q">
                         <p class="q__label">
@@ -258,5 +263,12 @@
             <p>Scans of this form cannot be read automatically; responses must be keyed in.</p>
         @endif
     </footer>
+
+    {{-- M245 (`R-d0bbb7bb`): the form's glossary, on a page of its own after the footer, so every question keeps
+         the place the reader expects it in. A note's marked words print plainly; their meanings are here. --}}
+    @if (($model['glossary'] ?? []) !== [])
+        <div class="pagebreak"></div>
+        @include('pdf._glossary', ['glossary' => $model['glossary']])
+    @endif
 </body>
 </html>

@@ -8,6 +8,7 @@ use App\Enums\FieldType;
 use App\Exceptions\Forms\FormException;
 use App\Rules\ContentBlocks;
 use App\Services\Xlsform\XlsformImportParser;
+use App\Support\Forms\Glossary;
 
 /**
  * Fail-closed structural validation of a schema blueprint BEFORE any row is written (Increment G9a) — the
@@ -92,6 +93,14 @@ final class BlueprintValidator
                 if ($relatedKey !== null && ! isset($fieldKeys[$relatedKey])) {
                     throw FormException::invalidBlueprint("A validation references an unknown related_field_key: {$relatedKey}.");
                 }
+            }
+        }
+
+        // M245 (`R-d0bbb7bb`): the glossary a snapshot carries, when it carries one — an older template has no key.
+        if (array_key_exists('glossary', $blueprint)) {
+            $problem = Glossary::problem($blueprint['glossary']);
+            if ($problem !== null) {
+                throw FormException::invalidBlueprint("The blueprint's glossary is invalid: {$problem}.");
             }
         }
     }

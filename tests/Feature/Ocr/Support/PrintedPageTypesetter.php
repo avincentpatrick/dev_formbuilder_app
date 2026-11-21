@@ -7,6 +7,7 @@ namespace Tests\Feature\Ocr\Support;
 use App\Services\Ocr\OcrPage;
 use App\Services\Ocr\OcrSymbol;
 use App\Services\Ocr\OcrWord;
+use App\Support\Forms\PrintedContent;
 
 /**
  * Lays out what a recognizer would read off a filled copy of a printed blank form (M128 tests; layout 2 since
@@ -161,7 +162,16 @@ final class PrintedPageTypesetter
                     continue;
                 }
                 if ($row['area'] === 'prose') {
-                    $page->paragraph((string) $row['label'], self::LEFT);
+                    // M245 (`R-c083b711`): a note with content prints it in place of its label, line by line as
+                    // `PrintedContent::lines()` gives it (a list item once, with its marker, as the paper sets it).
+                    $content = (array) ($row['content'] ?? []);
+                    if ($content === []) {
+                        $page->paragraph((string) $row['label'], self::LEFT);
+                    } else {
+                        foreach (self::paperLines($content) as $line) {
+                            $page->paragraph($line, self::LEFT);
+                        }
+                    }
 
                     continue;
                 }
@@ -213,6 +223,34 @@ final class PrintedPageTypesetter
         }, self::LEFT);
 
         return $page;
+    }
+
+    /**
+     * A note's content as the paper sets it (M245): `PrintedContent::lines()`, except that a list item prints once, with
+     * its marker on its line — `lines()` gives it twice, with and without, for the reader's benefit.
+     *
+     * @param  list<array<string, mixed>>  $blocks
+     * @return list<string>
+     */
+    private static function paperLines(array $blocks): array
+    {
+        $lines = [];
+        foreach ($blocks as $block) {
+            if (($block['kind'] ?? null) === 'list') {
+                foreach ($block['items'] as $position => $runs) {
+                    $lines[] = ($block['ordered'] ? ($position + 1).'.' : '-').' '.implode('', array_column($runs, 'text'));
+                }
+            } elseif (($block['kind'] ?? null) === 'details') {
+                if ($block['summary'] !== '') {
+                    $lines[] = (string) $block['summary'];
+                }
+                array_push($lines, ...self::paperLines($block['blocks']));
+            } else {
+                array_push($lines, ...PrintedContent::lines([$block]));
+            }
+        }
+
+        return $lines;
     }
 
     /** One word, its characters spread evenly across it; `$spaced` false when nothing separates it from the next. */

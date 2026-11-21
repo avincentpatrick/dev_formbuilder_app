@@ -67,6 +67,8 @@ import PageModePanel from '@/components/builder/PageModePanel.vue';
 import AutomationsPanel from '@/components/forms/AutomationsPanel.vue';
 import ChoiceListsPanel from '@/components/forms/ChoiceListsPanel.vue';
 import DataSharingPanel from '@/components/forms/DataSharingPanel.vue';
+import GlossaryPanel from '@/components/forms/GlossaryPanel.vue';
+import type { GlossaryRow } from '@/components/forms/glossary';
 import ReferenceFilesPanel from '@/components/forms/ReferenceFilesPanel.vue';
 import SaveResumePanel from '@/components/builder/SaveResumePanel.vue';
 import SchedulePanel from '@/components/builder/SchedulePanel.vue';
@@ -77,7 +79,21 @@ import SharePanel from '@/components/forms/SharePanel.vue';
 import type { AutomationsProps, DataSharingProps, FormSettingsForm, OcrScanningProps, ReferenceFileRow, ScopeSectionProps, ShareProps } from '@/components/forms/types';
 import type { ReferenceCandidate } from '@/components/builder/reference-candidates';
 
-type SectionKey = 'general' | 'pages' | 'theme' | 'files' | 'choice-lists' | 'share' | 'scanning' | 'schedule' | 'confirmation' | 'save-resume' | 'automations' | 'sharing' | 'scope';
+type SectionKey =
+    | 'general'
+    | 'pages'
+    | 'theme'
+    | 'files'
+    | 'choice-lists'
+    | 'glossary'
+    | 'share'
+    | 'scanning'
+    | 'schedule'
+    | 'confirmation'
+    | 'save-resume'
+    | 'automations'
+    | 'sharing'
+    | 'scope';
 
 const props = defineProps<{
     /** Whether the settings are open: the modal's state, or always true on the hub page. */
@@ -102,6 +118,9 @@ const props = defineProps<{
     confirmationReferences?: ReferenceCandidate[];
 }>();
 
+/** M245: the draft's glossary changed, so a builder can show the new meanings in its preview at once. */
+const emit = defineEmits<{ 'glossary-changed': [rows: GlossaryRow[]] }>();
+
 /**
  * ⚠️ THE GATED SECTIONS ARE FILTERED OUT OF THE RAIL, NOT DISABLED IN IT. A rail row that cannot be opened
  * is a dead end that still costs a reading. The order puts Scanning beside Share — the other switch that
@@ -120,6 +139,9 @@ const sections = computed<{ key: SectionKey; label: string }[]>(() => {
         // M141 (`R-f69aab42`, `D95`): the CSV files a cascading question takes its choices from. Offered wherever the
         // reference files are — the same editors of the same draft.
         { key: 'choice-lists', label: 'Choice lists', available: props.referenceFiles != null },
+        // M245 (`R-d0bbb7bb`): the terms the form explains, on the same draft as the files and lists above, so it is
+        // offered wherever they are.
+        { key: 'glossary', label: 'Glossary', available: props.referenceFiles != null },
         { key: 'share', label: 'Share', available: props.share != null },
         { key: 'scanning', label: 'Scanning', available: props.ocrScanning != null },
         { key: 'schedule', label: 'Schedule', available: true },
@@ -218,6 +240,11 @@ watch(
                 <template v-if="props.referenceFiles != null && mounted.has('choice-lists')">
                     <div v-show="active === 'choice-lists'" class="form-settings__section" :data-section="'choice-lists'">
                         <ChoiceListsPanel :open="props.open" :form-id="props.formId" />
+                    </div>
+                </template>
+                <template v-if="props.referenceFiles != null && mounted.has('glossary')">
+                    <div v-show="active === 'glossary'" class="form-settings__section" :data-section="'glossary'">
+                        <GlossaryPanel :open="props.open" :form-id="props.formId" @changed="emit('glossary-changed', $event)" />
                     </div>
                 </template>
                 <template v-if="props.share != null && mounted.has('share')">

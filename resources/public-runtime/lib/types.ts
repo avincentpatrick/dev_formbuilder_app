@@ -92,6 +92,8 @@ export interface RawSection {
 export interface RawSchemaSnapshot {
     sections: RawSection[];
     fields: RawField[];
+    /** M245 (`R-d0bbb7bb`): the version's glossary. Optional: a snapshot without one, or a cached older one, has no key. */
+    glossary?: { term: string; definition: string }[];
 }
 
 /** The live scheduled-form label the runtime branches on (Increment H12a backend; consumed by H12b). */

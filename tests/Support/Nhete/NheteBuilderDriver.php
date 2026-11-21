@@ -51,6 +51,11 @@ final class NheteBuilderDriver
 
     public function build(NhetePlan $plan): void
     {
+        // M245 (`R-d0bbb7bb`): the glossary first, through Form settings → Glossary's own route, so every marked word
+        // finds its term at publish.
+        foreach ($plan->glossary() as $entry) {
+            $this->send('post', 'glossary', $entry, "glossary term {$entry['term']}");
+        }
         foreach ($plan->sections() as $section) {
             $this->buildSection($section);
         }
@@ -357,6 +362,10 @@ final class NheteBuilderDriver
     private function withImages(array $content): array
     {
         return array_map(function (array $block): array {
+            // M245: a details block holds blocks of its own, one level down.
+            if ($block['type'] === 'details') {
+                return [...$block, 'blocks' => $this->withImages($block['blocks'])];
+            }
             if ($block['type'] !== 'image') {
                 return $block;
             }

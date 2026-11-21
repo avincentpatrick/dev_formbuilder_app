@@ -6,7 +6,7 @@
  */
 import { computed, onMounted, provide, ref, shallowRef, watch } from 'vue';
 import { MdsEmptyState, MdsSpinner } from '@meridian/design-system';
-import { ContentImageUrlKey } from '@/components/submissions/note-content';
+import { ContentGlossaryKey, ContentImageUrlKey } from '@/components/submissions/note-content';
 import ConfirmationScreen from './components/ConfirmationScreen.vue';
 import OfflineIndicator from './components/OfflineIndicator.vue';
 import RuntimeSession from './components/RuntimeSession.vue';
@@ -36,6 +36,8 @@ import { isoClock } from './lib/schema-mapping';
 import type { AnswerMap, Bootstrap, PaperFieldMeta, PaperPage, PaperReview, ScheduleAcceptance, ScheduleBlock, SchemaResponse, SubmitRedirect } from './lib/types';
 // M166 — below the other imports on purpose: `App.vue:29-31` is cited by line, and an import above would move it.
 import PaperReading from './components/PaperReading.vue';
+// M245 — below the cited lines too, for the same reason.
+import { glossaryEntries } from '@/components/builder/glossary';
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 
@@ -176,6 +178,12 @@ provide(UploadUrlKey, () => `/api/v1/public/f/${encodeURIComponent(client.token(
 // called, because four paths below set a schema (load, resume, conflict review, version drift).
 const contentImageUrlFor = (attachmentId: string): string => contentImageUrl(client.token(), attachmentId);
 provide(ContentImageUrlKey, contentImageUrlFor);
+// M245 (`R-d0bbb7bb`) — the version's glossary, for a note's marked words and the header's Glossary button. Read from the
+// snapshot as it arrives (an older cached one has none, and reads as empty).
+provide(
+    ContentGlossaryKey,
+    computed(() => glossaryEntries(schema.value?.version.schema.glossary)),
+);
 watch(schema, (loaded) => {
     if (loaded === null || typeof window === 'undefined' || !navigator.onLine) return;
     void warmContentImages(loaded, contentImageUrlFor, {

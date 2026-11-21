@@ -19,7 +19,22 @@ use Illuminate\Translation\PotentiallyTranslatedString;
  *   callout   {type, tone: info|success|warning|danger, spans}
  *   divider   {type}
  *   image     {type, attachment_id, alt}          attachment_id is one of the form's own uploads (M129, `D58` = B)
- *   span      {text, bold?, italic?, code?, link?}
+ *   list      {type, style: bulleted|numbered, items: [{spans}]}                       M245, one level
+ *   details   {type, summary, blocks}            collapsed for respondents, printed open; its blocks are any type
+ *                                                but another details (M245, `R-93e22765`)
+ *   span      {text, bold?, italic?, code?, link?, term?}
+ *
+ * ── A GLOSSARY WORD NAMES ITS TERM BY TEXT, NOT BY AN ENTRY'S ID (M245, `R-d0bbb7bb`) ────────────────────────
+ * `term` is the glossary term the span's text opens, and it must BE that text. Content is copied verbatim by publish's
+ * clone, a draft copy, the question library, a template and a restore, while a glossary entry's row id changes on every
+ * one of them; a word marked by text survives them all and is matched against whichever glossary its form has
+ * (`App\Support\Forms\Glossary::key()`). A word whose term the form's glossary lacks is refused at publish,
+ * never at save, so an author may mark a word before defining it. A `|` is refused in a term so `[[shown|term]]` can
+ * be added later without changing what any stored mark means.
+ *
+ * ⚠️ EVERY READER RECURSES INTO A DETAILS BLOCK. {@see problem()} counts nested blocks toward MAX_BLOCKS, and
+ * {@see imageIds()} and {@see termMarks()} name a nested block by its dotted path ("3.2"). A reader that walks only
+ * the top level would leave a picture inside a details block unserved to guests and unchecked at publish.
  *
  * ⛔ CLOSED BY REFUSAL, NEVER BY ENUMERATION. `UpdateFieldRequest::payload()` overlays the raw config back over
  * `validated()`, so a key a wildcard rule merely PRUNES — an `html` key on a span — is put straight back and persisted.
@@ -61,11 +76,18 @@ final class ContentBlocks implements ValidationRule
 
     public const MAX_ALT_LENGTH = 300;
 
+    public const MAX_LIST_ITEMS = 50;
+
+    public const MAX_TERM_LENGTH = 100;
+
     /** @var list<string> */
     public const LINK_SCHEMES = ['https', 'http', 'mailto', 'tel'];
 
     /** @var list<string> */
     public const TONES = ['info', 'success', 'warning', 'danger'];
+
+    /** @var list<string> */
+    public const LIST_STYLES = ['bulleted', 'numbered'];
 
     /** The keys each block type may carry, `type` included. */
     private const BLOCK_KEYS = [
@@ -74,9 +96,13 @@ final class ContentBlocks implements ValidationRule
         'callout' => ['type', 'tone', 'spans'],
         'divider' => ['type'],
         'image' => ['type', 'attachment_id', 'alt'],
+        'list' => ['type', 'style', 'items'],
+        'details' => ['type', 'summary', 'blocks'],
     ];
 
-    private const SPAN_KEYS = ['text', 'bold', 'italic', 'code', 'link'];
+    private const ITEM_KEYS = ['spans'];
+
+    private const SPAN_KEYS = ['text', 'bold', 'italic', 'code', 'link', 'term'];
 
     public function __construct(private readonly bool $strict = false) {}
 
@@ -101,21 +127,50 @@ final class ContentBlocks implements ValidationRule
         if (! is_array($value) || ! array_is_list($value)) {
             return 'it must be a list of blocks';
         }
-        if (count($value) > self::MAX_BLOCKS) {
-            return 'a note may hold at most '.self::MAX_BLOCKS.' blocks';
+        if (self::countBlocks($value) > self::MAX_BLOCKS) {
+            return 'a note may hold at most '.self::MAX_BLOCKS.' blocks, counting those inside a details block';
         }
 
         foreach ($value as $index => $block) {
-            $problem = self::blockProblem($block, $strict);
+            $problem = self::blockProblem($block, $strict, (string) ($index + 1), false);
             if ($problem !== null) {
-                return 'block '.($index + 1).' '.$problem;
+                return $problem;
             }
         }
 
         return null;
     }
 
-    private static function blockProblem(mixed $block, bool $strict): ?string
+    /**
+     * How many blocks `$value` holds, each details block's own blocks included. Not a shape check: a malformed entry
+     * counts as one block, and {@see problem()} is the authority on whether it is one.
+     */
+    public static function countBlocks(mixed $value): int
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($value as $block) {
+            $count++;
+            if (is_array($block) && ($block['type'] ?? null) === 'details' && is_array($block['blocks'] ?? null)) {
+                $count += count($block['blocks']);
+            }
+        }
+
+        return $count;
+    }
+
+    /** The first reason `$block` is not a block, as a whole phrase that names it by `$path`, or null. */
+    private static function blockProblem(mixed $block, bool $strict, string $path, bool $nested): ?string
+    {
+        $reason = self::blockReason($block, $strict, $path, $nested);
+
+        return $reason === null || str_starts_with($reason, 'block ') ? $reason : "block {$path} {$reason}";
+    }
+
+    private static function blockReason(mixed $block, bool $strict, string $path, bool $nested): ?string
     {
         if (! is_array($block) || ($block !== [] && array_is_list($block))) {
             return 'is not a block';
@@ -139,30 +194,183 @@ final class ContentBlocks implements ValidationRule
                 : 'has an unknown tone',
             'divider' => null,
             'image' => self::imageProblem($block, $strict),
+            'list' => self::listProblem($block, $strict, $path),
+            'details' => $nested
+                ? 'is a details block inside another details block'
+                : self::detailsProblem($block, $strict, $path),
         };
     }
 
     /**
-     * The attachment id of every image block, keyed by the block's position, for the publish gate's ownership check.
-     * Lowercased, because Postgres answers a uuid in lowercase whatever case it was written in. A malformed block is
-     * skipped, never thrown on: {@see problem()} is the authority on shape, and the gate asks it first.
-     *
-     * @return array<int, string>
+     * @param  array<array-key, mixed>  $block
      */
-    public static function imageIds(mixed $value): array
+    private static function listProblem(array $block, bool $strict, string $path): ?string
+    {
+        if (! in_array($block['style'] ?? null, self::LIST_STYLES, true)) {
+            return 'is a list that is neither bulleted nor numbered';
+        }
+
+        $items = $block['items'] ?? null;
+        if (! is_array($items) || ! array_is_list($items)) {
+            return 'is a list with no list of items';
+        }
+        if (count($items) > self::MAX_LIST_ITEMS) {
+            return 'is a list of more than '.self::MAX_LIST_ITEMS.' items';
+        }
+        if ($strict && $items === []) {
+            return 'is a list with no items';
+        }
+
+        foreach ($items as $position => $item) {
+            $name = "block {$path} item ".($position + 1);
+            if (! is_array($item) || ($item !== [] && array_is_list($item))) {
+                return "{$name} is not a list item";
+            }
+            $unknown = array_diff(array_map('strval', array_keys($item)), self::ITEM_KEYS);
+            if ($unknown !== []) {
+                return "{$name} has an unknown setting “".reset($unknown).'”';
+            }
+            $problem = self::spansProblem($item['spans'] ?? null, $strict);
+            if ($problem !== null) {
+                return "{$name} {$problem}";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $block
+     */
+    private static function detailsProblem(array $block, bool $strict, string $path): ?string
+    {
+        $summary = $block['summary'] ?? null;
+        if ($summary !== null && ! is_string($summary)) {
+            return 'is a details block whose summary is not text';
+        }
+        if (is_string($summary) && mb_strlen($summary) > self::MAX_HEADING_LENGTH) {
+            return 'is a details block whose summary is longer than '.self::MAX_HEADING_LENGTH.' characters';
+        }
+        if ($strict && trim((string) $summary) === '') {
+            return 'is a details block with no summary';
+        }
+
+        $inner = $block['blocks'] ?? null;
+        if (! is_array($inner) || ! array_is_list($inner)) {
+            return 'is a details block with no list of blocks';
+        }
+        if ($strict && $inner === []) {
+            return 'is a details block with nothing inside it';
+        }
+
+        foreach ($inner as $index => $child) {
+            $problem = self::blockProblem($child, $strict, $path.'.'.($index + 1), true);
+            if ($problem !== null) {
+                return $problem;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Every block of `$value` with its dotted path ("3", or "3.2" inside a details block), in reading order. A
+     * malformed entry is skipped, never thrown on: {@see problem()} is the authority on shape.
+     *
+     * @return list<array{path: string, block: array<array-key, mixed>}>
+     */
+    public static function walk(mixed $value): array
     {
         if (! is_array($value) || ! array_is_list($value)) {
             return [];
         }
 
-        $ids = [];
+        $out = [];
         foreach ($value as $index => $block) {
-            if (is_array($block) && ($block['type'] ?? null) === 'image' && is_string($block['attachment_id'] ?? null)) {
-                $ids[$index] = strtolower($block['attachment_id']);
+            if (! is_array($block)) {
+                continue;
+            }
+            $path = (string) ($index + 1);
+            $out[] = ['path' => $path, 'block' => $block];
+            $inner = $block['blocks'] ?? null;
+            if (($block['type'] ?? null) === 'details' && is_array($inner) && array_is_list($inner)) {
+                foreach ($inner as $position => $child) {
+                    if (is_array($child)) {
+                        $out[] = ['path' => $path.'.'.($position + 1), 'block' => $child];
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The attachment id of every image block, nested ones included, each with the dotted path of its block, for the
+     * publish gate's ownership check. Lowercased, because Postgres answers a uuid in lowercase whatever case it was
+     * written in. A malformed block is skipped, never thrown on: {@see problem()} is the authority on shape, and the
+     * gate asks it first.
+     *
+     * @return list<array{block: string, id: string}>
+     */
+    public static function imageIds(mixed $value): array
+    {
+        $ids = [];
+        foreach (self::walk($value) as ['path' => $path, 'block' => $block]) {
+            if (($block['type'] ?? null) === 'image' && is_string($block['attachment_id'] ?? null)) {
+                $ids[] = ['block' => $path, 'id' => strtolower($block['attachment_id'])];
             }
         }
 
         return $ids;
+    }
+
+    /**
+     * Every glossary word in `$value` (a span's `term`), in paragraphs, callouts and list items at any depth, each with
+     * the dotted path of its block, for the publish gate's "is it in this form's glossary" check.
+     *
+     * @return list<array{block: string, term: string}>
+     */
+    public static function termMarks(mixed $value): array
+    {
+        $marks = [];
+        foreach (self::walk($value) as ['path' => $path, 'block' => $block]) {
+            foreach (self::spanLists($block) as $spans) {
+                foreach ($spans as $span) {
+                    if (is_array($span) && is_string($span['term'] ?? null)) {
+                        $marks[] = ['block' => $path, 'term' => $span['term']];
+                    }
+                }
+            }
+        }
+
+        return $marks;
+    }
+
+    /**
+     * Each run of spans a block holds: a paragraph's or callout's one, a list's one per item, nothing for the rest.
+     *
+     * @param  array<array-key, mixed>  $block
+     * @return list<array<array-key, mixed>>
+     */
+    public static function spanLists(array $block): array
+    {
+        $type = $block['type'] ?? null;
+        if ($type === 'paragraph' || $type === 'callout') {
+            return is_array($block['spans'] ?? null) ? [$block['spans']] : [];
+        }
+        if ($type !== 'list' || ! is_array($block['items'] ?? null)) {
+            return [];
+        }
+
+        $lists = [];
+        foreach ($block['items'] as $item) {
+            if (is_array($item) && is_array($item['spans'] ?? null)) {
+                $lists[] = $item['spans'];
+            }
+        }
+
+        return $lists;
     }
 
     /**
@@ -263,6 +471,13 @@ final class ContentBlocks implements ValidationRule
             }
         }
 
+        if (array_key_exists('term', $span)) {
+            $problem = self::termProblem($span);
+            if ($problem !== null) {
+                return $problem;
+            }
+        }
+
         if (! array_key_exists('link', $span)) {
             return null;
         }
@@ -273,6 +488,29 @@ final class ContentBlocks implements ValidationRule
         }
 
         return is_string($link) && self::linkIsSafe($link) ? null : 'has a link this form cannot show';
+    }
+
+    /**
+     * A glossary word's own checks, the same in both modes: a term of 1 to MAX_TERM_LENGTH characters with no edge
+     * space, line break, control character or `|`, equal to the span's text, and neither a link nor code.
+     *
+     * @param  array<array-key, mixed>  $span
+     */
+    private static function termProblem(array $span): ?string
+    {
+        $term = $span['term'];
+        if (! is_string($term) || $term === '' || $term !== trim($term) || mb_strlen($term) > self::MAX_TERM_LENGTH
+            || preg_match('/[\x{0}-\x{1F}\x{7F}|]/u', $term) === 1) {
+            return 'has a glossary word that is not a term of up to '.self::MAX_TERM_LENGTH.' characters';
+        }
+        if (($span['text'] ?? null) !== $term) {
+            return 'has a glossary word whose text is not its term';
+        }
+        if (array_key_exists('link', $span) || ($span['code'] ?? false) === true) {
+            return 'has a glossary word that is also a link or code';
+        }
+
+        return null;
     }
 
     /** An absolute link with an allowlisted scheme and no whitespace or control character anywhere in it. */

@@ -71,5 +71,13 @@ final class SchemaTreeCloner
             $new->form_version_id = $target->id;
             $new->save();
         }
+
+        // M245 (`R-d0bbb7bb`) — the version's glossary, copied whole, for the same reason and with the same plain read.
+        // A note's marked word names its term by text, so nothing in the copied fields needs re-pointing.
+        foreach ($source->glossaryEntries()->get() as $entry) {
+            $new = $entry->replicate();
+            $new->form_version_id = $target->id;
+            $new->save();
+        }
     }
 }

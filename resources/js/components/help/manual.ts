@@ -150,6 +150,9 @@ const MATRIX_GRID = 'resources/js/components/submissions/MatrixGrid.vue';
 const REPEAT_LAYOUT = 'resources/js/components/builder/RepeatLayoutSelect.vue';
 const LOGIC = 'resources/js/components/builder/LogicRail.vue';
 const SETTINGS = 'resources/js/components/forms/FormSettingsSections.vue';
+// M245: a form's glossary, and the button respondents open it with.
+const GLOSSARY = 'resources/js/components/forms/GlossaryPanel.vue';
+const GLOSSARY_BUTTON = 'resources/js/components/submissions/GlossaryButton.vue';
 const DETAILS = 'resources/js/components/builder/GeneralPanel.vue';
 const PAGES = 'resources/js/components/builder/PageModePanel.vue';
 const THEME = 'resources/js/components/builder/ThemePanel.vue';
@@ -499,6 +502,11 @@ const guide: ChapterDraft[] = [
                         [ui('Details', SETTINGS), ' — the title and description. Click ', ui('Save details', DETAILS), ' after a change.'],
                         [ui('Pages', SETTINGS), ' — ', ui('Step by step', PAGES), ' (one section per screen) or ', ui('One page', PAGES), ' (everything on one long page). Saves as soon as you choose.'],
                         [ui('Theme', SETTINGS), ' — the colours of the form. ', ui('Workspace brand', THEME), ' uses your workspace’s colours. Saves as soon as you choose.'],
+                        [
+                            ui('Glossary', SETTINGS), ' — the terms your form explains. Type a ', ui('Term', GLOSSARY), ' and its ', ui('Definition', GLOSSARY),
+                            ', then click ', ui('Add term', GLOSSARY), '. In a note, mark a word as [[word]] and respondents tap it to read its meaning; a ',
+                            ui('Glossary', GLOSSARY_BUTTON), ' button on every page lists them all. Changes reach respondents when you publish.',
+                        ],
                         [ui('Share', SETTINGS), ' — the public link. See ', link('Share your form', '#share'), '.'],
                         [
                             ui('Schedule', SETTINGS), ' — when the form opens and closes (', ui('Opens at', SCHEDULE), ', ', ui('Closes at', SCHEDULE),
@@ -1236,8 +1244,15 @@ const reference: ChapterDraft[] = [
                     p('Text, headings or a picture for the respondent to read. It asks nothing. Build it on the ', ui('Content', CONFIG), ' tab by adding blocks:'),
                     list(
                         [ui('Heading', CONTENT), ' — a ', ui('Large heading', CONTENT), ' or a ', ui('Small heading', CONTENT), '.'],
-                        [ui('Paragraph', CONTENT), ' — text, with ', ui('Bold', CONTENT), ', ', ui('Italic', CONTENT), ' and ', ui('Link', CONTENT), ' buttons.'],
+                        [
+                            ui('Paragraph', CONTENT), ' — text, with ', ui('Bold', CONTENT), ', ', ui('Italic', CONTENT), ', ', ui('Link', CONTENT), ' and ',
+                            ui('Glossary word', CONTENT), ' buttons. A glossary word opens its meaning from the form’s ', link('Glossary', '#settings'), '.',
+                        ],
                         [ui('Callout', CONTENT), ' — a coloured box; choose its ', ui('Kind of callout', CONTENT), '.'],
+                        [ui('List', CONTENT), ' — a ', ui('Bulleted list', CONTENT), ' or a ', ui('Numbered list', CONTENT), '; type one item to a line in ', ui('Items', CONTENT), '.'],
+                        [
+                            ui('Details', CONTENT), ' — a ', ui('Summary', CONTENT), ' line that respondents tap to open the blocks you add inside it. Paper and PDF print it open.',
+                        ],
                         [ui('Divider', CONTENT), ' — a line across the page.'],
                         [ui('Add an image', CONTENT), ' — a picture. Give it a ', ui('Description', CONTENT), ' for people who cannot see it; publishing refuses an image without one.'],
                     ),

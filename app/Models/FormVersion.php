@@ -116,6 +116,16 @@ class FormVersion extends Model implements TenantScoped
     }
 
     /**
+     * This version's glossary (M245, `R-d0bbb7bb`), frozen with it and carried in its snapshot as `glossary`.
+     *
+     * @return HasMany<FormVersionGlossaryEntry, $this>
+     */
+    public function glossaryEntries(): HasMany
+    {
+        return $this->hasMany(FormVersionGlossaryEntry::class);
+    }
+
+    /**
      * The frozen schema as a browser is sent it: a CSV-backed cascade's options left out (M141, `R-f69aab42`).
      *
      * A published list-backed cascade holds its whole list in `config.options` — about 42,000 rows for a barangay list —

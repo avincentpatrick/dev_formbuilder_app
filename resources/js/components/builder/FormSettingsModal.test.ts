@@ -351,7 +351,7 @@ group('the Reference files section (M132)', () => {
         const wrapper = mountWith([]);
 
         expect(railLabels(wrapper)).toEqual([
-            'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later',
+            'Details', 'Pages', 'Theme', 'Reference files', 'Choice lists', 'Glossary', 'Share', 'Schedule', 'Thank-you message', 'Save and finish later',
         ]);
 
         await railButton(wrapper, 'Reference files').trigger('click');

@@ -12,11 +12,19 @@
  * re-checked here at render time by `linkLooksSafe()` — the TypeScript twin `ContentBlocks::linkIsSafe()` is
  * pinned to by `tests/fixtures/content-block-links.json` — and one that fails renders as plain text.
  */
-import type { InjectionKey } from 'vue';
-import type { ContentBlock, ContentSpan } from '@/components/builder/content-blocks';
+import type { InjectionKey, Ref } from 'vue';
+import type { ContentBlock, ContentInnerBlock, ContentListItem, ContentSpan } from '@/components/builder/content-blocks';
 import { linkLooksSafe } from '@/components/builder/content-markup';
+import type { GlossaryEntry } from '@/components/builder/glossary';
 
-export type { ContentBlock, ContentSpan };
+export type { ContentBlock, ContentInnerBlock, ContentListItem, ContentSpan, GlossaryEntry };
+
+/**
+ * The form's glossary (M245, `R-d0bbb7bb`): what a marked word opens and what the Glossary button lists. Provided by
+ * each host from the version it shows — the guest page and the encode page from the published snapshot, the builder
+ * from the draft — and empty when nothing provides it, so a marked word then renders as plain text.
+ */
+export const ContentGlossaryKey: InjectionKey<Readonly<Ref<readonly GlossaryEntry[]>>> = Symbol('content-glossary');
 
 /**
  * The level of the heading the note sits under. Content headings are stored RELATIVE (level 1 or 2), because
@@ -81,17 +89,40 @@ function spansOf(raw: unknown): ContentSpan[] {
     return Array.isArray(raw) ? raw.filter(isRecord).map((span) => span as unknown as ContentSpan) : [];
 }
 
+function itemsOf(raw: unknown): ContentListItem[] {
+    return Array.isArray(raw) ? raw.filter(isRecord).map((item) => ({ spans: spansOf(item.spans) })) : [];
+}
+
 /**
  * The blocks a renderer can draw, from a note's raw `config.content`. Anything outside the closed shape is
  * skipped rather than guessed at: a published snapshot is data, and a block this renderer does not know is one
- * it must not invent a rendering for.
+ * it must not invent a rendering for. A details block's own blocks are read the same way, one level down, and a
+ * details block inside one is skipped (M245): the shape allows one level, so a second is not content.
  */
 export function renderableBlocks(raw: unknown): ContentBlock[] {
+    const blocks: ContentBlock[] = [];
+
+    for (const block of Array.isArray(raw) ? raw : []) {
+        if (isRecord(block) && block.type === 'details') {
+            blocks.push({
+                type: 'details',
+                summary: typeof block.summary === 'string' ? block.summary : null,
+                blocks: innerBlocks(block.blocks),
+            });
+            continue;
+        }
+        blocks.push(...innerBlocks([block]));
+    }
+
+    return blocks;
+}
+
+function innerBlocks(raw: unknown): ContentInnerBlock[] {
     if (!Array.isArray(raw)) {
         return [];
     }
 
-    const blocks: ContentBlock[] = [];
+    const blocks: ContentInnerBlock[] = [];
 
     for (const block of raw) {
         if (!isRecord(block)) {
@@ -120,6 +151,9 @@ export function renderableBlocks(raw: unknown): ContentBlock[] {
                     blocks.push({ type: 'image', attachment_id: block.attachment_id, alt: typeof block.alt === 'string' ? block.alt : null });
                 }
                 break;
+            case 'list':
+                blocks.push({ type: 'list', style: block.style === 'numbered' ? 'numbered' : 'bulleted', items: itemsOf(block.items) });
+                break;
         }
     }
 
@@ -147,24 +181,39 @@ export function announcementFor(fieldType: string, content: unknown, label: stri
  * A note's content in one line for a screen reader: its first text, else its first image's description, else
  * nothing at all — never the author-only label (`D69`), and never an empty "New question: ".
  */
-export function contentSummary(blocks: ContentBlock[]): string | null {
+export function contentSummary(blocks: readonly ContentBlock[]): string | null {
     for (const block of blocks) {
-        const text =
-            block.type === 'heading'
-                ? (block.text ?? '')
-                : block.type === 'paragraph' || block.type === 'callout'
-                  ? block.spans.map(spanText).join('')
-                  : '';
+        const text = blockText(block);
         if (text.trim() !== '') {
             return text.trim();
         }
     }
 
     for (const block of blocks) {
-        if (block.type === 'image' && (block.alt ?? '').trim() !== '') {
-            return (block.alt ?? '').trim();
+        const inner = block.type === 'details' ? block.blocks : [block];
+        for (const candidate of inner) {
+            if (candidate.type === 'image' && (candidate.alt ?? '').trim() !== '') {
+                return (candidate.alt ?? '').trim();
+            }
         }
     }
 
     return null;
+}
+
+/** A block's own words: a list's first item that has any, a details block's summary or else its first words. */
+function blockText(block: ContentBlock): string {
+    switch (block.type) {
+        case 'heading':
+            return block.text ?? '';
+        case 'paragraph':
+        case 'callout':
+            return block.spans.map(spanText).join('');
+        case 'list':
+            return block.items.map((item) => item.spans.map(spanText).join('')).find((text) => text.trim() !== '') ?? '';
+        case 'details':
+            return (block.summary ?? '').trim() !== '' ? (block.summary ?? '') : (block.blocks.map(blockText).find((text) => text.trim() !== '') ?? '');
+        default:
+            return '';
+    }
 }

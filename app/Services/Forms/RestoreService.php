@@ -61,8 +61,10 @@ final class RestoreService
             $draft->fields()->delete();
             $draft->sections()->delete();
             // M132 — and its reference files, which the clone replaces with the source's. M141 — and its choice lists.
+            // M245 — and its glossary.
             $draft->referenceFiles()->delete();
             $draft->choiceLists()->delete();
+            $draft->glossaryEntries()->delete();
 
             $this->cloner->clone($source, $draft);
 

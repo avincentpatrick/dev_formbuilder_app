@@ -69,6 +69,17 @@ for (const theme of themes) {
             await editor.getByLabel('Description').fill('A map of the clinic entrance');
             await expect(editor.locator('[data-block-type]')).toHaveCount(3);
 
+            // M245: a list, and a details block with a paragraph inside, so the nested editor is scanned too, along with
+            // the note that names a glossary word the form's glossary does not have yet.
+            await add.getByRole('button', { name: 'List' }).click();
+            await editor.getByLabel('Items').fill('Your clinic card\nYour medicines');
+            await add.getByRole('button', { name: 'Details' }).click();
+            const details = editor.locator('[data-block-type="details"]');
+            await details.getByLabel('Summary').fill('Why we ask');
+            await details.getByRole('group', { name: 'Add inside block 5' }).getByRole('button', { name: 'Paragraph' }).click();
+            await details.getByLabel('Text', { exact: true }).fill('So the [[clinic]] can prepare.');
+            await expect(details.locator('[data-glossary-missing]')).toBeVisible();
+
             await forceTheme(page, theme);
             await assertClean(page, `note content tab, composed (${theme})`);
         } finally {

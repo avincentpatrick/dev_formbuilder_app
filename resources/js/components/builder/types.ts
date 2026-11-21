@@ -397,6 +397,8 @@ export interface BuilderPageProps {
     data_sharing?: DataSharingProps | null;
     /** M133 — the forms a choice question may take its choices from. Optional, so a fixture without it offers none. */
     linkable_sources?: LinkableSource[];
+    /** M245 — the draft's glossary, terms and meanings. Optional, so a fixture without it has none. */
+    glossary?: { term: string; definition: string }[];
     /** M186 — the built-in Philippine places, or null before a deploy copied them in. Optional: a fixture offers no preset. */
     psgc?: PsgcSummary | null;
     /**

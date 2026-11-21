@@ -45,10 +45,21 @@ function randomText(next: () => number): string {
     return text;
 }
 
+// M245: glossary words, each a valid term (no edge space, line break or bar) built from the syntax's own characters.
+const TERMS = ['TWG', 'B07', 'a*b', 'x]y', 'é😀', 'un_der', '[[nested', 'two words', 'C:' + String.fromCharCode(92) + 'path'];
+
 function randomSpans(next: () => number): ContentSpan[] {
     const spans: ContentSpan[] = [];
     const count = Math.floor(next() * 6);
     for (let i = 0; i < count; i += 1) {
+        if (next() < 0.2) {
+            const term = TERMS[Math.floor(next() * TERMS.length)];
+            const span: ContentSpan = { text: term, term };
+            if (next() < 0.35) span.bold = true;
+            if (next() < 0.35) span.italic = true;
+            spans.push(span);
+            continue;
+        }
         const span: ContentSpan = { text: randomText(next) };
         if (next() < 0.35) span.bold = true;
         if (next() < 0.35) span.italic = true;
@@ -99,6 +110,15 @@ describe('what an author types', () => {
         ['[a](https://e.org/x\\)y)', [{ text: 'a', link: 'https://e.org/x)y' }]],
         ['a \\* star', [{ text: 'a * star' }]],
         ['[no address]()', [{ text: '[no address]()' }]],
+        // M245: glossary words.
+        ['ask the [[TWG]] first', [{ text: 'ask the ' }, { text: 'TWG', term: 'TWG' }, { text: ' first' }]],
+        ['**[[TWG]]** and __[[B07]]__', [{ text: 'TWG', bold: true, term: 'TWG' }, { text: ' and ' }, { text: 'B07', italic: true, term: 'B07' }]],
+        ['[[TWG]][[TWG]]', [{ text: 'TWG', term: 'TWG' }, { text: 'TWG', term: 'TWG' }]],
+        ['[[ TWG ]] has spaces', [{ text: '[[ TWG ]] has spaces' }]],
+        ['[[]] is empty', [{ text: '[[]] is empty' }]],
+        ['[[a|b]] has a bar', [{ text: '[[a|b]] has a bar' }]],
+        ['`[[TWG]]` is code', [{ text: '[[TWG]]', code: true }, { text: ' is code' }]],
+        ['[[unclosed', [{ text: '[[unclosed' }]],
     ])('reads %j', (typed, spans) => {
         expect(parseMarkup(typed)).toEqual(spans);
     });
@@ -115,6 +135,18 @@ describe('what an author types', () => {
 
         expect(text).not.toBe('**not bold**');
         expect(parseMarkup(text)).toEqual(spans);
+    });
+
+    it('never merges a glossary word with the text beside it, and escapes brackets that are only text', () => {
+        expect(normalizeSpans([{ text: 'the ' }, { text: 'TWG', term: 'TWG' }, { text: 'TWG', term: 'TWG' }])).toEqual([
+            { text: 'the ' },
+            { text: 'TWG', term: 'TWG' },
+            { text: 'TWG', term: 'TWG' },
+        ]);
+
+        const literal: ContentSpan[] = [{ text: 'type [[TWG]] to mark it' }];
+        expect(serializeSpans(literal)).not.toBe('type [[TWG]] to mark it');
+        expect(parseMarkup(serializeSpans(literal))).toEqual(literal);
     });
 
     it('keeps a closing bracket inside an address, by escaping it', () => {

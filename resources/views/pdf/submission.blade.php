@@ -40,7 +40,7 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $model['form_title'] }}</title>
-    <style>@include('pdf._styles')</style>
+    <style>@include('pdf._styles') @include('pdf._note-content-styles')</style>
 </head>
 <body>
     <header class="head">
@@ -105,8 +105,13 @@
 
             @foreach ($block['fields'] as $field)
                 @if ($field['role'] === 'prose')
-                    {{-- A note: text the respondent read, with no answer slot. --}}
-                    <p class="prose">{{ $field['label'] }}</p>
+                    {{-- A note: text the respondent read, with no answer slot. M245 (`R-c083b711`): its content blocks
+                         when it has them, as the respondent was shown them (`D69`), details open. --}}
+                    @if (($field['content'] ?? []) !== [])
+                        <div class="prose">@include('pdf._note-content', ['blocks' => $field['content']])</div>
+                    @else
+                        <p class="prose">{{ $field['label'] }}</p>
+                    @endif
                 @else
                     <table class="qa">
                         <tr>
@@ -132,5 +137,10 @@
             form's own logic are omitted rather than left blank.</p>
         <p>Generated {{ $generatedAt }}.</p>
     </footer>
+
+    {{-- M245 (`R-d0bbb7bb`): the meanings of the form's glossary words, after the answers. --}}
+    @if (($model['glossary'] ?? []) !== [])
+        @include('pdf._glossary', ['glossary' => $model['glossary']])
+    @endif
 </body>
 </html>

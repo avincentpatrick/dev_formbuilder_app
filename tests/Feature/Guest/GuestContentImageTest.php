@@ -111,6 +111,23 @@ it('serves an image the token’s version shows, inline and never sniffed', func
         ->and($response->headers->getCacheControlDirective('max-age'))->toBe('86400');
 });
 
+it('serves an image a details block holds, one level inside the note’s content (M245)', function (): void {
+    $form = app(FormService::class)->create($this->tenant, $this->owner, 'Clinic Intake');
+    $image = guestContentImageStored($form);
+    addFormField($form->draftVersion, $this->owner, 'welcome', FieldType::Note, 0, [
+        'config' => ['content' => [
+            ['type' => 'paragraph', 'spans' => [['text' => 'Before you come:']]],
+            ['type' => 'details', 'summary' => 'How to find us', 'blocks' => [
+                ['type' => 'image', 'attachment_id' => $image->id, 'alt' => 'The clinic entrance'],
+            ]],
+        ]],
+    ]);
+    app(PublishService::class)->publish($form->refresh(), $this->owner);
+    $form->refresh()->update(['public_slug' => 'nested', 'allow_guest_submissions' => true]);
+
+    $this->get(guestContentImageUrl(shareTokenFor($form->refresh()), $image->id))->assertOk();
+});
+
 it('refuses with one enveloped 404 each image the token’s version does not show, after serving the one it does', function (string $case): void {
     [$form, $image] = guestContentImageForm($this->tenant, $this->owner);
     $token = shareTokenFor($form);

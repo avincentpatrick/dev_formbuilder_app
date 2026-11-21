@@ -12,8 +12,10 @@ use App\Exceptions\Forms\PublishValidationException;
 use App\Models\FormField;
 use App\Models\FormFieldValidation;
 use App\Models\FormVersion;
+use App\Models\FormVersionGlossaryEntry;
 use App\Rules\ContentBlocks;
 use App\Services\Validation\SemanticValidator;
+use App\Support\Forms\Glossary;
 use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Collection;
 
@@ -70,6 +72,8 @@ final class StructuralValidationGate
         // stable). Sections are only looked up, never iterated for a refusal, so their order changes nothing.
         $fields = $version->fields()->orderBy('sequence')->orderBy('id')->get();
         $sections = $version->sections()->get();
+        // M245 (`R-d0bbb7bb`): the version's glossary, by key, read once for every note's marked words. A plain read.
+        $glossaryKeys = array_flip(FormVersionGlossaryEntry::query()->where('form_version_id', $version->id)->pluck('term_key')->all());
         $sectionIds = $sections->pluck('id')->flip();
         $repeatableSectionIds = $sections->where('is_repeatable', true)->pluck('id')->flip();
         $fieldPosition = $fields->pluck('id')->flip();
@@ -192,7 +196,7 @@ final class StructuralValidationGate
             // Increment M125: a note's content blocks, STRICTLY — the save accepted a blank heading mid-edit, and a
             // respondent must never be shown one. A note with no `content` is today's one-line note and passes.
             if ($field->field_type === FieldType::Note) {
-                $violations[] = $this->capture(fn () => $this->assertNoteContentResolves($field, (string) $version->form_id));
+                $violations[] = $this->capture(fn () => $this->assertNoteContentResolves($field, (string) $version->form_id, $glossaryKeys));
             }
         }
 
@@ -625,9 +629,12 @@ final class StructuralValidationGate
     /**
      * A note's `config.content`, when present, must be a block list a respondent can be shown ({@see ContentBlocks}) —
      * and since M129 each image in it must be this form's own ({@see ContentImageOwnership}). The shape is asked first,
-     * so the ownership query only ever sees well-formed uuids.
+     * so the ownership query only ever sees well-formed uuids. Since M245 every marked word must name a term in this
+     * version's glossary.
+     *
+     * @param  array<string, int>  $glossaryKeys  the version's glossary keys, as array keys
      */
-    private function assertNoteContentResolves(FormField $field, string $formId): void
+    private function assertNoteContentResolves(FormField $field, string $formId, array $glossaryKeys): void
     {
         $content = data_get($field->config, 'content');
         if ($content === null) {
@@ -639,13 +646,25 @@ final class StructuralValidationGate
             throw PublishValidationException::noteContentInvalid($field->key, $problem);
         }
 
+        // M245: nested images too, each named by its dotted path ("3.2" inside a details block).
         $images = ContentBlocks::imageIds($content);
-        $foreign = ContentImageOwnership::foreign($formId, array_values($images));
-        foreach ($images as $index => $id) {
+        $foreign = ContentImageOwnership::foreign($formId, array_column($images, 'id'));
+        foreach ($images as ['block' => $block, 'id' => $id]) {
             if (in_array($id, $foreign, true)) {
                 throw PublishValidationException::noteContentInvalid(
                     $field->key,
-                    'block '.($index + 1).'’s image is missing, belongs to another form, or failed its virus check — upload it again',
+                    'block '.$block.'’s image is missing, belongs to another form, or failed its virus check — upload it again',
+                );
+            }
+        }
+
+        // M245 (`R-d0bbb7bb`): every marked word must find its term in this version's glossary. Refused here, never at
+        // save, so an author may mark a word before defining it; a renamed or removed term is named, never re-pointed.
+        foreach (ContentBlocks::termMarks($content) as ['block' => $block, 'term' => $term]) {
+            if (! isset($glossaryKeys[Glossary::key($term)])) {
+                throw PublishValidationException::noteContentInvalid(
+                    $field->key,
+                    'block '.$block.'’s glossary word “'.$term.'” is not in this form’s glossary — add it under Form settings → Glossary, or remove its [[ ]]',
                 );
             }
         }

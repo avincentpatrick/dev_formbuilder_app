@@ -9,6 +9,8 @@ use App\Enums\PrintAnswerArea;
 use App\Models\Form;
 use App\Models\FormVersion;
 use App\Services\Forms\BlankFormPrintPresenter;
+use App\Support\Forms\Glossary;
+use App\Support\Forms\PrintedContent;
 
 /**
  * Maps what a provider read off a scan back onto the printed form it was printed from (M128 — single-form
@@ -163,6 +165,11 @@ final class PrintedFormMatcher
 
         $rows = [];
         $static = [];
+        // M245 (`R-c083b711`): what each note prints, by the question it follows. A note's content lands in that
+        // question's region (or in no region, before the first question or across a page), so it is printed text for
+        // that region alone: a word the paper prints in one note must not blank the same word answered elsewhere.
+        /** @var array<int, list<string>> $trailing */
+        $trailing = [];
         foreach ((array) ($model['blocks'] ?? []) as $block) {
             if (! is_array($block)) {
                 continue;
@@ -176,11 +183,28 @@ final class PrintedFormMatcher
                 }
                 $this->addStatic($static, $row['hint'] ?? null);
                 if (in_array($row['area'] ?? null, self::NOT_A_QUESTION, true)) {
+                    // The label stays known everywhere: a sheet printed before M245 carries it in place of the content.
                     $this->addStatic($static, $row['label'] ?? null);
+                    if ($rows !== []) {
+                        $trailing[count($rows) - 1] ??= [];
+                        /** @var list<array<string, mixed>> $content `PrintedContent::blocks()`, as the presenter wrote it */
+                        $content = array_values(array_filter((array) ($row['content'] ?? []), is_array(...)));
+                        foreach (PrintedContent::lines($content) as $line) {
+                            $this->addStatic($trailing[count($rows) - 1], $line);
+                        }
+                    }
 
                     continue;
                 }
                 $rows[] = $row;
+            }
+        }
+        // M245 (`R-d0bbb7bb`): the glossary page, after the footer. It starts a page of its own, which no region reaches,
+        // so this is a second guard rather than the first: should a layout ever run it on, it is the last question's.
+        if ($rows !== []) {
+            $trailing[count($rows) - 1] ??= [];
+            foreach (PrintedContent::glossaryLines(Glossary::fromSnapshot(['glossary' => $model['glossary'] ?? null])) as $line) {
+                $this->addStatic($trailing[count($rows) - 1], $line);
             }
         }
         $this->addStatic($static, '(if applicable)');
@@ -227,7 +251,7 @@ final class PrintedFormMatcher
             }
 
             $region = $this->region($lines, $anchor['line'], $this->nextAnchor($anchors, $i));
-            $read = $this->reader->read($row, $type, $config, $region, $static);
+            $read = $this->reader->read($row, $type, $config, $region, [...$static, ...$this->trailingFor($trailing, $anchors, $i)]);
             $fields[$key] = $this->result($type, $row, $read, $anchor['line']->page, $anchor['by'], $thresholds);
             if (isset($read['labels'])) {
                 $labels[$key] = $read['labels'];
@@ -397,6 +421,24 @@ final class PrintedFormMatcher
         }
 
         return $out;
+    }
+
+    /**
+     * The printed note text that lands in question `$i`'s region (M245): what follows it, and what follows every question
+     * after it that was not found, up to the next question that was — the same lines {@see region()} spans.
+     *
+     * @param  array<int, list<string>>  $trailing
+     * @param  array<int, array{line: OcrLine, top: OcrLine, by: string}|null>  $anchors
+     * @return list<string>
+     */
+    private function trailingFor(array $trailing, array $anchors, int $i): array
+    {
+        $printed = $trailing[$i] ?? [];
+        for ($j = $i + 1; array_key_exists($j, $anchors) && $anchors[$j] === null; $j++) {
+            array_push($printed, ...($trailing[$j] ?? []));
+        }
+
+        return $printed;
     }
 
     /**

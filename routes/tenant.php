@@ -1205,6 +1205,24 @@ Route::middleware([
         ->middleware(['can:update,form', 'can:manage,automation', 'feature:webhooks', 'throttle:6,1'])
         ->scopeBindings()
         ->name('forms.automations.test');
+    // M245, `R-d0bbb7bb`: a form's glossary — terms and their definitions on the draft, frozen into each published
+    // version. On the already-imported FormController, for the `use`-line reason above. An entry is addressed by its id.
+    Route::get('/forms/{form}/glossary', [FormController::class, 'indexGlossary'])
+        ->middleware('can:update,form')
+        ->name('forms.glossary.index');
+    // Throttled at a whole glossary (`Glossary::MAX_ENTRIES`) a minute, under its OWN key: a bare `throttle:N,1` counts
+    // every such route of the user together, so NHETE's 62 terms spent the picture upload's budget and it answered 429.
+    Route::post('/forms/{form}/glossary', [FormController::class, 'storeGlossaryEntry'])
+        ->middleware(['can:update,form', 'throttle:200,1,glossary'])
+        ->name('forms.glossary.store');
+    Route::patch('/forms/{form}/glossary/{entry}', [FormController::class, 'updateGlossaryEntry'])
+        ->middleware('can:update,form')
+        ->whereUuid('entry')
+        ->name('forms.glossary.update');
+    Route::delete('/forms/{form}/glossary/{entry}', [FormController::class, 'destroyGlossaryEntry'])
+        ->middleware('can:update,form')
+        ->whereUuid('entry')
+        ->name('forms.glossary.destroy');
     // M133, `R-5da4a30f`: whether other forms may use this form's answers as their choices — Connect project's source
     // key. `D87`: whoever may edit the form AND read its responses, the hub responses route's own two gates, because
     // nobody shares what they cannot see. On the already-imported FormController, for the `use`-line reason above.

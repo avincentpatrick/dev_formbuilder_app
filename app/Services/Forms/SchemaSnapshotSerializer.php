@@ -77,6 +77,13 @@ final class SchemaSnapshotSerializer
                 ->sortBy('key', SORT_STRING)->values()->all(),
         ];
 
+        // M245 (`R-d0bbb7bb`): the version's glossary, in its one order (by key, then term, byte-wise). Omitted when
+        // empty, as `repeat_layout` is, so every version and template published before the glossary hashes as it did.
+        $glossary = FormGlossaryService::snapshotOf($version->id);
+        if ($glossary !== []) {
+            $canonical['glossary'] = $glossary;
+        }
+
         /** @var array<string, mixed> $sorted */
         $sorted = $this->ksortRecursive($canonical);
 

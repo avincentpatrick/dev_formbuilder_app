@@ -75,4 +75,31 @@ describe('note-content', () => {
         expect(announcementFor('note', null, 'Welcome to the clinic.')).toBe('New question: Welcome to the clinic.');
         expect(announcementFor('short_text', blocks, 'Full name')).toBe('New question: Full name');
     });
+
+    it('reads a list and a details block one level deep, and skips a details block inside one (M245)', () => {
+        expect(
+            renderableBlocks([
+                { type: 'list', style: 'numbered', items: [{ spans: [{ text: 'One' }] }, 'junk', { spans: 'x' }] },
+                { type: 'list', style: 'checklist', items: 'x' },
+                {
+                    type: 'details',
+                    summary: 'More',
+                    blocks: [{ type: 'paragraph', spans: [{ text: 'Inside' }] }, { type: 'details', summary: 'Deeper', blocks: [] }, { type: 'video' }],
+                },
+                { type: 'details', summary: 42, blocks: 'x' },
+            ]),
+        ).toEqual([
+            { type: 'list', style: 'numbered', items: [{ spans: [{ text: 'One' }] }, { spans: [] }] },
+            { type: 'list', style: 'bulleted', items: [] },
+            { type: 'details', summary: 'More', blocks: [{ type: 'paragraph', spans: [{ text: 'Inside' }] }] },
+            { type: 'details', summary: null, blocks: [] },
+        ]);
+    });
+
+    it('summarises a list by its first item, and a details block by its summary or else its first words (M245)', () => {
+        expect(contentSummary(renderableBlocks([{ type: 'list', style: 'bulleted', items: [{ spans: [] }, { spans: [{ text: 'Bring water' }] }] }]))).toBe('Bring water');
+        expect(contentSummary(renderableBlocks([{ type: 'details', summary: 'More about this', blocks: [] }]))).toBe('More about this');
+        expect(contentSummary(renderableBlocks([{ type: 'details', summary: '', blocks: [{ type: 'paragraph', spans: [{ text: 'Inside' }] }] }]))).toBe('Inside');
+        expect(contentSummary(renderableBlocks([{ type: 'details', summary: null, blocks: [{ type: 'image', attachment_id: 'a', alt: 'A chart' }] }]))).toBe('A chart');
+    });
 });

@@ -24,10 +24,10 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 | M129 — where a note's content blocks go today, and where they do not (R-6dedc3a9's editor half).
 |--------------------------------------------------------------------------
-| Since M130 (`R-c9f50df2`) the screens render the content — the guest page, the encode page, the preview — and
-| these four outputs still do not: the printed form, the response PDF, the XLSForm export and the CSV export each
-| show the note by its label, or not at all. `docs/piping-output-encoding-design.md` §5 records it per surface;
-| these cases hold that record true, and the printed form's half is `R-c083b711`.
+| Since M130 (`R-c9f50df2`) the screens render the content — the guest page, the encode page, the preview. Since M245
+| (`R-c083b711`) so do the printed form and the response PDF, in place of the label as on screen (`D69`): a link with its
+| address after it, a picture as its description. The XLSForm export and the CSV export still show the note by its
+| label, or not at all. `docs/piping-output-encoding-design.md` §5 records it per surface; these cases hold it true.
 |
 | ⚠️ EVERY ABSENCE IS PAIRED WITH A PRESENCE FROM THE SAME OUTPUT. "The sentinel is not in it" is also what an empty
 | or broken output says, so each case first shows the output carries something it must.
@@ -72,20 +72,27 @@ beforeEach(function (): void {
     $this->form = $form->refresh();
 });
 
-it('keeps the content out of the printed form, which still prints the note by its label', function (): void {
+it('prints the content on the printed form, in place of the note’s label (M245)', function (): void {
     $html = app(BlankFormPrintRenderer::class)->html($this->form, $this->version);
 
-    expect($html)->toContain('Welcome to the clinic.')
-        ->and($html)->not->toContain(NOTE_SURFACES_SENTINEL);
+    expect($html)->toContain('Full name')
+        ->and($html)->toContain(NOTE_SURFACES_SENTINEL.' heading')
+        ->and($html)->toContain(NOTE_SURFACES_SENTINEL.' paragraph, ')
+        ->and($html)->toContain(' (https://example.org/'.NOTE_SURFACES_SENTINEL.')')
+        ->and($html)->toContain(NOTE_SURFACES_SENTINEL.' callout')
+        ->and($html)->toContain('Picture: '.NOTE_SURFACES_SENTINEL.' image')
+        ->and($html)->not->toContain('Welcome to the clinic.');
 });
 
-it('keeps the content out of a response’s PDF, which carries the answers', function (): void {
+it('prints the content in a response’s PDF, beside the answers, in place of the note’s label (M245)', function (): void {
     $submission = seedInboxSubmission($this->form, $this->user, SubmissionStatus::Submitted, ['full_name' => 'Ana Reyes']);
 
     $html = app(SubmissionPdfRenderer::class)->html($submission);
 
     expect($html)->toContain('Ana Reyes')
-        ->and($html)->not->toContain(NOTE_SURFACES_SENTINEL);
+        ->and($html)->toContain(NOTE_SURFACES_SENTINEL.' heading')
+        ->and($html)->toContain('Picture: '.NOTE_SURFACES_SENTINEL.' image')
+        ->and($html)->not->toContain('Welcome to the clinic.');
 });
 
 it('keeps the content out of the XLSForm export, which still carries the note by its label', function (): void {

@@ -11,10 +11,18 @@
  * storage, and opens in a new tab so neither a respondent mid-form nor the builder preview navigates away.
  *
  * Content is NOT piped: it is not on the template-bearing list (§6), so a `${key}` in a paragraph is text.
+ *
+ * ── M245: LISTS, DETAILS AND GLOSSARY WORDS ─────────────────────────────────────────────────────────────
+ * A list is a real `<ul>`/`<ol>`. A details block is `MdsDisclosure` around this same component, `nested`, one level
+ * down. A marked word whose term the form's glossary has (`ContentGlossaryKey`) is an inline button that opens the
+ * definition in `MdsModal`, which returns focus to the word on close; one whose term is missing is plain text, as a
+ * lenient draft may hold it. The definition is interpolated text, like every other leaf.
  */
-import { MdsCallout } from '@meridian/design-system';
-import { h, inject, onBeforeUnmount, reactive, type FunctionalComponent, type VNodeChild } from 'vue';
+import { MdsCallout, MdsDisclosure, MdsModal } from '@meridian/design-system';
+import { computed, h, inject, onBeforeUnmount, reactive, ref, type FunctionalComponent, type VNodeChild } from 'vue';
+import { findEntry, type GlossaryEntry } from '@/components/builder/glossary';
 import {
+    ContentGlossaryKey,
     ContentHeadingBaseKey,
     ContentImageRetryKey,
     ContentImageUrlKey,
@@ -27,9 +35,23 @@ import {
     type ContentSpan,
 } from './note-content';
 
-defineProps<{ blocks: ContentBlock[] }>();
+withDefaults(
+    defineProps<{
+        blocks: ContentBlock[];
+        /** Inside a details block: no `data-note-content` marker of its own, since the note already carries one. */
+        nested?: boolean;
+    }>(),
+    { nested: false },
+);
 
 const headingBase = inject(ContentHeadingBaseKey, 2);
+const glossary = inject(
+    ContentGlossaryKey,
+    computed<readonly GlossaryEntry[]>(() => []),
+);
+
+// The definition open now, if any. One dialog per note: a respondent reads one meaning at a time.
+const openEntry = ref<GlossaryEntry | null>(null);
 const imageUrl = inject(ContentImageUrlKey, staffContentImageUrl);
 const retry = inject(ContentImageRetryKey, null);
 
@@ -68,12 +90,32 @@ onBeforeUnmount(() => {
     timers.clear();
 });
 
-/** One run of text, wrapped innermost-first: code, then italic, then bold, then the link around all of it. */
+/**
+ * One run of text, wrapped innermost-first: code, then italic, then bold, then the link around all of it. A glossary
+ * word is never a link or code (the shape refuses both), so its button wraps the styled text in the link's place.
+ */
 const SpanRun: FunctionalComponent<{ span: ContentSpan }> = (props) => {
     let node: VNodeChild = spanText(props.span);
     if (props.span.code === true) node = h('code', { class: 'note-content__code' }, node);
     if (props.span.italic === true) node = h('em', node);
     if (props.span.bold === true) node = h('strong', node);
+
+    const entry = typeof props.span.term === 'string' ? findEntry(glossary.value, props.span.term) : null;
+    if (entry !== null) {
+        return h(
+            'button',
+            {
+                type: 'button',
+                class: 'note-content__term',
+                'aria-haspopup': 'dialog',
+                'data-glossary-term': entry.term,
+                onClick: () => {
+                    openEntry.value = entry;
+                },
+            },
+            [node, h('span', { class: 'note-content__sr' }, ' (glossary)')],
+        );
+    }
 
     const href = safeLink(props.span);
     if (href !== null) {
@@ -89,7 +131,7 @@ SpanRun.props = ['span'];
 </script>
 
 <template>
-    <div class="note-content" data-note-content>
+    <div class="note-content" :data-note-content="nested ? undefined : ''">
         <template v-for="(block, index) in blocks" :key="index">
             <!-- A heading with no text (a lenient draft) draws nothing: an empty heading element is an axe failure. -->
             <component
@@ -108,6 +150,24 @@ SpanRun.props = ['span'];
                     <SpanRun v-for="(span, s) in block.spans" :key="s" :span="span" />
                 </p>
             </MdsCallout>
+            <component
+                :is="block.style === 'numbered' ? 'ol' : 'ul'"
+                v-else-if="block.type === 'list'"
+                class="note-content__list"
+                :data-list-style="block.style"
+            >
+                <li v-for="(item, i) in block.items" :key="i" class="note-content__item">
+                    <SpanRun v-for="(span, s) in item.spans" :key="s" :span="span" />
+                </li>
+            </component>
+            <MdsDisclosure
+                v-else-if="block.type === 'details'"
+                :summary="(block.summary ?? '').trim() !== '' ? (block.summary ?? '') : 'Details'"
+                class="note-content__details"
+                data-block-details
+            >
+                <NoteContent :blocks="block.blocks" nested />
+            </MdsDisclosure>
             <hr v-else-if="block.type === 'divider'" class="note-content__divider" />
             <figure v-else-if="block.type === 'image'" class="note-content__figure">
                 <p v-if="waiting.has(block.attachment_id)" class="note-content__alt" data-image-checking>
@@ -128,6 +188,14 @@ SpanRun.props = ['span'];
                 </p>
             </figure>
         </template>
+        <MdsModal
+            :open="openEntry !== null"
+            :title="openEntry?.term ?? ''"
+            data-glossary-dialog
+            @close="openEntry = null"
+        >
+            <p class="note-content__definition">{{ openEntry?.definition ?? '' }}</p>
+        </MdsModal>
     </div>
 </template>
 
@@ -203,6 +271,42 @@ SpanRun.props = ['span'];
     clip: rect(0 0 0 0);
     white-space: nowrap;
     border: 0;
+}
+
+.note-content__list {
+    margin: 0;
+    padding-inline-start: var(--mds-space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+}
+
+/* A glossary word reads as part of its sentence: inline, the sentence's own type and colour, a dotted underline as the
+   non-colour signal that it opens something, and the focus ring every control has. `:deep()` because `SpanRun` draws
+   it with `h()`, which carries no scope id. */
+.note-content :deep(.note-content__term) {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    text-decoration: underline dotted;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+    cursor: help;
+}
+
+.note-content :deep(.note-content__term:focus-visible) {
+    outline: 2px solid var(--mds-color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--mds-radius-sm);
+}
+
+.note-content__definition {
+    margin: 0;
 }
 
 .note-content__divider {

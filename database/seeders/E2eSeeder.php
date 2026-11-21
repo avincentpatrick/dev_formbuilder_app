@@ -59,6 +59,7 @@ use App\Services\Attachments\AttachmentStorageService;
 use App\Services\Authorization\ResourceGrantService;
 use App\Services\Forms\FormBuilderService;
 use App\Services\Forms\FormChoiceListService;
+use App\Services\Forms\FormGlossaryService;
 use App\Services\Forms\FormReferenceFileService;
 use App\Services\Forms\FormService;
 use App\Services\Forms\PublishService;
@@ -717,6 +718,20 @@ class E2eSeeder extends Seeder
                         ['type' => 'callout', 'tone' => 'warning', 'spans' => [
                             ['text' => 'For a blood test, do not eat for 8 hours before your visit.'],
                         ]],
+                        // M245: a glossary word, a list and a details block. A paragraph, never a callout, inside the
+                        // details: the axe spec finds the one callout by its role, which a second would make ambiguous.
+                        ['type' => 'paragraph', 'spans' => [
+                            ['text' => 'A '],
+                            ['text' => 'BHW', 'term' => 'BHW'],
+                            ['text' => ' will meet you at the door.'],
+                        ]],
+                        ['type' => 'list', 'style' => 'bulleted', 'items' => [
+                            ['spans' => [['text' => 'Your clinic card']]],
+                            ['spans' => [['text' => 'A list of the medicines you take']]],
+                        ]],
+                        ['type' => 'details', 'summary' => 'Why we ask you to fast', 'blocks' => [
+                            ['type' => 'paragraph', 'spans' => [['text' => 'Food changes what a blood test measures for several hours.']]],
+                        ]],
                         ['type' => 'divider'],
                         ['type' => 'heading', 'level' => 2, 'text' => 'Finding the entrance'],
                         ['type' => 'image', 'attachment_id' => $entrance->id, 'alt' => 'The clinic: a blue building facing the road, its door under a red pin.'],
@@ -725,6 +740,11 @@ class E2eSeeder extends Seeder
                 $guideBuilder->addField($guide, $owner, FieldType::ShortText, $guideSection->id)->update([
                     'key' => 'visitor_name',
                     'label' => 'Your name',
+                ]);
+                // M245 (`R-d0bbb7bb`): the glossary the note's marked word opens, and the Glossary button lists.
+                FormGlossaryService::writeAll($guide->refresh()->draftVersion()->firstOrFail(), [
+                    ['term' => 'BHW', 'definition' => 'A barangay health worker: a trained volunteer who visits households in the barangay.'],
+                    ['term' => 'Fasting', 'definition' => 'Eating nothing, and drinking only water, for a set time.'],
                 ]);
                 app(PublishService::class)->publish($guide->refresh(), $owner);
 

@@ -39,11 +39,14 @@ it('mirrors every bound the rule enforces, by value', function (string $mirror, 
     'text length' => ['maxTextLength', ContentBlocks::MAX_TEXT_LENGTH],
     'link length' => ['maxLinkLength', ContentBlocks::MAX_LINK_LENGTH],
     'description length' => ['maxAltLength', ContentBlocks::MAX_ALT_LENGTH],
+    'list items' => ['maxListItems', ContentBlocks::MAX_LIST_ITEMS],
+    'glossary word length' => ['maxTermLength', ContentBlocks::MAX_TERM_LENGTH],
 ]);
 
 it('mirrors the callout tones and the link schemes, in the rule’s order', function (): void {
     expect(contentBlocksMirrorList('CALLOUT_TONES'))->toBe(ContentBlocks::TONES)
-        ->and(contentBlocksMirrorList('LINK_SCHEMES'))->toBe(ContentBlocks::LINK_SCHEMES);
+        ->and(contentBlocksMirrorList('LINK_SCHEMES'))->toBe(ContentBlocks::LINK_SCHEMES)
+        ->and(contentBlocksMirrorList('LIST_STYLES'))->toBe(ContentBlocks::LIST_STYLES);
 });
 
 it('mirrors exactly the bounds the rule has, so a new one cannot be left out of both lists above', function (): void {
@@ -53,6 +56,6 @@ it('mirrors exactly the bounds the rule has, so a new one cannot be left out of 
     preg_match('/export const CONTENT_LIMITS = \{([^}]*)\}/', contentBlocksMirrorSource(), $limits);
     preg_match_all('/^\s*(\w+):/m', $limits[1] ?? '', $keys);
 
-    expect($bounds)->toBe(['MAX_BLOCKS', 'MAX_SPANS', 'MAX_HEADING_LENGTH', 'MAX_TEXT_LENGTH', 'MAX_LINK_LENGTH', 'MAX_ALT_LENGTH'])
-        ->and($keys[1])->toBe(['maxBlocks', 'maxSpans', 'maxHeadingLength', 'maxTextLength', 'maxLinkLength', 'maxAltLength']);
+    expect($bounds)->toBe(['MAX_BLOCKS', 'MAX_SPANS', 'MAX_HEADING_LENGTH', 'MAX_TEXT_LENGTH', 'MAX_LINK_LENGTH', 'MAX_ALT_LENGTH', 'MAX_LIST_ITEMS', 'MAX_TERM_LENGTH'])
+        ->and($keys[1])->toBe(['maxBlocks', 'maxSpans', 'maxHeadingLength', 'maxTextLength', 'maxLinkLength', 'maxAltLength', 'maxListItems', 'maxTermLength']);
 });

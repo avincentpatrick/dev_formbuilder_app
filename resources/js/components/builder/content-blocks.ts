@@ -20,7 +20,14 @@ export const CONTENT_LIMITS = {
     maxTextLength: 2000,
     maxLinkLength: 2000,
     maxAltLength: 300,
+    maxListItems: 50,
+    maxTermLength: 100,
 } as const;
+
+export type ContentListStyle = 'bulleted' | 'numbered';
+
+/** Mirror of `ContentBlocks::LIST_STYLES`, in its order. */
+export const LIST_STYLES: readonly ContentListStyle[] = ['bulleted', 'numbered'];
 
 /** Mirror of `ContentBlocks::LINK_SCHEMES`, in its order. */
 export const LINK_SCHEMES: readonly string[] = ['https', 'http', 'mailto', 'tel'];
@@ -36,16 +43,49 @@ export interface ContentSpan {
     italic?: boolean;
     code?: boolean;
     link?: string;
+    /**
+     * M245: the glossary term this run opens, always equal to its own text. Matched against the form's glossary by
+     * `glossaryKey()` (`glossary.ts`); never a link or code, and never merged with a neighbour.
+     */
+    term?: string;
 }
 
-export type ContentBlock =
+/** One item of a list block: a run of text, as a paragraph holds. */
+export interface ContentListItem {
+    spans: ContentSpan[];
+}
+
+/** Every block a details block may hold: any type but another details block (one level, M245). */
+export type ContentInnerBlock =
     | { type: 'heading'; level: 1 | 2; text: string | null }
     | { type: 'paragraph'; spans: ContentSpan[] }
     | { type: 'callout'; tone: CalloutTone; spans: ContentSpan[] }
     | { type: 'divider' }
-    | { type: 'image'; attachment_id: string; alt: string | null };
+    | { type: 'image'; attachment_id: string; alt: string | null }
+    | { type: 'list'; style: ContentListStyle; items: ContentListItem[] };
+
+/** A summary line and its own blocks, collapsed for respondents and printed open (M245, `R-93e22765`). */
+export interface ContentDetailsBlock {
+    type: 'details';
+    summary: string | null;
+    blocks: ContentInnerBlock[];
+}
+
+export type ContentBlock = ContentInnerBlock | ContentDetailsBlock;
 
 export type ContentBlockType = ContentBlock['type'];
+
+/** How many blocks a list holds, each details block's own blocks included: the count `MAX_BLOCKS` bounds. */
+export function countBlocks(blocks: readonly ContentBlock[]): number {
+    let count = 0;
+    for (const block of blocks) {
+        count += 1;
+        if (block.type === 'details' && Array.isArray(block.blocks)) {
+            count += block.blocks.length;
+        }
+    }
+    return count;
+}
 
 /** What the upload answers with: the new image's id, where staff read it, and whether it has passed its check. */
 export interface ContentImageRef {

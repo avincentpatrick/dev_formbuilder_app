@@ -1,0 +1,57 @@
+{
+    "_comment": "M245: the glossary matching key (App\\Support\\Forms\\Glossary::key and glossary.ts glossaryKey) as [input, key] pairs. Both suites read this file. The last two show that a composed and a decomposed e-acute are deliberately two keys: no Unicode normalisation is applied.",
+    "vectors": [
+        [
+            "TWG",
+            "twg"
+        ],
+        [
+            "  TWG  ",
+            "twg"
+        ],
+        [
+            "Barangay Health Worker",
+            "barangay health worker"
+        ],
+        [
+            "Barangay Health　Worker",
+            "barangay health worker"
+        ],
+        [
+            "Barangay HealthWorker\u000bNow",
+            "barangay health worker now"
+        ],
+        [
+            "Barangay \t\n Health",
+            "barangay health"
+        ],
+        [
+            "TWGs",
+            "twgs"
+        ],
+        [
+            "B07",
+            "b07"
+        ],
+        [
+            "İstanbul",
+            "i̇stanbul"
+        ],
+        [
+            "ΟΔΟΣ",
+            "οδος"
+        ],
+        [
+            "Straße",
+            "straße"
+        ],
+        [
+            "café",
+            "café"
+        ],
+        [
+            "café",
+            "café"
+        ]
+    ]
+}

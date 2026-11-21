@@ -14,8 +14,10 @@ use App\Services\Submissions\SchemaValueFormatter;
 use App\Services\Submissions\SubmissionPdfPresenter;
 use App\Services\Templates\TemplateParser;
 use App\Support\Forms\FieldVisibility;
+use App\Support\Forms\Glossary;
 use App\Support\Forms\LocaleVariant;
 use App\Support\Forms\MatrixColumns;
+use App\Support\Forms\PrintedContent;
 use App\Support\Forms\RepeatTable;
 use App\Support\Forms\StepProjection;
 use LogicException;
@@ -191,6 +193,9 @@ final class BlankFormPrintPresenter
             'accepts_scans' => $form->allow_ocr_single === true,
             'layout' => self::LAYOUT,
             'blocks' => $this->numbered($this->blocks($sections, $bySection, $locale)),
+            // M245 (`R-d0bbb7bb`): the version's glossary, printed on a page of its own at the end. Plain text, in the
+            // form's default language only, as on screen (`D70`).
+            'glossary' => Glossary::fromSnapshot($snapshot),
         ];
     }
 
@@ -446,6 +451,9 @@ final class BlankFormPrintPresenter
                     'rows' => $this->optionList($config, 'rows', $locale),
                     'columns' => $this->gridColumns($type, $config, $locale),
                 ] : null,
+                // M245 (`R-c083b711`): a note's content blocks, printed in place of its label as on screen (`D69`); empty
+                // for every other row and for a note with none. Not piped, so a `${key}` prints as written (`D69`).
+                'content' => $area === PrintAnswerArea::Prose ? PrintedContent::blocks($config['content'] ?? null) : [],
             ];
         }
 

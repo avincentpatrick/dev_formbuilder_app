@@ -16,7 +16,58 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M248`, `R-8881210a`, `R-d37a38f9`, `R-e07273d1` (`respondent-edit-after-submit`) and `R-aec84b42`: reopening a form's link on the same device offers "Continue where you left off" or "Start over"; a form's "After submitting" setting offers another response, "Change my answers" until the form closes, or one response only (m248-respondent-keeps-answers)
+## Status: ACTIVE CLAIM — `M249`, `R-ee5e000c` (`progress-chapters`) and `R-359ddb99` (`dropdown-placeholder`): pages grouped into named chapters on the progress bar with a short progress label per page, a dropdown's own placeholder that an optional answer can be cleared back to, and a short label a closed dropdown shows (m249-chapters-dropdown-labels)
+
+Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-6b-lively-cloud-of-d7c3a361-1918-4eb3-8b28-2b58cd22945b.md`). NHETE recommendation 6b, the other half of recommendation 6 after `M248` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m249-chapters-dropdown-labels`, cut from `origin/m247-grid-wide-sticky-explorer` at `67b6ce99`, so it is **stacked on #610** (and through it on #597): `page_width` sits on the very lines a section's new columns take — the serializer's `$layout`, the materializer, `updateSection`, `EncodeFormPresenter`, `toRenderSection` and the section settings in `ConfigPanel` — and NHETE's TABLE layout, whose dropdown columns take a short label, exists only there. `origin/main` is merged in for the claim files. PR into main, held after #625 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.26.0 → 0.28.0 (a feature) with its release notes**, kept on top when the held PRs merge first.
+Rows: `R-ee5e000c` (filed by `M237`), *"The progress bar cannot group pages into named chapters, and a page's progress label is always its section title"*; `R-359ddb99` (filed by `M237`), *"A dropdown always shows "Select an option" and its full choice text when closed"*. Two rows are filed and closed by this increment, each found in planning beside a cited line: `dropdown-cannot-clear` and `progress-title-unpiped` (below).
+
+The user's answers in planning (2026-11-23), recorded on this branch as `D233`:
+- **A chapter is started, not repeated**: "Starts a chapter" is ticked and named on the page that begins one, and the pages after it belong to it until the next. A Kobo or ODK outer group made only of groups imports as one.
+- **The short closed label is drawn over the box**: the phone's own dropdown stays; the open list and screen readers get the full text; Windows high-contrast mode shows the full text.
+- **It works for dropdown questions and for a question table's dropdown columns.**
+- **With chapters on, the bar shows the chapters and the current chapter's own page dots.** A form with no chapter keeps today's bar exactly.
+
+### Evidence verified
+- `R-ee5e000c`: **held** — `ProgressIndicator.vue` draws one numbered dot per visible step under "Step X of N" and the step's title (`stepTitle()` in `useFormRuntime.ts`); `form_sections` has no parent column and no second label. Neither file is touched by any held branch.
+- `R-359ddb99`: **held** — `FieldInput.vue`'s select arm hard-codes `placeholder="Select an option"` (the cascade selects do the same), and a choice is `{value, label, label_translations?}`.
+
+### Premise verified
+- *"NHETE has 10 named stops over about 45 screens, each screen with its own small progress label"*: **held, sharper** — the real text (session `3df65fc6`'s scratchpad, never committed) has 10 stops over 49 screens, and 44 screens open with a heading of up to 83 characters under a screen name of at most 36. The heading is the page's title; the screen name is its progress label. **The fixture cannot show it today:** `D221`'s scrambling gave each screen's copy of its stop name its own text, so the fixture's 49 `stop` values are all different, and `NheteBuilderDriver` drops `stop`.
+- *"`FieldInput.vue` hard-codes the empty option's text"*: **held**, and the question's own placeholder already exists — `form_fields.placeholder`, edited for every type in `ConfigPanel`, piped by both runtimes, and ignored only by the select arm. No migration is needed for it.
+- The design system's dropdown is a native `<select>` on purpose (`MdsSelect`'s docblock; `docs/ux/design-system-reference.md` argues against a combobox primitive): **held**, so a closed label different from the open list's text cannot come from the select itself — `D233` answer 2.
+- `MdsSelect` draws its placeholder as a **disabled** option, so an answered optional dropdown can never be emptied again: **found in planning, filed as `dropdown-cannot-clear`**. The grid's own select already offers a selectable "Select…".
+- The progress line, the screen-reader announcement and the welcome-back banner read `step.title`, which is resolved for the locale but not piped, while the section heading pipes: **found in planning, filed as `progress-title-unpiped`**.
+- `NheteE2eSeeder` builds through XLSForm import, which carries no placeholder for any type: **held**, so the seeder sets placeholders (and progress labels, which XLSForm has no column for) after import, as `M248`'s seeder set its mode.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the rows' sketches:**
+1. `progress-chapters`'s *"an optional chapter name on a section"* becomes a name on the section that **starts** a chapter (`D233` answer 1); grouping is computed over every section in order and only then filtered to the visible steps, so a hidden first page still names its chapter.
+2. The progress label has no translations: in another language it is used only when the section title has no translation there, so a short default-language word never sits beside a translated page. Chapter names carry translations, filled only by XLSForm import, as section labels are.
+3. Every new snapshot key is emitted **only when set**, so no published form's checksum, paper stamp or offline drift check moves.
+4. `dropdown-placeholder`'s placeholder half is one line; its short-label half cannot be done by the select alone and is the overlay (`D233` answer 2), measured in a real browser before its test is written; it reaches the grid's dropdown columns too (answer 3). Every other surface keeps the full label — paper above all, because the scan reader matches printed labels.
+
+Files:
+- **Data and server:** new `database/migrations/2026_08_17_000153_add_chapter_and_progress_label_to_form_sections_table.php`; `app/Models/FormSection.php`; `app/Http/Requests/Forms/UpdateSectionRequest.php`, `UpdateFieldRequest.php`; `app/Services/Forms/` `FormBuilderService.php`, `BuilderPresenter.php`, `SchemaSnapshotSerializer.php`, `SchemaBlueprintMaterializer.php`, `VersionComparison.php`, `DraftCopier.php`, `FieldTypeConversion.php`; `app/Services/Submissions/EncodeFormPresenter.php`; `app/Enums/FieldType.php`; `app/Support/Forms/MatrixColumns.php`.
+- **XLSForm:** `app/Services/Xlsform/` `XlsformImportParser.php`, `XlsformImporter.php`, `XlsformExporter.php`, `Dto/SectionSpec.php`.
+- **Respondent page:** `resources/public-runtime/` `lib/types.ts`, `lib/schema-mapping.ts`, new `lib/chapters.ts`, `composables/useFormRuntime.ts`, `components/ProgressIndicator.vue`, `StepView.vue`, `WelcomeBackBanner.vue`, `RuntimeSession.vue`, `FieldControl.vue`, `InstanceField.vue`.
+- **Shared and design system:** `resources/js/components/submissions/FieldInput.vue`, `MatrixGrid.vue`; `packages/design-system/src/components/Select/` `Select.vue`, its story and a new unit test.
+- **Builder:** `resources/js/components/builder/` `ConfigPanel.vue`, `ChoicesEditor.vue`, `GridOptionList.vue`, `types.ts`, `useBuilderStore.ts`, `draft-snapshot.ts`, `conflict-diff.ts`, `PreviewRuntime.vue`, `field-save-errors.ts`; `resources/js/components/help/manual.ts`.
+- **Tests:** the Pest, Vitest and unit files beside each of the above; new `tests/Feature/Forms/SectionChapterTest.php`, `tests/Feature/Xlsform/XlsformChaptersTest.php`, `XlsformShortLabelTest.php`; `tests/fixtures/nhete/nhete-shape.json` (stop names only); `tests/Support/Nhete/`, `tests/Feature/Forms/Nhete/`; `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/`; `tests/e2e/` `nhete-walk.spec.ts`, `public-runtime-axe.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/data-dictionary.md`, `docs/xlsform-interop-spec.md`, `docs/ux/design-system-reference.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D233`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, the two `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `M249`; migration prefix `2026_08_17_000153`, taken by hand — `state.php` on this branch reports `000152`, which #625 holds; `D233`; no ADR.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the section shape (the `RawSection` member floor, the section-settings lists, the extract-column string), the field save's display names, and the NHETE suite's counts once two heading-only notes leave it.
+- A form with no chapter renders today's progress bar byte for byte; the existing progress tests stay untouched.
+- NHETE's walk names the right chapter and progress label on all 49 pages at three widths, shows "Choose…" and the short word on an indicator page, and never overflows.
+- The one most likely wrong: the overlay's transparent select text under the axe scans (Storybook and the guest page) and in browsers whose open list inherits the select's colour — the reason `option` gets its own colour, measured before the test.
+
+## HELD — `M248`, `R-8881210a`, `R-d37a38f9`, `R-e07273d1` (`respondent-edit-after-submit`) and `R-aec84b42`: reopening a form's link on the same device offers "Continue where you left off" or "Start over"; a form's "After submitting" setting offers another response, "Change my answers" until the form closes, or one response only (m248-respondent-keeps-answers) — BUILT AND HELD: PR #625, CI 44922909203 every job green with real step counts
 
 Taken 2026-11-21, from the plan the user approved in chat the same day (`~/.claude/plans/continue-with-nhete-recommenda-staged-stonebraker-of-a595e0ed-3d64-4d67-ab8f-df866cda2ed3.md`). NHETE recommendation 6a, the NHETE plan's next item after `M247` (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Its other half, 6b (`progress-chapters`, `dropdown-placeholder`), is not taken: it overlaps #610 and #568 and is planned in its own session as `M249`.
 Branch `m248-respondent-keeps-answers`, cut from origin/main at `1bf3bb87`, PR into main, held for a merge point on the user's word (`D137`). Not stacked: nothing here needs a held PR. **A change a tester sees: `VERSION` 0.21.0 → 0.27.0 (a feature) with its release notes**, kept on top when #545, #568, #580, #589, #597 and #610 merge first.

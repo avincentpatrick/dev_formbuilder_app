@@ -68,11 +68,22 @@ export function chaptersOf<S extends ChapterStep>(
     return chapters;
 }
 
-/** A chapter's name as the bar and the announcer say it: the pages before the first chapter are named after their first page. */
+/**
+ * A chapter's name as the bar and the announcer say it. The pages before the first chapter are named after their first
+ * page that has a name — the lead block of top-level questions has none — and "Start" when none does.
+ */
 export function chapterName<S extends ChapterStep>(chapter: Chapter<S>, textOf: (step: S) => string | null): string {
-    const first = chapter.steps[0];
+    if (chapter.name !== null) {
+        return chapter.name;
+    }
+    for (const step of chapter.steps) {
+        const text = textOf(step);
+        if (text !== null && text !== '') {
+            return text;
+        }
+    }
 
-    return chapter.name ?? (first !== undefined ? textOf(first) : null) ?? 'Start';
+    return 'Start';
 }
 
 /** The chapter holding a step, with its position among the chapters and the step's among the chapter's pages. */

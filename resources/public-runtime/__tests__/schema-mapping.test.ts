@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     buildEngineSchema,
     buildRenderModel,
+    controlOption,
+    resolveMatrix,
     resolveOptional,
     resolveText,
 } from '../lib/schema-mapping';
@@ -227,5 +229,81 @@ describe('translation resolver', () => {
         expect(resolveText('Detail', { es: '' }, 'es')).toBe('Detail'); // empty translation ignored
         expect(resolveOptional(null, { es: 'Pista' }, 'es')).toBe('Pista');
         expect(resolveOptional(null, null, 'es')).toBeNull();
+    });
+});
+
+/**
+ * M249 (`D233`): a section's chapter and progress label, and a choice's short label, reach the render model — blank
+ * as none, absent as before — and a control draws a short label only where the locale may show it.
+ */
+describe('M249 — chapters, progress labels and short labels in the render model', () => {
+    it('carries a section\'s chapter, its translations and its progress label, blank and absent as none', () => {
+        const schema = schemaResponse({
+            sections: [
+                section({ key: 'a', sequence: 0, chapter: ' Welcome ', chapter_translations: { fil: 'Maligayang pagdating' }, progress_label: 'Hello' }),
+                section({ key: 'b', sequence: 1, chapter: '  ', progress_label: '' }),
+                section({ key: 'c', sequence: 2 }),
+            ],
+            fields: [],
+        });
+
+        expect(buildRenderModel(schema).sections.map((s) => [s.key, s.chapter, s.chapterTranslations, s.progressLabel])).toEqual([
+            ['a', 'Welcome', { fil: 'Maligayang pagdating' }, 'Hello'],
+            ['b', null, null, null],
+            ['c', null, null, null],
+        ]);
+    });
+
+    it('keeps a choice\'s short label only when it has one, and draws it only where the locale may show it', () => {
+        const schema = schemaResponse({
+            fields: [
+                field({
+                    key: 'use',
+                    field_type: 'dropdown',
+                    config: {
+                        options: [
+                            { value: 'include', label: 'Include. As it stands.', label_translations: { fil: 'Isama. Gaya ng dati.' }, short_label: 'Include' },
+                            { value: 'change', label: 'Change it. Measure it another way.', label_translations: { fil: 'Baguhin.' }, short_label: 'Change', short_label_translations: { fil: 'Baguhin' } },
+                            { value: 'drop', label: 'Drop it', short_label: '  ' },
+                        ],
+                    },
+                }),
+            ],
+        });
+        const options = buildRenderModel(schema).fields[0].options;
+
+        expect(options.map((o) => o.shortLabel)).toEqual(['Include', 'Change', undefined]);
+        expect(options[2]).not.toHaveProperty('shortLabel');
+        expect(options.map((o) => controlOption(o, 'en'))).toEqual([
+            { value: 'include', label: 'Include. As it stands.', shortLabel: 'Include' },
+            { value: 'change', label: 'Change it. Measure it another way.', shortLabel: 'Change' },
+            { value: 'drop', label: 'Drop it' },
+        ]);
+        // In Filipino, "Include" would sit beside a translated list: the closed box shows the translated full label.
+        expect(options.map((o) => controlOption(o, 'fil'))).toEqual([
+            { value: 'include', label: 'Isama. Gaya ng dati.' },
+            { value: 'change', label: 'Baguhin.', shortLabel: 'Baguhin' },
+            { value: 'drop', label: 'Drop it' },
+        ]);
+    });
+
+    it('carries a grid cell choice\'s short label to the resolved grid', () => {
+        const schema = schemaResponse({
+            fields: [
+                field({
+                    key: 'grid',
+                    field_type: 'matrix',
+                    config: {
+                        rows: [{ value: 'a01', label: 'A01' }],
+                        columns: [{ value: 'use', label: 'Use', options: [{ value: 'include', label: 'Include. As it stands.', short_label: 'Include' }] }],
+                        cells: [{ value: 'yes', label: 'Yes', short_label: 'Y' }],
+                    },
+                }),
+            ],
+        });
+        const grid = resolveMatrix(buildRenderModel(schema).fields[0].matrix, 'en');
+
+        expect(grid?.columns[0].options).toEqual([{ value: 'include', label: 'Include. As it stands.', shortLabel: 'Include' }]);
+        expect(grid?.cells).toEqual([{ value: 'yes', label: 'Yes', shortLabel: 'Y' }]);
     });
 });

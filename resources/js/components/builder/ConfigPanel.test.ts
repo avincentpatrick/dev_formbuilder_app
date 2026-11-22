@@ -272,6 +272,28 @@ describe('ConfigPanel — the tab set it hands the shared widget', () => {
         expect(touched).toEqual(['s1:section', 's1:section']);
     });
 
+    it('M249: gives a section a progress label, and starts a chapter named after its title without a piped answer', async () => {
+        // Reactive, as the store's sections are, so the Chapter name field appears once the box is ticked.
+        const target = reactive({ ...section(), label: 'About you, ${name}' });
+        const touched: string[] = [];
+        const wrapper = mountPanel(makeStore({ section: target, touch: (uid, kind) => touched.push(`${uid}:${kind}`) }));
+
+        await wrapper.get('[data-section-progress-label]').setValue('About you');
+        expect(target.progress_label).toBe('About you');
+        await wrapper.get('[data-section-progress-label]').setValue('');
+        expect(target.progress_label).toBeNull();
+
+        expect(wrapper.find('[data-section-chapter]').exists()).toBe(false);
+        await wrapper.get('[data-section-starts-chapter] input[type="checkbox"]').setValue(true);
+        expect(target.chapter).toBe('About you,');
+        await wrapper.get('[data-section-chapter]').setValue('Your starting point');
+        expect(target.chapter).toBe('Your starting point');
+        await wrapper.get('[data-section-starts-chapter] input[type="checkbox"]').setValue(false);
+        expect(target.chapter).toBeNull();
+        expect(wrapper.find('[data-section-chapter]').exists()).toBe(false);
+        expect(touched).toHaveLength(5);
+    });
+
     it('renders no switcher at all when nothing is selected', () => {
         const wrapper = mountPanel(makeStore());
 

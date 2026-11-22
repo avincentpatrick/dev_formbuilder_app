@@ -24,10 +24,29 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D233`, the last filed, was asked and answered on 2026-11-23 in the planning of `M249`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D233 — A long form needs named chapters on its progress bar, and a dropdown needs its own placeholder and a short word when closed: how is a chapter marked, how is the short word shown, where does it work, and what does the bar show? **Starts a chapter (A). Drawn over the box (A). Questions and table columns (A). Chapters and the current chapter's pages (A).**
+
+**Asked and answered 2026-11-23 (user decision, in chat), in the planning of `M249` (NHETE recommendation 6b).** Four questions, each put with its options and the session's recommendation.
+
+1. **NHETE groups its 49 pages into 10 named stops. How does a form author mark which pages belong to a chapter on the progress bar?**
+   - **A — "Starts a chapter" (chosen, the recommendation).** On the page that begins a chapter, tick "Starts a chapter" and name it; the pages after it belong to it until the next one. NHETE needs 10 names. A Kobo or ODK outer group made only of groups imports as a chapter.
+   - **B — a name on every page.** Neighbouring pages with the same name form one chapter. NHETE needs 49 names, and one typo splits a chapter in two.
+2. **NHETE wants a closed dropdown to show only a short word ("Include") while the open list shows the full sentence. A phone's own dropdown cannot show different text closed and open. Which way?**
+   - **A — draw it over the box (chosen, the recommendation).** The phone's own dropdown stays; the open list and screen readers get the full text, and the short word is drawn over the closed box. Windows high-contrast mode shows the full text instead.
+   - **B — a new custom dropdown.** It can show anything, but gives up the phone's own picker and is the hardest accessibility pattern there is.
+   - **C — the placeholder only for now**, with the short label filed for later.
+3. **Where does the short closed label work?**
+   - **A — dropdown questions and the dropdown columns of a question table (chosen, the recommendation).** NHETE's 35-row indicator table is where "Include" matters most.
+   - **B — dropdown questions only**, with table columns filed for later.
+4. **With chapters on, what does the progress bar show?** A form with no chapter keeps today's numbered dots, unchanged.
+   - **A — the chapters and the current chapter's own page dots (chosen, the recommendation).** A row of chapter marks, and under it the current chapter's pages, so any page already seen can still be reached in one step.
+   - **B — the chapters only.** One mark per chapter; a jump goes to a chapter's first page.
+
+**What the answer files:** `M249` builds all four and closes `R-ee5e000c` (`progress-chapters`) and `R-359ddb99` (`dropdown-placeholder`), with `dropdown-cannot-clear` and `progress-title-unpiped` filed and closed beside them. It files `xlsform-progress-label`, `xlsform-placeholder`, `chapters-paper-encode` and `placeholder-shown-for-choice-buttons`, each `during-testing`.
 ### D231 — A big table needs room and its header in view, and a grid cannot be charted: what widens, and how is a grid charted? **Wide page: per section (A). Charting: by row (A).**
 
 **Asked and answered 2026-11-20 (user decision, in chat), in the planning of `M247` (NHETE recommendation 5b).** Two questions, each put with its options and the session's recommendation.

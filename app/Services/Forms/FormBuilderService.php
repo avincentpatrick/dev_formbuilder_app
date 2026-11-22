@@ -122,8 +122,17 @@ final class FormBuilderService
                 'max_instances' => $data['max_instances'] ?? null,
                 // M185 (`R-0a7275ce`): cards are stored as null, so a section never set to a table hashes as it always did.
                 'repeat_layout' => ($data['repeat_layout'] ?? null) === 'table' ? 'table' : null, 'page_width' => ($data['page_width'] ?? null) === 'wide' ? 'wide' : null,
+                // M249 (`progress-chapters`, `D233`): trimmed, and blank is none — so a section never given either hashes as it did.
+                'chapter' => self::plainOrNull($data['chapter'] ?? null),
+                'progress_label' => self::plainOrNull($data['progress_label'] ?? null),
                 'relevant_expression' => $data['relevant_expression'] ?? null,
-            ])->save();
+            ]);
+            // M249: an imported chapter's names in other languages go when the section stops starting it, so a snapshot never
+            // carries translations of a chapter that is not there.
+            if ($section->chapter === null) {
+                $section->chapter_translations = null;
+            }
+            $section->save();
 
             return $section->refresh();
         });
@@ -1286,5 +1295,15 @@ final class FormBuilderService
                 return $candidate;
             }
         }
+    }
+
+    /**
+     * M249: a plain-text section setting as stored — trimmed, and blank as null.
+     */
+    private static function plainOrNull(mixed $value): ?string
+    {
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text === '' ? null : $text;
     }
 }

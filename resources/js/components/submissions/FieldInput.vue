@@ -56,6 +56,8 @@ export interface CascadeOption {
 export interface MatrixOption {
     value: string;
     label: string;
+    /** M249 (`D233`): what a closed dropdown cell shows while this choice is chosen; absent shows `label`. */
+    shortLabel?: string | null;
 }
 
 // M183 (`R-5033e87e`): a matrix column carries its type, its choices (its own, else the cells) and its required flag;
@@ -141,7 +143,8 @@ export interface EncodeField {
     hint: string | null;
     placeholder: string | null;
     required: boolean;
-    options: { value: string; label: string }[];
+    // M249 (`D233`): `shortLabel` is what a closed dropdown shows while that choice is chosen (resolved for the locale).
+    options: { value: string; label: string; shortLabel?: string | null }[];
     // Cascading-select hierarchy (Increment G4a); labels already resolved to the active locale by the caller.
     // M186 (`R-70c7673a`): `skip_single` — a level with one choice under the one picked above is filled in for the person.
     cascade?: { levels: CascadeLevel[]; options: CascadeOption[]; skip_single?: boolean } | null;
@@ -389,7 +392,7 @@ function passesNarrowing(filter: NarrowingSet | undefined, option: { value: stri
 
 const flatNarrowing = computed<NarrowingSet | undefined>(() => narrowing.value.find((filter) => filter.level === null));
 /** A choice question's options as shown: the narrowed ones, and whatever the answer already holds. */
-const shownOptions = computed<{ value: string; label: string }[]>(() => {
+const shownOptions = computed<{ value: string; label: string; shortLabel?: string | null }[]>(() => {
     const filter = flatNarrowing.value;
     if (filter === undefined || filter.values === null) return props.field.options;
     const held = new Set([stringValue.value, ...listValue.value]);
@@ -622,7 +625,8 @@ function setCascadeLevel(index: number, value: string): void {
             :id="id"
             :model-value="stringValue"
             :options="shownOptions"
-            placeholder="Select an option"
+            :placeholder="field.placeholder || 'Select an option'"
+            :clearable="marker !== 'required'"
             :describedby="describedby"
             :invalid="invalid"
             @update:model-value="emit('update:modelValue', $event)"

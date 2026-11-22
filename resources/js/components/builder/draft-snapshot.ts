@@ -146,6 +146,13 @@ function requiredModeOf(value: string): RequiredMode {
  * `null` unless the expression parses. A blank expression is not a failure — it is the ordinary state of
  * a field with no condition — so it yields `null` with no issue recorded.
  */
+/** M249: a plain-text section setting as the server stores it — trimmed, and blank (or absent) as null. */
+function blankAsNull(value: string | null | undefined): string | null {
+    const text = (value ?? '').trim();
+
+    return text === '' ? null : text;
+}
+
 function parsedOrNull(expression: string | null, onFailure: () => void): string | null {
     if (expression === null || expression.trim() === '') return null;
 
@@ -353,6 +360,10 @@ export function projectDraft(input: DraftProjectionInput): DraftProjection {
             max_instances: s.max_instances,
             repeat_layout: s.repeat_layout === 'table' ? 'table' : null,
             page_width: s.page_width === 'wide' ? 'wide' : null,
+            // M249 (`D233`): as the server stores them — trimmed, blank as none; the builder holds no translations.
+            chapter: blankAsNull(s.chapter),
+            chapter_translations: null,
+            progress_label: blankAsNull(s.progress_label),
             relevant_expression: parsedOrNull(s.relevant_expression, () =>
                 add(s.uid, key, 'unparsable_expression', 'This section’s condition is not finished yet, so it is being ignored in the preview.'),
             ),

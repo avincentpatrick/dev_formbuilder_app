@@ -89,6 +89,34 @@ export function resolveText(base: string, translations: Record<string, string> |
     return value !== undefined && value !== '' ? value : base;
 }
 
+/**
+ * M249 (`D233`): a SHORT form shown beside a text that may be translated — a page's progress label beside its title, a
+ * choice's short label beside its label. Its own translation for the locale wins; failing that it is used only when the
+ * full text has no translation there either, so a short default-language word never sits beside a translated page or
+ * choice. Null means "show the full text".
+ */
+export function resolveShort(
+    short: string | null,
+    shortTranslations: Record<string, string> | null,
+    fullTranslations: Record<string, string> | null,
+    locale: string,
+): string | null {
+    const own = shortTranslations?.[locale];
+    if (own !== undefined && own !== '') {
+        return own;
+    }
+    const full = fullTranslations?.[locale];
+
+    return full !== undefined && full !== '' ? null : short;
+}
+
+/** M249: a plain-text setting as the server stores it — trimmed, and blank (or absent) as null. */
+export function blankAsNull(value: string | null | undefined): string | null {
+    const text = (value ?? '').trim();
+
+    return text === '' ? null : text;
+}
+
 export function resolveOptional(
     base: string | null,
     translations: Record<string, string> | null,
@@ -148,9 +176,36 @@ function buildOptions(field: RawField): RenderOption[] {
             value,
             label: option.label !== undefined && option.label !== null ? String(option.label) : value,
             labelTranslations: option.label_translations ?? null,
+            ...shortLabelOf(option),
         });
     }
     return out;
+}
+
+/** M249: a stored choice's short label and its translations, or nothing when it has none. */
+function shortLabelOf(option: unknown): Pick<RenderOption, 'shortLabel' | 'shortLabelTranslations'> {
+    const raw = option as { short_label?: unknown; short_label_translations?: unknown };
+    const short = typeof raw.short_label === 'string' ? raw.short_label.trim() : '';
+    if (short === '') {
+        return {};
+    }
+    const translations = raw.short_label_translations;
+
+    return {
+        shortLabel: short,
+        shortLabelTranslations: translations !== null && typeof translations === 'object' && !Array.isArray(translations) ? (translations as Record<string, string>) : null,
+    };
+}
+
+/**
+ * A choice as a control draws it: its label in the locale and, when it has one the locale may show, its short label
+ * (M249, `resolveShort()`). Option labels are never piped (`FieldControl.vue`).
+ */
+export function controlOption(option: RenderOption, locale: string): { value: string; label: string; shortLabel?: string } {
+    const label = resolveText(option.label, option.labelTranslations, locale);
+    const short = resolveShort(option.shortLabel ?? null, option.shortLabelTranslations ?? null, option.labelTranslations, locale);
+
+    return short === null ? { value: option.value, label } : { value: option.value, label, shortLabel: short };
 }
 
 /** The `config.options[].value` set (as strings) the engine membership check reads. Mirror of PHP's optionValueSet. */
@@ -270,7 +325,7 @@ export interface ResolvedMatrixColumn {
     value: string;
     label: string;
     type?: string;
-    options?: { value: string; label: string }[];
+    options?: { value: string; label: string; shortLabel?: string }[];
     required?: boolean;
 }
 
@@ -283,13 +338,14 @@ export interface ResolvedMatrixColumn {
 export function resolveMatrix(
     matrix: RenderMatrix | null,
     locale: string,
-): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked'; rowDetails?: Record<string, unknown[]> } | null {
+): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string; shortLabel?: string }[]; layout: 'table' | 'stacked'; rowDetails?: Record<string, unknown[]> } | null {
     if (matrix === null) {
         return null;
     }
 
-    const resolve = (options: RenderOption[]): { value: string; label: string }[] =>
-        options.map((option) => ({ value: option.value, label: resolveText(option.label, option.labelTranslations, locale) }));
+    // M249: a choice keeps its short label (what a closed dropdown cell shows), when it has one the locale may show.
+    const resolve = (options: RenderOption[]): { value: string; label: string; shortLabel?: string }[] =>
+        options.map((option) => controlOption(option, locale));
 
     const columns = matrix.columns.map((column): ResolvedMatrixColumn => ({
         value: column.value,
@@ -415,6 +471,7 @@ function optionPairs(raw: unknown): RenderOption[] {
             value: String(value),
             label: label !== undefined && label !== null ? String(label) : String(value),
             labelTranslations: (option as { label_translations?: Record<string, string> | null }).label_translations ?? null,
+            ...shortLabelOf(option),
         });
     }
 
@@ -630,6 +687,10 @@ function toRenderSection(section: RawSection): RenderSection {
         minInstances: section.min_instances ?? null,
         maxInstances: section.max_instances ?? null,
         repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards', pageWidth: section.page_width === 'wide' ? 'wide' : 'normal',
+        // M249 (`D233`): blank is none, as the server stores it.
+        chapter: blankAsNull(section.chapter),
+        chapterTranslations: section.chapter_translations ?? null,
+        progressLabel: blankAsNull(section.progress_label),
         relevantExpression: section.relevant_expression,
     };
 }

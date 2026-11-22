@@ -30,6 +30,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $min_instances
  * @property int|null $max_instances
  * @property string|null $relevant_expression
+ * @property string|null $chapter
+ * @property ?array<string, string> $chapter_translations
+ * @property string|null $progress_label
  */
 class FormSection extends Model implements TenantScoped
 {
@@ -58,6 +61,11 @@ class FormSection extends Model implements TenantScoped
         'repeat_layout',
         // M247 (`D231`): `wide` widens the respondent's page while this section is on screen; null is the reading width.
         'page_width',
+        // M249 (`progress-chapters`, `D233`): the name of the chapter this section STARTS (null starts none), its names per
+        // language (XLSForm import only), and a short name for its page on the progress bar in place of its title.
+        'chapter',
+        'chapter_translations',
+        'progress_label',
         'relevant_expression',
     ];
 
@@ -69,6 +77,7 @@ class FormSection extends Model implements TenantScoped
         return [
             'label_translations' => 'array',
             'description_translations' => 'array',
+            'chapter_translations' => 'array',
             'sequence' => 'integer',
             'is_repeatable' => 'boolean',
             'min_instances' => 'integer',

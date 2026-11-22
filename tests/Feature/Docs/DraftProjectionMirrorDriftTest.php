@@ -104,5 +104,5 @@ it('holds a member count floor, so a parser that degrades cannot pass', function
     // matching two members instead of seventeen fails here rather than reporting a clean mirror.
     expect(rawInterfaceMembers('RawField'))->toHaveCount(17)
         ->and(rawInterfaceMembers('RawValidation'))->toHaveCount(10)
-        ->and(rawInterfaceMembers('RawSection'))->toHaveCount(12);
+        ->and(rawInterfaceMembers('RawSection'))->toHaveCount(15); // M249: + chapter, chapter_translations, progress_label
 });

@@ -88,7 +88,21 @@ final class XlsformExporter
             $this->emitField($field, $locale, $langs, $survey, $choices, $listsSeen);
         }
 
+        // M249 (`progress-chapters`, `D233`): a chapter is an outer group around the sections it holds — the way ODK and Kobo
+        // name a run of pages — which the import folds back into a chapter. Pages before the first chapter stay flat.
+        $chapterNames = self::chapterGroupNames($sections, $fields);
+        $openChapter = null;
         foreach ($sections as $section) {
+            if (is_string($section['chapter'] ?? null) && $section['chapter'] !== '') {
+                if ($openChapter !== null) {
+                    $survey[] = ['type' => 'end group', 'name' => $openChapter];
+                }
+                $openChapter = $chapterNames[(string) $section['key']];
+                $row = ['type' => 'begin group', 'name' => $openChapter];
+                $this->fillText($row, 'label', $section['chapter'], $section['chapter_translations'] ?? null, $langs);
+                $row['relevant'] = '';
+                $survey[] = $row;
+            }
             $survey[] = $this->sectionRow($section, $locale, $langs, true);
             $sectionFields = $bySection[(string) $section['key']] ?? [];
             usort($sectionFields, $this->bySectionSequence(...));
@@ -96,6 +110,9 @@ final class XlsformExporter
                 $this->emitField($field, $locale, $langs, $survey, $choices, $listsSeen);
             }
             $survey[] = $this->sectionRow($section, $locale, $langs, false);
+        }
+        if ($openChapter !== null) {
+            $survey[] = ['type' => 'end group', 'name' => $openChapter];
         }
 
         // M246 (`R-ffd10da2`): a grid's cells are questions of their own here, so every `${grid.row.col}` — in a condition,
@@ -105,7 +122,7 @@ final class XlsformExporter
 
         return [
             'survey' => ['headers' => $this->surveyHeaders($langs), 'rows' => $survey],
-            'choices' => ['headers' => $this->choicesHeaders($langs, $hasCascade), 'rows' => $choices],
+            'choices' => ['headers' => $this->choicesHeaders($langs, $hasCascade, self::anyShortLabel($choices)), 'rows' => $choices],
             'settings' => $this->settingsSheet($form, $version, $locale),
         ];
     }
@@ -524,6 +541,37 @@ final class XlsformExporter
     }
 
     /**
+     * M249: the name of each chapter's outer group, keyed by the section that starts it — `ch_<section key>`, counted up
+     * past any section or question already holding that name, so the sheet's names stay distinct.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @param  list<array<string, mixed>>  $fields
+     * @return array<string, string>
+     */
+    private static function chapterGroupNames(array $sections, array $fields): array
+    {
+        $used = [];
+        foreach ([...$sections, ...$fields] as $entry) {
+            $used[(string) ($entry['key'] ?? '')] = true;
+        }
+        $names = [];
+        foreach ($sections as $section) {
+            if (! is_string($section['chapter'] ?? null) || $section['chapter'] === '') {
+                continue;
+            }
+            $base = 'ch_'.$section['key'];
+            $name = $base;
+            for ($n = 2; isset($used[$name]); $n++) {
+                $name = $base.'_'.$n;
+            }
+            $used[$name] = true;
+            $names[(string) $section['key']] = $name;
+        }
+
+        return $names;
+    }
+
+    /**
      * A group/repeat boundary row for a section. `$open` chooses begin/end; a repeat carries its
      * relevant + a static `repeat_count`.
      *
@@ -565,7 +613,7 @@ final class XlsformExporter
     }
 
     /**
-     * @param  list<array{value: string, label: string, translations?: mixed}>  $pairs
+     * @param  list<array{value: string, label: string, translations?: mixed, short?: ?string}>  $pairs
      * @param  list<string>  $langs
      * @param  list<array<string, scalar|null>>  $choices
      * @param  array<string, true>  $listsSeen
@@ -580,8 +628,28 @@ final class XlsformExporter
         foreach ($pairs as $pair) {
             $row = ['list_name' => $listName, 'name' => $pair['value']];
             $this->fillText($row, 'label', $pair['label'], $pair['translations'] ?? null, $langs);
+            // M249 (`D233`): a choice's short label, in the form's own language — a column ODK and Kobo pass over.
+            if (($pair['short'] ?? null) !== null) {
+                $row['short_label'] = $pair['short'];
+            }
             $choices[] = $row;
         }
+    }
+
+    /**
+     * M249: whether any choice row carries a short label, which earns the sheet its `short_label` column.
+     *
+     * @param  list<array<string, scalar|null>>  $choices
+     */
+    private static function anyShortLabel(array $choices): bool
+    {
+        foreach ($choices as $row) {
+            if (array_key_exists('short_label', $row)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -670,11 +738,15 @@ final class XlsformExporter
      * @param  list<string>  $langs
      * @return list<string>
      */
-    private function choicesHeaders(array $langs, bool $hasCascade): array
+    private function choicesHeaders(array $langs, bool $hasCascade, bool $hasShortLabel = false): array
     {
         $headers = ['list_name', 'name', 'label'];
         foreach ($langs as $lang) {
             $headers[] = 'label::'.$lang;
+        }
+        // M249: after the labels, before the cascade's columns.
+        if ($hasShortLabel) {
+            $headers[] = 'short_label';
         }
         if ($hasCascade) {
             $headers[] = 'level';
@@ -714,7 +786,7 @@ final class XlsformExporter
      * A `{value,label,translations}` list from a config option-array key (`options`/`rows`/`columns`/`cells`).
      *
      * @param  array<string, mixed>  $config
-     * @return list<array{value: string, label: string, translations: mixed}>
+     * @return list<array{value: string, label: string, translations: mixed, short: ?string}>
      */
     private function pairs(array $config, string $key): array
     {
@@ -725,10 +797,13 @@ final class XlsformExporter
                 continue;
             }
             $value = (string) ($entry['value'] ?? '');
+            $short = is_string($entry['short_label'] ?? null) ? trim($entry['short_label']) : '';
             $pairs[] = [
                 'value' => $value,
                 'label' => (string) ($entry['label'] ?? $value),
                 'translations' => $entry['label_translations'] ?? null,
+                // M249 (`D233`): a dropdown choice's short label; null when it has none.
+                'short' => $short === '' ? null : $short,
             ];
         }
 
@@ -755,6 +830,7 @@ final class XlsformExporter
 
         foreach ($sections as $section) {
             $collect($section['label_translations'] ?? null);
+            $collect($section['chapter_translations'] ?? null);
         }
         foreach ($fields as $field) {
             $collect($field['label_translations'] ?? null);

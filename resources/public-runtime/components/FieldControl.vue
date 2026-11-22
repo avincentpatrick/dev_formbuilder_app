@@ -7,7 +7,7 @@
  */
 import { computed, inject } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
-import { resolveCascade, resolveMatrix, resolveText } from '../lib/schema-mapping';
+import { controlOption, resolveCascade, resolveMatrix } from '../lib/schema-mapping';
 import { useRuntime, OfflineMediaKey, UploadUrlKey } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -29,10 +29,8 @@ const encodeField = computed<EncodeField>(() => ({
     hint: runtime.hintFor(props.field),
     placeholder: runtime.placeholderFor(props.field),
     required: marker.value === 'required',
-    options: props.field.options.map((o) => ({
-        value: o.value,
-        label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
-    })),
+    // M249 (`D233`): a choice keeps its short label — what a closed dropdown shows — when the locale may show it.
+    options: props.field.options.map((o) => controlOption(o, runtime.locale.value)),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
     matrix: resolveMatrix(props.field.matrix, runtime.locale.value),
     // Geo capture config (Increment G5b2) is labels-free, so it passes straight through with no resolution.

@@ -203,6 +203,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.options.*.parent' => 'choice parent',
             'config.options.*.label_translations' => 'choice label translations',
             'config.options.*.label_translations.*' => 'choice label translation',
+            ...self::shortLabelNames('config.options.*', 'choice'),
             'config.options_source' => 'choices source',
             'config.options_source.form_id' => 'source form',
             'config.options_source.field_key' => 'source question',
@@ -247,6 +248,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.columns.*.options.*.label' => 'column choice label',
             'config.columns.*.options.*.label_translations' => 'column choice label translations',
             'config.columns.*.options.*.label_translations.*' => 'column choice label translation',
+            ...self::shortLabelNames('config.columns.*.options.*', 'column choice'),
             // M185 — where a grid's rows, its shared cells and a column's choices come from.
             'config.rows_list' => 'rows list',
             'config.rows_source' => 'rows source',
@@ -266,6 +268,7 @@ final class UpdateFieldRequest extends FormRequest
             'config.cells.*.label' => 'cell label',
             'config.cells.*.label_translations' => 'cell label translations',
             'config.cells.*.label_translations.*' => 'cell label translation',
+            ...self::shortLabelNames('config.cells.*', 'cell'),
             // Hidden, and a note.
             'config.prefill_source' => 'value source',
             'config.url_param' => 'URL parameter',
@@ -358,12 +361,12 @@ final class UpdateFieldRequest extends FormRequest
                 'config.columns.*.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.columns.*.options.*.label' => ['nullable', 'string', 'max:500'],
                 'config.columns.*.options.*.label_translations' => ['sometimes', 'array'],
-                'config.columns.*.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                'config.columns.*.options.*.label_translations.*' => ['nullable', 'string', 'max:500'], ...self::shortLabelRules('config.columns.*.options.*'),
                 'config.cells' => ['sometimes', 'array'],
                 'config.cells.*.value' => ['nullable', 'string', 'max:255'],
                 'config.cells.*.label' => ['nullable', 'string', 'max:500'],
                 'config.cells.*.label_translations' => ['sometimes', 'array'],
-                'config.cells.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                'config.cells.*.label_translations.*' => ['nullable', 'string', 'max:500'], ...self::shortLabelRules('config.cells.*'),
                 // M183 (`R-1c1d7266`): cards at every width instead of a table where one fits; absent = the table.
                 'config.layout' => ['nullable', Rule::in(['table', 'stacked'])],
                 // M185 (`R-bb79aec0`, `D161`): the rows, the shared cells and a column's choices from a list file or another
@@ -408,7 +411,7 @@ final class UpdateFieldRequest extends FormRequest
                 'config.options.*.value' => ['nullable', 'string', 'max:255'],
                 'config.options.*.label' => ['nullable', 'string', 'max:500'],
                 'config.options.*.label_translations' => ['sometimes', 'array'],
-                'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'],
+                'config.options.*.label_translations.*' => ['nullable', 'string', 'max:500'], ...self::shortLabelRules('config.options.*'),
                 // M133: choices taken from another form's answers — shape only; whether the link can serve is publish's.
                 'config.options_source' => ['sometimes', 'nullable', 'array:form_id,field_key'],
                 'config.options_source.form_id' => ['nullable', 'uuid'],
@@ -567,6 +570,35 @@ final class UpdateFieldRequest extends FormRequest
             'config.columns.*.relevant' => 'column condition',
             'config.columns.*.needed_when' => 'when this column is needed',
             'config.columns.*.required_when' => 'when this column is required',
+        ];
+    }
+
+    /**
+     * M249 (`dropdown-placeholder`, `D233`): a choice's short label — what a closed dropdown shows while it is chosen —
+     * and its names per language (XLSForm import only). Ruled, or `validated()` would strip them (M111).
+     *
+     * @return array<string, list<string>>
+     */
+    private static function shortLabelRules(string $choice): array
+    {
+        return [
+            $choice.'.short_label' => ['nullable', 'string', 'max:60'],
+            $choice.'.short_label_translations' => ['sometimes', 'nullable', 'array'],
+            $choice.'.short_label_translations.*' => ['nullable', 'string', 'max:60'],
+        ];
+    }
+
+    /**
+     * M249: the words a refusal uses for a choice's short label.
+     *
+     * @return array<string, string>
+     */
+    private static function shortLabelNames(string $choice, string $noun): array
+    {
+        return [
+            $choice.'.short_label' => $noun.' short label',
+            $choice.'.short_label_translations' => $noun.' short label translations',
+            $choice.'.short_label_translations.*' => $noun.' short label translation',
         ];
     }
 }

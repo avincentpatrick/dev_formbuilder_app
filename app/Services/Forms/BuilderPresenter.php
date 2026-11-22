@@ -256,6 +256,9 @@ final class BuilderPresenter
             'repeat_layout' => $section->repeat_layout,
             // M247 (`D231`): `wide` or null (the reading width).
             'page_width' => $section->page_width,
+            // M249 (`D233`): the chapter this section starts, and its page's short name on the progress bar — each null when unset.
+            'chapter' => $section->chapter,
+            'progress_label' => $section->progress_label,
             'relevant_expression' => $section->relevant_expression,
             'sequence' => $section->sequence,
             'version' => FormBuilderService::rowVersion($section),
@@ -398,6 +401,11 @@ final class BuilderPresenter
             'linked_choice_types' => array_map(static fn (FieldType $type): string => $type->value, LinkedChoiceService::LINKABLE_TYPES),
             // M177 (`R-71509975`): the types whose Options tab offers "Other, please specify" — transmitted, never listed in the client.
             'other_specify_types' => array_map(static fn (FieldType $type): string => $type->value, OtherSpecify::types()),
+            // M249 (`D233`): the types whose Options tab offers a short label per choice (`FieldType::takesShortLabels()`).
+            'short_label_types' => array_values(array_map(
+                static fn (FieldType $type): string => $type->value,
+                array_filter(FieldType::cases(), static fn (FieldType $type): bool => $type->takesShortLabels()),
+            )),
             // M134 (`R-910d2286`) — what a condition may compare a question of each kind with, from `OperandKind`'s own
             // methods: the condition editor offers a subset of what the publish gate accepts, and never restates it.
             'operand_kinds' => array_map(static fn (OperandKind $kind): array => [

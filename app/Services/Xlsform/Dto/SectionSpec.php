@@ -17,6 +17,7 @@ final class SectionSpec
     /**
      * @param  array<string, string>|null  $labelTranslations
      * @param  array<string, string>|null  $descriptionTranslations
+     * @param  array<string, string>|null  $chapterTranslations
      */
     public function __construct(
         public string $key,
@@ -29,5 +30,8 @@ final class SectionSpec
         public ?int $minInstances = null,
         public ?int $maxInstances = null,
         public ?string $relevantExpression = null,
+        // M249 (`D233`): the chapter this section starts — an outer group made only of groups, folded onto its first.
+        public ?string $chapter = null,
+        public ?array $chapterTranslations = null,
     ) {}
 }

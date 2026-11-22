@@ -2150,6 +2150,9 @@ function sectionPayload(section: LocalSection): Record<string, unknown> {
         repeat_layout: section.repeat_layout ?? null,
         // M247 (`D231`): a wide page, or null for the reading width.
         page_width: section.page_width === 'wide' ? 'wide' : null,
+        // M249 (`D233`): sent as typed; the server trims it and stores a blank as none.
+        chapter: section.chapter ?? null,
+        progress_label: section.progress_label ?? null,
         relevant_expression: section.relevant_expression,
         version: section.version,
     };

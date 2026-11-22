@@ -39,10 +39,12 @@ import {
     buildTemplateSources,
     fieldRendersNothing,
     resolveOptional,
+    resolveShort,
     resolveText,
     toSemanticInput,
     type EngineSchema,
 } from '../lib/schema-mapping';
+import { chaptersOf, type Chapter } from '../lib/chapters';
 import { buildDefaults, type Defaults } from '../lib/defaults';
 import { buildPrefill } from '../lib/prefill';
 import { randomUuid, uuidv7 } from '../lib/uuid';
@@ -194,6 +196,11 @@ export interface FormRuntime {
     readonly erroredItems: ComputedRef<ErroredItem[]>;
 
     readonly visibleSteps: ComputedRef<RuntimeStep[]>;
+    /**
+     * M249 (`progress-chapters`, `D233`): the visible steps grouped into the chapters the form's sections start, or null
+     * when no section starts one — the progress bar then draws exactly what it drew before chapters existed.
+     */
+    readonly chapters: ComputedRef<Chapter<RuntimeStep>[] | null>;
     readonly currentStepKey: Ref<string>;
     /**
      * Increment M124 — the step a saved draft records: the BLOCK the respondent is in (a section key, or
@@ -235,6 +242,12 @@ export interface FormRuntime {
     placeholderFor(field: RenderField, scope?: RepeatScope): string | null;
     sectionTitleFor(section: RenderSection): string;
     sectionDescriptionFor(section: RenderSection): string | null;
+    /**
+     * M249: the name a step is shown and announced under on the progress bar — its section's progress label when it has
+     * one the locale may show, else its title PIPED as the heading is (`progress-title-unpiped`), plus " (continued)" on
+     * a later page of the section. Null for the lead block, which has no title.
+     */
+    progressTextFor(step: RuntimeStep): string | null;
     templateText(base: string, translations: Record<string, string> | null, scope?: RepeatScope): string;
     templateOptional(base: string | null, translations: Record<string, string> | null, scope?: RepeatScope): string | null;
 
@@ -1016,6 +1029,21 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         return templateOptional(section.description, section.descriptionTranslations);
     }
 
+    const sectionsByKey = new Map(renderModel.sections.map((section) => [section.key, section]));
+
+    function progressTextFor(step: RuntimeStep): string | null {
+        const section = step.sectionKey === null ? undefined : sectionsByKey.get(step.sectionKey);
+        if (section === undefined) {
+            return stepTitle(step);
+        }
+        // The progress label is plain text with no translations of its own: shown unless the title is translated here.
+        const text = resolveShort(section.progressLabel, null, section.labelTranslations, locale.value) ?? sectionTitleFor(section);
+
+        return step.continuation ? `${text} (continued)` : text;
+    }
+
+    const chapters = computed(() => chaptersOf(renderModel.sections, visibleSteps.value, locale.value));
+
     const erroredFields = computed(() =>
         renderModel.fields.filter(
             (f) => (f.sectionKey === null || !repeatSectionKeys.has(f.sectionKey)) && errorFor(f.key) !== undefined,
@@ -1447,6 +1475,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         erroredFields,
         erroredItems,
         visibleSteps,
+        chapters,
         currentStepKey,
         resumeStepKey,
         currentStepIndex,
@@ -1472,6 +1501,7 @@ export function createFormRuntime(schema: SchemaResponse, opts: RuntimeOptions =
         placeholderFor,
         sectionTitleFor,
         sectionDescriptionFor,
+        progressTextFor,
         templateText,
         templateOptional,
         membersOf,

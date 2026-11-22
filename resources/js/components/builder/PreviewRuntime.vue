@@ -40,6 +40,7 @@ import { AnnouncerKey, RuntimeKey } from '../../../public-runtime/composables/co
 import { createFormRuntime } from '../../../public-runtime/composables/useFormRuntime';
 import type { RuntimeStep } from '../../../public-runtime/composables/useFormRuntime';
 import type { AnswerMap, RenderField, RenderModel, RenderSection, SchemaResponse } from '../../../public-runtime/lib/types';
+import { chapterOfStep, chaptersOf } from '../../../public-runtime/lib/chapters';
 import { ContentHeadingBaseKey } from '../submissions/note-content';
 import type { ProjectionIssue } from './draft-snapshot';
 import AddQuestionHere from './AddQuestionHere.vue';
@@ -204,6 +205,17 @@ const position = computed(() => {
     return index < 0 ? null : { index, total: steps.value.length };
 });
 
+/**
+ * M249 (`D233`): the chapter the page on screen belongs to, read from the LIVE model — a chapter ticked or renamed a moment
+ * ago shows at once — and grouped over the frozen engine's steps, which are only asked which pages are visible. The
+ * pages before the first chapter have no name here.
+ */
+const chapter = computed(() => {
+    const chapters = chaptersOf(props.model.sections, steps.value, runtime.locale.value);
+
+    return chapters === null ? null : (chapterOfStep(chapters, step.value?.key)?.chapter.name ?? null);
+});
+
 const stripOptions = computed(() => previewStepLabels(steps.value, props.model, runtime.sectionTitleFor));
 
 /**
@@ -344,7 +356,7 @@ function go(delta: number): void {
             >
                 Back
             </MdsButton>
-            <span class="preview__position">Page {{ position.index + 1 }} of {{ position.total }}</span>
+            <span class="preview__position"><template v-if="chapter">{{ chapter }} · </template>Page {{ position.index + 1 }} of {{ position.total }}</span>
             <MdsButton
                 v-if="position.index < position.total - 1"
                 type="button"

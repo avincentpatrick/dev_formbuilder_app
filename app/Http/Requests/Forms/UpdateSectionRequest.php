@@ -34,10 +34,36 @@ final class UpdateSectionRequest extends FormRequest
             'repeat_layout' => ['nullable', 'string', Rule::in(['cards', 'table'])],
             // M247 (`grid-wide-sticky-explorer`, `D231`): `wide` widens the respondent's page while this section is on screen.
             'page_width' => ['nullable', 'string', Rule::in(['wide'])],
+            // M249 (`progress-chapters`, `D233`): the name of the chapter this section starts, and its page's short name on the
+            // progress bar. Plain text — never piped, so a `${…}` would show as typed — and blank is saved as none.
+            'chapter' => ['nullable', 'string', 'max:60', 'not_regex:/\$\{/'],
+            'progress_label' => ['nullable', 'string', 'max:60', 'not_regex:/\$\{/'],
             'relevant_expression' => ['nullable', 'string', 'max:2000'],
             // M196 (`R-036f3226`, `D189`): required — a save without the token it last read is refused, not taken as an overwrite.
             'version' => ['required', 'string'],
         ];
+    }
+
+    /**
+     * M249: the words a refusal uses for the two progress-bar settings.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ['chapter' => 'chapter name', 'progress_label' => 'progress label'];
+    }
+
+    /**
+     * M249: a `${…}` is refused in words that say why, rather than "the format is invalid".
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        $plain = 'The :attribute is shown as typed, so it cannot hold an answer (${…}).';
+
+        return ['chapter.not_regex' => $plain, 'progress_label.not_regex' => $plain];
     }
 
     public function withValidator(Validator $validator): void

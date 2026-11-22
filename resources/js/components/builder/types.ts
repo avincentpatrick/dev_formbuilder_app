@@ -107,6 +107,10 @@ export interface ServerSection {
     max_instances: number | null;
     /** M185 (`R-0a7275ce`): `table` draws a repeatable section as a table; null (or absent, in an older fixture) is the cards. */
     repeat_layout?: 'table' | 'cards' | null; page_width?: 'wide' | null; // M247 (`D231`): `wide` widens the respondent's page while this section is on screen.
+    /** M249 (`D233`): the name of the chapter this section starts on the progress bar; null (or absent) starts none. */
+    chapter?: string | null;
+    /** M249: a short name for this section's page on the progress bar, in place of its title; null (or absent) is the title. */
+    progress_label?: string | null;
     relevant_expression: string | null;
     sequence: number;
     version: string | null;
@@ -273,6 +277,9 @@ export interface BuilderEnums {
     // M177 (`R-71509975`) — the types whose Options tab offers "Other, please specify" (`OtherSpecify::types()`). Optional so
     // a hand-built enums payload in a test may carry none; absent reads as no type offering it.
     other_specify_types?: string[];
+    // M249 (`D233`) — the types whose Options tab offers a short label per choice (`FieldType::takesShortLabels()`).
+    // Optional: a hand-built enums payload in a test may carry none, which offers it nowhere.
+    short_label_types?: string[];
     // M134 (`R-910d2286`) — one row per `OperandKind`, what the condition editor may offer. Optional: a hand-built
     // enum block in a test offers none, and the editor then filters nothing.
     operand_kinds?: OperandKindOption[];

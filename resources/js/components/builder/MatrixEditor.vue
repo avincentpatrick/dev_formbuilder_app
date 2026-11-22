@@ -243,6 +243,7 @@ const cellChoiceUsers = computed(() =>
                             prefix="choice"
                             hint="Leave this empty to use the Cell choices below."
                             :options="option.options ?? []"
+                            :short-labels="typeOf(option) === 'single_select'"
                             @update:options="setOptions(index, $event)"
                         />
                     </div>
@@ -263,8 +264,9 @@ const cellChoiceUsers = computed(() =>
             heading="Cell choices"
             singular="Choice"
             prefix="cell"
-            hint="The choices of every choice column that has no list of its own."
+            hint="The choices of every choice column that has no list of its own. A short label is what a closed dropdown cell shows."
             :options="cells"
+            short-labels
             @update:options="emit('update:cells', $event)"
         />
         <p class="matrix-editor__users" data-cell-choices-users>

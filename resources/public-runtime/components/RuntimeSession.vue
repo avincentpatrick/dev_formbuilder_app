@@ -220,7 +220,8 @@ onMounted(async () => {
 
 // Increment H21b — where the resume cursor landed, and the step it landed on, for the banner's explanation.
 const stepResolution = ref<StepResolution | null>(null);
-const resumeStepTitle = computed(() => runtime.currentStep.value?.title ?? null);
+// M249: named as the progress bar names it — its progress label, or its title piped as the heading is.
+const resumeStepTitle = computed(() => (runtime.currentStep.value ? runtime.progressTextFor(runtime.currentStep.value) : null));
 
 onBeforeUnmount(() => autosave.dispose());
 

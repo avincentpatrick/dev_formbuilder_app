@@ -930,6 +930,12 @@ const reference: ChapterDraft[] = [
                     list(
                         [ui('Basics', CONFIG), ': ', ui('Section title', CONFIG), ' (the heading respondents see), ', ui('Section key', CONFIG), ' (its short name) and ', ui('Description', CONFIG), '.'],
                         [
+                            ui('Progress label', CONFIG), ' is a short name for the page on the progress bar, shown there instead of a long title. ',
+                            ui('Starts a chapter', CONFIG), ' begins a named chapter: the pages after it belong to it until the next page that starts one. ',
+                            'With chapters, the progress bar shows each chapter as a mark and the pages of the one you are in, instead of a dot for every page — useful on a long form. ',
+                            'A copied section never starts a chapter of its own.',
+                        ],
+                        [
                             ui('Advanced', CONFIG), ': ', ui('Repeatable group', CONFIG), ' lets respondents fill the section in more than once — one entry per household member, for example. ',
                             ui('Min instances', CONFIG), ' and ', ui('Max instances', CONFIG), ' set how many entries are allowed. ',
                             ui('Layout', REPEAT_LAYOUT), ' draws the entries as ', ui('A card per entry', REPEAT_LAYOUT), ', or as ', ui('A table, a row per entry', REPEAT_LAYOUT),

@@ -593,7 +593,7 @@ final class EncodeFormPresenter
     /**
      * A matrix's columns with their answer rules resolved (M183, {@see MatrixColumns}).
      *
-     * @return list<array{value: string, label: string, type: string, options: list<array{value: string, label: string}>, required: bool}>
+     * @return list<array{value: string, label: string, type: string, options: list<array{value: string, label: string, shortLabel?: string}>, required: bool}>
      */
     private function matrixColumns(FormField $field): array
     {
@@ -683,7 +683,7 @@ final class EncodeFormPresenter
      * A `config.<key>` option list ({value,label}[]) normalised to `{value,label}` pairs, skipping entries
      * with no value and defaulting a blank label to the value.
      *
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function optionPairs(FormField $field, string $configKey): array
     {
@@ -692,7 +692,7 @@ final class EncodeFormPresenter
 
     /**
      * @param  array<mixed>  $options
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function pairs(array $options): array
     {
@@ -702,17 +702,32 @@ final class EncodeFormPresenter
                 continue;
             }
             $value = (string) $option['value'];
-            $pairs[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+            $pairs[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value), ...self::shortLabelOf($option)];
         }
 
         return $pairs;
     }
 
     /**
+     * M249 (`dropdown-placeholder`, `D233`): a choice's short label — what a closed dropdown shows while it is chosen —
+     * as `shortLabel`, the member the shared `FieldInput` reads; nothing when it has none, so every other choice keeps its
+     * shape. This page shows the form's base language, so the short label's translations are not read.
+     *
+     * @param  array<mixed>  $option
+     * @return array{shortLabel?: string}
+     */
+    private static function shortLabelOf(array $option): array
+    {
+        $short = is_string($option['short_label'] ?? null) ? trim($option['short_label']) : '';
+
+        return $short === '' ? [] : ['shortLabel' => $short];
+    }
+
+    /**
      * The author-defined option list for choice fields, normalised to `{value,label}` pairs (shared with the
      * F7 read side via {@see SchemaValueFormatter}). Empty for non-choice types.
      *
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function options(FormField $field): array
     {
@@ -724,7 +739,18 @@ final class EncodeFormPresenter
             return $this->linkedOptions($field);
         }
 
-        return $this->formatter->options($field->config ?? []);
+        // M249: each choice keeps its short label, matched by value.
+        $short = [];
+        foreach ((array) data_get($field->config, 'options', []) as $option) {
+            if (is_array($option) && isset($option['value'])) {
+                $short[(string) $option['value']] = self::shortLabelOf($option);
+            }
+        }
+
+        return array_map(
+            static fn (array $pair): array => [...$pair, ...($short[$pair['value']] ?? [])],
+            $this->formatter->options($field->config ?? []),
+        );
     }
 
     /**

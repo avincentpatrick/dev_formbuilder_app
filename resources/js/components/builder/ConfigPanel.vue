@@ -569,6 +569,15 @@ function setRequiredRules(next: BuilderValidation[]): void {
 
     setValidations(merged.map((row, i) => ({ ...row, sequence: i })));
 }
+/**
+ * M249 (`D233`): the name a newly ticked "Starts a chapter" begins with — the section's title without any piped answer
+ * (a chapter name is plain text, and the save refuses `${…}`), cut to the 60 characters a chapter name may hold.
+ */
+function chapterSeed(title: string): string {
+    const plain = title.replace(/\$\{[^}]*\}/g, '').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+
+    return plain === '' ? 'Chapter' : plain;
+}
 function setSection<K extends keyof LocalSection>(key: K, value: LocalSection[K]): void {
     const target = section.value;
     if (!target) return;
@@ -715,7 +724,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="choiceSources" :filter-sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="choiceSources" :filter-sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" :allow-short-label="enums.short_label_types?.includes(field.field_type) === true" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"
@@ -976,6 +985,14 @@ watch(librarySaved, (value) => {
                     <template v-if="activeTab === 'basics'">
                         <MdsFormField label="Section title" v-slot="{ id }">
                             <ReferenceInput single-line :id="id" :candidates="sectionTextReferences" :model-value="section.label" @update:model-value="setSection('label', $event)" />
+                        </MdsFormField>
+                        <!-- M249 (`progress-chapters`, `D233`): the page's short name on the progress bar, and the chapter it starts. -->
+                        <MdsFormField label="Progress label" help="A short name for this page on the progress bar, shown there instead of the title. Leave it empty to use the title." v-slot="{ id, describedby }">
+                            <MdsTextInput :id="id" :describedby="describedby" :model-value="section.progress_label ?? ''" data-section-progress-label @update:model-value="setSection('progress_label', $event === '' ? null : $event)" />
+                        </MdsFormField>
+                        <MdsCheckbox :model-value="section.chapter != null" label="Starts a chapter" data-section-starts-chapter @update:model-value="setSection('chapter', $event ? chapterSeed(section.label) : null)" />
+                        <MdsFormField v-if="section.chapter != null" label="Chapter name" help="Shown on the progress bar. The pages after this one belong to this chapter until the next page that starts one. Plain words only." v-slot="{ id, describedby }">
+                            <MdsTextInput :id="id" :describedby="describedby" :model-value="section.chapter" data-section-chapter @update:model-value="setSection('chapter', $event)" />
                         </MdsFormField>
                         <MdsFormField label="Section key" help="This section's short name in exports and conditions. Lowercase letters, numbers and _ only." v-slot="{ id, describedby }">
                             <MdsTextInput

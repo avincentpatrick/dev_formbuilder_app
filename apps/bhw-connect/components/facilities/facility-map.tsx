@@ -76,8 +76,8 @@ export function FacilityMap({
           />
           <span>
             {formatCount(nBarangaysWithFacility)}{" "}
-            {nBarangaysWithFacility === 1 ? "barangay has" : "barangays have"} at least one facility
-            — bigger circle, more facilities
+            {nBarangaysWithFacility === 1 ? "barangay has" : "barangays have"} at least one
+            attributed facility — bigger circle, more facilities
           </span>
         </li>
         <li className="flex items-center gap-1.5">
@@ -88,7 +88,8 @@ export function FacilityMap({
           />
           <span>
             {formatCount(nBarangaysWithoutFacility)}{" "}
-            {nBarangaysWithoutFacility === 1 ? "barangay has" : "barangays have"} none
+            {nBarangaysWithoutFacility === 1 ? "barangay has" : "barangays have"} no attributed
+            facility
           </span>
         </li>
       </ul>

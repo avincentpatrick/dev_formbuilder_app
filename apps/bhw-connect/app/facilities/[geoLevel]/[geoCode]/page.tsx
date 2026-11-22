@@ -1,3 +1,4 @@
+import { facilitySearchQuery } from "@/lib/facilities/search";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
@@ -14,6 +15,7 @@ import {
   getNhfrStaticParams,
   getNhfrTypes,
   nhfrCaption,
+  nhfrAreaHref,
 } from "@/lib/db/nhfr";
 import { GEO_LEVELS, type GeoLevel } from "@/lib/filters/schema";
 import { formatCount } from "@/lib/format";
@@ -80,7 +82,14 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   return { title: geo.geoName, description };
 }
 
-export default async function FacilitiesAreaPage({ params }: { params: Promise<Params> }) {
+export default async function FacilitiesAreaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<{ facilitySearch?: string | string[] }>;
+}) {
+  const query = facilitySearchQuery((await searchParams).facilitySearch);
   const geo = await loadGeo(await params);
   if (!geo) notFound();
 
@@ -112,7 +121,11 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
   // ("how many, per area") answered by ChildBreakdown; a national canvas of 42,000 barangay dots
   // would be neither readable nor within the mobile payload budget (BUILD_PLAN §5).
   const pointData =
-    isCitymun && counts && barangays.length > 0
+    isCitymun &&
+    counts &&
+    facilities !== null &&
+    facilities.length === counts.nFacilities &&
+    barangays.length > 0
       ? buildFacilityPoints({
           barangays,
           centroids: ancestors.province
@@ -124,9 +137,6 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
       : null;
 
   const childHeading = CHILD_HEADING[geo.geoLevel];
-  const withoutFacility = counts
-    ? Math.max(0, counts.nBarangays - counts.nBarangaysWithFacility)
-    : 0;
 
   // Title-slide facts for presentation mode (serializable, server → client). brandLabel keeps the
   // deck from presenting this dataset under the BHW Census's name (UUC_PHC_BRAND_LABEL's
@@ -173,13 +183,6 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
                   <div className="mt-3">
                     <CoverageBar counts={counts} />
                   </div>
-                  {withoutFacility > 0 && (
-                    <p className="mt-3 text-xs text-muted">
-                      {formatCount(withoutFacility)}{" "}
-                      {withoutFacility === 1 ? "barangay has" : "barangays have"} no registered
-                      health facility.
-                    </p>
-                  )}
                 </div>
                 <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
                   <DownloadLinks geoLevel={geo.geoLevel} geoCode={geo.geoCode} />
@@ -189,7 +192,7 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
 
             <PresentationSlide id="types" title="Facility types">
               <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
-                <TypeBreakdown items={types} />
+                <TypeBreakdown items={types} expectedCount={counts.nFacilities} />
               </div>
             </PresentationSlide>
 
@@ -199,6 +202,11 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
                     barangays are all missing from the boundary source (Manila's 14
                     sub-municipalities — see docs/BARANGAY_CENTROID_RECONCILIATION.md) gets no
                     empty map frame; the facility list below is the whole figure there. */}
+                {(!facilities || facilities.length !== counts.nFacilities) && (
+                  <p role="status" className="text-sm">
+                    The facility map is unavailable until the complete list can be loaded.
+                  </p>
+                )}
                 {pointData && pointData.points.length > 0 && (
                   <PresentationSlide id="facility-map" title="Which barangays have facilities">
                     <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
@@ -217,7 +225,12 @@ export default async function FacilitiesAreaPage({ params }: { params: Promise<P
                 )}
                 <PresentationSlide id="facility-list" title="Facilities">
                   <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
-                    <FacilityList facilities={facilities} expectedCount={counts.nFacilities} />
+                    <FacilityList
+                      facilities={facilities}
+                      expectedCount={counts.nFacilities}
+                      query={query}
+                      areaHref={nhfrAreaHref(geo.geoLevel, geo.geoCode)}
+                    />
                   </div>
                 </PresentationSlide>
               </>

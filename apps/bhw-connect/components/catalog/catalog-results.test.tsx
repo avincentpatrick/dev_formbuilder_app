@@ -7,7 +7,7 @@ import { summarizeCatalog } from "@/lib/catalog/summary";
 
 const dataset: CatalogDataset = {
   id: "nhfr",
-  title: "NHFR",
+  title: "Health facilities",
   category: "Facilities",
   state: "available",
   availableIndicators: 1,
@@ -191,7 +191,7 @@ it("gives each card and the dataset view its own full map, at the chosen place",
     renderToStaticMarkup(<CatalogDetails catalog={catalog([dataset])} dataset={dataset} />),
   ]) {
     const { document } = parseHTML(markup);
-    const link = document.querySelector('a[aria-label="Open full NHFR map"]');
+    const link = document.querySelector('a[aria-label="Open full Health facilities map"]');
     expect(link?.textContent).toBe(`Open full ${dataset.title} map →`);
     expect(link?.getAttribute("href")).toMatch(
       /^\/map\?dataset=nhfr-2026-09&.*level=region&code=01/,

@@ -1,3 +1,5 @@
+import { NhfrDetails } from "./nhfr-details";
+import { PovertyCoverage } from "./poverty-coverage";
 import { PovertyMunicipalities } from "./poverty-municipalities";
 import Link from "next/link";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
@@ -13,9 +15,11 @@ import { getDistrictCatalog } from "@/lib/catalog/district-catalog";
 export async function CatalogContent({
   request,
   mapState,
+  facilitySearch = "",
 }: {
   request: CatalogRequest;
   mapState?: string;
+  facilitySearch?: string;
 }) {
   if (request.selection.mode === "district") {
     const geography = await getDistrictGeography(request.selection);
@@ -123,24 +127,50 @@ export async function CatalogContent({
             : "Figures and availability for this location only."}
         </p>
       </div>
+      {request.dataset === "poverty" &&
+        (!geography.current || ["national", "region"].includes(geography.current.level)) && (
+          <PovertyCoverage
+            key={geography.current?.code ?? "all"}
+            places={geography.children}
+            mapState={mapState}
+          />
+        )}
+      {povertyProvince && (
+        <a className="inline-block underline" href="#poverty-municipal-list">
+          See cities and municipalities in {povertyProvince.name} →
+        </a>
+      )}
       {dataset ? (
         <CatalogDetails
           catalog={catalog}
           dataset={dataset}
           mapState={mapState}
           locationName={locationName}
+          facilityDetails={
+            dataset.id === "nhfr" ? (
+              <NhfrDetails
+                dataset={dataset}
+                selection={request.selection}
+                locationName={locationName}
+                query={facilitySearch}
+                mapState={mapState}
+              />
+            ) : undefined
+          }
         />
       ) : (
         <CatalogResults catalog={catalog} locationName={locationName} mapState={mapState} />
       )}
       {povertyProvince && (
-        <PovertyMunicipalities
-          key={povertyProvince.code}
-          province={povertyProvince.code}
-          name={povertyProvince.name}
-          selected={geography.current?.level === "citymun" ? geography.current.code : null}
-          mapState={mapState}
-        />
+        <div id="poverty-municipal-list">
+          <PovertyMunicipalities
+            key={povertyProvince.code}
+            province={povertyProvince.code}
+            name={povertyProvince.name}
+            selected={geography.current?.level === "citymun" ? geography.current.code : null}
+            mapState={mapState}
+          />
+        </div>
       )}
     </div>
   );

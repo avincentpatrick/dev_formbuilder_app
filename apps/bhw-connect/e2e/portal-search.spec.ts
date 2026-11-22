@@ -41,7 +41,11 @@ test("portal searches all dataset destinations and supports keyboard selection",
   for (const place of places) {
     for (const section of ["place", "uuc-phc", "facilities", "health-services"]) {
       await expect(
-        page.locator(`[role=option] a[href$="/${section}/${place.geoLevel}/${place.geoCode}"]`),
+        page.locator(
+          section === "facilities"
+            ? `[role=option] a[href$="/catalog?mode=psgc&location=${place.geoLevel}%3A${place.geoCode}&dataset=nhfr"]`
+            : `[role=option] a[href$="/${section}/${place.geoLevel}/${place.geoCode}"]`,
+        ),
       ).toHaveCount(1);
     }
   }
@@ -62,7 +66,11 @@ for (const section of ["uuc-phc", "facilities", "health-services"]) {
     await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(4);
     await expect(page.getByRole("listbox")).not.toContainText("No profile data yet");
     await expect(
-      page.locator(`[role=option] a[href$="/${section}/barangay/0102801001"]`),
+      page.locator(
+        section === "facilities"
+          ? `[role=option] a[href$="/catalog?mode=psgc&location=barangay%3A0102801001&dataset=nhfr"]`
+          : `[role=option] a[href$="/${section}/barangay/0102801001"]`,
+      ),
     ).toHaveCount(1);
   });
 }

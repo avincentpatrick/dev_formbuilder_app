@@ -13,7 +13,15 @@ import type { NhfrChild } from "@/lib/db/nhfr";
  * Areas with no facilities are shown, not filtered out: "0 facilities" is a finding about that
  * area, and dropping the row would make an incomplete-looking table out of complete data.
  */
-export function ChildBreakdown({ heading, items }: { heading: string; items: NhfrChild[] }) {
+export function ChildBreakdown({
+  heading,
+  items,
+  areaHref,
+}: {
+  heading: string;
+  items: NhfrChild[];
+  areaHref?: (item: NhfrChild) => string;
+}) {
   if (items.length === 0) return null;
 
   const sorted = [...items].sort((a, b) => {
@@ -27,9 +35,14 @@ export function ChildBreakdown({ heading, items }: { heading: string; items: Nhf
     <section aria-label={heading}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">{heading}</h2>
-        <span className="text-xs text-muted">Least covered first</span>
+        <span className="text-xs text-muted">Lowest recorded presence first</span>
       </div>
-      <div className="mt-2 overflow-x-auto">
+      <div
+        className="mt-2 overflow-x-auto"
+        role="region"
+        aria-label="Scrollable locality breakdown"
+        tabIndex={0}
+      >
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted">
@@ -40,10 +53,10 @@ export function ChildBreakdown({ heading, items }: { heading: string; items: Nhf
                 Facilities
               </th>
               <th scope="col" className="py-2 pr-3 text-right font-medium">
-                Barangays with one
+                Barangays with an attributed facility
               </th>
               <th scope="col" className="py-2 text-right font-medium">
-                Coverage
+                Recorded presence
               </th>
             </tr>
           </thead>
@@ -52,7 +65,7 @@ export function ChildBreakdown({ heading, items }: { heading: string; items: Nhf
               <tr key={c.geoCode} className="border-b border-border last:border-0">
                 <td className="py-2 pr-3">
                   <Link
-                    href={`/facilities/${c.geoLevel}/${c.geoCode}`}
+                    href={areaHref ? areaHref(c) : `/facilities/${c.geoLevel}/${c.geoCode}`}
                     className="font-medium hover:text-accent hover:underline"
                   >
                     {c.geoName}

@@ -1,3 +1,7 @@
+import { FacilityContext } from "@/components/facilities/facility-context";
+import type { ReactNode } from "react";
+import { NhfrOverview } from "./nhfr-overview";
+import { PopulationOverview } from "./population-overview";
 import Link from "next/link";
 import { PovertyOverview } from "./poverty-overview";
 import { measureDefinition, derivationNote } from "@/lib/catalog/measure-notes";
@@ -129,7 +133,7 @@ export function CatalogResults({
             className="flex min-w-0 flex-col rounded-xl border border-border bg-background p-5"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {dataset.category}
+              {dataset.id === "nhfr" ? "DOH NHFR · September 2026" : dataset.category}
             </p>
             <h2 className="mt-1 text-xl font-semibold">
               <Link
@@ -203,7 +207,9 @@ export function CatalogResults({
               >
                 {dataset.id === "bhw" && catalog.selection.mode === "all"
                   ? "Open BHW overview →"
-                  : `View ${dataset.title} indicators →`}
+                  : dataset.id === "nhfr"
+                    ? "Explore health facilities →"
+                    : `View ${dataset.title} indicators →`}
               </Link>
               <FullMapLink dataset={dataset} selection={catalog.selection} />
               <SourceDates dataset={dataset} />
@@ -227,6 +233,15 @@ export function CatalogResults({
             {omitted.map((dataset) => (
               <li key={dataset.id}>
                 <strong>{dataset.title}:</strong> {omissionReason(dataset, catalog.selection)}
+                {dataset.id === "poverty" && (
+                  <Link
+                    prefetch={false}
+                    className="ml-2 underline"
+                    href={catalogJourneyHref(catalog.selection, "poverty", mapState)}
+                  >
+                    Find covered areas and sources →
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -273,13 +288,16 @@ export function CatalogDetails({
   dataset,
   mapState,
   locationName = "Selected location",
+  facilityDetails,
 }: {
   catalog: PublicCatalog;
   dataset: CatalogDataset;
   mapState?: string;
   locationName?: string;
+  facilityDetails?: ReactNode;
 }) {
-  const DetailContainer = dataset.id === "poverty" ? "details" : "div";
+  const readable = dataset.id === "poverty" || dataset.id === "population" || dataset.id === "nhfr";
+  const DetailContainer = readable ? "details" : "div";
   const available = dataset.indicators.filter((i) => hasAvailableValue(i.state));
   const missing = dataset.indicators.filter((i) => !hasAvailableValue(i.state));
   return (
@@ -293,9 +311,15 @@ export function CatalogDetails({
       </Link>
       <div>
         <h2 className="text-2xl font-semibold">
-          {dataset.id === "poverty" ? "Poverty in 2023" : `${dataset.title} indicators`}
+          {dataset.id === "poverty"
+            ? "Poverty in 2023"
+            : dataset.id === "population"
+              ? "Population in 2024"
+              : dataset.id === "nhfr"
+                ? "Health facilities"
+                : `${dataset.title} indicators`}
         </h2>
-        {dataset.id !== "poverty" && (
+        {!readable && (
           <p className="mt-2 text-muted">
             {dataset.availableIndicators} of {dataset.totalIndicators} indicators available
           </p>
@@ -303,13 +327,26 @@ export function CatalogDetails({
       </div>
       {dataset.id === "poverty" && (
         <PovertyOverview
+          mapState={mapState}
           dataset={dataset}
           selection={catalog.selection}
           locationName={locationName}
         />
       )}
+      {dataset.id === "population" && (
+        <PopulationOverview
+          dataset={dataset}
+          selection={catalog.selection}
+          locationName={locationName}
+        />
+      )}
+      {dataset.id === "nhfr" && (
+        <NhfrOverview dataset={dataset} selection={catalog.selection} locationName={locationName} />
+      )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
-      {dataset.detailHref && (
+      {facilityDetails}
+      {dataset.id === "nhfr" && <FacilityContext catalog={catalog} mapState={mapState} />}
+      {dataset.detailHref && dataset.id !== "nhfr" && (
         <Link
           href={
             dataset.id === "bhw"
@@ -324,7 +361,7 @@ export function CatalogDetails({
         </Link>
       )}
       <DetailContainer className="space-y-4">
-        {dataset.id === "poverty" && (
+        {readable && (
           <summary className="cursor-pointer rounded border border-border p-4 font-medium">
             Exact data, availability and sources
           </summary>
@@ -393,7 +430,9 @@ export function CatalogDetails({
                               {value.ciLow != null && value.ciHigh != null && (
                                 <span className="block text-xs text-muted">
                                   {dataset.id === "poverty"
-                                    ? "90% confidence interval"
+                                    ? indicator.id === "poverty.official-incidence"
+                                      ? "95% confidence interval"
+                                      : "90% confidence interval"
                                     : "Confidence interval"}
                                   : {value.ciLow}–{value.ciHigh}
                                 </span>

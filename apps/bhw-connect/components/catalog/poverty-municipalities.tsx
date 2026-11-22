@@ -10,6 +10,11 @@ import { povertyMapChoice, povertySearchSuffix } from "@/lib/catalog/poverty-nav
 import { mapHref, type MapPayload } from "@/lib/maps/prototype";
 import { readMapResponse } from "@/lib/maps/read-map-response";
 import { FigureCard } from "@/components/narrative/figure-card";
+import {
+  PovertyIntervalChart,
+  povertyChartDomain,
+  povertyInterval,
+} from "./poverty-interval-chart";
 import { POVERTY_UNCERTAINTY } from "@/lib/catalog/poverty-reading";
 
 type Result =
@@ -33,6 +38,7 @@ export function PovertyMunicipalities({
       ? (params.get("povertySearch") ?? "").slice(0, 100)
       : "";
   const statusId = useId();
+  const [view, setView] = useState<"chart" | "table">("chart");
   const [retry, setRetry] = useState(0);
   const [result, setResult] = useState<{ province: string; value: Result } | null>(null);
   const data: Result = result?.province === province ? result.value : { state: "loading" };
@@ -73,6 +79,7 @@ export function PovertyMunicipalities({
             a.name.localeCompare(b.name, "en", { numeric: true }) || a.code.localeCompare(b.code),
         )
       : [];
+  const domain = povertyChartDomain(rows);
   const filtered = rows.filter((row) =>
     `${row.name} ${row.code}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
   );
@@ -113,7 +120,8 @@ export function PovertyMunicipalities({
     >
       <div className="space-y-4" data-testid="poverty-municipalities">
         <p className="text-sm">
-          {POVERTY_UNCERTAINTY} No provincial average or poor-person count is calculated.
+          Dots show estimates; lines show published 90% confidence intervals. All places use the
+          same scale. A wider interval means less precision.
         </p>
         <Link
           href={mapHref(povertyMapChoice(province, selected)) + povertySearchSuffix(params)}
@@ -140,45 +148,40 @@ export function PovertyMunicipalities({
               </button>
             )}
             <p id={statusId} role="status" className="text-sm">
-              {filtered.length} of {rows.length} places shown. Search filters this list only.
-              Unavailable estimates remain listed.
+              {rows.filter((row) => row.value !== null).length} of {rows.length} places have usable
+              estimates. {filtered.length} of {rows.length} places shown. Search filters this list
+              only. Unavailable estimates remain listed.
             </p>
-            <div
-              className="overflow-x-auto rounded border border-border"
-              role="region"
-              aria-label="Municipal poverty estimates"
-              tabIndex={0}
-            >
-              <table className="w-full text-left text-sm">
-                <caption className="p-3 text-left">
-                  2023 estimates within {name}: the share of people below the poverty threshold.
-                  Open a place for exact data and accepted source records.
-                </caption>
-                <thead className="border-b border-border bg-surface">
-                  <tr>
-                    <th scope="col" className="p-3">
-                      City or municipality
-                    </th>
-                    <th scope="col" className="p-3">
-                      Poverty estimate
-                    </th>
-                    <th scope="col" className="p-3">
-                      Published 90% confidence interval
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row) => (
-                    <tr
-                      key={row.code}
-                      className={`border-b border-border ${row.code === selected ? "bg-accent-subtle" : ""}`}
-                    >
-                      <th scope="row" className="p-3 font-normal">
+            <div role="group" aria-label="Municipal comparison view" className="flex gap-2">
+              {(["chart", "table"] as const).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  aria-pressed={view === choice}
+                  onClick={() => setView(choice)}
+                  className={`rounded border px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 ${view === choice ? "border-accent bg-accent-subtle text-accent" : "border-border"}`}
+                >
+                  {choice === "chart" ? "Chart" : "Table"}
+                </button>
+              ))}
+            </div>
+            {view === "chart" ? (
+              <ul
+                aria-label="Municipal poverty comparison"
+                className="divide-y divide-border rounded border border-border"
+              >
+                {filtered.map((row) => (
+                  <li
+                    key={row.code}
+                    className={`min-w-0 p-3 sm:p-4 ${row.code === selected ? "bg-accent-subtle" : ""}`}
+                  >
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center">
+                      <div className="min-w-0">
                         <Link
                           prefetch={false}
                           href={detailHref(row.code)}
                           aria-current={row.code === selected ? "location" : undefined}
-                          className="underline"
+                          className="break-words font-medium underline"
                         >
                           {row.name}
                         </Link>
@@ -186,34 +189,101 @@ export function PovertyMunicipalities({
                           PSGC {row.code}
                           {row.code === selected ? " · Selected place" : ""}
                         </span>
+                      </div>
+                      {row.value === null ? (
+                        <p className="text-sm text-muted">
+                          Unavailable — no usable accepted estimate
+                        </p>
+                      ) : (
+                        <PovertyIntervalChart
+                          point={row}
+                          confidence={90}
+                          label={row.name}
+                          domain={domain}
+                          format={format}
+                        />
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div
+                className="overflow-x-auto rounded border border-border"
+                role="region"
+                aria-label="Municipal poverty estimates"
+                tabIndex={0}
+              >
+                <table className="w-full text-left text-sm">
+                  <caption className="p-3 text-left">
+                    2023 estimates within {name}: the share of people below the poverty threshold.
+                    Open a place for exact data and accepted source records.
+                  </caption>
+                  <thead className="border-b border-border bg-surface">
+                    <tr>
+                      <th scope="col" className="p-3">
+                        City or municipality
                       </th>
-                      <td className="p-3">
-                        {row.value === null
-                          ? "Unavailable — no usable accepted estimate"
-                          : format(row.value)}
-                      </td>
-                      <td className="p-3">
-                        {row.value !== null &&
-                        typeof row.ciLow === "number" &&
-                        typeof row.ciHigh === "number"
-                          ? `${format(row.ciLow)} to ${format(row.ciHigh)}`
-                          : "Unavailable"}
-                      </td>
+                      <th scope="col" className="p-3">
+                        Poverty estimate
+                      </th>
+                      <th scope="col" className="p-3">
+                        Published 90% confidence interval
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((row) => (
+                      <tr
+                        key={row.code}
+                        className={`border-b border-border ${row.code === selected ? "bg-accent-subtle" : ""}`}
+                      >
+                        <th scope="row" className="p-3 font-normal">
+                          <Link
+                            prefetch={false}
+                            href={detailHref(row.code)}
+                            aria-current={row.code === selected ? "location" : undefined}
+                            className="underline"
+                          >
+                            {row.name}
+                          </Link>
+                          <span className="mt-1 block text-xs text-muted">
+                            PSGC {row.code}
+                            {row.code === selected ? " · Selected place" : ""}
+                          </span>
+                        </th>
+                        <td className="p-3">
+                          {row.value === null
+                            ? "Unavailable — no usable accepted estimate"
+                            : format(row.value)}
+                        </td>
+                        <td className="p-3">
+                          {row.value !== null && povertyInterval(row)
+                            ? `${format(row.ciLow!)} to ${format(row.ciHigh!)}`
+                            : "Unavailable"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {!filtered.length && (
               <p>No matching places. Clear the search or try another name or PSGC code.</p>
             )}
-            <p className="text-sm text-muted">
-              Source: {data.source}. Reference year: 2023.{" "}
-              {data.date ? `Source date: ${data.date}.` : "Source date unavailable."}{" "}
-              {data.license ? `License: ${data.license}.` : "License information unavailable."}{" "}
-              Published interval bounds are not clipped to 0–100%. Source exclusions and geographic
-              mismatches remain applicable; an absent estimate is not zero.
-            </p>
+            <details className="text-sm text-muted">
+              <summary className="cursor-pointer font-medium">Methodology and source</summary>
+              <p className="mt-3">
+                {POVERTY_UNCERTAINTY} No provincial average or poor-person count is calculated.
+              </p>
+              <p className="mt-3">
+                Source: {data.source}. Reference year: 2023.{" "}
+                {data.date ? `Source date: ${data.date}.` : "Source date unavailable."}{" "}
+                {data.license ? `License: ${data.license}.` : "License information unavailable."}{" "}
+                Published interval bounds are not clipped to 0–100%. Source exclusions and
+                geographic mismatches remain applicable; an absent estimate is not zero.
+              </p>
+            </details>
           </>
         ) : (
           <div role="status">

@@ -9,7 +9,20 @@ import type { NhfrTypeCount } from "@/lib/db/nhfr";
  * gets the empty state, and the count beside it (from `agg_nhfr_counts`) states the 0 explicitly,
  * so "nothing here" is never confused with "nothing loaded".
  */
-export function TypeBreakdown({ items }: { items: NhfrTypeCount[] }) {
+export function TypeBreakdown({
+  items,
+  expectedCount,
+}: {
+  items: NhfrTypeCount[] | null;
+  expectedCount: number;
+}) {
+  if (items === null || (items.length === 0 && expectedCount > 0)) {
+    return (
+      <p role="status" className="text-sm text-muted">
+        Facility types could not be loaded completely. This is not a reported zero.
+      </p>
+    );
+  }
   if (items.length === 0) {
     return (
       <p className="text-sm text-muted">
@@ -22,11 +35,22 @@ export function TypeBreakdown({ items }: { items: NhfrTypeCount[] }) {
 
   return (
     <section aria-label="Facilities by type">
+      {total !== expectedCount && (
+        <p role="status" className="mb-3 text-sm">
+          Incomplete type detail: these rows account for {formatCount(total)} of{" "}
+          {formatCount(expectedCount)} registered facilities. Do not infer zero for missing types.
+        </p>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">By facility type</h2>
         <span className="text-xs text-muted">{items.length} types present</span>
       </div>
-      <div className="mt-2 overflow-x-auto">
+      <div
+        className="mt-2 overflow-x-auto"
+        role="region"
+        aria-label="Scrollable facility types"
+        tabIndex={0}
+      >
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted">

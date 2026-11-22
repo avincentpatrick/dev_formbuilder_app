@@ -1,3 +1,5 @@
+import { restoredNhfrMapHref } from "@/lib/catalog/nhfr-navigation";
+import { restoredPopulationMapHref } from "@/lib/catalog/population-navigation";
 import { restoredPovertyMapHref } from "@/lib/catalog/poverty-navigation";
 import Link from "next/link";
 import { withBasePath } from "@/lib/base-path";
@@ -18,11 +20,15 @@ export function LocationControls({
   mapState?: string;
 }) {
   const snapshot = (
-    dataset === "poverty"
-      ? restoredPovertyMapHref(mapState)
-      : !dataset || dataset === "bhw"
-        ? restoredBhwMapHref(mapState)
-        : null
+    dataset === "nhfr"
+      ? restoredNhfrMapHref(mapState)
+      : dataset === "population"
+        ? restoredPopulationMapHref(mapState)
+        : dataset === "poverty"
+          ? restoredPovertyMapHref(mapState)
+          : !dataset || dataset === "bhw"
+            ? restoredBhwMapHref(mapState)
+            : null
   )?.split("?")[1];
   const href = (scope: CatalogSelection) =>
     catalogJourneyHref(scope, scope.mode === "district" ? null : dataset, snapshot);
@@ -34,7 +40,7 @@ export function LocationControls({
       <div className="flex flex-wrap items-center gap-3">
         <Link
           prefetch={false}
-          href={href({ mode: "all" })}
+          href={catalogJourneyHref({ mode: "all" }, dataset === "nhfr" ? null : dataset, snapshot)}
           aria-current={selection.mode === "all" ? "page" : undefined}
           className="rounded-md border border-border px-3 py-2 text-sm hover:border-accent focus-visible:outline-2 focus-visible:outline-accent"
         >

@@ -119,6 +119,10 @@ export function syntheticValue(table, column, index, stats = {}, salt = 0) {
   if (stats.categories) {
     return stats.categories.length ? pick(stats.categories, index, salt) : null;
   }
+  // Expanded FHSIS releases can exceed the safe categorical-copy limit. A made-up
+  // free-text breakdown would remove every usable total from the development fixture.
+  // Use the known total code for synthetic rows only; never copy extra source values.
+  if (table === "fact_fhsis_indicator" && column.column_name === "breakdown") return "total";
   const type = column.udt_name;
   if (/^(int2|int4|int8|numeric|float4|float8)$/.test(type)) {
     const min = Number(stats.min ?? 0);

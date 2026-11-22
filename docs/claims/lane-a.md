@@ -16,7 +16,202 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer)
+## Status: ACTIVE CLAIM — `M249`, `R-ee5e000c` (`progress-chapters`) and `R-359ddb99` (`dropdown-placeholder`): pages grouped into named chapters on the progress bar with a short progress label per page, a dropdown's own placeholder that an optional answer can be cleared back to, and a short label a closed dropdown shows (m249-chapters-dropdown-labels)
+
+Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-6b-lively-cloud-of-d7c3a361-1918-4eb3-8b28-2b58cd22945b.md`). NHETE recommendation 6b, the other half of recommendation 6 after `M248` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m249-chapters-dropdown-labels`, cut from `origin/m247-grid-wide-sticky-explorer` at `67b6ce99`, so it is **stacked on #610** (and through it on #597): `page_width` sits on the very lines a section's new columns take — the serializer's `$layout`, the materializer, `updateSection`, `EncodeFormPresenter`, `toRenderSection` and the section settings in `ConfigPanel` — and NHETE's TABLE layout, whose dropdown columns take a short label, exists only there. `origin/main` is merged in for the claim files. PR into main, held after #625 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.26.0 → 0.28.0 (a feature) with its release notes**, kept on top when the held PRs merge first.
+Rows: `R-ee5e000c` (filed by `M237`), *"The progress bar cannot group pages into named chapters, and a page's progress label is always its section title"*; `R-359ddb99` (filed by `M237`), *"A dropdown always shows "Select an option" and its full choice text when closed"*. Two rows are filed and closed by this increment, each found in planning beside a cited line: `dropdown-cannot-clear` and `progress-title-unpiped` (below).
+
+The user's answers in planning (2026-11-23), recorded on this branch as `D233`:
+- **A chapter is started, not repeated**: "Starts a chapter" is ticked and named on the page that begins one, and the pages after it belong to it until the next. A Kobo or ODK outer group made only of groups imports as one.
+- **The short closed label is drawn over the box**: the phone's own dropdown stays; the open list and screen readers get the full text; Windows high-contrast mode shows the full text.
+- **It works for dropdown questions and for a question table's dropdown columns.**
+- **With chapters on, the bar shows the chapters and the current chapter's own page dots.** A form with no chapter keeps today's bar exactly.
+
+### Evidence verified
+- `R-ee5e000c`: **held** — `ProgressIndicator.vue` draws one numbered dot per visible step under "Step X of N" and the step's title (`stepTitle()` in `useFormRuntime.ts`); `form_sections` has no parent column and no second label. Neither file is touched by any held branch.
+- `R-359ddb99`: **held** — `FieldInput.vue`'s select arm hard-codes `placeholder="Select an option"` (the cascade selects do the same), and a choice is `{value, label, label_translations?}`.
+
+### Premise verified
+- *"NHETE has 10 named stops over about 45 screens, each screen with its own small progress label"*: **held, sharper** — the real text (session `3df65fc6`'s scratchpad, never committed) has 10 stops over 49 screens, and 44 screens open with a heading of up to 83 characters under a screen name of at most 36. The heading is the page's title; the screen name is its progress label. **The fixture cannot show it today:** `D221`'s scrambling gave each screen's copy of its stop name its own text, so the fixture's 49 `stop` values are all different, and `NheteBuilderDriver` drops `stop`.
+- *"`FieldInput.vue` hard-codes the empty option's text"*: **held**, and the question's own placeholder already exists — `form_fields.placeholder`, edited for every type in `ConfigPanel`, piped by both runtimes, and ignored only by the select arm. No migration is needed for it.
+- The design system's dropdown is a native `<select>` on purpose (`MdsSelect`'s docblock; `docs/ux/design-system-reference.md` argues against a combobox primitive): **held**, so a closed label different from the open list's text cannot come from the select itself — `D233` answer 2.
+- `MdsSelect` draws its placeholder as a **disabled** option, so an answered optional dropdown can never be emptied again: **found in planning, filed as `dropdown-cannot-clear`**. The grid's own select already offers a selectable "Select…".
+- The progress line, the screen-reader announcement and the welcome-back banner read `step.title`, which is resolved for the locale but not piped, while the section heading pipes: **found in planning, filed as `progress-title-unpiped`**.
+- `NheteE2eSeeder` builds through XLSForm import, which carries no placeholder for any type: **held**, so the seeder sets placeholders (and progress labels, which XLSForm has no column for) after import, as `M248`'s seeder set its mode.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the rows' sketches:**
+1. `progress-chapters`'s *"an optional chapter name on a section"* becomes a name on the section that **starts** a chapter (`D233` answer 1); grouping is computed over every section in order and only then filtered to the visible steps, so a hidden first page still names its chapter.
+2. The progress label has no translations: in another language it is used only when the section title has no translation there, so a short default-language word never sits beside a translated page. Chapter names carry translations, filled only by XLSForm import, as section labels are.
+3. Every new snapshot key is emitted **only when set**, so no published form's checksum, paper stamp or offline drift check moves.
+4. `dropdown-placeholder`'s placeholder half is one line; its short-label half cannot be done by the select alone and is the overlay (`D233` answer 2), measured in a real browser before its test is written; it reaches the grid's dropdown columns too (answer 3). Every other surface keeps the full label — paper above all, because the scan reader matches printed labels.
+
+Files:
+- **Data and server:** new `database/migrations/2026_08_17_000153_add_chapter_and_progress_label_to_form_sections_table.php`; `app/Models/FormSection.php`; `app/Http/Requests/Forms/UpdateSectionRequest.php`, `UpdateFieldRequest.php`; `app/Services/Forms/` `FormBuilderService.php`, `BuilderPresenter.php`, `SchemaSnapshotSerializer.php`, `SchemaBlueprintMaterializer.php`, `VersionComparison.php`, `DraftCopier.php`, `FieldTypeConversion.php`; `app/Services/Submissions/EncodeFormPresenter.php`; `app/Enums/FieldType.php`; `app/Support/Forms/MatrixColumns.php`.
+- **XLSForm:** `app/Services/Xlsform/` `XlsformImportParser.php`, `XlsformImporter.php`, `XlsformExporter.php`, `Dto/SectionSpec.php`.
+- **Respondent page:** `resources/public-runtime/` `lib/types.ts`, `lib/schema-mapping.ts`, new `lib/chapters.ts`, `composables/useFormRuntime.ts`, `components/ProgressIndicator.vue`, `StepView.vue`, `WelcomeBackBanner.vue`, `RuntimeSession.vue`, `FieldControl.vue`, `InstanceField.vue`.
+- **Shared and design system:** `resources/js/components/submissions/FieldInput.vue`, `MatrixGrid.vue`; `packages/design-system/src/components/Select/` `Select.vue`, its story and a new unit test.
+- **Builder:** `resources/js/components/builder/` `ConfigPanel.vue`, `ChoicesEditor.vue`, `GridOptionList.vue`, `types.ts`, `useBuilderStore.ts`, `draft-snapshot.ts`, `conflict-diff.ts`, `PreviewRuntime.vue`, `field-save-errors.ts`; `resources/js/components/help/manual.ts`.
+- **Tests:** the Pest, Vitest and unit files beside each of the above; new `tests/Feature/Forms/SectionChapterTest.php`, `tests/Feature/Xlsform/XlsformChaptersTest.php`, `XlsformShortLabelTest.php`; `tests/fixtures/nhete/nhete-shape.json` (stop names only); `tests/Support/Nhete/`, `tests/Feature/Forms/Nhete/`; `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/`; `tests/e2e/` `nhete-walk.spec.ts`, `public-runtime-axe.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/data-dictionary.md`, `docs/xlsform-interop-spec.md`, `docs/ux/design-system-reference.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D233`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, the two `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `M249`; migration prefix `2026_08_17_000153`, taken by hand — `state.php` on this branch reports `000152`, which #625 holds; `D233`; no ADR.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the section shape (the `RawSection` member floor, the section-settings lists, the extract-column string), the field save's display names, and the NHETE suite's counts once two heading-only notes leave it.
+- A form with no chapter renders today's progress bar byte for byte; the existing progress tests stay untouched.
+- NHETE's walk names the right chapter and progress label on all 49 pages at three widths, shows "Choose…" and the short word on an indicator page, and never overflows.
+- The one most likely wrong: the overlay's transparent select text under the axe scans (Storybook and the guest page) and in browsers whose open list inherits the select's colour — the reason `option` gets its own colour, measured before the test.
+
+## HELD — `M248`, `R-8881210a`, `R-d37a38f9`, `R-e07273d1` (`respondent-edit-after-submit`) and `R-aec84b42`: reopening a form's link on the same device offers "Continue where you left off" or "Start over"; a form's "After submitting" setting offers another response, "Change my answers" until the form closes, or one response only (m248-respondent-keeps-answers) — BUILT AND HELD: PR #625, CI 44922909203 every job green with real step counts
+
+Taken 2026-11-21, from the plan the user approved in chat the same day (`~/.claude/plans/continue-with-nhete-recommenda-staged-stonebraker-of-a595e0ed-3d64-4d67-ab8f-df866cda2ed3.md`). NHETE recommendation 6a, the NHETE plan's next item after `M247` (`~/.claude/plans/this-is-a-working-composed-ripple.md`). Its other half, 6b (`progress-chapters`, `dropdown-placeholder`), is not taken: it overlaps #610 and #568 and is planned in its own session as `M249`.
+Branch `m248-respondent-keeps-answers`, cut from origin/main at `1bf3bb87`, PR into main, held for a merge point on the user's word (`D137`). Not stacked: nothing here needs a held PR. **A change a tester sees: `VERSION` 0.21.0 → 0.27.0 (a feature) with its release notes**, kept on top when #545, #568, #580, #589, #597 and #610 merge first.
+Rows: `R-8881210a` (filed by `M170`, `D118` A), *"Reopening a public form's link on the same device starts a blank form"*; `R-d37a38f9` (filed by `M170`), *"A respondent who pauses for more than ten minutes and then keeps typing loses every answer on the next reload"*; `R-e07273d1` (filed by `M237`), *"A respondent cannot change their answers after Submit, even while the form is still open"*; `R-aec84b42` (filed by `M130`, tier `before-launch`, taken early by `D232` — not a retier), *"The single-response-only form that `docs/ux/form-filling-ux-flow.md` §9 specifies is not built"*. The user's "Continue with NHETE recommendation 6" is the explicit signal for the two not-live request rows.
+
+The user's answers in planning (2026-11-21), recorded on this branch as `D232`:
+- **The way back to a submitted response is the device plus a link**: reopening the form's link on that device offers "Change my answers", and the thank-you page gives a link to copy or email, which anyone holding can use, as "Save and finish later" links are.
+- **One form setting, "After submitting", with three choices**: another response (the default, as today), "Change my answers" until the form closes, or one response only. The last two hold for one device only.
+- **Only before review**: a respondent changes a response only while it is `submitted`.
+- **Continue carries on the same saved draft**, so a "Save and finish later" link and the device stay in step — on a shared phone the next person pressing Continue can change it too, extending `D118`'s accepted cost.
+
+### Evidence verified
+- `R-8881210a` and `R-d37a38f9`: **held** — the visit id is in `sessionStorage` (`lib/respondent-session.ts`); `useAutosave.restore()` and `App.vue`'s resume read both refuse a row `draftBelongsToVisit()` says another visit wrote, and leave it for the next save to overwrite. A reload after an idle visit mints a new id, so the respondent's own row reads as a stranger's.
+- `R-e07273d1`: **held** — `SubmissionAnswerEditService` takes a `User`; the guest draft save answers 409 `draft_already_finalized`, the resume read 404, and the submit is idempotent or 409 on a final row.
+- `R-aec84b42`: **held** — `ConfirmationScreen.vue` renders "Submit another response" unconditionally; no form column or setting names a single response.
+
+### Premise verified
+- The kiosk-mode row `R-968816fe` (`after-launch`) still exists as `D118`'s named off-switch for a shared device: **held**.
+- `DraftRow` carries no `client_submission_uuid`, baseline or resume token, so Continue cannot carry a server draft without new (un-indexed, no Dexie version bump) members: **held**, and `D232` answer 4 decides it.
+- The service worker has no `localStorage` and replays queued submits itself, so device memory of a sent response belongs in Dexie, not `localStorage`: **held**.
+- `/f/resume/{token}` exists as a reserved first segment (`FormSlug::RESERVED = ['resume']`); `/f/amend/{token}` takes `amend` the same way. A live form already named `amend` would lose only its manifest URL to the new route; this cannot be measured from the repository, so the route refuses that one value and the slug is reserved for new forms.
+- Guest API routes are in `routes/api.php`, under their own token-verifying middleware (`EstablishGuestDraftContext` for resume): **held**.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the rows' sketches:**
+1. `D118`'s choice must be asked in `App.vue` before `RuntimeSession` mounts: autosave's watcher and backstop start at creation and would overwrite the row first.
+2. "Start over" deletes nothing; the row is left for the first save to overwrite, as today, because a second tab or a parked submission may still reference its media.
+3. "Edit after Submit" reuses `SubmissionAnswerEditService` with a respondent actor, a separate one-state set (`submitted`) checked before the work and again under the lock, the stored `submitted_at` as the validation clock on both sides, and a 409 mapping for its refusals (an uncaught one is a 500 today).
+4. The amend link must never be cached under its token URL by the service worker (the `M140` resume-shell defect, one route over).
+
+Files:
+- **Migration and settings:** new `database/migrations/2026_08_17_000152_add_after_submit_to_forms_and_respondent_amended_at_to_submissions.php`; `app/Models/Form.php`, `Submission.php`; `app/Services/Forms/FormService.php`; a new after-submit request and controller; `app/Services/Forms/FormSettingsPresenter.php`; `routes/tenant.php`.
+- **Amend:** `app/Support/Guest/GuestShareTokenService.php`, `config/guest.php`, new `app/Http/Middleware/EstablishGuestAmendContext.php`, new `app/Http/Controllers/Public/GuestAmendController.php`, `GuestSubmissionController.php`, `GuestFormController.php`, `app/Services/Submissions/` `SubmissionAnswerEditService.php`, `FormAcceptanceGuard.php`, `PublicFormPresenter.php`, `SubmissionEditException.php` (wherever it lives), `app/Events/SubmissionUpdated.php`, `app/Services/Audit/` presenter and exporter, `app/Providers/AppServiceProvider.php`, `bootstrap/app.php`, `app/Support/Forms/FormSlug.php`, `routes/api.php`.
+- **Guest page:** `resources/public-runtime/` `App.vue`, `components/RuntimeSession.vue`, `ConfirmationScreen.vue`, new `ContinueOrStartOver.vue`, new `AlreadyAnswered.vue`, `FieldControl.vue`; `lib/` `db.ts`, `bootstrap.ts`, `api-client.ts`, `error-normalizer.ts`, `types.ts`, `resume-shell.ts`, `brand-cache.ts`, `replay.ts`, `outbox.ts`; `composables/useAutosave.ts`; `sw.ts`; `resources/views/public-runtime.blade.php`; `resources/js/components/submissions/FieldInput.vue` (respondent wording only).
+- **Builder and staff:** `resources/js/components/forms/FormSettingsSections.vue` and a new panel; `resources/js/pages/submissions/Show.vue`; `resources/js/components/help/manual.ts`.
+- **Tests:** the Pest, Vitest and unit files beside each of the above; new `tests/Feature/Guest/GuestAmendSubmissionTest.php`, `tests/Feature/Forms/AfterSubmitSettingTest.php`; `tests/Support/Nhete/` and `tests/Feature/Forms/Nhete/`; `database/seeders/NheteE2eSeeder.php` and `tests/Feature/Seeders/`; `tests/e2e/` `nhete-walk.spec.ts`, `public-runtime-axe.spec.ts`.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `openapi.json`, `docs/adr/` new `0026-…` and `0021-respondent-scoped-device-outbox.md` (a dated amendment), `docs/security-threat-model.md`, `docs/ux/form-filling-ux-flow.md`, `docs/data-dictionary.md`, `docs/webhook-integration-design.md`, `docs/feature-backlog.md`, `docs/pipeline.md`, `docs/claims/decisions.md` (`D232`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, `openapi.json`, the two `tests/e2e/*.spec.ts` above, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `M248`; migration prefix `2026_08_17_000152`, taken by hand — `state.php` on this main-cut branch reports `000150`, which #589 holds, and #610 holds `000151`; ADR `0026`; `D232`.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the guest submit's body, the webhook envelope's `edited_by`, the confirmation screen's buttons and the service worker's cached prefixes.
+- NHETE's walk closes and reopens its page, continues, submits, changes an answer and sees it kept.
+- The one most likely wrong: the amend session's validation clock and version pinning — a respondent whose form was republished after they sent it, or whose answers fail a date check against "today", is where client and server can disagree. Also at risk: `resume-boot.test.ts`, which mounts the whole app and will meet the new device-memory read.
+
+**BUILT AND HELD (2026-11-22): PR #625, cut from `origin/main`.**
+- **Version.** `VERSION` 0.27.0 with its notes.
+- **Merge order.** Held after #545, #568, #580, #589, #597 and #610, which go first at the merge point. The PR body lists the merge-time steps:
+  - recheck the migration prefix after #589's `000150` and #610's `000151`;
+  - the expected conflicts;
+  - re-export `openapi.json`;
+  - recheck the cache-prefix gate's `f/` list.
+
+- **CI:** run 44922909203 on `a6a66e90`, every job green with real step counts:
+  - Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5;
+  - Boundary 44922907385 green (5);
+  - E2E 930 passed in 33.5 min.
+
+  Three earlier runs each found something, fixed before this one (below).
+
+- **The setting.** Migration `2026_08_17_000152` (additive) adds `forms.after_submit` (`another` | `amend` | `once`, CHECK, default `another`) and `submissions.respondent_amended_at`.
+  - `App\Enums\AfterSubmit`; the column is not fillable.
+  - Written by `PATCH /forms/{form}/after-submit` → `FormService::setAfterSubmit()`, locked and audited.
+  - Read by both presenters; the builder's "After submitting" panel; the manual.
+  - The enum's three TypeScript mirrors are registered with the drift gate.
+
+- **Changing a sent response.**
+  - **Token:** `GuestShareTokenService::mintAmend()`/`verifyAmend()`, signed with a key derived from the resume key, 365 days at most. The server decides live; the token decides nothing.
+  - **Context:** `EstablishGuestAmendContext`.
+  - **Routes:** `GET`/`PUT api/v1/public/submissions/amend/{amendToken}`, outside every cached prefix, and the `/f/amend/{amendToken}` page. The page's token pattern keeps `/f/amend/manifest.webmanifest` on the manifest route. `amend` is reserved as a slug.
+  - **Rules:** `RespondentAmendService` requires a guest row on its own form, the mode on, guests allowed and the form open; `FormAcceptanceGuard::assertCanAmend()` enforces those.
+  - **Write:** `SubmissionAnswerEditService::amendAsRespondent()` uses a separate `RESPONDENT_AMENDABLE` set (`submitted` alone). The status and the form are re-checked under the lock. The audit row has no actor (`AuditLogger` `withoutActor`) and carries `by: respondent`, which the log names "Respondent". It stamps `respondent_amended_at` and consumes no capacity.
+  - **Event:** `SubmissionUpdated` gains `edited_by_respondent`, and no points are awarded.
+  - **Submit response:** the guest submit returns `amend` (token, url, until).
+
+- **Guest page.**
+  - **Continue or Start over** is asked in `App.vue` before `RuntimeSession` mounts (`earlierVisitDraft()`, `adoptDraft()`). Autosave writes the server draft's uuid, baseline and resume token, so Continue resumes that draft through the resume read.
+  - **Device memory** of a sent response sits in Dexie `app_state` (`lib/answered.ts`), written by the page and by the service worker's replay. `AlreadyAnswered.vue` shows it.
+  - **Amend mode:**
+    - the response's own version, its sent day as the clock;
+    - autosave, the outbox, "Save and finish later", the paper upload and URL prefill all off;
+    - sent media read-only, with respondent wording;
+    - Submit as a PUT whose refusals are sentences (error kind `amend`, never a re-mint).
+  - **Thank-you page** by mode; no countdown while the link shows.
+  - `sw.ts` leaves `/f/amend/` to the network.
+
+- **NHETE.**
+  - The seeder sets amend and a closing date a month out, and converges an older seed.
+  - The walk closes its tab on the first indicator page and continues there, then changes `s1a` after Submit through "Change my answers" and finds the change kept, at all three widths. The change part takes about 49 s at 1440 px.
+  - The route test changes a sent response through the token. It is refused by the word cap, once under review and once closed.
+
+- **Docs.**
+  - ADR `0026-respondent-changes-own-response.md`, and a dated amendment to `0021`.
+  - The threat model's amend-link row, the UX flow §9 and the webhook doc.
+  - The data dictionary, `openapi.json` and `D232`.
+  - The four rows closed and four filed.
+  - ADR `0009-oauth-connector-token-custody.md`'s stale `routes/api.php` line cite became the group's name, and six ledger citations this branch's insertions moved are re-pointed.
+
+- **Local runs.**
+  - **Pest:**
+    - Guest, Submissions, Audit, Gamification, Webhooks and Unit: 3,118 passed;
+    - every other Feature folder: 3,553 passed, 6 skipped, and only `SuiteCollectionFloorTest` red — the bind-mount truncation, 79 files unseen locally, which CI runs;
+    - the NHETE suite.
+  - **Vitest:** all 295 files.
+  - **Static checks:** the type-check; Pint, every lint gate and `preflight --with-gates --with-pint` on the host.
+  - **PHPStan** in the container reports 54 "undefined property" errors, the identical set on `origin/main` in the same container; CI's static analysis is green.
+  - **E2E:** NHETE and the new guest axe cases at all three widths; `public-runtime-axe`, `public-runtime-offline` and `form-settings-axe` on desktop.
+
+- **Mutants: 9 of 9 caught.**
+  - Six through `mutate.php`:
+    - the status re-check under the lock;
+    - the form re-read under the lock;
+    - guest rows only;
+    - the limiter's `{amendToken}` key;
+    - the audit's `by: respondent`;
+    - the amend-mode gate.
+  - Three in Vitest through a byte-restoring harness:
+    - Continue's adopt;
+    - the service worker's amend exclusion;
+    - the earlier-visit predicate.
+
+**How the prediction fared.**
+- **Churn in tests that pin the guest submit body, the webhook envelope's `edited_by`, the confirmation screen's buttons and the service worker's cached prefixes: right, and it was wider.**
+  - The ones I ran locally were updated before the first push: the envelope, the cache-prefix gate, the submitted event's arguments, the boot object's shape and the settings rail's count.
+  - CI found five more in folders I had not run:
+    - `OpenApiContractTest` twice — the guest body's keys, and a request docblock that Scramble published with an increment mark;
+    - `FormSettingsLockingTest` (a new writer must be listed and staged);
+    - `FormSettingsPageTest`'s pinned builder keys;
+    - my own page case, which needed `withoutVite()` on CI.
+  - Its E2E found the settings rail pinned in `form-settings-axe.spec.ts`.
+- **NHETE's walk closes, continues, submits, changes and keeps: right first time** once the dev database was seeded (locally the e2e setup seeds nothing; CI seeds it as a step).
+- **The one most likely wrong — the amend session's validation clock and version pinning: right.** The sent-day clock and the response's own version were built in from the start, and a republish case pins the version. What actually went wrong was elsewhere:
+  - **The audit's actor.** NHETE's route test is signed in as its admin when it changes the response, and `AuditLogger`'s `Auth::id()` fallback credited the admin. It is fixed with `withoutActor` and pinned by its own case.
+  - **The guest mint limit.** Every E2E spec opens guest links from one address, at 30 mints a minute. The new axe cases first met a 429 themselves (run 44914567216), then pushed `repeat-table.spec.ts` into one (run 44918997179). The cases now scan both themes on one page and wait out a 429, and CI's E2E job sets `GUEST_MINT_PER_IP: 600`. So **`.github/workflows/ci.yml` WAS touched** — one env line in the E2E job — contrary to this claim's premise; `.github/` is ours (CODEOWNERS), and the boundary map asks a label only of jongsky25.
+- **What it did not see:**
+  - **Windows tooling:** Python on Windows writes CRLF unless told otherwise (two models were converted back); the tool layer collapses an escaped quote inside a heredoc (twice); the Windows console's encoding killed the Vitest harness until it printed UTF-8.
+  - **Docker:** Docker Desktop was stopped at the session's start.
+  - **Interception:** `page.route()` cannot see a request a service worker makes, so the amend axe case blocks workers.
+  - **Insertions moved citations:** the branch's insertions moved six ledger citations past the citation lint's ceiling of 16, and they were re-pointed.
+
+## HELD — `M247`, `grid-wide-sticky-explorer` and the grid half of `explorer-unchartable-questions`: a section can make its page wide, a long grid keeps its header row and first column in view, and the Data Explorer charts a grid by row (m247-grid-wide-sticky-explorer) — BUILT AND HELD: PR #610, CI 44669259929 every job green with real step counts
 
 Taken 2026-11-20, from the plan the user approved in chat the same day (`~/.claude/plans/take-nhete-recommendation-5a-vivid-floyd.md`, rewritten for 5b). NHETE recommendation 5b, the NHETE plan's next item after `M246` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m247-grid-wide-sticky-explorer`, cut from `origin/m246-grid-question-table` at `7ab0cc8d`, so it is **stacked on #597**: NHETE's tables (`NhetePlan`'s TABLE layout) and `MatrixGrid.vue`'s M246 rework exist only there, as `M240` stacked on #521. `origin/main` is merged in for the claim files. PR into main (CI runs only on pull requests into main), held after #597 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.25.0 → 0.26.0 (a feature) with its release notes.**
@@ -63,6 +258,28 @@ Prediction:
 - Every gate is green on the first CI run, apart from churn in tests that pin a section's settings payload, the snapshot's keys and the explorer's sources list.
 - NHETE's indicator chart, counted by row, equals what `NheteAnswers::scenario` implies, and its total equals the answered rows.
 - The one most likely wrong: the sticky header in a height-capped box at 834–1440 px — the threshold or the scroll padding may need tuning. Also at risk: axe on the focusable scroll box in dark mode, and `E2eSeederIdempotencyTest`'s count of seeded published forms.
+
+**BUILT AND HELD (2026-11-20): PR #610, stacked on #597.** `VERSION` 0.26.0 with its notes. Held after #545, #568, #580, #589 and #597, which go first at the merge point; until #597 merges this PR's diff includes it. The PR body lists the merge-time steps (recheck the migration prefix after #589's `000150`; the expected overlaps and conflicts).
+- **CI:** run 44669259929 on `67b6ce99`: every job green with real step counts — Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5 — and Boundary 44669257611 green (5). Pest 7,754 passed and 1 skipped; E2E 939 passed and 84 skipped in 32.6 min. The first run, 44669201316 on `4f493fc9`, was cancelled by the status-bullet push, as M244–M246's were.
+- **Section setting.** `form_sections.page_width` (migration `2026_08_17_000151`, additive, `CHECK` allows only `wide`), saved by `UpdateSectionRequest`/`FormBuilderService`, presented by `BuilderPresenter`, carried by templates and the library (`SchemaBlueprintMaterializer`) and by copies (`replicate()`), compared by `VersionComparison`, snapshotted only when `wide` (old checksums unchanged, tested), and handed to the encode page's blocks.
+- **Runtime and builder.** `page-width.ts`'s `pageIsWide`/`stepsOnScreen` hand `RuntimeShell` its existing `wide` column (the shell is untouched) and App.vue's banner widens with it; the encode page lifts its 45rem column unless a scanned paper is beside it; the section Advanced tab's "Wide page — for big tables", saved, projected into the preview schema, named in a save conflict; the manual.
+- **Sticky grid.** `MatrixGrid` in table mode: the row label pinned to the inline start, header cells to the top, opaque, on layers local to the scroll box (`isolation`), separate borders; `mds-grid--long` (>8 shown rows) caps the box at 75dvh on a screen at least 40rem tall; an overflowing box is a focusable group named by the question; a ResizeObserver sets scroll padding to the pinned header's height and first column's width.
+- **Explorer.** `ExplorerQuery.grid` (stored only when set; `SCHEMA_VERSION` stays 1); `GridScopedSource` and `ExplorerCatalog::resolve`'s grid checks (`grid_required`, `grid_unavailable`, `grid_not_allowed`); `GridRowsSource` (lateral `jsonb_each`, answered rows only, Row + typed columns, Likert Rating and Rating-as-number, withholding as D6); `AnswerSql` (moved unchanged from `AnswersSource`); the presenter's `grids`, the controller's `grid`, `Chart.vue`'s Grid select; ADR 0025 §D9 with notes under D2 and D6.
+- **NHETE.** The table layout's 8 indicator and parts screens are wide; `NheteTableRouteTest` checks the snapshot carries exactly those and that domain A's indicators, charted by Keep, equal the stored answers.
+- **Local runs.** Pest 3,393 over Forms, Explorer, Submissions, Docs, Seeders, Releases and Unit (only `SuiteCollectionFloorTest`, red on any partial-folder run), the NHETE suite, Explorer 158; Vitest 4,768 of 4,770 (the two design-system token scans time out under load, 4/4 alone); type-check, Pint, PHPStan 0 on the host, every lint gate, `preflight --with-gates --with-pint`. E2E at one worker, all three widths, 63 green: the new `grid-wide-table.spec.ts`, all of `explore-axe`, the field-types scan, the question-table test and all of `builder-preview-authoring`.
+- **Mutants: 6 of 6 caught**, plus a CSS positive control — 5 through `mutate.php` (the snapshot always writing `page_width`, the answered-row predicate dropped, the column-name pattern removed, the personal/sensitive check removed, the catalogue accepting a grid on any source), 1 in Vitest by hand (`stepsOnScreen` ignoring the current step); the sticky rules removed turned `grid-wide-table` red at its first pin check, restored byte-exact and green.
+
+**How the prediction fared.**
+- Every gate green on the first CI run, apart from churn in tests that pin a section's payload, the snapshot's keys and the explorer's sources list: **right.** The run that finished was green throughout; the predicted churn was updated locally before the push.** The churn was `ExplorerPageTest`'s pinned source lists (five roles and the builder's 8 → 9 sources), `DraftProjectionMirrorDriftTest`'s `RawSection` floor (11 → 12) and `E2eSeederIdempotencyTest`'s published count (13 → 14) — all updated locally.
+- NHETE's indicator chart, counted by row, equals what the scenario implies: **right** — checked against the stored answers rather than recomputed from the scenario, which is the stronger form of the same claim.
+- The one most likely wrong — the sticky header in a height-capped box at 834–1440 px: **right first time.** The pin checks passed at both widths without tuning, and the positive control proves the check can fail. Axe on the focusable box in dark mode: clean. `E2eSeederIdempotencyTest`: moved, as predicted.
+- What it did not see:
+  - Docker Desktop stopped early in the build, taking every container down; it was started again and the stack brought back up;
+  - a Pint failure (a fully-qualified `@see` in a docblock) was committed because the commit was not gated on Pint's exit status, and was fixed in the next commit; every later commit was gated with `&&`, which then caught an unordered import before it was committed;
+  - the plan's separate `GridRowsSourceTest.php` became cases in `ExplorerQueryRunnerTest.php`, because Pest's helpers there are global functions a second file cannot redeclare;
+  - the seeded "Wide Table" form has no responses, so `/analytics`' pinned counts do not move; its explorer tile shows the empty state, and the counting is proved in Pest (12 cases) and by NHETE;
+  - the builder spec's new steps needed the Structure pane for "Add section", and the label rather than the hidden native input to tick the design-system checkbox;
+  - the first positive-control run failed for an unrelated reason — a compose run launched from Python recreated the app container, and Playwright fell back to a web server its image lacks — and was rerun once the app answered.
 
 ## HELD — `M246`, `grid-question-table` and `R-ffd10da2`: a grid becomes a real question table — a row shown only when an answer calls for it, a cell "Not needed" or required only when its row says so, a column shown only when an answer calls for it, a long-text column, details under a row's label — and conditions, calculations and piped text can read a grid's cell (m246-grid-question-table) — BUILT AND HELD: PR #597, CI 44355204759 every job green with real step counts
 

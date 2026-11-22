@@ -1,9 +1,17 @@
+import { NHFR_DEFINITION, NHFR_BEDS, NHFR_PRESENCE } from "./nhfr-reading";
+import { OFFICIAL_POVERTY_DEFINITION, OFFICIAL_POVERTY_INTERPRETATION } from "./poverty-official";
+import {
+  POPULATION_DEFINITION,
+  POPULATION_COVERAGE,
+  POPULATION_COMPARISON,
+} from "./population-reading";
 import { POVERTY_DEFINITION, POVERTY_SCOPE, POVERTY_UNCERTAINTY } from "./poverty-reading";
 import { demographicSourceNote } from "@/lib/bhw/demographic-labels";
 import { CATALOG } from "./definitions";
 import type { CatalogIndicator } from "./types";
 
 const definitions: Record<string, string> = {
+  "poverty.official-incidence": `${OFFICIAL_POVERTY_DEFINITION} ${OFFICIAL_POVERTY_INTERPRETATION}`,
   "bhw.total":
     "BHWs reported by local government units (LGUs), including registered-only, registered-and-accredited and nonregistered workers. This count covers a different group from the checked individual profiles.",
   "bhw.registered":
@@ -21,14 +29,12 @@ const definitions: Record<string, string> = {
     "Average recorded years active as a BHW, using checked profiles with a usable value. Profiles without a usable value are excluded. Do not add averages from different places.",
   "bhw.any-honorarium":
     "The percentage of all checked profiles with an allowance (honorarium) record. This does not establish the amount received or whether it is enough.",
-  "nhfr.facilities":
-    "Registered facilities in the accepted NHFR snapshot, counted once per facility.",
+  "nhfr.facilities": NHFR_DEFINITION,
   "nhfr.government":
     "Registered facilities classified as government-owned in the accepted snapshot.",
   "nhfr.private": "Registered facilities classified as privately owned in the accepted snapshot.",
-  "nhfr.beds": "Sum of recorded bed capacity; missing capacity is not evidence of zero beds.",
-  "nhfr.barangay-presence":
-    "Distinct barangays with an attributed registered facility. The denominator describes service presence, not source reporting completeness.",
+  "nhfr.beds": NHFR_BEDS,
+  "nhfr.barangay-presence": NHFR_PRESENCE,
   "uuc.listed":
     "Barangays on the accepted final UUC-PHC list. At barangay level, 1 means listed and 0 means not listed; not listed does not mean assessed and well served.",
   "uuc.route.ip":
@@ -39,8 +45,7 @@ const definitions: Record<string, string> = {
     "Listed barangays qualifying through the recorded 4Ps route under AO 2020-0023. Denominator: listed barangays.",
   "uuc.route.health":
     "Listed barangays qualifying through recorded health criteria. Denominator: health-evaluable listed barangays; unusable provincial benchmarks are excluded.",
-  "population.residents":
-    "PSA POPCEN 2024 resident population in accepted matched census rows. Higher-level totals sum matched municipalities and may be partial; Manila retains its published province-node figure.",
+  "population.residents": `${POPULATION_DEFINITION} ${POPULATION_COVERAGE} ${POPULATION_COMPARISON}`,
   "poverty.incidence": `${POVERTY_DEFINITION} ${POVERTY_UNCERTAINTY} ${POVERTY_SCOPE}`,
 };
 const specs = new Map(CATALOG.flatMap((d) => d.indicators.map((s) => [s.id, s] as const)));

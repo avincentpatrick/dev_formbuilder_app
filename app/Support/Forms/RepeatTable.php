@@ -13,8 +13,8 @@ use App\Enums\FieldType;
  * `resources/js/components/submissions/repeat-table.ts`. `tests/fixtures/repeat-table.json` holds the cases both read.
  *
  * A table cell holds one short answer: a text (short, email, phone or web address), a number, a date, or a choice (one, a
- * dropdown, or several as ticks) — a grid column's types ({@see MatrixColumns::TYPES}) and the three text kinds and a
- * dropdown beside them. Anything else a respondent sees — a long text, a time, a cascade, a note, a shown calculation, a
+ * dropdown, or several as ticks) — a grid column's types ({@see MatrixColumns::TYPES}) but its long text (M246), and the
+ * three text kinds and a dropdown beside them. Its own list, tied to the grid's only by `RepeatTableTest`. Anything else a respondent sees — a long text, a time, a cascade, a note, a shown calculation, a
  * Yes / No kept from before `D140` — keeps the section as cards, and the builder names the question that does. A member
  * that renders nothing (a hidden question, a page break, a calculation left Never) is no column at all.
  */

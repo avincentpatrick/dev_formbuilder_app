@@ -134,6 +134,35 @@ it('refuses to save a chart it could not run, as a field error and with nothing 
     'answers of a form that does not exist' => [['source' => 'answers', 'form_id' => '019a0000-0000-7000-8000-000000000000'], 'no longer exists'],
 ]);
 
+// M250 (`agreement-report`, `D234`): an agreement list is saved like any chart, as the declaration the server wrote.
+it('saves an agreement list with what it counts, and refuses one naming a question the form cannot report on', function (): void {
+    $form = publishedInboxForm($this->tenant, $this->owner, 'Clinic Intake');
+    $definition = chartDefinition([
+        'source' => 'agreement',
+        'form_id' => (string) $form->id,
+        'chart' => 'agreement',
+        'dimensions' => [],
+        'measures' => [],
+        'agreement' => ['items' => ['answer:color', 'answer:hobbies'], 'leave_out' => ['g'], 'threshold' => 80, 'min_views' => 2],
+    ]);
+
+    $this->actingAs($this->owner)->post(chartsUrl(), ['name' => 'Short list', 'definition' => $definition])->assertRedirect();
+
+    expect(chartRows($this)->sole()->definition['agreement'])->toEqual([
+        'items' => ['answer:color', 'answer:hobbies'], 'leave_out' => ['g'], 'agreeing' => [], 'threshold' => 80, 'min_views' => 2,
+    ]);
+
+    // A short text is not a choice, so it cannot be put on the list: a field error while the author can still fix it.
+    $this->actingAs($this->owner)
+        ->from('http://acme.meridian.test/explore/new')
+        ->post(chartsUrl(), ['name' => 'Broken list', 'definition' => [...$definition, 'agreement' => ['items' => ['answer:full_name']]]])
+        ->assertRedirect('http://acme.meridian.test/explore/new')
+        ->assertSessionHasErrors(['definition']);
+
+    expect(session('errors')->first('definition'))->toContain('not a question this agreement list can report on')
+        ->and(chartRows($this))->toHaveCount(1);
+});
+
 it('refuses to save a chart over a source its author may not read', function (): void {
     // A Reviewer cannot open the audit trail, so a Reviewer cannot keep a chart of it either.
     $this->actingAs($this->colleague)
@@ -269,7 +298,7 @@ it('lets a colleague open a shared chart and nothing more', function (): void {
             ->where('chart.is_mine', false)
             ->where('chart.is_shared', true)
             ->where('chart.owner', 'Olivia Owner')
-            ->where('chart.can', ['update' => false, 'delete' => false])
+            ->where('chart.can', ['update' => false, 'delete' => false, 'export' => false])
             ->where('chart.source_label', 'Responses'));
 
     $this->actingAs($this->colleague)->patch(chartsUrl("/{$shared->id}"), ['name' => 'Renamed'])->assertForbidden();
@@ -293,12 +322,12 @@ it('lists a member\'s own charts first and then the shared ones, each by name', 
             ->where('charts.0.name', 'Alpha')
             ->where('charts.0.is_mine', true)
             ->where('charts.0.owner', null)
-            ->where('charts.0.can', ['update' => true, 'delete' => true])
+            ->where('charts.0.can', ['update' => true, 'delete' => true, 'export' => false])
             ->where('charts.1.name', 'Zebra')
             ->where('charts.2.name', 'Aardvark')
             ->where('charts.2.is_mine', false)
             ->where('charts.2.owner', 'Raj Reviewer')
-            ->where('charts.2.can', ['update' => false, 'delete' => false]));
+            ->where('charts.2.can', ['update' => false, 'delete' => false, 'export' => false]));
 });
 
 it('runs a shared chart as the member looking at it, never as its author', function (): void {

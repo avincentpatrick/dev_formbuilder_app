@@ -26,7 +26,9 @@
  * the parser's own hole-free fast path already returns in one `String.includes`.
  */
 
+import { ABSENT } from './coercion';
 import { displayValue } from './display-value';
+import { cellSource, resolveCell } from './grid-cells';
 import { TemplateParser } from './template';
 
 /** One piping source: a field's raw `field_type` and its RAW `config` (never a render-model projection). */
@@ -67,7 +69,14 @@ export class TemplateRenderer {
             // `hasOwn`, not `sources[key]`. A hole key is `[A-Za-z_][A-Za-z0-9_]*`, so `${constructor}`
             // and `${toString}` are GRAMMATICAL — and a bare lookup on an object literal would return
             // `Object.prototype`'s member for them. PHP structurally cannot have this bug; we can.
-            const source = hasOwn(sources, segment.value) ? sources[segment.value] : undefined;
+            let source = hasOwn(sources, segment.value) ? sources[segment.value] : undefined;
+            let answer: unknown = hasOwn(answers, segment.value) ? answers[segment.value] : null;
+
+            // M246 (`R-ffd10da2`; mirror of PHP `TemplateRenderer::cell()`): `${grid.row.col}` / `${grid.row}` — one
+            // cell of a grid, shown as its column's type, its value read as an expression reads it.
+            if (source === undefined && segment.value.includes('.')) {
+                [source, answer] = cellOf(segment.value, sources, answers);
+            }
 
             // An unknown key renders empty rather than throwing: the publish gate already refused every
             // resolvable-at-publish case, so reaching here means the snapshot and the answer document
@@ -75,8 +84,6 @@ export class TemplateRenderer {
             if (source === undefined) {
                 continue;
             }
-
-            const answer = hasOwn(answers, segment.value) ? answers[segment.value] : null;
 
             out += displayValue(source.type, answer, source.config, locale);
         }
@@ -98,6 +105,20 @@ export class TemplateRenderer {
     ): string | null {
         return template === null ? null : this.render(template, sources, answers, locale);
     }
+}
+
+/** M246: a cell hole's source and answer, or `[undefined, null]` for an unknown grid, row or column. */
+function cellOf(hole: string, sources: RenderSources, answers: Record<string, unknown>): [RenderSource | undefined, unknown] {
+    const [key, row, column] = hole.split('.');
+    const grid = hasOwn(sources, key) ? sources[key] : undefined;
+    const source = grid === undefined || row === undefined ? null : cellSource(grid.type, grid.config, row, column ?? null);
+    if (source === null) {
+        return [undefined, null];
+    }
+
+    const value = resolveCell(hasOwn(answers, key) ? answers[key] : undefined, row, column ?? null);
+
+    return [source, value === ABSENT ? null : value];
 }
 
 /** Hand-wired factory, mirroring `makeTemplateParser()`'s role for the golden runner. */

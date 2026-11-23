@@ -2148,6 +2148,11 @@ function sectionPayload(section: LocalSection): Record<string, unknown> {
         min_instances: section.min_instances,
         max_instances: section.max_instances,
         repeat_layout: section.repeat_layout ?? null,
+        // M247 (`D231`): a wide page, or null for the reading width.
+        page_width: section.page_width === 'wide' ? 'wide' : null,
+        // M249 (`D233`): sent as typed; the server trims it and stores a blank as none.
+        chapter: section.chapter ?? null,
+        progress_label: section.progress_label ?? null,
         relevant_expression: section.relevant_expression,
         version: section.version,
     };
@@ -2193,7 +2198,7 @@ export interface ConversionWarningItem {
     message: string;
 }
 
-/** `site` is one of `relevance`, `section_relevance`, `formula`, `constraint`, `rule`, `template`. */
+/** `site` is one of `relevance`, `section_relevance`, `formula`, `constraint`, `rule`, `grid_rule` (M246), `template`. */
 export interface ConversionCensusEntry {
     code: string;
     site: string;

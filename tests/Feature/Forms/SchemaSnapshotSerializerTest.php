@@ -215,3 +215,32 @@ it('refuses a layout the database does not know', function (): void {
         'sequence' => 0, 'is_repeatable' => true, 'repeat_layout' => 'carousel',
     ]))->toThrow(QueryException::class);
 });
+
+it('M247: writes a wide page into the snapshot only when the section is wide, so a reading-width section hashes as before', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+    $section = FormSection::query()->create([
+        'tenant_id' => $this->tenant->id, 'form_version_id' => $version->id, 'key' => 'indicators', 'label' => 'Indicators',
+        'sequence' => 0,
+    ]);
+    $narrow = $this->serializer->snapshot($version->refresh());
+    $before = $this->serializer->checksumOf($narrow);
+
+    $section->forceFill(['page_width' => 'wide'])->save();
+    $wide = $this->serializer->snapshot($version->refresh());
+
+    expect($narrow['sections'][0])->not->toHaveKey('page_width')
+        ->and($wide['sections'][0]['page_width'])->toBe('wide')
+        ->and($this->serializer->checksumOf($wide))->not->toBe($before);
+
+    $section->forceFill(['page_width' => null])->save();
+    expect($this->serializer->checksumOf($this->serializer->snapshot($version->refresh())))->toBe($before);
+});
+
+it('M247: refuses a page width the database does not know', function (): void {
+    $version = makeDraftVersion(makeForm($this->user));
+
+    expect(fn () => FormSection::query()->create([
+        'tenant_id' => $this->tenant->id, 'form_version_id' => $version->id, 'key' => 'indicators', 'label' => 'Indicators',
+        'sequence' => 0, 'page_width' => 'huge',
+    ]))->toThrow(QueryException::class);
+});

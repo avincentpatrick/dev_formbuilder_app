@@ -631,6 +631,16 @@ final class PublishValidationException extends RuntimeException
         );
     }
 
+    /**
+     * M246 (`grid-question-table`, `R-ffd10da2`): a grid cell — `${grid.row.col}`, `${grid.row}` or this row's `${.col}`
+     * — named where it cannot be: a grid, row or column that is not there, a cell that is not always asked (`D230`), a
+     * cell of the grid's own rules named by its full path, one to the right, or one in a default value.
+     */
+    public static function gridCellReference(string $ownerKey, string $reference, string $reason): self
+    {
+        return self::one($ownerKey, 'grid_cell_reference_invalid', '“'.$ownerKey.'” names the grid cell “${'.$reference.'}”, but '.$reason.'.');
+    }
+
     private static function one(?string $field, string $code, string $message): self
     {
         return new self($message, [['field' => $field, 'code' => $code, 'message' => $message]]);

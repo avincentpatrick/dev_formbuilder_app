@@ -178,13 +178,13 @@ it('offers each role exactly the data sources whose own pages it can open', func
 
     expect(exploreSourcesFor($member))->toBe($sources);
 })->with([
-    'an Owner: everything' => ['owner', ['responses', 'answers', 'forms', 'members', 'activity', 'deliveries', 'points', 'feedback']],
-    'an Admin: everything' => ['admin', ['responses', 'answers', 'forms', 'members', 'activity', 'deliveries', 'points', 'feedback']],
+    'an Owner: everything' => ['owner', ['responses', 'answers', 'grid_rows', 'agreement', 'forms', 'members', 'activity', 'deliveries', 'points', 'feedback']],
+    'an Admin: everything' => ['admin', ['responses', 'answers', 'grid_rows', 'agreement', 'forms', 'members', 'activity', 'deliveries', 'points', 'feedback']],
     // A Viewer reads org-wide numbers and the leaderboard; not the roster, the audit trail or deliveries.
-    'a Viewer' => ['viewer', ['responses', 'answers', 'forms', 'points']],
+    'a Viewer' => ['viewer', ['responses', 'answers', 'grid_rows', 'agreement', 'forms', 'points']],
     // An Editor and a Reviewer are grant-scoped: their own forms' responses and answers, nothing workspace-wide.
-    'a Form Editor' => ['form_editor', ['responses', 'answers', 'forms']],
-    'a Reviewer' => ['reviewer', ['responses', 'answers', 'forms']],
+    'a Form Editor' => ['form_editor', ['responses', 'answers', 'grid_rows', 'agreement', 'forms']],
+    'a Reviewer' => ['reviewer', ['responses', 'answers', 'grid_rows', 'agreement', 'forms']],
 ]);
 
 it('offers deliveries only for the half a member could open a page for', function (): void {
@@ -227,18 +227,30 @@ it('gives the builder its sources with their fields, and never a field\'s SQL', 
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('explore/Chart', false)
-        ->has('sources', 8)
+        ->has('sources', 10)
         ->where('sources.0.key', 'responses')
         ->where('sources.0.range_field', 'submitted_at')
         ->where('sources.1.key', 'answers')
         ->where('sources.1.requires_form', true)
+        ->where('sources.1.requires_grid', false)
+        // M247 (`D231`): a grid, row by row — it names a form and one of the form's grids.
+        ->where('sources.2.key', 'grid_rows')
+        ->where('sources.2.requires_form', true)
+        ->where('sources.2.requires_grid', true)
+        // M250 (`D234`): the agreement list — a form's questions, and no chart but its own list.
+        ->where('sources.3.key', 'agreement')
+        ->where('sources.3.requires_form', true)
+        ->where('sources.3.charts', ['agreement'])
+        ->where('sources.1.charts', ['bar', 'column', 'stacked', 'line', 'area', 'donut', 'table', 'number'])
+        ->where('options.agreement.default_threshold', 75)
+        ->where('options.agreement.default_min_views', 6)
         ->has('sources.0.fields.0', fn (Assert $field) => $field
             ->where('key', 'form')
             ->where('label', 'Form')
             ->where('type', 'category')
             ->where('group', 'Response')
             ->where('options', []))
-        ->has('options.charts', 8)
+        ->has('options.charts', 9)
         ->has('options.aggregates', 7)
         ->has('options.buckets', 7)
         ->where('options.limits.max_range_days', 1096)
@@ -365,6 +377,8 @@ it('mounts every explorer route inside the tenant group, with the same pipeline 
     $names = [
         'explore.index', 'explore.create', 'explore.fields', 'explore.query', 'explore.charts.store',
         'explore.charts.show', 'explore.charts.result', 'explore.charts.update', 'explore.charts.destroy',
+        // M250 (`D234`): a saved agreement list as a spreadsheet.
+        'explore.charts.export',
     ];
 
     foreach ($names as $name) {

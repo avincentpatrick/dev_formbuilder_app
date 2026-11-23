@@ -1,6 +1,6 @@
 {
   "grammar_version": "2.0",
-  "total": 361,
+  "total": 403,
   "files": {
     "comparison": 14,
     "emptiness": 14,
@@ -9,11 +9,12 @@
     "coercion": 27,
     "arithmetic": 33,
     "functions": 31,
-    "parse-errors": 58,
+    "parse-errors": 67,
     "yes-no": 33,
     "temporal": 37,
     "constraint": 11,
     "date-functions": 50,
-    "math-functions": 35
+    "math-functions": 35,
+    "cells": 33
   }
 }

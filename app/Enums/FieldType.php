@@ -142,6 +142,16 @@ enum FieldType: string
     }
 
     /**
+     * M249 (`dropdown-placeholder`, `D233`): whether this type's choices may carry a short label — what its CLOSED box
+     * shows while a choice is chosen. Only a dropdown has a closed box; a grid's single-choice column is one too, and the
+     * grid's own editor offers it there.
+     */
+    public function takesShortLabels(): bool
+    {
+        return $this === self::Dropdown;
+    }
+
+    /**
      * The builder config editor this type needs beyond the shared Basics/Validation/Advanced tabs, or null
      * for none. `'choices'` is the plain option-list editor (all {@see hasOptions()} types); the others are
      * dedicated per-type editors. Single source the builder palette ships to the client so the config panel

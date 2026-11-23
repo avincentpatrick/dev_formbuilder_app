@@ -8,7 +8,8 @@
  *
  * Frozen answer-value shape (the engines cannot diverge on it): scalar string for text/choice/date;
  * number for integer/decimal; ALWAYS a `string[]` for multi_select; null or an absent key for unanswered.
- * A repeatable section's key resolves to its instance-map array (for `count()`).
+ * A repeatable section's key resolves to its instance-map array (for `count()`). M246: a grid's key resolves to
+ * its answer object, read only through a cell reference; `row` is the current grid row's cells for `${.col}`.
  */
 
 import type { EngineValue } from './coercion';
@@ -23,10 +24,14 @@ export class EvaluationContext {
     /** The injected clock (ISO-8601) that `today()`/`now()` read; null when no clock is set (grammar v2.0). */
     readonly now: string | null;
 
-    constructor(answers: Answers, self: EngineValue | typeof UNSET = UNSET, now: string | null = null) {
+    /** M246: the current grid row's cells while a grid column's own rule runs, read by `${.col}`; null elsewhere. */
+    readonly row: Record<string, unknown> | null;
+
+    constructor(answers: Answers, self: EngineValue | typeof UNSET = UNSET, now: string | null = null, row: Record<string, unknown> | null = null) {
         this.answers = answers;
         this.self = self;
         this.now = now;
+        this.row = row;
     }
 
     has(key: string): boolean {
@@ -49,11 +54,12 @@ export class EvaluationContext {
     /**
      * Golden-runner factory — mirrors EvaluationContext::fromVector.
      */
-    static fromVector(vector: { answers?: Answers; self?: EngineValue; now?: string }): EvaluationContext {
+    static fromVector(vector: { answers?: Answers; self?: EngineValue; now?: string; row?: Record<string, unknown> }): EvaluationContext {
         return new EvaluationContext(
             vector.answers ?? {},
             Object.prototype.hasOwnProperty.call(vector, 'self') ? (vector.self as EngineValue) : UNSET,
             typeof vector.now === 'string' ? vector.now : null,
+            typeof vector.row === 'object' && vector.row !== null ? vector.row : null,
         );
     }
 }

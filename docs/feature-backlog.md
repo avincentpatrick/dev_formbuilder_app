@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:413` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md` evidence list (its "And a Free tenant reaches neither route" note; number dropped by `M250`: an inserted row moved it), **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same
@@ -4665,7 +4665,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   and the `AppServiceProvider` call site that causes it. **Latent when found and recorded as such**: nothing
   in `app/` creates or updates a `Tenant` row's name. Original filing follows.
   **`major` · A second raw-HTML sink shipped in this branch, and the escaping contract says there is
-  none.** `docs/piping-output-encoding-design.md:151` asserts *"zero `{!!` exists in application code
+  none.** `docs/piping-output-encoding-design.md` §5 (its Blade-shells row) asserts *"zero `{!!` exists in application code
   today"*, status "(holds)", and `:180` makes any second sink a contract change. The new
   `resources/views/vendor/mail/html/header.blade.php:31,33` carries two — `:31` interpolating blind into an
   HTML **attribute** (`alt="{!! trim($slot) !!}"`). Its premise that the slot arrived escaped does not hold:
@@ -7573,7 +7573,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php`
   through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
   **twin**, which this repository treats as a separate obligation:
-  `docs/xlsform-interop-spec.md:139` records both surfaces for the adjacent export, and
+  `docs/xlsform-interop-spec.md` §8 ("Both HTTP surfaces expose export") records both surfaces for the adjacent export, and
   `routes/tenant.php` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
   ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
   fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
@@ -11365,7 +11365,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M112` (2026-09-26) — `minor` · Publish refuses on the first violation only, as a message-only toast, while the warnings path beside
   it gets a proper banner.** Filed 2026-09-25 by `M110` from the same exploration, and this is the half of *"or if
   we can show what is wrong to the user so the user can correct it"* that the server owns.
-  `StructuralValidationGate.php:39-91` throws inside its `foreach`, so one mis-configured field aborts the whole
+  `StructuralValidationGate.php`'s `assertPublishable()` and `collect()` throws inside its `foreach`, so one mis-configured field aborts the whole
   transaction and the author is told about exactly one of however many problems exist.
   `FormPublishController.php:33-37` renders `PublishValidationException` — which is prose, carrying no structured
   `field` or `code` — as a transient flash toast. ⚠️ **The contrast is in the same controller:** `:42-61` flashes
@@ -11839,7 +11839,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:75`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:50`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:49`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:75`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:50`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts`'s `SUPPORTED` set. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11892,7 +11892,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   collector risks the expression gate meeting a field whose section belongs to a foreign version — which is why
   `M112` scoped its change to one gate rather than three. Eighteen message assertions across
   `ExpressionValidationGateTest` and `TemplateValidationGateTest` pin the current wording and would need the same
-  join-not-summarise treatment. **Live.** Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — BOTH GATES COLLECT, `PublishService.php` WAS NOT EDITED, AND THE ROW POINTED AT THE WRONG GATE FOR ITS OWN WARNING.** ✅ **EVERY CITATION HELD EXACTLY.** ⛔ **THE TEMPLATE GATE'S LOSS WAS THREE-DEEP, NOT ONE-DEEP.** `checkAll()` threw on the **first** entry of a walk that covers base-then-locales, and it is called six-plus times per publish — so one refusal discarded (a) the later **columns** of the same owner, (b) the later **locale variants** of the same column, and (c) every later field and section. A form whose English label was fine and whose French one dangled reported the English problem and hid the French one behind it. `checkAll()` becomes `violationsIn()`, its returning twin, and the per-locale half is recovered for free. ⛔ **`PublishService.php` IS NOT EDITED, DELIBERATELY.** Each gate collects internally and throws once from its existing `assert*()`, so `:126-128` stays three sequential statements and statement n+1 stays unreachable when n throws — the ordering is preserved **by not touching it**, and the row stays off a hub. ⚠️ **AND THE ROW'S STATED REASON FOR THAT ORDERING IS WRONG, WHICH MAKES THE CONCLUSION STRONGER RATHER THAN WEAKER.** It warns the expression gate might meet *"a field whose section belongs to a foreign version"*. `ExpressionValidationGate` **never joins a field to its section** — it builds a flat `knownKeys` union from field keys (`:48`) and section keys (`:73`) and never reads `form_section_id`. It is **`TemplateValidationGate.php:82`** that makes that join, and a miss there flows into `TemplateScopeResolver::fieldPosition()` as `sectionSequence ?? -1` — a *real* position, silently wrong, hoisting the field to the front of the form and nulling its repeat scope. Recorded at both gates. ⚠️ **The row's *"eighteen message assertions"* is right as a `toThrow` count (6 + 12) and loose as a description:** **16** assert wording, 2 are bare class assertions. ✅ **All of them stayed green, and the reason is a property rather than luck:** Pest's `toThrow($class, $message)` calls `assertStringContainsString`, none asserts a count, none asserts exact equality, and `several()` joins the sentences verbatim — so a single violation is **byte-identical** to the pre-`M113` message. Pinned by its own case in each gate's suite rather than hoped for. ⚠️ **The clause I most expected to be wrong was wrong in my favour:** no existing fixture carried an incidental second violation that the widened walk would newly surface. ✅ **Two mutations CAUGHT with DISJOINT kill sets, because one would have read as a single gap:** `m113-template-first-wins-within-owner` (`violationsIn()` returns after its first finding) reddens **only the per-locale case** while the per-column case stays green, since each column is its own call; and `m113-expression-first-wins` (`capture()` rethrows) reddens **only the two across-owner cases** while the byte-identity case and all five pre-existing wording cases stay green.
+  join-not-summarise treatment. **Live.** Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — BOTH GATES COLLECT, `PublishService.php` WAS NOT EDITED, AND THE ROW POINTED AT THE WRONG GATE FOR ITS OWN WARNING.** ✅ **EVERY CITATION HELD EXACTLY.** ⛔ **THE TEMPLATE GATE'S LOSS WAS THREE-DEEP, NOT ONE-DEEP.** `checkAll()` threw on the **first** entry of a walk that covers base-then-locales, and it is called six-plus times per publish — so one refusal discarded (a) the later **columns** of the same owner, (b) the later **locale variants** of the same column, and (c) every later field and section. A form whose English label was fine and whose French one dangled reported the English problem and hid the French one behind it. `checkAll()` becomes `violationsIn()`, its returning twin, and the per-locale half is recovered for free. ⛔ **`PublishService.php` IS NOT EDITED, DELIBERATELY.** Each gate collects internally and throws once from its existing `assert*()`, so `:126-128` stays three sequential statements and statement n+1 stays unreachable when n throws — the ordering is preserved **by not touching it**, and the row stays off a hub. ⚠️ **AND THE ROW'S STATED REASON FOR THAT ORDERING IS WRONG, WHICH MAKES THE CONCLUSION STRONGER RATHER THAN WEAKER.** It warns the expression gate might meet *"a field whose section belongs to a foreign version"*. `ExpressionValidationGate` **never joins a field to its section** — it builds a flat `knownKeys` union from field keys (`:48`) and section keys (`:73`) and never reads `form_section_id`. It is **`TemplateValidationGate.php`**'s source map (its `$sectionById->get($field->form_section_id)`) that makes that join, and a miss there flows into `TemplateScopeResolver::fieldPosition()` as `sectionSequence ?? -1` — a *real* position, silently wrong, hoisting the field to the front of the form and nulling its repeat scope. Recorded at both gates. ⚠️ **The row's *"eighteen message assertions"* is right as a `toThrow` count (6 + 12) and loose as a description:** **16** assert wording, 2 are bare class assertions. ✅ **All of them stayed green, and the reason is a property rather than luck:** Pest's `toThrow($class, $message)` calls `assertStringContainsString`, none asserts a count, none asserts exact equality, and `several()` joins the sentences verbatim — so a single violation is **byte-identical** to the pre-`M113` message. Pinned by its own case in each gate's suite rather than hoped for. ⚠️ **The clause I most expected to be wrong was wrong in my favour:** no existing fixture carried an incidental second violation that the widened walk would newly surface. ✅ **Two mutations CAUGHT with DISJOINT kill sets, because one would have read as a single gap:** `m113-template-first-wins-within-owner` (`violationsIn()` returns after its first finding) reddens **only the per-locale case** while the per-column case stays green, since each column is its own call; and `m113-expression-first-wins` (`capture()` rethrows) reddens **only the two across-owner cases** while the byte-identity case and all five pre-existing wording cases stay green.
 
 - ✅ **CLOSED BY `M113` (2026-09-26) — `minor` · Ten client-side copies of the field-type catalogue have no parity test, and two of them mirror no
   PHP counterpart at all.** Found by `M112` (2026-09-26) while verifying `R-54a19217`; the row it was verified
@@ -11923,7 +11923,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   nothing reports it. Real temporal ordering means either a date-aware comparison in both engines with golden
   vectors, or a documented refusal at publish. ⚠️ `duration` is NOT affected: `XlsformTypeMap.php:64` maps it to
   `decimal` and its stored answer really is a number, which is why `ValueShape` splits it out. **Live.**
-  Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — REFUSED AT PUBLISH, AND THE ROW'S PREMISE WAS OVERSTATED IN THE ONE CLAUSE THE REMEDY RESTS ON.** ⛔ **`ValueShape::allows()` AND `allowsOperator()` HAD ZERO PRODUCTION CALLERS.** A whole-`app/` grep for `ValueShape` returned three hits — the `use` and the `carriesOptionList()` call in `StructuralValidationGate.php`, and a docblock mention in `DefaultFieldRules.php` — and `UpdateFieldRequest.php:73` validates `rule_type` as a bare `Rule::enum()` with no field-type cross-check. `M112` shipped the table and wired it to nothing, so *"the authoring half is closed"* was false on both sides. This increment is its **first production caller**. ⛔ **AND THE LIVE DEFECT WAS NARROWER AND SHARPER THAN THE ROW.** `ExpressionValidationGate.php:190-192` already refuses `min_value`/`max_value` whose `rule_value` is not numeric-like, so `min_value = '2026-01-01'` on a date was **already** refused; what had no check anywhere is `greater_than_field`/`less_than_field`, which takes no `rule_value` at all — so `end_date > start_date`, the row's own *"single most natural temporal rule"*, published clean and refused every submission. ✅ **Both engines fail closed identically** (`coercion.ts:27` is byte-identical to `NUMERIC_RE`; `evaluator.ts:119` returns false on NaN), so it is a correctness defect and not a parity one. ⛔ **THE GAP THE ROW DID NOT NAME, FOUND BY REDDENING AN EXISTING TEST RATHER THAN BY READING:** `form_field_validations` carries a DB CHECK enforcing `expression` XOR `rule_type`, so every raw-expression row has a **null** `rule_type`; passing that to `allows()` — whose parameter is not nullable — escaped the gate as a **TypeError** rather than a refusal and reddened `ExpressionValidationGateTest`'s unparseable-expression case. Guarded, and pinned by its own regression case. ✅ **Blast radius measured at ZERO and it held**: no seeder writes any validation row, `database/**` and `tests/fixtures/**` carry no `min_value`/`greater_than_field`, both `greater_than_field` golden vectors are `integer`, and `DefaultFieldRules.php:68-80` seeds `[]` for all four temporal types — 954 tests across `Forms`, `Submissions` and `Unit/Forms` stayed green. ⚠️ **Save-time rejection in `UpdateFieldRequest` was deliberately refused** — it would block an author mid-edit and strays onto `R-e878d49a`'s surface. ⚠️ **The row's OTHER remedy is filed, not dropped:** real temporal ordering is now its own row, because `ValueShape.php:46` claims one already exists and it did not. ✅ **Mutation `m113-temporal-allowed` CAUGHT** — letting `Temporal` take `GreaterThanField` reddens the ordered-rule case and the every-violation case while **the `min_value` case stays green**, because that is a different `match` arm: the two halves are proved separately rather than read as one gap.
+  Filed by `M112`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — REFUSED AT PUBLISH, AND THE ROW'S PREMISE WAS OVERSTATED IN THE ONE CLAUSE THE REMEDY RESTS ON.** ⛔ **`ValueShape::allows()` AND `allowsOperator()` HAD ZERO PRODUCTION CALLERS.** A whole-`app/` grep for `ValueShape` returned three hits — the `use` and the `carriesOptionList()` call in `StructuralValidationGate.php`, and a docblock mention in `DefaultFieldRules.php` — and `UpdateFieldRequest.php:73` validates `rule_type` as a bare `Rule::enum()` with no field-type cross-check. `M112` shipped the table and wired it to nothing, so *"the authoring half is closed"* was false on both sides. This increment is its **first production caller**. ⛔ **AND THE LIVE DEFECT WAS NARROWER AND SHARPER THAN THE ROW.** `ExpressionValidationGate.php:190-192` already refuses `min_value`/`max_value` whose `rule_value` is not numeric-like, so `min_value = '2026-01-01'` on a date was **already** refused; what had no check anywhere is `greater_than_field`/`less_than_field`, which takes no `rule_value` at all — so `end_date > start_date`, the row's own *"single most natural temporal rule"*, published clean and refused every submission. ✅ **Both engines fail closed identically** (`coercion.ts:27` is byte-identical to `NUMERIC_RE`; `evaluator.ts`'s `numericCompare()` returns false on NaN), so it is a correctness defect and not a parity one. ⛔ **THE GAP THE ROW DID NOT NAME, FOUND BY REDDENING AN EXISTING TEST RATHER THAN BY READING:** `form_field_validations` carries a DB CHECK enforcing `expression` XOR `rule_type`, so every raw-expression row has a **null** `rule_type`; passing that to `allows()` — whose parameter is not nullable — escaped the gate as a **TypeError** rather than a refusal and reddened `ExpressionValidationGateTest`'s unparseable-expression case. Guarded, and pinned by its own regression case. ✅ **Blast radius measured at ZERO and it held**: no seeder writes any validation row, `database/**` and `tests/fixtures/**` carry no `min_value`/`greater_than_field`, both `greater_than_field` golden vectors are `integer`, and `DefaultFieldRules.php:68-80` seeds `[]` for all four temporal types — 954 tests across `Forms`, `Submissions` and `Unit/Forms` stayed green. ⚠️ **Save-time rejection in `UpdateFieldRequest` was deliberately refused** — it would block an author mid-edit and strays onto `R-e878d49a`'s surface. ⚠️ **The row's OTHER remedy is filed, not dropped:** real temporal ordering is now its own row, because `ValueShape.php:46` claims one already exists and it did not. ✅ **Mutation `m113-temporal-allowed` CAUGHT** — letting `Temporal` take `GreaterThanField` reddens the ordered-rule case and the every-violation case while **the `min_value` case stays green**, because that is a different `match` arm: the two halves are proved separately rather than read as one gap.
 
 - **`minor` · `BuilderPresenter` emits no `*_translations` column at all, so the builder cannot show a form in
   any locale but the default — and the live preview inherits that.** Found by `M112` (2026-09-26) while building
@@ -12014,10 +12014,10 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   disjunctions of the same catalogue remain ungated.** Found by `M113` (2026-09-26) by enumerating every
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
-  strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
+  strings appear as bare inline disjunctions at eight places in `schema-mapping.ts`,
   `FieldInput.vue:252,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
-  already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
+  already guards** — `schema-mapping.ts` held a fourth four-member media disjunction (number dropped by `M249`: its line went blank), and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
   literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why
   their totals differ from each other and from the tree: ten by declaration, six by file, twenty-eight or so
@@ -14595,7 +14595,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M183` (2026-10-22) — ****`minor` · A grid is drawn as a stack of row cards, never as a table, on the web form, manual entry and the builder preview.**
   `resources/js/components/submissions/MatrixGrid.vue:9-13` states "NO `<table>` — each row is its own nested `<fieldset>`", and
   `:118-135` lays one card per row with a labelled select per column; the same component serves the public form, the encode page
-  and the preview (`resources/js/components/submissions/FieldInput.vue:269-270`). Only the printed PDF draws a table
+  and the preview (`resources/js/components/submissions/FieldInput.vue`'s grid controls). Only the printed PDF draws a table
   (`app/Enums/PrintAnswerArea.php:92`). The testers want "a grid"; Kobo's matrix is a table in the Grid theme. The remedy: a real
   `<table>` (`<th scope="col">`, `<th scope="row">`, one control per cell by column type from the design system's inputs) from
   48em, the existing stacked fieldsets below it, `config.layout = table | stacked` for an author who wants cards everywhere;
@@ -14681,7 +14681,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The testers' question (2026-10-15): *"Does the platform support cascading options linked to the Philippine Standard Geographic
   code (PSGC)?"*. `M141` made a PSGC-sized cascade work from uploaded CSV files (measured at 43,739 options), but no PSGC data
   exists in the repository, each form re-uploads its own lists (`app/Services/Forms/ChoiceListMaterializer.php:185` reads them by
-  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md:375` says a reference-dataset table is
+  version), `docs/PRD.md:442` declined a national geography, and `docs/data-dictionary.md`'s Design Notes say a reference-dataset table is
   "deliberately not introduced here". The Philippine Statistics Authority publishes the PSGC Publication Datafile each quarter
   (3Q 2026 released 2026-10-12; ten-digit codes kept as text; region, province or independent city, city or municipality,
   barangay). `D131` (the user, 2026-10-15): built in, free. The remedy: a platform-wide read-only `psgc_places` table (code, name,
@@ -14749,12 +14749,13 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   drift test and `manual.test.ts` so it cannot rot — written with the two controls `D134` builds. **Live.** Filed by `M172`.
   **Tier: early-testing.** ✅ **CLOSED BY `M187` (2026-10-25), reshaped:** a hand-written table pinned by two tests would still be a ninth copy of eight rules, so the cells are DERIVED — `app/Support/Forms/FieldReadiness.php` reads each from the rule that decides it (`isRetired()`, `EncodeFormPresenter::supports()` — one column for the web form and manual entry, which `FieldTypeMirrorDriftTest` pins equal — `PrintAnswerArea`, `OcrFieldEligibility`, `PdfFieldRole`, `isDataField()` with a grid's per-cell columns, `AnalyticsFieldEligibility`, `OperandKind::offered()`), `php artisan help:readiness` commits `resources/js/components/help/field-readiness.json`, and `tests/Feature/Help/FieldReadinessTableTest.php` holds the file equal to the derivation. Help → Builder reference → *What each type can do* draws it with `MdsDataTable` (a card per type on a phone); the Preview is a sentence under it rather than a column (it draws each question as the web form does, and its differences are `previewLimitations()`'s). Both Adv sentences link to it. Reviewed T2–T5's chapters: one stale line (Duration's "a duration will be worked out by a calculation" — `M180` built it) corrected. Mutants caught: a verdict's words changed, a rule changed without regenerating (both Pest), a row dropped on the way into the manual (Vitest). **Live** on the trunk since `M187` merged at merge point 6 (`4f321bd5`, 2026-10-26). Released at merge point 6 as PR #380 (`4f321bd5`), live on staging since 2026-10-26.
 
-- **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
+- ✅ **CLOSED BY `M246` (2026-11-18) — ****`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
   `docs/data-dictionary.md:383` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
   `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1126` tells authors so.
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M246` (2026-11-18), on its branch, held for the merge point.** `${grid.row.col}` names a Grid's cell and `${grid.row}` a Likert row, in every expression and in piped text, in both engines (`CellReferenceNode`; TS `cell`; 30 expression vectors, 9 parse errors, 11 template vectors). A rule elsewhere reads only a cell that is always asked (`D230`), which the publish gate checks by name; piped text shows any cell of an earlier grid, as its column's type. A cell is offered in the condition editor as "Grid — Row — Column" and in the "Insert a question" picker. Automations refuse one for now (`automation-grid-cell-conditions`); publish does not yet judge a cell's use by its column's type (`grid-cell-operand-judge`).
 
 - **`minor` · A grid cannot sit inside a repeatable section.**
   `app/Services/Forms/StructuralValidationGate.php:147-154` refuses it at publish, and `docs/data-dictionary.md:383` records the
@@ -15022,7 +15023,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
   or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
   with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
-  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:621` is a two-row text box whose help says *"Evaluated on the
+  hours or minutes). the Formula box in `resources/js/components/builder/ConfigPanel.vue` is a two-row text box whose help says *"Evaluated on the
   server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
   pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
@@ -15048,7 +15049,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M183` (2026-10-22) — ****`minor` · A Likert matrix is drawn as stacked cards that repeat the scale in every row, and a Likert scale as loose chips; neither looks like a Likert scale.**
   The user (2026-10-16): *"the likert matrix doesnt look like likert matrix, make a deep research on how kobo make the likert
-  matrix"*. `resources/js/components/submissions/MatrixGrid.vue:94` draws each statement as its own card with the scale's words
+  matrix"*. `resources/js/components/submissions/MatrixGrid.vue` draws each statement as its own card with the scale's words
   repeated beside its radios (no `<table>`, by the docblock at `:9`); `resources/js/components/submissions/FieldInput.vue:267` sends
   a Likert scale to the chip-row control. KoboToolbox's Rating question is one grid — a header row of scale words over equal-width
   columns, a statement column about a third wide, one centred radio per cell (Enketo's `label` / `list-nolabel` table) — and its
@@ -15172,7 +15173,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.
 
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
-  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue`, its `Default value` field) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
   XLSForm export (`XlsformExporter::applyDefault()`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the
@@ -15920,6 +15921,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: first read what is using C: and how fast it grows, then choose between a free-space warning and moving folders to E:. Moving the data directory restarts the PostgreSQL server, which also interrupts BHW Connect.
 
   **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**
+  *Amended by `M250` (2026-11-23), with the box's read-only measurements of 2026-11-20/21 (taken while BHW Connect's datasets were uploaded):*
+  - **C: free space** read 18.4 GB on 2026-11-08, 15.1 GB on 2026-11-20, 16.1 GB after the move below, and 15.0 GB on 2026-11-21 once the last datasets were in.
+  - **The database** is 1,774 MB (1,531 MB on 2026-11-20). BHW Connect's uploads added about 1.19 GB of stored files (LIPHIS alone 1,069 MiB), and `nightly-dump.ps1` keeps 14 nightly copies of them — about 16.6 GB, more than C: had free.
+  - **BHW Connect's nightly backup moved to E:** on 2026-11-20 (`E:\meridianackupshw`, the task's `-BackupDir`; its own operator's script, shared `ops/`, `D211`). Meridian's backups, the BHW pre-deploy dumps and `env\` stay on C:.
+  - The rate of growth is still unmeasured, and the free-space warning this row asks for is still unbuilt.
 
 - **`minor` · A tier holding only blocked rows leaves the Next section with nothing to take, even when a lower tier has ready rows.** Found by `M215` (2026-11-06) while separating ready rows from blocked ones in the reports. `next_work()` in `scripts/pipeline.php` picks the most urgent tier holding a ready or a blocked row and stops there, so once a tier's ready rows run out, its blocked rows hide every ready row below it. `during-testing` holds 76 blocked rows today, so this is what happens the day its 168 ready rows are done. `M215` made the reports say so (*"holds no ready row, so nothing in it can be started"*) instead of printing an empty list, and left the choice of tier alone. The remedy, to be measured when taken: fall through to the next tier with a ready row and name the blocked tier above it. **Latent.** — needs a tier whose open rows are all blocked. Filed by `M215`. **Tier: during-testing.**
 
@@ -16032,14 +16038,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Found by `M236` (2026-11-12). `/analytics` has a metered CSV and XLSX export of its tables; `/explore` shows each chart's numbers in a table on the page and offers no download. The remedy, when taken: export the shaped result (the table the page already prints) through the same metered export path, so a chart's download counts against the plan the way an analytics export does.
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
+  *Amended by `M250` (2026-11-23):* the path now exists for one chart type — `GET /explore/charts/{chart}/export` (`ExplorerExportController`, `ExplorerChartPolicy::export`, `AgreementExporter`, metered before the stream) downloads a saved **agreement list**. Every other chart is still refused there (403). What is left: an exporter arm for the grouped result, and the download rule per source (D5 of ADR-0025 says a download follows the source's own page — `submissions.export` for the answer sources; the others need theirs named).
 
 - **`minor` · `explorer-area-and-folder` — The explorer cannot group responses by area (scope node), which `/analytics` offers.**
   Found by `M236` (2026-11-12). `ResponsesSource` offers form, status, channel, language, reviewer and dates as group-bys. The area a response belongs to is one of `/analytics`' five axes, and the reader who moves to `/explore` loses it. The remedy, when taken: a scope-node field on the responses source, labelled through the scope tree and narrowed by the member's own scope grants, as the analytics axis is.
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
 
-- **`minor` · `explorer-unchartable-questions` — Questions in repeating sections, grids, cascading choices, locations, files and long text cannot be charted in the explorer.**
-  Found by `M236` (2026-11-12). `AnswersSource` offers a form's top-level questions of the countable kinds and says on the page how many it left out (ADR `0025-data-explorer.md` §D6). A repeating section's answers are an array per response, a grid's are an object per row, and a cascading choice stores a path, so each needs its own unnesting rule before it can be grouped or counted. Location, file and long-text answers have no category to group by.
+- **`minor` · `explorer-unchartable-questions` — Questions in repeating sections, cascading choices, locations, files and long text cannot be charted in the explorer.**
+  Found by `M236` (2026-11-12). `AnswersSource` offers a form's top-level questions of the countable kinds and says on the page how many it left out (ADR `0025-data-explorer.md` §D6). A repeating section's answers are an array per response, a grid's are an object per row, and a cascading choice stores a path, so each needs its own unnesting rule before it can be grouped or counted. Location, file and long-text answers have no category to group by. **Amended by `M247` (2026-11-20):** grids are charted row by row by their own source, "Rows of a grid" (ADR `0025-data-explorer.md` §D9, `D231`), whose unnesting is the pattern for a repeating section; the rest stands.
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
 
@@ -16302,7 +16309,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
+- ✅ **CLOSED BY `M246` (2026-11-18) — ****`minor` · `grid-question-table` — A grid cannot be a table of questions: its cells cannot drive a condition, a row cannot be hidden, a cell cannot be required-when or "not needed", and a row cannot carry details.**
   Found by `M237` (2026-11-14). NHETE's Stop 8 is two tables per domain, and today both become blocks of questions.
   - **The indicator table** has five answer columns, a long-text column, a cut-off cell that six rows cannot answer, and a comment required for three reasons.
   - **The parts table** has rows shown only for indicators the office keeps.
@@ -16317,12 +16324,114 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
+  ✅ **CLOSED BY `M246` (2026-11-18), on its branch, held for the merge point.** A row may be shown only when an answer calls for it and carry details under its label (content blocks, no picture); a Grid row may mark cells "Not needed"; a Grid column may be shown only when an answer calls for it, and in each row be needed or required only when its row says so, reading `${.col}` to its left; `long_text` joins the column types (`GridRules`, `config` only, no migration). Both engines decide them in their grid pass and report `gridRelevance`; the screen hides what is not asked, greys "Not needed", draws each cell's own error, and the builder edits them under each row and column in the Grid tab. Paper marks a conditional row or column and greys "Not needed"; XLSForm export writes each cell's rules. NHETE's three agreement grids, four indicator tables and a parts table per indicator are drawn as grids (`NhetePlan::TABLE`, `NheteTableRouteTest`). Left open as rows of their own: row details on paper, row details in XLSForm, a long-text column's word limit, a column's help text, renaming a named row or column safely, a labelled grid in the inbox and PDF, a version check for a cached page, cells in automations, and publish judging a cell by its column's type.
+
+- **`minor` · `grid-row-details-on-paper` — A grid row's details reach the screen but not the printed blank form or the response PDF.**
+  Found by `M246` (2026-11-18). Paper and PDF print a grid's rows by their labels (`BlankFormPrintPresenter::gridRows()`); on this branch's base they print no note content at all, which #589 (`M245`, held) changes with `PrintedContent`. NHETE's indicator rows carry their definition, cut-off and research as details, so a paper respondent sees only "A01 · name".
+
+  The remedy, when taken (once #589 is on the trunk): print each row's details under its label through `PrintedContent`, and teach `PrintedFormMatcher` the new printed lines in the grid's region, as it learned a note's.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-grid-row-details` — An exported grid loses its rows' details.**
+  Found by `M246` (2026-11-18). `XlsformExporter::emitMatrix()` writes one question per cell with its rules, and nothing for a row's details; this branch's base writes a note's label only, and #580 (`M244`, held) brings `XlsformMarkdown`.
+
+  The remedy, when taken (once #580 is on the trunk): write each row's details as a note row before its cells, through `XlsformMarkdown`, with a `#meridian` marker naming the row.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `grid-column-answer-limits` — A long-text grid column has no word limit, so NHETE's 1,500-word cap on its table comments is lost.**
+  Found by `M246` (2026-11-18). #568 (`M243`, held) gives a question `min_words`/`max_words` (`AnswerLimits`, both engines); a grid column has no such setting, and a grid's cells take no rule rows. `NhetePlan`'s table layout counts it (`grid-column-word-cap`).
+
+  The remedy, when taken (once #568 is on the trunk): a column's `min_words`/`max_words` (and a choice column's at-most), read by both engines' grid pass with golden vectors, set under the column in the Grid tab, and exported as the cell's constraint.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-column-help-text` — A grid column has no help text.**
+  Found by `M246` (2026-11-18). NHETE's cut-off and coverage columns carry a hint as questions; as grid columns they have nowhere to put it (`grid-column-hint` in `NhetePlan`'s table layout).
+
+  The remedy, when taken: a column's `hint`, drawn under its header in the table and its caption in the cards, tied to its controls by `aria-describedby`, printed on paper and exported as the cells' `hint`.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `grid-value-rename-carries` — Renaming or removing a grid row or column that a rule elsewhere names leaves the rule pointing at nothing.**
+  Found by `M246` (2026-11-18). A cell is named by its row's and column's values (`${grid.row.col}`). The Grid tab says "Named by …" under a named row or column, and publish refuses the dangling cell by name, but the rename does not carry — as a key rename did not before `M242` (#545, held).
+
+  The remedy, when taken: a row or column value rename rewrites every `${grid.row…}` that names it, through `ExpressionKeyRewriter` and the template rename, on the server, as `KeyRenameCarrier` does a key.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-answers-labelled-table` — The inbox and the response PDF show a grid as one line of values, which a long-text column makes hard to read.**
+  Found by `M246` (2026-11-18). `SchemaValueFormatter::formatGrid()` writes `row: col=cell; …` by values, not labels; a comment of several sentences sits inside it.
+
+  The remedy, when taken: the inbox and the PDF draw a grid as a table of its asked cells, by labels, with each long-text cell in full.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`minor` · `runtime-engine-handshake` — A respondent's cached old page, given a newer form, reads rules it does not know as if they were not there.**
+  Found by `M246` (2026-11-18). The service worker serves the page's shell and assets from cache when the network is slow or gone, and the form's schema separately; nothing checks that the engine in the cached page understands the schema. An engine from before `M246` given a form with `${grid.row.col}` stops on the reference and treats every question as shown, and ignores a grid's row and column rules. The server still refuses a wrong answer, and since `M246` shows it on its cell.
+
+  The remedy, when taken: the schema carries the engine version it needs; an older page reloads when online, or says it needs updating when offline; the sync manifest carries the same.
+
+  **Latent** — reachable only with a page cached before a release. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `automation-grid-cell-conditions` — A form automation's condition cannot read a grid cell.**
+  Found by `M246` (2026-11-18). `AutomationCondition` refuses a condition naming a cell, and its catalogue offers none, so "send an email when indicator A01 is kept" cannot be written.
+
+  The remedy, when taken: the automation catalogue offers always-asked cells as the condition editor does, and `AutomationCondition` checks a cell's grid, row and column.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `grid-cell-operand-judge` — Publish does not judge a grid cell's use by its column's type, so `${grid.row.col} > 3` on a text column publishes and is always false.**
+  Found by `M246` (2026-11-18). `ExpressionValidationGate`'s ordering checks (`ExpressionKeyUse`, `ExpressionOperandJudge`) read a whole question's `OperandKind`; a cell is not one, so it is not judged. The builder's condition editor offers only what a cell's column type allows, so only a hand-written expression meets this.
+
+  The remedy, when taken: judge a cell as its column's type (a Likert row as a number) in the same walk.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- **`nit` · `nhete-walk-tables` — The 49-page NHETE walk never meets a real grid, because it seeds the block-layout workbook.**
+  Found by `M246` (2026-11-18). `NheteE2eSeeder` imports the Meridian-dialect workbook, written from `NhetePlan`'s block layout (XLSForm cannot carry a grid back in), so `nhete-walk.spec.ts` checks scroll and axe on Stop 8 as blocks of questions. Real grids are checked in a browser on the showcase form (`public-runtime-axe.spec.ts`) and in the builder (`nhete-builder-block.spec.ts`), never at NHETE's scale of 42 grids and a 12-row indicator table. #589 files the same gap for note content (`nhete-walk-note-content`).
+
+  The remedy, when taken: a seeder that builds `NhetePlan::TABLE` through the services rather than a workbook, and the walk run on it at the three widths.
+
+  **Not live** — a request. Filed by `M246`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M247` (2026-11-20) — ****`minor` · `grid-wide-sticky-explorer` — A wide table cannot be drawn on a respondent's page, nothing is sticky, and grid answers cannot be charted.**
   Found by `M237` (2026-11-14). `RuntimeShell.vue` caps every respondent page at 44rem, so NHETE's table, drawn true from 900 px, can never be one. Neither grid component uses `position: sticky` for its header row or first column. The explorer cannot chart a grid (`explorer-unchartable-questions`).
 
   The remedy, when taken: a wide-page option per form or section, a sticky header and first column for wide grids (scrolling inside the table, never the page), and one explorer row per grid row.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M247` (2026-11-20), on its branch, held for the merge point (`D231`).** A section's Advanced tab gains **Wide page — for big tables** (`form_sections.page_width`, additive): while that section is on screen the guest page widens to the scanned-paper view's 90rem column from a 64rem viewport (`page-width.ts`; in single-page mode when any shown section is wide), the banner with it, and the encode page lifts its 45rem column. A grid's table pins its first column and, for more than eight shown rows on a screen at least 40rem tall, its header row in a box capped at 75dvh; the box is a named, focusable group when it overflows, and scroll padding keeps a focused cell clear of the pinned cells. The explorer's **Rows of a grid** source counts each answered row of each response once, with the Row and each column as fields (ADR `0025-data-explorer.md` §D9). Left out, each filed: `repeat-table-sticky`, `wide-page-prose-measure`, `explorer-grid-row-order`, `xlsform-page-width`.
+
+- **`nit` · `repeat-table-sticky` — A repeating section drawn as a table pins neither its header row nor its first column.**
+  Found by `M247` (2026-11-20). `RepeatTableFrame.vue` is the other grid-like table a respondent meets, and `M247` pinned only `MatrixGrid.vue`'s. A long household roster drawn as a table scrolls its column names out of view as a grid did.
+
+  The remedy, when taken: the same local layers, opaque pinned cells, height cap and focusable box `MatrixGrid.vue` has, on the repeat table — ideally one shared rule rather than a second copy.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+
+- **`nit` · `wide-page-prose-measure` — On a wide page, a note's text and a question's description run the full 90rem.**
+  Found by `M247` (2026-11-20). "Wide page" widens the whole column so a grid can be a table (`D231`); everything else on that page takes the width too, so a long note reads at well over the comfortable measure on a big screen.
+
+  The remedy, when taken: keep prose — notes, descriptions, hints — at a reading measure inside a wide column, and let only tables and repeat tables take the full width.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+
+- **`nit` · `explorer-grid-row-order` — A grid charted row by row lists its rows by count or by label, not in the grid's own order.**
+  Found by `M247` (2026-11-20). "Rows of a grid" makes the Row an ordinary category, so the explorer's sorts (by value, or by name) apply; NHETE's indicators read A01 … A11 in the form and by count on the chart.
+
+  The remedy, when taken: a "form order" sort for a category whose values have an author's order — a grid's rows, a choice's options.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+  *Note by `M250` (2026-11-23):* the agreement list already keeps the form's order — sections, questions, then a table's rows — as its tie-break (`AgreementItem::$position`); a chart's sort still does not.
+
+- **`nit` · `xlsform-page-width` — An exported or imported XLSForm does not carry a section's wide page.**
+  Found by `M247` (2026-11-20). `form_sections.page_width` is not written by `XlsformExporter` nor read by the importer, as `repeat_layout` is not; a form re-imported from its own export loses "Wide page".
+
+  The remedy, when taken: a `#meridian` token on the group's row, as the answer limits use, read back on import.
+
+  **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
 
 - **`minor` · `respondent-edit-after-submit` — A respondent cannot change their answers after Submit, even while the form is still open.**
   Found by `M237` (2026-11-14). NHETE says *"Until the closing date, a person can come back on the same device and change answers"*. Only staff can edit a submission (`SubmissionAnswerEditService`), and a finalized draft cannot be saved again. It pairs with the single-response-only row filed by `M130` and with `D118`'s same-device "Continue where you left off" row.
@@ -16331,26 +16440,102 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
   Found by `M237` (2026-11-14). NHETE has 10 named stops over about 45 screens, each screen with its own small progress label. `ProgressIndicator.vue` draws one numbered dot per visible step, and `useFormRuntime` labels a step *"Step X of N: {section title}"*. Sections have no parent.
 
   The remedy, when taken: an optional chapter name on a section, drawn as the progress bar's groups, and an optional progress label separate from the section title.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, stacked on #610, held for the merge point (`D233`).** A section's Basics tab gains **Progress label** and **Starts a chapter** with its **Chapter name** (`form_sections.chapter`, `chapter_translations`, `progress_label`, migration `2026_08_17_000153`, additive; plain text, at most 60 characters; snapshotted only when set, so no checksum moves; a copied section never starts a chapter).
+  - With chapters the respondent's bar shows "3 of 10 · {chapter}", one mark per chapter (a visited one jumps to its first visited page), then "Page 2 of 3: {page}" and the current chapter's own page dots (`lib/chapters.ts`). Grouping runs over every section before the visible pages are taken, so a hidden first page still names its chapter. A form with no chapter draws the step dots as before.
+  - A page is named by its progress label, or by its title piped as the heading is (`progress-title-unpiped`, below). In another language the progress label gives way to a translated title.
+  - The screen reader hears the same words; the builder's preview names the chapter; an ODK or Kobo outer group made only of groups imports as a chapter, and export writes each chapter back as one.
+  - NHETE: its ten stops are chapters and 48 screens carry a progress label. Left out, each filed below: `xlsform-progress-label`, `chapters-paper-encode`.
 
-- **`nit` · `dropdown-placeholder` — A dropdown always shows "Select an option" and its full choice text when closed.**
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `dropdown-placeholder` — A dropdown always shows "Select an option" and its full choice text when closed.**
   Found by `M237` (2026-11-14). NHETE asks for *"Choose…"* and for a closed dropdown to show only the words before a choice's first full stop (*"Include"*), with the full text in the open list. `FieldInput.vue` hard-codes the empty option's text, and a choice has one label.
 
   The remedy, when taken: the question's placeholder as the empty option's text, and an optional short label per choice for the closed state.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, stacked on #610, held for the merge point (`D233`).** A dropdown's empty choice reads the question's own Placeholder, else "Select an option". A dropdown choice — and a question table's dropdown cell choice — takes a **Short label** (`config.options[].short_label`, at most 60 characters; `short_label_translations` from XLSForm import only).
+  - `MdsSelect` draws the chosen option's short label over the closed box while the select's own text is transparent; the open list (the phone's own picker) and every screen reader keep the full label, and under `forced-colors` the full label shows alone (`D233` answer 2).
+  - Every other surface keeps the full label: piping, the staff view, exports, the explorer, paper and its scan.
+  - XLSForm carries it in a `short_label` choices column.
+  - NHETE: every dropdown says what to do, and the six "use" choices show their first word closed. Left out, each filed below: `xlsform-placeholder`, `xlsform-short-label-translations`, `placeholder-shown-for-choice-buttons`.
 
-- **`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`minor` · `dropdown-cannot-clear` — An optional dropdown, once answered, can never be emptied again.**
+  Found by `M249` (2026-11-23), in planning, beside `dropdown-placeholder`'s citation. `MdsSelect` draws its placeholder as a *disabled* option, so once a respondent picks a choice in an optional dropdown, nothing takes the answer back. Radios have "Clear selection", and a grid's own select already offers a choosable "Select…".
+
+  The remedy, when taken: let the placeholder be chosen in an optional dropdown, emptying the answer; keep it a disabled prompt in a required one.
+
+  **Live** — every optional dropdown on the testing server. Filed by `M249`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, held for the merge point.** `MdsSelect` gains `clearable`; `FieldInput` passes it whenever the question is not required right now (the live marker, so "Required when…" counts).
+
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `progress-title-unpiped` — The progress line, the screen-reader announcement and the welcome-back banner show a section title's `${…}` as typed.**
+  Found by `M249` (2026-11-23), in planning. `ProgressIndicator`, `StepView.stepLabel()` and `WelcomeBackBanner` read `step.title`, which `useFormRuntime` resolves for the locale but deliberately leaves unpiped, while the section's heading pipes it. A section titled "About you, ${name}" reads "Step 2 of 3: About you, ${name}" above a heading that reads "About you, Ana".
+
+  The remedy, when taken: name a page on the bar, in the announcement and on the banner through the same piping the heading uses.
+
+  **Latent** — no published form on the testing server is known to pipe an answer into a section title. Filed by `M249`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, held for the merge point.** `progressTextFor()` names a page by its progress label or its piped title, and all three read it.
+
+- **`nit` · `xlsform-progress-label` — A section's progress label is not carried by XLSForm.**
+  Found by `M249` (2026-11-23). ODK has no column for a page's short name on a progress bar, so export writes none and import reads none; NHETE's seeder sets its 48 after importing the workbook.
+
+  The remedy, when taken: a `#meridian` marker on the group row, or a `progress_label` column our import reads.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-placeholder` — No question's placeholder is carried by XLSForm, export or import.**
+  Found by `M249` (2026-11-23). `XlsformExporter` writes no placeholder column, `XlsformImportParser` reads none, and `docs/xlsform-interop-spec.md` never mentions it; a Kobo author folds it into the hint. A form exported and imported again loses every placeholder, a dropdown's "Choose…" included.
+
+  The remedy, when taken: a `placeholder` survey column our export writes and our import reads (ODK and Kobo pass an unknown column over).
+
+  **Live** — any form with a placeholder, exported and imported on the testing server today. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-short-label-translations` — A choice's short label leaves XLSForm export in the form's own language only.**
+  Found by `M249` (2026-11-23). Import reads `short_label::<lang>`, but export writes only `short_label`: a translated extra choices column has not been proven safe in pyxform and Kobo.
+
+  The remedy, when taken: prove `short_label::<lang>` against pyxform, then write it as `label::<lang>` is written.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `chapters-paper-encode` — Paper, the response PDF and staff manual entry show no chapters.**
+  Found by `M249` (2026-11-23). The blank paper form and the response PDF print each section's title only, and the staff entry page keeps its own "Step N of M" and section list. A long form's chapters are only on the respondent's bar and the builder's preview.
+
+  The remedy, when taken: a chapter heading above the section that starts it on paper and in the PDF (the paper layout's version moves, since the scanner reads the geometry), and the chapters as groups in the entry page's section list.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `placeholder-shown-for-choice-buttons` — The builder offers a Placeholder for radio and tick-box questions, which never show one.**
+  Found by `M249` (2026-11-23). `ConfigPanel` shows the Placeholder box for every type but a calculation. A single or multiple choice drawn as radios or tick boxes, a Likert scale and a yes/no have no empty box to show it in, so what an author types there goes nowhere.
+
+  The remedy, when taken: offer Placeholder only for the types whose control has an empty box, from a server list as `short_label_types` is.
+
+  **Live** — the builder on the testing server today. Filed by `M249`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-nested-group-relevance` — A condition on an outer XLSForm group is lost for the groups inside it.**
+  Found by `M249` (2026-11-23). Import flattens nested groups into sections of their own, and a section's condition does not reach the sections after it, so an outer group's `relevant` applies to the outer group's own (usually empty) section only. The inner groups' pages show whatever the outer condition says. A pure container with no condition becomes a chapter since `M249`; one with a condition keeps today's flattening, and with it this defect.
+
+  The remedy, when taken: join an outer group's `relevant` onto each inner group's with `and` on import.
+
+  **Live** — any ODK or Kobo workbook with a conditional group of groups, imported on the testing server today. Filed by `M249`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M250` (2026-11-23) — ****`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
   Found by `M237` (2026-11-14). NHETE's rule is that an item goes on the meeting's short list when at least 75% agree and at least six gave a view, with "No view or opinion" left out. The explorer counts a choice question's answers and can exclude a value (`AnswersSource`), for top-level questions only, but it has no agreement share, no threshold and no list across questions.
 
   The remedy, when taken: a report that, for a chosen set of questions, shows each one's share agreeing over those who gave a view, flags the ones over a threshold with enough views, and exports the list.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M250` (2026-11-23), on its branch, held for the merge point.** The Data Explorer's "Agreement across questions" (ADR-0025 §D10, `D234`): an item is a choice question, or a row of a question table's choice column (one tick for the whole column), or a Likert grid row; its share is the most common answer's, or the answers the list counts as agreeing where the item offers one, out of those who gave a view; on the short list at the threshold with the minimum of views, decided in whole numbers; the short list first, then the rest most-disagreed first; a saved list downloads as CSV or Excel. NHETE's table layout is held against a plain-PHP tally of eight varied guest responses.
+
+- **`nit` · `agreement-report-pdf` — A saved agreement list cannot be printed as a one-page summary.**
+  Found by `M250` (2026-11-23), in planning (`D234` answer 2). NHETE sends every member a one-page summary of the results two working days before the meeting. The list downloads as CSV or Excel, from which the summary is written; nothing prints the list itself.
+
+  The remedy, when taken: `format=pdf` on the list's export, through dompdf as the blank paper form prints (`BlankFormPrintRenderer`, A4): the short list first, then the items to discuss, most disagreement first, then those with too few views, the rule in one line at the top; metered as the spreadsheet is.
+
+  **Not live** — a request. Filed by `M250`. **Tier: during-testing.**
 
 - **`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
   Found by `M239` (2026-11-14), on the NHETE walk's first axe scan: `html-lang-valid` on the welcome page, *"<html> element must have a valid value for the lang attribute"*.

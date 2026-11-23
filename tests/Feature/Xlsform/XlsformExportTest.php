@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\FieldType;
 use App\Enums\RequiredMode;
+use App\Exceptions\Forms\FormException;
 use App\Models\FormFieldValidation;
 use App\Models\FormSection;
 use App\Models\FormVersion;
@@ -562,4 +563,68 @@ it('opens no column for a cascade level, which has nowhere in the workbook to be
     ]);
 
     expect($sheets['choices']['headers'])->not->toContain('label::de');
+});
+
+// ── M246 (`grid-question-table`, `R-ffd10da2`): a grid's own rules and its cells named elsewhere ──────────────
+
+/** @param  callable(FormVersion, User): void  $author */
+function gridRulesExport(callable $author): array
+{
+    $tenant = inboxTenant();
+    $owner = User::factory()->create();
+    enterTenant($tenant->id, $owner->id);
+    makeActiveMember($owner, 'owner');
+
+    $form = makeForm($owner, 'Question table');
+    $version = makeDraftVersion($form);
+    $author($version, $owner);
+
+    return app(XlsformExporter::class)->build($form, $version->refresh());
+}
+
+it('M246: writes each cell\'s rules as its relevant and required, leaves out a "Not needed" cell, and names cells elsewhere by their question', function (): void {
+    $sheets = gridRulesExport(function (FormVersion $version, User $owner): void {
+        addFormField($version, $owner, 'gate', FieldType::ShortText, 1);
+        addFormField($version, $owner, 'mx', FieldType::Matrix, 2, ['relevant_expression' => '${gate} != ""', 'config' => [
+            'rows' => [
+                ['value' => 'a01', 'label' => 'A01'],
+                ['value' => 'b03', 'label' => 'B03', 'relevant' => '${gate} = "yes"', 'not_needed' => ['cut']],
+            ],
+            'columns' => [
+                ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'short_text'],
+                ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text', 'needed_when' => '${.cut} != ""', 'required_when' => '${.cut} = "change"'],
+            ],
+            'cells' => [],
+        ]]);
+        addFormField($version, $owner, 'lk', FieldType::LikertMatrix, 3, ['is_required' => RequiredMode::Required, 'config' => [
+            'rows' => [['value' => 'r1', 'label' => 'Clean', 'relevant' => '${gate} = "yes"']],
+            'columns' => [['value' => '1', 'label' => 'Low'], ['value' => '2', 'label' => 'High']],
+        ]]);
+        addFormField($version, $owner, 'follow', FieldType::ShortText, 4, [
+            'label' => 'You wrote ${mx.a01.cut}',
+            'relevant_expression' => '${mx.a01.cut} = "change" and ${lk.r1} > 1',
+        ]);
+    });
+
+    $comment = surveyRow($sheets, 'mx_a01_comment');
+    expect($comment['relevant'])->toBe('(${gate} != "") and (${mx_a01_cut} != "")')
+        ->and($comment['required'])->toBe('${mx_a01_cut} = "change"')
+        ->and(surveyRow($sheets, 'mx_b03_cut'))->toBeNull()
+        ->and(surveyRow($sheets, 'mx_b03_comment')['relevant'])->toBe('(${gate} != "") and (${gate} = "yes") and (${mx_b03_cut} != "")')
+        ->and(surveyRow($sheets, 'lk_r1'))->toMatchArray(['required' => 'yes', 'relevant' => '${gate} = "yes"'])
+        ->and(surveyRow($sheets, 'follow'))->toMatchArray([
+            'label' => 'You wrote ${mx_a01_cut}',
+            'relevant' => '${mx_a01_cut} = "change" and ${lk_r1} > 1',
+        ]);
+});
+
+it('M246: refuses an export in which a grid cell would share its name with another question', function (): void {
+    expect(fn () => gridRulesExport(function (FormVersion $version, User $owner): void {
+        addFormField($version, $owner, 'g', FieldType::Matrix, 1, ['config' => [
+            'rows' => [['value' => 'a', 'label' => 'A']],
+            'columns' => [['value' => 'b', 'label' => 'B', 'type' => 'short_text']],
+            'cells' => [],
+        ]]);
+        addFormField($version, $owner, 'g_a_b', FieldType::ShortText, 2);
+    }))->toThrow(FormException::class, 'Two questions would both be named “g_a_b”');
 });

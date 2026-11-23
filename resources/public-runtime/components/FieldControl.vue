@@ -7,7 +7,7 @@
  */
 import { computed, inject } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField } from '@/components/submissions/FieldInput.vue';
-import { resolveCascade, resolveMatrix, resolveText } from '../lib/schema-mapping';
+import { controlOption, resolveCascade, resolveMatrix } from '../lib/schema-mapping';
 import { useRuntime, OfflineMediaKey, UploadUrlKey } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -29,10 +29,8 @@ const encodeField = computed<EncodeField>(() => ({
     hint: runtime.hintFor(props.field),
     placeholder: runtime.placeholderFor(props.field),
     required: marker.value === 'required',
-    options: props.field.options.map((o) => ({
-        value: o.value,
-        label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
-    })),
+    // M249 (`D233`): a choice keeps its short label — what a closed dropdown shows — when the locale may show it.
+    options: props.field.options.map((o) => controlOption(o, runtime.locale.value)),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
     matrix: resolveMatrix(props.field.matrix, runtime.locale.value),
     // Geo capture config (Increment G5b2) is labels-free, so it passes straight through with no resolution.
@@ -82,6 +80,9 @@ const value = computed<AnswerValue>(() => {
 function onUpdate(next: AnswerValue): void {
     runtime.setAnswer(props.field.key, next);
 }
+
+// M246: a grid shows each cell's own error, and its whole-grid line only for a refusal that is not a cell's.
+const isGrid = computed<boolean>(() => props.field.fieldType === 'matrix' || props.field.fieldType === 'likert_matrix');
 </script>
 
 <template>
@@ -89,7 +90,10 @@ function onUpdate(next: AnswerValue): void {
         :field="encodeField"
         :model-value="value"
         :required-marker="marker"
-        :error="runtime.errorFor(field.key)"
+        :error="isGrid ? runtime.gridErrorFor(field.key) : runtime.errorFor(field.key)"
+        :grid-relevance="isGrid ? runtime.gridRelevanceFor(field.key) : null"
+        :cell-errors="isGrid ? runtime.cellErrorsFor(field.key) : undefined"
         @update:model-value="onUpdate"
+        @cell-touched="(path: string) => runtime.markTouched(`${field.key}.${path}`)"
     />
 </template>

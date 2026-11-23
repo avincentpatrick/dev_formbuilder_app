@@ -1,0 +1,216 @@
+[
+  {
+    "name": "grid row show-when that does not hold hides the row, prunes it and never requires it",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a", "b"], "columns": ["q1"], "cells": ["ok"], "row_rules": { "b": { "relevant": "${gate} = 'yes'" } } } }
+    ] },
+    "answers": { "gate": "no", "svc": { "a": { "q1": "ok" }, "b": { "q1": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": true } },
+      "errors": [],
+      "effective_answers": { "gate": "no", "svc": { "a": { "q1": "ok" } } },
+      "grid_relevance": { "svc": { "rows": { "a": true, "b": false }, "columns": { "q1": true }, "cells": { "a": { "q1": true } } } }
+    }
+  },
+  {
+    "name": "grid row show-when that holds asks the row and its required cells",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a", "b"], "columns": ["q1"], "cells": ["ok"], "row_rules": { "b": { "relevant": "${gate} = 'yes'" } } } }
+    ] },
+    "answers": { "gate": "yes", "svc": { "a": { "q1": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": true } },
+      "errors": [ { "field": "svc.b.q1", "rule": "field_required" } ],
+      "effective_answers": { "gate": "yes", "svc": { "a": { "q1": "ok" } } },
+      "grid_relevance": { "svc": { "rows": { "a": true, "b": true }, "columns": { "q1": true }, "cells": { "a": { "q1": true }, "b": { "q1": true } } } }
+    }
+  },
+  {
+    "name": "grid column show-when that does not hold hides the column in every row of a required grid",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["a"], "columns": ["q1", "q2"], "cells": ["ok"], "column_specs": { "q2": { "relevant": "${gate} = 'yes'" } } } }
+    ] },
+    "answers": { "gate": "no", "svc": { "a": { "q1": "ok", "q2": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": true } },
+      "errors": [],
+      "effective_answers": { "gate": "no", "svc": { "a": { "q1": "ok" } } },
+      "grid_relevance": { "svc": { "rows": { "a": true }, "columns": { "q1": true, "q2": false }, "cells": { "a": { "q1": true } } } }
+    }
+  },
+  {
+    "name": "grid not-needed cell is pruned and never required even in a column required in every row",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a", "b"], "columns": ["cut"], "cells": ["x"], "column_specs": { "cut": { "required": true } }, "row_rules": { "b": { "not_needed": ["cut"] } } } }
+    ] },
+    "answers": { "svc": { "a": { "cut": "x" }, "b": { "cut": "x" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "cut": "x" } } },
+      "grid_relevance": { "svc": { "rows": { "a": true, "b": true }, "columns": { "cut": true }, "cells": { "a": { "cut": true }, "b": { "cut": false } } } }
+    }
+  },
+  {
+    "name": "grid needed-when reads the cell to its left in the same row",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "parts", "field_type": "matrix", "grid": { "rows": ["p1", "p2", "p3"], "columns": ["keep", "close"], "column_specs": { "keep": { "type": "single_select", "options": ["yes", "close", "no"] }, "close": { "type": "long_text", "required": true, "needed_when": "${.keep} = 'close'" } } } }
+    ] },
+    "answers": { "parts": { "p1": { "keep": "close" }, "p2": { "keep": "yes", "close": "stray" }, "p3": {} } },
+    "expected": {
+      "relevance": { "fields": { "parts": true } },
+      "errors": [ { "field": "parts.p1.close", "rule": "field_required" } ],
+      "effective_answers": { "parts": { "p1": { "keep": "close" }, "p2": { "keep": "yes" } } },
+      "grid_relevance": { "parts": { "rows": { "p1": true, "p2": true, "p3": true }, "columns": { "keep": true, "close": true }, "cells": { "p1": { "keep": true, "close": true }, "p2": { "keep": true, "close": false }, "p3": { "keep": true, "close": false } } } }
+    }
+  },
+  {
+    "name": "grid required-when makes a cell required only in the rows where it holds",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "mx", "field_type": "matrix", "grid": { "rows": ["a01", "a02", "a03", "a04"], "columns": ["cut", "worry", "keep", "comment"], "cells": ["change", "use", "other", "none", "yes", "close"], "column_specs": { "comment": { "type": "long_text", "required_when": "${.cut} = 'change' or ${.worry} = 'other' or ${.keep} = 'close'" } } } }
+    ] },
+    "answers": { "mx": { "a01": { "cut": "change" }, "a02": { "worry": "other", "comment": "Why it worries us." }, "a03": { "keep": "yes" }, "a04": { "keep": "close" } } },
+    "expected": {
+      "relevance": { "fields": { "mx": true } },
+      "errors": [ { "field": "mx.a01.comment", "rule": "field_required" }, { "field": "mx.a04.comment", "rule": "field_required" } ],
+      "effective_answers": { "mx": { "a01": { "cut": "change" }, "a02": { "worry": "other", "comment": "Why it worries us." }, "a03": { "keep": "yes" }, "a04": { "keep": "close" } } },
+      "grid_relevance": { "mx": {
+        "rows": { "a01": true, "a02": true, "a03": true, "a04": true },
+        "columns": { "cut": true, "worry": true, "keep": true, "comment": true },
+        "cells": {
+          "a01": { "cut": true, "worry": true, "keep": true, "comment": true },
+          "a02": { "cut": true, "worry": true, "keep": true, "comment": true },
+          "a03": { "cut": true, "worry": true, "keep": true, "comment": true },
+          "a04": { "cut": true, "worry": true, "keep": true, "comment": true }
+        }
+      } }
+    }
+  },
+  {
+    "name": "grid required-when skips a row where the cut-off cell is not needed",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "mx", "field_type": "matrix", "grid": { "rows": ["b03"], "columns": ["cut", "comment"], "cells": ["change", "use"], "column_specs": { "comment": { "type": "long_text", "required_when": "${.cut} = 'change'" } }, "row_rules": { "b03": { "not_needed": ["cut"] } } } }
+    ] },
+    "answers": { "mx": { "b03": { "cut": "change" } } },
+    "expected": {
+      "relevance": { "fields": { "mx": true } },
+      "errors": [],
+      "effective_answers": {},
+      "grid_relevance": { "mx": { "rows": { "b03": true }, "columns": { "cut": true, "comment": true }, "cells": { "b03": { "cut": false, "comment": true } } } }
+    }
+  },
+  {
+    "name": "grid row-relative cell reads only the cells kept to its left",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "svc", "field_type": "matrix", "grid": { "rows": ["r"], "columns": ["a", "b"], "cells": ["x", "y"], "column_specs": { "b": { "needed_when": "${.a} = 'x'" } }, "row_rules": { "r": { "not_needed": ["a"] } } } }
+    ] },
+    "answers": { "svc": { "r": { "a": "x", "b": "y" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": {},
+      "grid_relevance": { "svc": { "rows": { "r": true }, "columns": { "a": true, "b": true }, "cells": { "r": { "a": false, "b": false } } } }
+    }
+  },
+  {
+    "name": "likert row show-when that does not hold hides the row and never requires it",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "lk", "field_type": "likert_matrix", "is_required": "required", "grid": { "rows": ["r1", "r2"], "columns": ["1", "2"], "row_rules": { "r2": { "relevant": "${gate} = 'yes'" } } } }
+    ] },
+    "answers": { "gate": "no", "lk": { "r1": "2", "r2": "1" } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "lk": true } },
+      "errors": [],
+      "effective_answers": { "gate": "no", "lk": { "r1": "2" } },
+      "grid_relevance": { "lk": { "rows": { "r1": true, "r2": false }, "columns": {}, "cells": {} } }
+    }
+  },
+  {
+    "name": "grid an outside condition reads an always-asked cell",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["keep"], "cells": ["yes", "no"] } },
+      { "key": "follow", "field_type": "short_text", "relevant": "${svc.a.keep} = 'yes'" },
+      { "key": "other", "field_type": "short_text", "relevant": "${svc.a.keep} = 'no'" }
+    ] },
+    "answers": { "svc": { "a": { "keep": "yes" } }, "follow": "kept", "other": "dropped" },
+    "expected": {
+      "relevance": { "fields": { "svc": true, "follow": true, "other": false } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "keep": "yes" } }, "follow": "kept" },
+      "grid_relevance": { "svc": { "rows": { "a": true }, "columns": { "keep": true }, "cells": { "a": { "keep": true } } } }
+    }
+  },
+  {
+    "name": "grid a calculation reads a number cell",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "svc", "field_type": "matrix", "grid": { "rows": ["a"], "columns": ["n"], "column_specs": { "n": { "type": "integer" } } } },
+      { "key": "double", "field_type": "calculated", "calculate": "${svc.a.n} * 2" }
+    ] },
+    "answers": { "svc": { "a": { "n": 3 } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true, "double": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "a": { "n": 3 } } },
+      "computed": { "double": 6 }
+    }
+  },
+  {
+    "name": "grid a row named constructor has no rule of its own",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["constructor"], "columns": ["q"], "cells": ["ok"], "row_rules": { "other": { "relevant": "1 = 2" } } } }
+    ] },
+    "answers": { "svc": { "constructor": { "q": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "svc": true } },
+      "errors": [],
+      "effective_answers": { "svc": { "constructor": { "q": "ok" } } },
+      "grid_relevance": { "svc": { "rows": { "constructor": true }, "columns": { "q": true }, "cells": { "constructor": { "q": true } } } }
+    }
+  },
+  {
+    "name": "grid numeric row values are their own rows",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "is_required": "required", "grid": { "rows": ["1", "01"], "columns": ["q"], "cells": ["ok"], "row_rules": { "01": { "relevant": "${gate} = 'yes'" } } } }
+    ] },
+    "answers": { "gate": "no", "svc": { "1": { "q": "ok" }, "01": { "q": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": true } },
+      "errors": [],
+      "effective_answers": { "gate": "no", "svc": { "1": { "q": "ok" } } },
+      "grid_relevance": { "svc": { "rows": { "1": true, "01": false }, "columns": { "q": true }, "cells": { "1": { "q": true } } } }
+    }
+  },
+  {
+    "name": "grid hidden grid reports no grid relevance",
+    "grammar_version": "2.0",
+    "schema": { "fields": [
+      { "key": "gate", "field_type": "short_text" },
+      { "key": "svc", "field_type": "matrix", "relevant": "${gate} = 'yes'", "grid": { "rows": ["a"], "columns": ["q"], "cells": ["ok"], "row_rules": { "a": { "relevant": "1 = 1" } } } }
+    ] },
+    "answers": { "gate": "no", "svc": { "a": { "q": "ok" } } },
+    "expected": {
+      "relevance": { "fields": { "gate": true, "svc": false } },
+      "errors": [],
+      "effective_answers": { "gate": "no" },
+      "grid_relevance": {}
+    }
+  }
+]

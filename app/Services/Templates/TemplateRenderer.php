@@ -6,8 +6,11 @@ namespace App\Services\Templates;
 
 use App\Enums\FieldType;
 use App\Services\Expressions\EvaluationContext;
+use App\Services\Expressions\GridCells;
+use App\Services\Expressions\Marker;
 use App\Services\Submissions\EncodeFormPresenter;
 use App\Services\Submissions\SchemaValueFormatter;
+use App\Support\Forms\MatrixColumns;
 
 /**
  * Fills a template's holes from an answer document (`docs/piping-output-encoding-design.md` §3.2/§3.4).
@@ -76,6 +79,12 @@ final class TemplateRenderer
             }
 
             $source = $sources[$segment['value']] ?? null;
+            $answer = $answers[$segment['value']] ?? null;
+
+            // M246 (`R-ffd10da2`): `${grid.row.col}` / `${grid.row}` — one cell of a grid, shown as its column's type.
+            if ($source === null && str_contains($segment['value'], '.')) {
+                [$source, $answer] = $this->cell($segment['value'], $sources, $answers);
+            }
 
             // An unknown key renders empty rather than throwing: the publish gate already refused every
             // resolvable-at-publish case, so reaching here means the snapshot and the answer document
@@ -86,13 +95,38 @@ final class TemplateRenderer
 
             $out .= $this->formatter->displayValue(
                 $source['type'],
-                $answers[$segment['value']] ?? null,
+                $answer,
                 $source['config'],
                 $locale,
             );
         }
 
         return $out;
+    }
+
+    /**
+     * M246: a cell hole's source and answer — the grid's cell as {@see MatrixColumns::cellSource()} reads it, and the
+     * cell's value as an expression reads it ({@see GridCells}); an unknown grid, row or column is no source.
+     *
+     * @param  array<string, RenderSource>  $sources
+     * @param  array<string, mixed>  $answers
+     * @return array{0: RenderSource|null, 1: mixed}
+     */
+    private function cell(string $hole, array $sources, array $answers): array
+    {
+        $parts = TemplateParser::holeParts($hole);
+        $grid = $sources[$parts['key']] ?? null;
+        $source = $grid === null || $parts['row'] === null
+            ? null
+            : MatrixColumns::cellSource($grid['type'], $grid['config'], $parts['row'], $parts['column']);
+
+        if ($source === null) {
+            return [null, null];
+        }
+
+        $value = GridCells::resolve($answers[$parts['key']] ?? null, $parts['row'], $parts['column']);
+
+        return [$source, $value === Marker::Absent ? null : $value];
     }
 
     /**

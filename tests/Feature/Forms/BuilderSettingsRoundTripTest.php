@@ -242,6 +242,11 @@ it('keeps every setting of a section, and sends it back on the builder page', fu
         'max_instances' => 12,
         // M185 (`R-0a7275ce`): laid out as a table.
         'repeat_layout' => 'table',
+        // M247 (`D231`): its page drawn wide.
+        'page_width' => 'wide',
+        // M249 (`D233`): the chapter it starts, and its page's short name on the progress bar.
+        'chapter' => 'Your household',
+        'progress_label' => 'Members',
         'relevant_expression' => null,
         'version' => $section['version'],
     ];

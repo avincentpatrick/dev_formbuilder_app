@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     dropUnknownFields,
+    dropUnknownPicks,
     fieldGroups,
     fieldsForAggregate,
     fitToChart,
     incompleteReason,
     isFilterable,
+    isAgreementSource,
     isGroupable,
     isoDate,
     isTemporal,
+    newAgreement,
     newDefinition,
     operatorApplies,
     rangeEnding,
@@ -16,7 +19,7 @@ import {
     spanInDays,
     toPayload,
 } from './definition';
-import type { Aggregate, ChartOption, ChartType, Definition, Field, FieldType, FilterOperator, Source } from './types';
+import type { Aggregate, AgreementPick, ChartOption, ChartType, Definition, Field, FieldType, FilterOperator, Source } from './types';
 
 /**
  * M236 — the pure helpers under the chart builder.
@@ -601,6 +604,14 @@ describe('incompleteReason', () => {
         );
     });
 
+    it('M247: asks for the grid on a source that counts one grid’s rows, once the form is chosen', () => {
+        const ROWS = source({ key: 'grid_rows', label: 'Rows of a grid', requires_form: true, requires_grid: true });
+
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1' }), ROWS, FIELDS)).toBe('Choose the grid whose rows to count.');
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1', grid: null }), ROWS, FIELDS)).toBe('Choose the grid whose rows to count.');
+        expect(incompleteReason(definition({ source: 'grid_rows', form_id: 'f1', grid: 'clinics' }), ROWS, FIELDS)).toBeNull();
+    });
+
     it('asks what to group by when a group-by names a field that is not there', () => {
         expect(incompleteReason(definition({ dimensions: [{ field: 'answer:district', bucket: null }] }), RESPONSES, FIELDS)).toBe(
             'Choose what to group by.',
@@ -796,5 +807,80 @@ describe('toPayload', () => {
 
         expect(live.v).toBe(1);
         expect(Object.keys(live)).toContain('v');
+    });
+});
+
+describe('M247: a chart that names a grid', () => {
+    it('sends a grid only when one is named, so a chart without one is the shape the server stores', () => {
+        expect(toPayload(definition({ grid: null }))).not.toHaveProperty('grid');
+        expect(toPayload(definition())).not.toHaveProperty('grid');
+        expect(toPayload(definition({ source: 'grid_rows', grid: 'clinics' })).grid).toBe('clinics');
+    });
+
+    it('reads a chart saved without a grid as the same chart built with an unnamed one', () => {
+        expect(sameDefinition(definition({ grid: null }), definition())).toBe(true);
+        expect(sameDefinition(definition({ grid: 'clinics' }), definition())).toBe(false);
+    });
+});
+
+describe('M250: an agreement list', () => {
+    const AGREEMENT = source({ key: 'agreement', label: 'Agreement across questions', requires_form: true, default_range_days: 365, charts: ['agreement'] });
+
+    function pick(value: string): AgreementPick {
+        return { value, label: value, question: value, column: null, section: '', kind: 'question', multiple: false, rows: 0, options: [] };
+    }
+
+    function list(items: string[] = ['answer:q1']): Definition {
+        return definition({
+            source: 'agreement',
+            form_id: 'f1',
+            chart: 'agreement',
+            dimensions: [],
+            measures: [],
+            agreement: { items, leave_out: ['noview'], agreeing: [], threshold: 75, min_views: 6 },
+        });
+    }
+
+    it('knows the source whose only chart is the list, and no other', () => {
+        expect(isAgreementSource(AGREEMENT)).toBe(true);
+        expect(isAgreementSource(source())).toBe(false);
+        expect(isAgreementSource(source({ charts: ['bar', 'agreement'] }))).toBe(false);
+        expect(isAgreementSource(undefined)).toBe(false);
+    });
+
+    it('opens an empty list on its source — no group-by, no value, the server’s threshold — over its own default range', () => {
+        const opened = newDefinition(AGREEMENT, TZ, '2026-08-03', { threshold: 80, min_views: 4 });
+
+        expect(opened).toMatchObject({ chart: 'agreement', dimensions: [], measures: [], from: '2025-08-04', to: '2026-08-03' });
+        expect(opened.agreement).toEqual({ items: [], leave_out: [], agreeing: [], threshold: 80, min_views: 4 });
+        expect(newAgreement()).toEqual({ items: [], leave_out: [], agreeing: [], threshold: 75, min_views: 6 });
+        // Every other source still opens on a chart, with no agreement member at all.
+        expect(newDefinition(source(), TZ, '2026-08-03')).not.toHaveProperty('agreement');
+    });
+
+    it('asks for the form, then for the questions, and never for a group-by or a value', () => {
+        expect(incompleteReason(list(), AGREEMENT, [])).toBeNull();
+        expect(incompleteReason({ ...list(), form_id: null }, AGREEMENT, [])).toBe('Choose the form whose answers to chart.');
+        expect(incompleteReason(list([]), AGREEMENT, [])).toBe('Choose the questions to report on.');
+        expect(incompleteReason({ ...list(), agreement: null }, AGREEMENT, [])).toBe('Choose the questions to report on.');
+    });
+
+    it('sends the list only on its own chart, and as the server stores it', () => {
+        expect(toPayload(list()).agreement).toEqual({ items: ['answer:q1'], leave_out: ['noview'], agreeing: [], threshold: 75, min_views: 6 });
+        expect(toPayload(definition({ agreement: null }))).not.toHaveProperty('agreement');
+        expect(toPayload(definition())).not.toHaveProperty('agreement');
+        expect(sameDefinition(list(), { ...list(), v: 1 })).toBe(true);
+        expect(sameDefinition(list(['answer:q1']), list(['answer:q2']))).toBe(false);
+    });
+
+    it('drops the questions the form no longer lets the list report on, and keeps the rest of the list as it was', () => {
+        const kept = dropUnknownPicks(list(['answer:q1', 'grid:tor:agree', 'answer:gone']), [pick('answer:q1'), pick('grid:tor:agree')]);
+
+        expect(kept.agreement?.items).toEqual(['answer:q1', 'grid:tor:agree']);
+        expect(kept.agreement?.leave_out).toEqual(['noview']);
+        // Nothing to drop is the same object, so the builder's watcher is not woken for nothing.
+        const same = list();
+        expect(dropUnknownPicks(same, [pick('answer:q1')])).toBe(same);
+        expect(dropUnknownPicks(definition(), [])).toEqual(definition());
     });
 });

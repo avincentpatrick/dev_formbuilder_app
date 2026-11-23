@@ -55,7 +55,7 @@ final class AnswersSource extends AbstractExplorerSource
 
     private const string ANSWERS = 'submission_answers.answers';
 
-    /** @var array<string, array{fields: list<ExplorerField>, withheld: int, unsupported: int}> */
+    /** @var array<string, array{fields: list<ExplorerField>, withheld: int, unsupported: int, grids: int}> */
     private array $memo = [];
 
     public function __construct(private readonly ExplorerFormReach $reach) {}
@@ -145,13 +145,18 @@ final class AnswersSource extends AbstractExplorerSource
                 : "{$questions['unsupported']} questions cannot be charted yet: long text, grids, files, locations and questions inside a repeating section.";
         }
 
+        // M247 (`D231`): a grid is charted row by row, by its own source.
+        if ($questions['grids'] > 0) {
+            $notes[] = 'A grid is charted row by row: choose “Rows of a grid” as the data.';
+        }
+
         return $notes;
     }
 
     /**
      * The form's questions across every version that ever collected a response, newest wording first.
      *
-     * @return array{fields: list<ExplorerField>, withheld: int, unsupported: int}
+     * @return array{fields: list<ExplorerField>, withheld: int, unsupported: int, grids: int}
      */
     private function questions(Form $form): array
     {
@@ -189,11 +194,14 @@ final class AnswersSource extends AbstractExplorerSource
 
         $fields = [];
         $unsupported = 0;
+        $grids = 0;
 
         foreach ($latest as $key => $row) {
             if (isset($flagged[$key])) {
                 continue;
             }
+
+            $grids += in_array((string) $row->field_type, [FieldType::Matrix->value, FieldType::LikertMatrix->value], true) && ! $row->is_repeatable ? 1 : 0;
 
             $field = $this->questionField((string) $key, $row);
 
@@ -210,6 +218,7 @@ final class AnswersSource extends AbstractExplorerSource
             'fields' => $fields,
             'withheld' => count($flagged),
             'unsupported' => $unsupported,
+            'grids' => $grids,
         ];
     }
 
@@ -239,7 +248,7 @@ final class AnswersSource extends AbstractExplorerSource
         $fieldKey = 'answer:'.$key;
 
         return match (ValueShape::for($type)) {
-            ValueShape::Number => new ExplorerField($fieldKey, $label, ExplorerFieldType::Number, self::numberSql($text, $json), 'Questions'),
+            ValueShape::Number => new ExplorerField($fieldKey, $label, ExplorerFieldType::Number, AnswerSql::number($text, $json), 'Questions'),
             ValueShape::Boolean => new ExplorerField($fieldKey, $label, ExplorerFieldType::Boolean, $text, 'Questions', options: ['true' => 'Yes', 'false' => 'No']),
             ValueShape::Choice, ValueShape::Scale => new ExplorerField($fieldKey, $label, ExplorerFieldType::Category, $text, 'Questions', options: $this->options($row)),
             ValueShape::MultipleChoice => new ExplorerField(
@@ -253,7 +262,7 @@ final class AnswersSource extends AbstractExplorerSource
             ),
             ValueShape::Temporal => $type === FieldType::Time
                 ? null
-                : new ExplorerField($fieldKey, $label, ExplorerFieldType::Date, self::dateSql($text), 'Questions'),
+                : new ExplorerField($fieldKey, $label, ExplorerFieldType::Date, AnswerSql::date($text), 'Questions'),
             // Long text is every respondent's own sentence: grouping by it makes one group per response.
             ValueShape::Text => $type === FieldType::LongText
                 ? null
@@ -271,58 +280,7 @@ final class AnswersSource extends AbstractExplorerSource
     private function options(stdClass $row): ?array
     {
         $config = is_string($row->config) ? json_decode($row->config, true) : $row->config;
-        $options = is_array($config) ? ($config['options'] ?? null) : null;
 
-        if (! is_array($options) || $options === []) {
-            return null;
-        }
-
-        $out = [];
-
-        foreach ($options as $option) {
-            if (is_array($option) && isset($option['value']) && is_scalar($option['value'])) {
-                $label = $option['label'] ?? null;
-                $out[(string) $option['value']] = is_string($label) && $label !== '' ? $label : (string) $option['value'];
-            }
-        }
-
-        return $out === [] ? null : $out;
-    }
-
-    /**
-     * An answer as a number, or NULL. A jsonb number is taken as it is; a string only if it is digits with
-     * an optional sign and decimal part. The pattern is written without `?` because a raw `?` in a
-     * statement is a placeholder to the driver.
-     *
-     * @param  literal-string  $text
-     * @param  literal-string  $json
-     * @return literal-string
-     */
-    private static function numberSql(string $text, string $json): string
-    {
-        return "(case when jsonb_typeof({$json}) = 'number' then {$text}::numeric"
-            ." when jsonb_typeof({$json}) = 'string' and {$text} ~ '^-{0,1}[0-9]{1,30}([.][0-9]{1,30}){0,1}$' then {$text}::numeric end)";
-    }
-
-    /**
-     * An answer as a date, or NULL — for a date, and for the date part of a date-and-time.
-     *
-     * Two guards, nested so the second is only evaluated once the first has held: the text opens with a
-     * well-formed `YYYY-MM-DD`, and the day exists in that month. Without the second, `2026-02-30` passes
-     * the pattern and `make_date` raises, which would fail the whole query for one bad row. (PostgreSQL 16
-     * has `pg_input_is_valid` for this; the testing server runs 15.)
-     *
-     * @param  literal-string  $text
-     * @return literal-string
-     */
-    private static function dateSql(string $text): string
-    {
-        $year = "substr({$text}, 1, 4)::int";
-        $month = "substr({$text}, 6, 2)::int";
-        $day = "substr({$text}, 9, 2)::int";
-
-        return "(case when {$text} ~ '^[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])' then"
-            ." case when {$day} <= extract(day from (make_date({$year}, {$month}, 1) + interval '1 month' - interval '1 day'))::int"
-            ." then make_date({$year}, {$month}, {$day}) end end)";
+        return AnswerSql::labels(is_array($config) ? ($config['options'] ?? null) : null);
     }
 }

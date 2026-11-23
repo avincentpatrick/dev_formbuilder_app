@@ -25,6 +25,14 @@ export interface GridConfig {
     cells?: string[];
     /** M183 (`R-5033e87e`): a matrix column's own type, choices and required flag, keyed by column value. */
     column_specs?: Record<string, GridColumnSpec> | null;
+    /** M246 (`grid-question-table`): a row's own show-when and (a Grid's) "Not needed" columns, keyed by row value. */
+    row_rules?: Record<string, GridRowRule> | null;
+}
+
+/** M246: a grid row's own rules (mirror of PHP `SemanticValidator::gridRowRules`). */
+export interface GridRowRule {
+    relevant?: string | null;
+    not_needed?: string[] | null;
 }
 
 /**
@@ -36,6 +44,10 @@ export interface GridColumnSpec {
     type?: string | null;
     options?: string[] | null;
     required?: boolean | null;
+    /** M246: show this column only when…, in each row needed only when…, in each row required when… */
+    relevant?: string | null;
+    needed_when?: string | null;
+    required_when?: string | null;
 }
 
 /** A likert_matrix answer `{row: score}` (Increment G4b). */

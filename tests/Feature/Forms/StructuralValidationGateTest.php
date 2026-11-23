@@ -1124,3 +1124,39 @@ it('still publishes one value at two levels — the Philippine places’ city un
 
     expect(true)->toBeTrue(); // reached here without throwing — and an empty parent at the first level is no parent
 });
+
+// ── M246 (`grid-question-table`): a grid row's own settings ─────────────────────────────────────────────
+
+/** @param  array<string, mixed>  $config */
+function gateGridRowRefusal(StructuralValidationGate $gate, User $user, FieldType $type, array $config): ?string
+{
+    $version = makeDraftVersion(makeForm($user));
+    addFormField($version, $user, 'svc', $type, 1, ['config' => $config]);
+
+    try {
+        $gate->assertPublishable($version->refresh());
+    } catch (PublishValidationException $e) {
+        return $e->getMessage();
+    }
+
+    return null;
+}
+
+it('M246: publishes a grid whose rows carry details and "Not needed" cells naming its own columns', function (): void {
+    expect(gateGridRowRefusal($this->gate, $this->user, FieldType::Matrix, [
+        'rows' => [['value' => 'a', 'label' => 'A', 'not_needed' => ['c2'], 'details' => [['type' => 'paragraph', 'spans' => [['text' => 'About A.']]]]]],
+        'columns' => [['value' => 'c1', 'label' => 'C1', 'type' => 'short_text'], ['value' => 'c2', 'label' => 'C2', 'type' => 'long_text']],
+        'cells' => [],
+    ]))->toBeNull();
+});
+
+it('M246: refuses a "Not needed" cell naming no column, one on a Likert grid, and details that are blank at publish', function (): void {
+    $columns = [['value' => 'c1', 'label' => 'C1', 'type' => 'short_text']];
+
+    expect(gateGridRowRefusal($this->gate, $this->user, FieldType::Matrix, ['rows' => [['value' => 'a', 'label' => 'A', 'not_needed' => ['nope']]], 'columns' => $columns, 'cells' => []]))
+        ->toContain('row 1 marks a column “Not needed” that the grid does not have (nope)')
+        ->and(gateGridRowRefusal($this->gate, $this->user, FieldType::LikertMatrix, ['rows' => [['value' => 'a', 'label' => 'A', 'not_needed' => ['1']]], 'columns' => [['value' => '1', 'label' => 'Low'], ['value' => '2', 'label' => 'High']]]))
+        ->toContain('only a Grid’s columns can be')
+        ->and(gateGridRowRefusal($this->gate, $this->user, FieldType::Matrix, ['rows' => [['value' => 'a', 'label' => 'A', 'details' => [['type' => 'heading', 'level' => 2, 'text' => '  ']]]], 'columns' => $columns, 'cells' => []]))
+        ->toContain('row 1\'s details: block 1 is a heading with no text');
+});

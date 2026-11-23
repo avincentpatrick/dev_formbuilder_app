@@ -20,11 +20,16 @@ use App\Enums\FieldType;
  */
 final class MatrixColumns
 {
-    /** The types a matrix column may take, in the order the builder offers them. */
+    /**
+     * The types a matrix column may take, in the order the builder offers them. M246 (`grid-question-table`) adds long
+     * text, the comment column a question table needs. Mirrored by `schema-mapping.ts` and `MatrixEditor.vue`, held
+     * equal by `MatrixColumnTypesMirrorDriftTest`.
+     */
     public const array TYPES = [
         FieldType::SingleSelect,
         FieldType::MultiSelect,
         FieldType::ShortText,
+        FieldType::LongText,
         FieldType::Integer,
         FieldType::Decimal,
         FieldType::Date,
@@ -85,6 +90,42 @@ final class MatrixColumns
     }
 
     /**
+     * M246 (`R-ffd10da2`): what one grid cell is when it is shown on its own — piped into text — as the spreadsheet
+     * export already reads it: a Grid's cell as a question of its column's type over its column's choices, and a
+     * Likert row as a Likert scale over the grid's columns. Null for a row or column the grid does not have, or a path
+     * of the wrong length for the grid's kind (a Grid needs a column; a Likert row has none).
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{type: FieldType, config: array<string, mixed>}|null
+     */
+    public static function cellSource(FieldType $gridType, array $config, string $row, ?string $column): ?array
+    {
+        $rows = array_map(
+            static fn (mixed $entry): string => is_array($entry) ? (string) ($entry['value'] ?? '') : '',
+            (array) ($config['rows'] ?? []),
+        );
+        if (! in_array($row, $rows, true)) {
+            return null;
+        }
+
+        if ($gridType === FieldType::LikertMatrix) {
+            return $column === null ? ['type' => FieldType::LikertScale, 'config' => ['options' => self::columns($config)]] : null;
+        }
+
+        if ($gridType !== FieldType::Matrix || $column === null) {
+            return null;
+        }
+
+        foreach (self::columns($config) as $candidate) {
+            if ((string) ($candidate['value'] ?? '') === $column) {
+                return ['type' => self::type($candidate), 'config' => ['options' => self::choices($candidate, $config)]];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Whether some choice column draws from the shared `cells` — the only case in which a matrix needs them. A column
      * whose choices come from a list or a form (M185) has its own.
      *
@@ -114,7 +155,8 @@ final class MatrixColumns
 
     /**
      * The column list a Likert matrix keeps when a matrix becomes one: its scale is the columns themselves, so a
-     * column's own type, choices, their source (M185) and required flag have nothing to mean there.
+     * column's own type, choices, their source (M185) and required flag have nothing to mean there — nor, since M246,
+     * its show-when, needed-when and required-when, which are a question column's rules.
      *
      * @param  array<string, mixed>  $config
      * @return list<array<string, mixed>>
@@ -122,8 +164,31 @@ final class MatrixColumns
     public static function asScale(array $config): array
     {
         return array_map(
-            static fn (array $column): array => array_diff_key($column, ['type' => true, 'options' => true, 'options_list' => true, 'options_source' => true, 'required' => true]),
+            static fn (array $column): array => array_diff_key($column, [
+                'type' => true, 'options' => true, 'options_list' => true, 'options_source' => true, 'required' => true,
+                GridRules::COLUMN_RELEVANT => true, GridRules::NEEDED_WHEN => true, GridRules::REQUIRED_WHEN => true,
+            ]),
             self::columns($config),
+        );
+    }
+
+    /**
+     * M246: the rows a Likert matrix keeps when a matrix becomes one — a row's "Not needed" cells name columns a scale
+     * does not have. Its show-when and details stay: a Likert row takes both.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<array-key, mixed>|null the rows as given when they are not a list
+     */
+    public static function rowsAsScale(array $config): ?array
+    {
+        $rows = $config['rows'] ?? null;
+        if (! is_array($rows)) {
+            return null;
+        }
+
+        return array_map(
+            static fn (mixed $row): mixed => is_array($row) ? array_diff_key($row, [GridRules::NOT_NEEDED => true]) : $row,
+            $rows,
         );
     }
 

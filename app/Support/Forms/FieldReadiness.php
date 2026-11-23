@@ -115,6 +115,8 @@ final class FieldReadiness
             'conditions' => match (true) {
                 $noAnswer => '—',
                 OperandKind::for($type)->offered() => 'Yes',
+                // M246 (`R-ffd10da2`): a grid is never read whole, but each cell it always asks is (`D230`).
+                $type->isComposite() => 'Its cells',
                 default => 'No',
             },
         ];

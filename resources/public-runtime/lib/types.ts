@@ -86,6 +86,15 @@ export interface RawSection {
      * every section drawn as cards since — is the cards.
      */
     repeat_layout?: 'table' | 'cards' | null;
+    page_width?: 'wide' | null; // M247 (`D231`): `wide` widens the page while the section is on screen; absent is the reading width.
+    /**
+     * M249 (`progress-chapters`, `D233`): the name of the chapter this section STARTS on the progress bar, its names per
+     * language (XLSForm import only), and a short name for its page on the bar. Absent — every snapshot published before
+     * them, and every section since without them — starts no chapter and is listed under its title.
+     */
+    chapter?: string | null;
+    chapter_translations?: Record<string, string> | null;
+    progress_label?: string | null;
     relevant_expression: string | null;
 }
 
@@ -236,6 +245,12 @@ export interface RenderOption {
     value: string;
     label: string;
     labelTranslations: Record<string, string> | null;
+    /**
+     * M249 (`dropdown-placeholder`, `D233`): what a CLOSED dropdown shows while this choice is chosen, and its names per
+     * language (XLSForm import only). Present only when the choice has one, so every other option keeps its shape.
+     */
+    shortLabel?: string;
+    shortLabelTranslations?: Record<string, string> | null;
 }
 
 /** One cascading-select level's label (Increment G4a); translations resolved by the render layer. */
@@ -272,6 +287,11 @@ export interface RenderMatrix {
     cells: RenderOption[];
     /** M183 (`R-1c1d7266`): `stacked` draws cards at every width; `table` (the default) a table wherever one fits. */
     layout: 'table' | 'stacked';
+    /**
+     * M246 (`grid-question-table`): a row's details — note content drawn under its label — keyed by row value. Optional
+     * because a manifest cached before M246 has none.
+     */
+    rowDetails?: Record<string, unknown[]>;
 }
 
 /**
@@ -372,6 +392,13 @@ export interface RenderSection {
     maxInstances: number | null;
     /** M185: the section is drawn as a table when it holds only questions a table can hold (`repeat-table.ts`). */
     repeatLayout: 'table' | 'cards';
+    /** M247 (`D231`): `wide` widens the respondent's page while this section is on screen (`page-width.ts`). */
+    pageWidth: 'wide' | 'normal';
+    /** M249 (`D233`): the chapter this section starts (null starts none) and its names per language (`chapters.ts`). */
+    chapter: string | null;
+    chapterTranslations: Record<string, string> | null;
+    /** M249: the page's short name on the progress bar, in place of its title; untranslated (`resolveShort()`). */
+    progressLabel: string | null;
     relevantExpression: string | null;
 }
 

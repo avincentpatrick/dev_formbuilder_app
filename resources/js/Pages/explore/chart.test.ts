@@ -27,7 +27,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
     runQuery: vi.fn<(definition: Definition) => Promise<RunPayload>>(),
-    fetchFields: vi.fn<(source: string, formId: string) => Promise<{ payload: FieldsPayload | null; message: string | null }>>(),
+    fetchFields: vi.fn<(source: string, formId: string, grid?: string | null) => Promise<{ payload: FieldsPayload | null; message: string | null }>>(),
     patch: vi.fn<(url: string, data: Record<string, unknown>, options: Record<string, unknown>) => void>(),
     del: vi.fn(),
 }));
@@ -583,6 +583,164 @@ describe('Chart builder — saving', () => {
         // `v` is the server's to write; a client echo is how a stored shape comes to carry a version nothing wrote.
         expect(body.definition).not.toHaveProperty('v');
         expect(body.definition).toEqual(toPayload({ ...storedDefinition(), sort: 'label' }));
+        wrapper.unmount();
+    });
+});
+
+// ── M247 (`D231`): a grid, counted row by row ───────────────────────────────────────────────────────────
+
+describe('Chart builder — counting a grid row by row', () => {
+    const GRID_ROWS: Source = { ...ANSWERS, key: 'grid_rows', label: 'Rows of a grid', requires_grid: true };
+
+    it('asks for the grid once the form is chosen, loads its fields, groups by its Row and sends the grid', async () => {
+        mocks.fetchFields.mockImplementation((_source, _formId, grid) =>
+            Promise.resolve({
+                payload: {
+                    fields: grid ? [...ANSWERS.fields, field('row', 'Row', 'category', 'Grid'), field('column:rate', 'Rating', 'category', 'Grid')] : ANSWERS.fields,
+                    notes: [],
+                    grids: [{ value: 'clinics', label: 'Clinics' }],
+                },
+                message: null,
+            }),
+        );
+        const wrapper = render({ sources: [GRID_ROWS, RESPONSES] });
+        await flushPromises();
+
+        expect(wrapper.find('#explore-grid').exists()).toBe(false);
+        await wrapper.find('#explore-form').setValue('f1');
+        await flushPromises();
+        expect(wrapper.find('#explore-grid').exists()).toBe(true);
+        expect(optionLabels(wrapper, '#explore-grid')).toContain('Clinics');
+        await settle();
+        expect(wrapper.text()).toContain('Choose the grid whose rows to count.');
+
+        await wrapper.find('#explore-grid').setValue('clinics');
+        await flushPromises();
+        expect(mocks.fetchFields).toHaveBeenLastCalledWith('grid_rows', 'f1', 'clinics');
+
+        await settle();
+        expect(lastQuery()).toMatchObject({ source: 'grid_rows', form_id: 'f1', grid: 'clinics', dimensions: [{ field: 'row', bucket: null }] });
+
+        // Another form has other grids: the grid goes with the form.
+        await wrapper.find('#explore-form').setValue('f2');
+        await flushPromises();
+        expect((wrapper.find('#explore-grid').element as HTMLSelectElement).value).toBe('');
+        wrapper.unmount();
+    });
+});
+
+describe('Chart builder — an agreement list (M250, `D234`)', () => {
+    const AGREEMENT: Source = { ...ANSWERS, key: 'agreement', label: 'Agreement across questions', default_range_days: 365, charts: ['agreement'] };
+    const WITH_LIST: BuilderOptions = {
+        ...OPTIONS,
+        charts: [...OPTIONS.charts, chartOption('agreement', 'Agreement list', 0, 0, 0)],
+        agreement: {
+            max_picks: 100,
+            max_items: 500,
+            max_marks: 50,
+            min_threshold: 50,
+            max_threshold: 100,
+            default_threshold: 75,
+            max_min_views: 1000,
+            default_min_views: 6,
+        },
+    };
+    const PICKS = [
+        {
+            value: 'answer:q_view',
+            label: 'Do you agree?',
+            question: 'Do you agree?',
+            column: null,
+            section: 'Terms',
+            kind: 'question' as const,
+            multiple: false,
+            rows: 0,
+            options: [
+                { value: 'agree', label: 'Agree' },
+                { value: 'noview', label: 'No view or opinion' },
+            ],
+        },
+    ];
+
+    function listChart(overrides: Partial<SavedChart> = {}): SavedChart {
+        return saved({
+            name: 'Meeting short list',
+            definition: storedDefinition({
+                source: 'agreement',
+                form_id: 'f1',
+                chart: 'agreement',
+                dimensions: [],
+                measures: [],
+                agreement: { items: ['answer:q_view'], leave_out: ['noview'], agreeing: [], threshold: 75, min_views: 6 },
+            }),
+            source_label: 'Agreement across questions',
+            can: { update: true, delete: true, export: true },
+            ...overrides,
+        });
+    }
+
+    beforeEach(() => {
+        mocks.fetchFields.mockResolvedValue({ payload: { fields: ANSWERS.fields, notes: [], items: PICKS }, message: null });
+    });
+
+    it('asks for the questions in place of a group-by and a value, and sends the list it builds', async () => {
+        const wrapper = mount(ChartPage, { props: { chart: null, sources: [AGREEMENT, RESPONSES], forms: FORMS, options: WITH_LIST } });
+        await flushPromises();
+
+        expect(wrapper.find('#explore-group').exists()).toBe(false);
+        expect(wrapper.find('#explore-chart').exists()).toBe(false);
+        expect(wrapper.text()).toContain('Choose a form, then the questions to report on.');
+
+        await wrapper.find('#explore-form').setValue('f1');
+        await flushPromises();
+        await settle();
+        expect(wrapper.text()).toContain('Choose the questions to report on.');
+        expect(mocks.runQuery).not.toHaveBeenCalled();
+
+        await wrapper.find('#agreement-pick-answer-q_view').setValue(true);
+        await settle();
+        expect(lastQuery()).toMatchObject({
+            source: 'agreement',
+            form_id: 'f1',
+            chart: 'agreement',
+            dimensions: [],
+            measures: [],
+            agreement: { items: ['answer:q_view'], leave_out: [], agreeing: [], threshold: 75, min_views: 6 },
+        });
+        wrapper.unmount();
+    });
+
+    it('never offers the agreement list as a chart on any other source', async () => {
+        const wrapper = mount(ChartPage, { props: { chart: null, sources: [RESPONSES, AGREEMENT], forms: FORMS, options: WITH_LIST } });
+        await flushPromises();
+
+        expect(optionLabels(wrapper, '#explore-chart')).not.toContain('Agreement list');
+        wrapper.unmount();
+    });
+
+    it('downloads a saved list, and waits for unsaved changes to be saved first', async () => {
+        mocks.runQuery.mockResolvedValue({ result: null, refusal: { reason: 'x', message: 'x' } });
+        const wrapper = mount(ChartPage, { props: { chart: listChart(), sources: [AGREEMENT], forms: FORMS, options: WITH_LIST } });
+        await flushPromises();
+
+        expect(button(wrapper, 'Download CSV')?.attributes('disabled')).toBeUndefined();
+        expect(button(wrapper, 'Download Excel')).toBeDefined();
+
+        await wrapper.find('#agreement-threshold').setValue('80');
+        await flushPromises();
+        expect(button(wrapper, 'Download CSV')?.attributes('disabled')).toBeDefined();
+        expect(wrapper.text()).toContain('Save your changes to download them.');
+        wrapper.unmount();
+    });
+
+    it('offers no download to a reader who may not take the answers away', async () => {
+        mocks.runQuery.mockResolvedValue({ result: null, refusal: { reason: 'x', message: 'x' } });
+        const wrapper = mount(ChartPage, {
+            props: { chart: listChart({ can: { update: false, delete: false, export: false }, is_mine: false, owner: 'Olivia' }), sources: [AGREEMENT], forms: FORMS, options: WITH_LIST },
+        });
+        await flushPromises();
+
+        expect(button(wrapper, 'Download CSV')).toBeUndefined();
         wrapper.unmount();
     });
 });

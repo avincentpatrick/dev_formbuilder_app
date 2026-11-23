@@ -9,6 +9,7 @@ use App\Enums\LogicOperator;
 use App\Exceptions\Expressions\ExpressionEvaluationException;
 use App\Exceptions\Expressions\ExpressionSyntaxException;
 use App\Services\Expressions\Ast\ArithmeticNode;
+use App\Services\Expressions\Ast\CellReferenceNode;
 use App\Services\Expressions\Ast\ComparisonNode;
 use App\Services\Expressions\Ast\FieldReferenceNode;
 use App\Services\Expressions\Ast\FunctionCallNode;
@@ -16,6 +17,7 @@ use App\Services\Expressions\Ast\LiteralNode;
 use App\Services\Expressions\Ast\LogicalNode;
 use App\Services\Expressions\Ast\Node;
 use App\Services\Expressions\Ast\NotNode;
+use App\Services\Expressions\Ast\RowCellReferenceNode;
 use App\Services\Expressions\Ast\SelfReferenceNode;
 
 /**
@@ -104,6 +106,15 @@ final class ExpressionEvaluator
 
         if ($node instanceof FieldReferenceNode) {
             return $context->has($node->key) ? $context->answers[$node->key] : Marker::Absent;
+        }
+
+        // M246: a grid cell, or this row's cell inside a grid column's own rule.
+        if ($node instanceof CellReferenceNode) {
+            return $context->has($node->key) ? GridCells::resolve($context->answers[$node->key], $node->row, $node->column) : Marker::Absent;
+        }
+
+        if ($node instanceof RowCellReferenceNode) {
+            return GridCells::rowCell($context->row, $node->column);
         }
 
         if ($node instanceof SelfReferenceNode) {

@@ -163,6 +163,7 @@ const ANALYTICS = 'resources/js/Pages/forms/Analytics.vue';
 const EXPLORE_BOARD = 'resources/js/Pages/explore/Index.vue';
 const EXPLORE_CHART = 'resources/js/Pages/explore/Chart.vue';
 const EXPLORE_SAVE = 'resources/js/components/explore/ExploreSaveModal.vue';
+const EXPLORE_AGREEMENT = 'resources/js/components/explore/ExploreAgreementControls.vue';
 // M176 (`R-61d43278`): "No negative numbers" is a kind the builder names itself, stored as a minimum of 0.
 const RULE_WORDS = 'resources/js/components/builder/field-conversion.ts';
 
@@ -637,12 +638,18 @@ const guide: ChapterDraft[] = [
                     ),
                     steps(
                         ['Click ', ui('New chart', EXPLORE_BOARD), ' (or ', ui('Build a chart', EXPLORE_BOARD), ' if you have none yet).'],
-                        ['Under ', ui('Data source', EXPLORE_CHART), ', choose what to count. To chart the answers to a form, choose the form under ', ui('Form', EXPLORE_CHART), '.'],
+                        ['Under ', ui('Data source', EXPLORE_CHART), ', choose what to count. To chart the answers to a form, choose the form under ', ui('Form', EXPLORE_CHART), '. To count a grid row by row — for example, how many chose each answer in every row of a table — choose “Rows of a grid”, the form, and the grid under ', ui('Grid', EXPLORE_CHART), '; each answered row of each response counts once.'],
                         ['Choose a ', ui('Chart type', EXPLORE_CHART), ' and what to ', ui('Group by', EXPLORE_CHART), '. The chart redraws as you change it.'],
                         ['Narrow it with ', ui('Filters', EXPLORE_CHART), ' and the ', ui('Date range', EXPLORE_CHART), ', and tick ', ui('Show the numbers', EXPLORE_CHART), ' to see the table behind the chart.'],
                         ['Click ', ui('Save chart', EXPLORE_CHART), ', give it a ', ui('Name', EXPLORE_SAVE), ', and tick ', ui('Share with the workspace', EXPLORE_SAVE), ' if your colleagues should see it too.'],
                     ),
                     p('Saved charts appear under ', ui('Your charts', EXPLORE_BOARD), '. Charts colleagues shared appear under ', ui('Shared with the workspace', EXPLORE_BOARD), '; you can look at them, and save a copy to change.'),
+                    p(
+                        'To see how far people agree, choose “Agreement across questions” under ', ui('Data source', EXPLORE_CHART), ' and the form, and tick the questions under ',
+                        ui('Questions on the list', EXPLORE_AGREEMENT), ' — a table’s column puts every row of it on the list. Tick the answers that are not a view, such as “No view or opinion”, under ',
+                        ui('Leave out these answers', EXPLORE_AGREEMENT), ', and set ', ui('Short list at (%)', EXPLORE_AGREEMENT), ' and ', ui('With at least (views)', EXPLORE_AGREEMENT),
+                        '. The list shows the short list first, then the items to discuss, the most divided first. Once saved, ', ui('Download Excel', EXPLORE_CHART), ' gives you the list as a spreadsheet.',
+                    ),
                     tip('info', 'A shared chart only ever shows each person what they could already see, so two people may see different numbers on the same chart. Questions marked personal or sensitive are never offered.'),
                 ],
             },
@@ -691,6 +698,10 @@ const CHOICE_FILTER = 'resources/js/components/builder/ChoiceFilterEditor.vue';
 const DATA_SHARING = 'resources/js/components/forms/DataSharingPanel.vue';
 const LIKERT_MATRIX = 'resources/js/components/builder/LikertMatrixEditor.vue';
 const MATRIX = 'resources/js/components/builder/MatrixEditor.vue';
+// M246 (`grid-question-table`): a grid row's settings and a Grid column's rules.
+const GRID_ROW = 'resources/js/components/builder/GridRowRules.vue';
+const GRID_COLUMN = 'resources/js/components/builder/GridColumnRules.vue';
+const GRID_CELLS = 'resources/js/components/builder/grid-condition-cells.ts';
 const GRID_LAYOUT = 'resources/js/components/builder/GridLayoutSelect.vue';
 const GEO = 'resources/js/components/builder/GeoEditor.vue';
 const MEDIA = 'resources/js/components/builder/MediaEditor.vue';
@@ -926,10 +937,17 @@ const reference: ChapterDraft[] = [
                     list(
                         [ui('Basics', CONFIG), ': ', ui('Section title', CONFIG), ' (the heading respondents see), ', ui('Section key', CONFIG), ' (its short name) and ', ui('Description', CONFIG), '.'],
                         [
+                            ui('Progress label', CONFIG), ' is a short name for the page on the progress bar, shown there instead of a long title. ',
+                            ui('Starts a chapter', CONFIG), ' begins a named chapter: the pages after it belong to it until the next page that starts one. ',
+                            'With chapters, the progress bar shows each chapter as a mark and the pages of the one you are in, instead of a dot for every page — useful on a long form. ',
+                            'A copied section never starts a chapter of its own.',
+                        ],
+                        [
                             ui('Advanced', CONFIG), ': ', ui('Repeatable group', CONFIG), ' lets respondents fill the section in more than once — one entry per household member, for example. ',
                             ui('Min instances', CONFIG), ' and ', ui('Max instances', CONFIG), ' set how many entries are allowed. ',
                             ui('Layout', REPEAT_LAYOUT), ' draws the entries as ', ui('A card per entry', REPEAT_LAYOUT), ', or as ', ui('A table, a row per entry', REPEAT_LAYOUT),
-                            ' — every question a column. A table holds text, numbers, dates and choices; a section with any other question stays as cards, and the setting names it. Phones show a card per entry either way, and the response PDF and the paper form draw the table too.',
+                            ' — every question a column. A table holds text, numbers, dates and choices; a section with any other question stays as cards, and the setting names it. Phones show a card per entry either way, and the response PDF and the paper form draw the table too. ',
+                            ui('Wide page — for big tables', CONFIG), ' lets the page use the whole width of a big screen while the section is on screen, so a wide grid is drawn as a table rather than squeezed. Phones are unchanged, and so is the Preview pane.',
                         ],
                         ['“', ui('Show this section only when…', CONFIG), '” — show or skip the whole section, like a question.'],
                     ),
@@ -1160,7 +1178,7 @@ const reference: ChapterDraft[] = [
                     p('Several statements, each rated on the same scale, in one table: the scale’s words across the top and one round button for each statement and point. On a phone each statement becomes a card with its scale on one line. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' or ', ui("Another form's answers", LINKED), '. Rows from a list or a form are copied in when you publish; publish again to pick up new answers.'],
-                        [ui('Rows', LIKERT_MATRIX), ' — the statements to rate.'],
+                        [ui('Rows', LIKERT_MATRIX), ' — the statements to rate. Under each one, ', ui('Row settings', GRID_ROW), ': ', ui('Show this row only when…', GRID_ROW), ' and ', ui('Details under the row’s label', GRID_ROW), '.'],
                         [ui('Scale points', LIKERT_MATRIX), ' — the rating scale shared by every row, from lowest to highest.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
@@ -1274,13 +1292,14 @@ const reference: ChapterDraft[] = [
                     p('A table of questions: each row is asked in every column, and each column takes its own kind of answer. It is a table on a wide screen and a card per row on a phone. On the ', ui('Grid', CONFIG), ' tab:'),
                     list(
                         [ui('Rows come from', LINKED), ' — ', ui('Typed here', LINKED), ', ', ui('A list file', LINKED), ' (each row of the file a row of the grid, up to 200) or ', ui("Another form's answers", LINKED), '.'],
-                        [ui('Rows', MATRIX), ' — each row is a question.'],
-                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', and for a choice column where its choices come from — typed, a list file or another form’s answers.'],
+                        [ui('Rows', MATRIX), ' — each row is a question. Under each one, ', ui('Row settings', GRID_ROW), ': ', ui('Show this row only when…', GRID_ROW), ', ', ui('Not needed in this row', GRID_ROW), ' (those cells read “Not needed” and are never asked), and ', ui('Details under the row’s label', GRID_ROW), ' — text shown under the row, with no pictures.'],
+                        [ui('Columns', MATRIX), ' — each column is asked in every row. Under each one: its ', ui('Type', MATRIX), ' (one choice, several choices, short or long text, a whole or decimal number, or a date), ', ui('Required in every row', MATRIX), ', for a choice column where its choices come from — typed, a list file or another form’s answers — and its ', ui('Column rules', GRID_COLUMN), ': ', ui('Show this column only when…', GRID_COLUMN), ', ', ui('In each row, this cell is needed only when…', GRID_COLUMN), ' and ', ui('In each row, this cell is required when…', GRID_COLUMN), '. The two in-each-row rules can read ', ui('This row’s', GRID_CELLS), ' cells to the left.'],
                         [ui('Cell choices come from', LINKED), ' and ', ui('Cell choices', MATRIX), ' — the choices of every choice column with no list of its own.'],
                         [ui('Layout', GRID_LAYOUT), ' — ', ui('Table where it fits', GRID_LAYOUT), ', or ', ui('Cards everywhere', GRID_LAYOUT), '.'],
                     ),
                     tip('info', 'Rows and choices from a list file or another form are copied into the grid when you publish, so the paper form, the PDF and every export show them. Publish again to pick up new answers.'),
-                    tip('info', 'Grids cannot be used in conditions or formulas, or inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
+                    tip('info', 'A condition, a formula or a label elsewhere can use one cell of a grid: pick it as “Grid — Row — Column”. A condition or a formula can only use a cell that is always asked — its row and column have no condition, and it is never “Not needed” — and a label can show any cell of a grid before it. A row or column whose code has a space or a full stop cannot be picked.'),
+                    tip('info', 'A grid cannot sit inside a repeatable section. A spreadsheet gives every cell its own column, beside the grid’s one-line summary.'),
                 ],
             },
         ],

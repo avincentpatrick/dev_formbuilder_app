@@ -7,6 +7,8 @@ namespace App\Services\Explorer;
 use App\Enums\ExplorerFieldType;
 use App\Exceptions\Explorer\InvalidExplorerQueryException;
 use App\Models\User;
+use App\Services\Explorer\Agreement\AgreementReportRunner;
+use App\Services\Explorer\Sources\AgreementSource;
 use App\Services\Explorer\Sources\ExplorerSource;
 use App\Support\Explorer\ExplorerDimension;
 use App\Support\Explorer\ExplorerField;
@@ -42,6 +44,8 @@ final class ExplorerQueryRunner
         private readonly ExplorerCatalog $catalog,
         private readonly ExplorerCompiler $compiler,
         private readonly ExplorerResultShaper $shaper,
+        // M250 (`D234`): an agreement list is counted by its own runner; nothing below the branch changes for any other chart.
+        private readonly AgreementReportRunner $agreement,
     ) {}
 
     /**
@@ -50,6 +54,10 @@ final class ExplorerQueryRunner
     public function run(ExplorerQuery $query, User $user): array
     {
         [$source, $form] = $this->catalog->resolve($query, $user);
+
+        if ($source instanceof AgreementSource && $form !== null) {
+            return $this->agreement->run($query, $user, $source, $form);
+        }
 
         $fields = [];
         foreach ($source->fields($user, $form) as $field) {
@@ -134,6 +142,12 @@ final class ExplorerQueryRunner
     public function assertRunnable(ExplorerQuery $query, User $user): void
     {
         [$source, $form] = $this->catalog->resolve($query, $user);
+
+        if ($source instanceof AgreementSource && $form !== null) {
+            $this->agreement->assertRunnable($query, $user, $source, $form);
+
+            return;
+        }
 
         $fields = [];
         foreach ($source->fields($user, $form) as $field) {

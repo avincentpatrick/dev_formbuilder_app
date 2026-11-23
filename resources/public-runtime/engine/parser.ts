@@ -211,6 +211,20 @@ export class ExpressionParser {
             return fieldRef(token.lexeme);
         }
 
+        // M246: `key.row.col` / `key.row` — the lexer has already proved the shape.
+        if (token.type === 'cell_ref') {
+            this.advance();
+            const parts = token.lexeme.split('.');
+
+            return { type: 'cell', key: parts[0], row: parts[1] ?? '', column: parts[2] ?? null };
+        }
+
+        if (token.type === 'row_cell_ref') {
+            this.advance();
+
+            return { type: 'row_cell', column: token.lexeme.slice(1) };
+        }
+
         if (token.type === 'self_ref') {
             this.advance();
 

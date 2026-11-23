@@ -8,6 +8,9 @@
  *
  * M183 (`R-5033e87e`): generic over the entry, so an edit keeps every key an entry already had (a matrix column's
  * type, choices and required flag), and a `details` slot draws an entry's own settings under its row.
+ *
+ * M249 (`dropdown-placeholder`, `D233`): with `shortLabels`, each entry also takes a SHORT LABEL — what a closed
+ * dropdown cell shows while that choice is chosen. A blank one removes the key (and any imported translations of it).
  */
 import { MdsButton, MdsIconButton, MdsTextInput } from '@meridian/design-system';
 
@@ -19,6 +22,8 @@ const props = defineProps<{
     prefix: string;
     hint?: string;
     options: T[];
+    /** M249: offer a short label per entry — a single-choice column's choices, and the cell choices. */
+    shortLabels?: boolean;
 }>();
 const emit = defineEmits<{ 'update:options': [value: T[]] }>();
 defineSlots<{ details?: (props: { option: T; index: number }) => unknown }>();
@@ -33,6 +38,21 @@ function addOption(): void {
 function removeOption(index: number): void {
     emit('update:options', removeGridEntry(props.options, index));
 }
+function shortLabelOf(option: T): string {
+    const short = (option as Record<string, unknown>).short_label;
+    return typeof short === 'string' ? short : '';
+}
+function setShortLabel(index: number, text: string): void {
+    emit(
+        'update:options',
+        props.options.map((option, i) => {
+            if (i !== index) return option;
+            if (text !== '') return { ...option, short_label: text };
+            const { short_label: _short, short_label_translations: _translations, ...rest } = option as Record<string, unknown>;
+            return rest as T;
+        }),
+    );
+}
 </script>
 
 <template>
@@ -41,7 +61,7 @@ function removeOption(index: number): void {
         <p v-if="hint" class="grid-list__hint">{{ hint }}</p>
         <div class="grid-list__rows">
             <div v-for="(option, i) in options" :key="i" class="grid-list__item">
-                <div class="grid-list__row">
+                <div class="grid-list__row" :class="{ 'grid-list__row--short': shortLabels }">
                     <MdsTextInput
                         :model-value="option.value"
                         :aria-label="`${singular} ${i + 1} value`"
@@ -51,6 +71,13 @@ function removeOption(index: number): void {
                         :model-value="option.label"
                         :aria-label="`${singular} ${i + 1} label`"
                         @update:model-value="updateOption(i, { label: $event })"
+                    />
+                    <MdsTextInput
+                        v-if="shortLabels"
+                        :model-value="shortLabelOf(option)"
+                        :aria-label="`Short form of ${singular.toLowerCase()} ${i + 1}`"
+                        data-grid-short-label
+                        @update:model-value="setShortLabel(i, $event)"
                     />
                     <MdsIconButton
                         icon="trash"
@@ -111,6 +138,11 @@ function removeOption(index: number): void {
     grid-template-columns: 1fr 1fr 28px;
     gap: var(--mds-space-2);
     align-items: center;
+}
+
+/* M249: the short label sits between the label and the remove button. */
+.grid-list__row--short {
+    grid-template-columns: 1fr 1fr 1fr 28px;
 }
 
 .grid-list__empty {

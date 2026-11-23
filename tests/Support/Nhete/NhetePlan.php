@@ -27,16 +27,39 @@ use RuntimeException;
  *   - a word cap → a whole-answer pattern rule (`word-pattern`); "up to N" and "only answer" → expression rules;
  *   - a changing placeholder → a hidden calculation piped into the placeholder (`piped-placeholder`);
  *   - a note whose text pipes an answer → a label-only note, because note content blocks are not piped (`piped-note`).
+ *
+ * ── THE TABLE LAYOUT (M246, `grid-question-table`) ──────────────────────────────────────────────────────────────
+ * `new NhetePlan(layout: NhetePlan::TABLE)` draws what M246 lets a grid hold, as the module draws it:
+ *   - each agreement grid → one Grid: a choice column and a long-text column needed only on "Agree with changes" or
+ *     "Disagree", each row's text its details (`grid_table`);
+ *   - each domain's indicator table → one Grid: a row per indicator, its content the row's details, its cut-off
+ *     "Not needed" in the six rows that have none, its comment required when `${.cut}`, `${.worry}` or `${.keep}` asks
+ *     (`ind_table`);
+ *   - each kept indicator's parts → one Grid of its own, shown when that indicator's `keep` cell is yes or close, its
+ *     coverage columns shown for the region the office named (`parts_table`, `D230` answer 2).
+ * What a grid cannot hold yet is still counted: a column's help text (`grid-column-hint`), a long-text column's word
+ * cap (`grid-column-word-cap`) and the per-row placeholder (`piped-placeholder`).
+ * BLOCKS stays the default — the layout the XLSForm workbooks, the seeder, the browser walk and the copy equivalence
+ * test read, so each of them is byte for byte what it was.
  */
 final class NhetePlan
 {
     public const FIXTURE = 'tests/fixtures/nhete/nhete-shape.json';
+
+    /** Today's layout before M246: every table a block of questions. */
+    public const BLOCKS = 'blocks';
+
+    /** M246: every table a Grid. */
+    public const TABLE = 'table';
 
     public const FOUR_REGIONS = ['ncr', 'mimaropa', 'car', 'barmm'];
 
     public const SMALL_AREAS = ['household', 'purok', 'barangay', 'city'];
 
     public const WORD_CAP = 1500;
+
+    /** M249 (`D233`): the lists whose choices read "Short. Longer explanation…" and so carry a short closed label. */
+    public const SHORT_LABEL_LISTS = ['use'];
 
     /** @var array<string, mixed> */
     private array $fixture;
@@ -45,9 +68,15 @@ final class NhetePlan
     private array $workarounds = [];
 
     /** @param  array<string, mixed>|null  $fixture  the decoded fixture; null reads {@see self::FIXTURE} */
-    public function __construct(?array $fixture = null)
+    public function __construct(?array $fixture = null, public readonly string $layout = self::BLOCKS)
     {
         $this->fixture = $fixture ?? self::read(base_path(self::FIXTURE));
+    }
+
+    /** M246: the key of a domain's indicator Grid in the table layout. */
+    public static function indicatorGrid(string $domain): string
+    {
+        return "mx_{$domain}_table";
     }
 
     /** @return array<string, mixed> */
@@ -98,7 +127,7 @@ final class NhetePlan
     /**
      * The form as today's builder can hold it: one section per screen, each with its ordered elements.
      *
-     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>}>
+     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>, page_width?: string, chapter?: string, progress_label?: string}>
      */
     public function sections(): array
     {
@@ -106,7 +135,9 @@ final class NhetePlan
         $sections = [];
         foreach ($this->fixture['screens'] as $screen) {
             if (isset($screen['parts'])) {
-                $sections[] = $this->partsSection($screen, (string) $screen['parts'], count($sections));
+                $sections[] = $this->layout === self::TABLE
+                    ? $this->partsTableSection($screen, (string) $screen['parts'])
+                    : $this->partsSection($screen, (string) $screen['parts'], count($sections));
 
                 continue;
             }
@@ -122,6 +153,56 @@ final class NhetePlan
                 'relevant' => $screen['show_if'] ?? null,
                 'elements' => $elements,
             ];
+        }
+
+        // M247 (`grid-wide-sticky-explorer`, `D231`): in the table layout a screen holding an indicator or parts table is
+        // drawn on a wide page, so its five columns are a table rather than squeezed.
+        if ($this->layout === self::TABLE) {
+            foreach ($sections as $i => $section) {
+                $tables = array_filter($section['elements'], static fn (array $e): bool => in_array($e['role'], ['ind_table', 'parts_table'], true));
+                if ($tables !== []) {
+                    $sections[$i]['page_width'] = 'wide';
+                }
+            }
+        }
+
+        return $this->chaptered($sections);
+    }
+
+    /**
+     * M249 (`progress-chapters`, `D233`): the module's own way of finding your way, in every layout.
+     *
+     *  - Each STOP is a chapter, started by its first screen (`chapter`).
+     *  - A screen whose page opens with a heading — 44 of 49 — has that heading as its title, and its short screen name
+     *    as its PROGRESS LABEL, as the module draws them. The heading leaves the note (the page would otherwise say it
+     *    twice), and a note left with nothing in it leaves the screen.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    private function chaptered(array $sections): array
+    {
+        $previousStop = null;
+        foreach ($sections as $i => $section) {
+            if ($section['stop'] !== $previousStop) {
+                $sections[$i]['chapter'] = $section['stop'];
+            }
+            $previousStop = $section['stop'];
+
+            $first = $section['elements'][0] ?? null;
+            $heading = $first !== null && $first['type'] === 'note' && is_array($first['content']) ? ($first['content'][0] ?? null) : null;
+            if (! is_array($heading) || ($heading['type'] ?? null) !== 'heading' || ($heading['level'] ?? null) !== 1) {
+                continue;
+            }
+
+            $sections[$i]['progress_label'] = $section['label'];
+            $sections[$i]['label'] = (string) $heading['text'];
+            $rest = array_slice($first['content'], 1);
+            if ($rest === []) {
+                array_shift($sections[$i]['elements']);
+            } else {
+                $sections[$i]['elements'][0]['content'] = $rest;
+            }
         }
 
         return $sections;
@@ -143,10 +224,10 @@ final class NhetePlan
             return $this->question($item);
         }
         if (isset($item['grid'])) {
-            return $this->perRowGrid($item);
+            return $this->layout === self::TABLE ? [$this->agreementGrid($item)] : $this->perRowGrid($item);
         }
         if (isset($item['table'])) {
-            return $this->indicatorTable((string) $item['table']);
+            return $this->layout === self::TABLE ? [$this->indicatorGridElement((string) $item['table'])] : $this->indicatorTable((string) $item['table']);
         }
 
         throw new RuntimeException('Unknown NHETE item: '.json_encode($item));
@@ -506,6 +587,168 @@ final class NhetePlan
         return ['key' => $key, 'label' => (string) $screen['label'], 'stop' => (string) $screen['stop'], 'relevant' => $sectionShown, 'elements' => $elements];
     }
 
+    // ── M246: the table layout ──────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * An agreement grid as one Grid: the module's choice per row, and its comment needed only when the row is agreed
+     * with changes or disagreed with.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function agreementGrid(array $item): array
+    {
+        $this->count('grid-column-word-cap');
+        $rows = [];
+        foreach ($item['rows'] as [$row, $rowLabel, $rowText]) {
+            $rows[] = [
+                'value' => (string) $row,
+                'label' => self::plain((string) $rowLabel),
+                'details' => [['type' => 'paragraph', 'spans' => $this->spans((string) $rowText)]],
+            ];
+        }
+
+        return $this->element((string) $item['grid'], 'matrix', mb_substr(self::plain((string) $item['question']), 0, 500), [
+            'role' => 'grid_table',
+            'grid' => (string) $item['grid'],
+            'config' => [
+                'rows' => $rows,
+                'columns' => [
+                    [
+                        'value' => 'agree', 'label' => 'Your view', 'type' => 'single_select',
+                        'options' => self::optionObjects($this->options($item['list'])),
+                        ...(($item['required'] ?? true) ? ['required' => true] : []),
+                    ],
+                    [
+                        'value' => 'why', 'label' => mb_substr(self::plain((string) $item['comment']), 0, 500), 'type' => 'long_text',
+                        'needed_when' => self::anyOf('.agree', ['agree_changes', 'disagree']),
+                    ],
+                ],
+                'cells' => [],
+            ],
+        ]);
+    }
+
+    /**
+     * A domain's indicator table as one Grid: a row per indicator with its content as the row's details.
+     *
+     * @return array<string, mixed>
+     */
+    private function indicatorGridElement(string $domain): array
+    {
+        $t = $this->fixture['texts'];
+        $rows = [];
+        foreach ($this->indicatorsIn($domain) as $ind) {
+            // The comment's placeholder cannot say why it became required, row by row.
+            $this->count('piped-placeholder');
+            $rows[] = [
+                'value' => strtolower((string) $ind['code']),
+                'label' => mb_substr("{$ind['code']} · ".self::plain((string) $ind['name']), 0, 500),
+                'details' => $this->indicatorContent($ind),
+                ...($ind['cutoff_cell'] ? [] : ['not_needed' => ['cut']]),
+            ];
+        }
+        $this->count('grid-column-hint');
+        $this->count('grid-column-word-cap');
+
+        return $this->element(self::indicatorGrid($domain), 'matrix', mb_substr(self::plain((string) $t['table_use']), 0, 500), [
+            'role' => 'ind_table',
+            'grid' => $domain,
+            'config' => [
+                'rows' => $rows,
+                'columns' => [
+                    ['value' => 'use', 'label' => self::plain((string) $t['table_use']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('use')), 'required' => true],
+                    ['value' => 'cut', 'label' => self::plain((string) $t['table_cutoff']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('cutoff')), 'required' => true],
+                    ['value' => 'worry', 'label' => self::plain((string) $t['table_worry']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('worry'))],
+                    ['value' => 'keep', 'label' => self::plain((string) $t['table_keep']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('keep')), 'required' => true],
+                    [
+                        'value' => 'comment', 'label' => self::plain((string) $t['table_comment']), 'type' => 'long_text',
+                        'required_when' => "\${.cut} = 'change' or \${.worry} = 'other' or \${.keep} = 'close'",
+                    ],
+                ],
+                'cells' => [],
+            ],
+        ]);
+    }
+
+    /**
+     * A domain's parts screen in the table layout: its four notes, then one Grid per indicator (`D230` answer 2), shown
+     * when that indicator's `keep` cell is yes or close.
+     *
+     * @return array{key: string, label: string, stop: string, relevant: string, elements: list<array<string, mixed>>}
+     */
+    private function partsTableSection(array $screen, string $domain): array
+    {
+        $t = $this->fixture['texts'];
+        $kept = static fn (array $ind): string => self::anyOf(
+            self::indicatorGrid((string) $ind['domain']).'.'.strtolower((string) $ind['code']).'.keep',
+            ['yes', 'close'],
+        );
+        $indicators = $this->indicatorsIn($domain);
+        $sectionShown = implode(' or ', array_map(static fn (array $ind): string => '('.$kept($ind).')', $indicators));
+        $earlierKept = [];
+        foreach (array_filter(['a', 'b', 'c', 'd'], static fn (string $d): bool => $d < $domain) as $d) {
+            foreach ($this->indicatorsIn($d) as $ind) {
+                $earlierKept[] = '('.$kept($ind).')';
+            }
+        }
+
+        $key = (string) $screen['key'];
+        $elements = [
+            $this->note("{$key}_intro", [['h', (string) $t['parts_heading']], ['p', (string) $t['parts_intro']], ['p', (string) $t['parts_promise']]], null),
+            $this->note("{$key}_region", [['p', (string) $t['parts_region']]], self::anyOf('q0_4', self::FOUR_REGIONS)),
+            $this->note("{$key}_national", [['p', (string) $t['parts_national']]], "\${q0_4} = 'whole'"),
+            $this->note("{$key}_request", [['callout', (string) $t['parts_request']]], $earlierKept === [] ? null : 'not('.implode(' or ', $earlierKept).')'),
+        ];
+
+        $partKept = self::anyOf('.keep', ['yes', 'close']);
+        $small = self::anyOf('.area', self::SMALL_AREAS);
+        foreach ($indicators as $ind) {
+            $this->count('grid-column-hint');
+            $this->count('grid-column-word-cap');
+            $p = strtolower((string) $ind['code']);
+            $rows = [];
+            foreach ($ind['parts'] as $n => $partText) {
+                $rows[] = ['value' => 'p'.($n + 1), 'label' => mb_substr(self::plain((string) $partText), 0, 500)];
+            }
+            $elements[] = $this->element("{$p}_parts", 'matrix', mb_substr("{$ind['code']} · ".self::plain((string) $ind['name']), 0, 500), [
+                'relevant' => $kept($ind),
+                'role' => 'parts_table',
+                'indicator' => $ind['code'],
+                'config' => [
+                    'rows' => $rows,
+                    'columns' => [
+                        ['value' => 'keep', 'label' => self::plain((string) $t['parts_keep']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('keep')), 'required' => true],
+                        ['value' => 'close', 'label' => self::plain((string) $t['parts_close_ph']), 'type' => 'long_text', 'required' => true, 'needed_when' => "\${.keep} = 'close'"],
+                        ['value' => 'area', 'label' => self::plain((string) $t['parts_area']), 'type' => 'single_select', 'options' => self::optionObjects($this->options('area')), 'required' => true, 'needed_when' => $partKept],
+                        [
+                            'value' => 'cov_r', 'label' => self::plain((string) $t['parts_cov_region']), 'type' => 'single_select',
+                            'options' => self::optionObjects($this->options('coverage')), 'required' => true,
+                            'relevant' => self::anyOf('q0_4', self::FOUR_REGIONS), 'needed_when' => "({$partKept}) and ({$small})",
+                        ],
+                        [
+                            'value' => 'cov_n', 'label' => self::plain((string) $t['parts_cov_national']), 'type' => 'single_select',
+                            'options' => self::optionObjects($this->options('coverage')), 'required' => true,
+                            'relevant' => "\${q0_4} = 'whole'", 'needed_when' => "({$partKept}) and ({$small})",
+                        ],
+                    ],
+                    'cells' => [],
+                ],
+            ]);
+        }
+
+        return ['key' => $key, 'label' => (string) $screen['label'], 'stop' => (string) $screen['stop'], 'relevant' => $sectionShown, 'elements' => $elements];
+    }
+
+    /**
+     * @param  list<array{0: string, 1: string}>  $options
+     * @return list<array{value: string, label: string}>
+     */
+    private static function optionObjects(array $options): array
+    {
+        return array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1], ...(isset($o[2]) ? ['short_label' => $o[2]] : [])], $options);
+    }
+
     /** @return list<array<string, mixed>> */
     private function indicatorsIn(string $domain): array
     {
@@ -525,7 +768,8 @@ final class NhetePlan
             'type' => $type,
             'label' => $label,
             'hint' => null,
-            'placeholder' => null,
+            // M249 (`dropdown-placeholder`, `D233`): every dropdown says what to do in its empty box, as the module does.
+            'placeholder' => $type === 'dropdown' ? (string) $this->fixture['texts']['ph_dropdown'] : null,
             'required' => 'optional',
             'required_when' => [],
             'relevant' => null,
@@ -540,16 +784,28 @@ final class NhetePlan
             'calculated_type' => null,
             'role' => 'question',
             'indicator' => null,
+            'config' => null,
             ...$extra,
         ];
     }
 
-    /** @return list<array{0: string, 1: string}> */
+    /**
+     * A choice list as `[value, label]` pairs — and, for the lists whose choices are "Short. Longer explanation…"
+     * (M249, `D233`), a third entry: the short label a closed dropdown shows, the words before the first full stop.
+     *
+     * @return list<array{0: string, 1: string, 2?: string}>
+     */
     private function options(mixed $choices): array
     {
         $list = is_string($choices) ? $this->fixture['lists'][$choices] : $choices;
+        $short = is_string($choices) && in_array($choices, self::SHORT_LABEL_LISTS, true);
 
-        return array_map(static fn (array $c): array => [(string) $c[0], self::plain((string) $c[1])], $list);
+        return array_map(static function (array $c) use ($short): array {
+            $label = self::plain((string) $c[1]);
+            $stop = mb_strpos($label, '.');
+
+            return $short && $stop !== false && $stop > 0 ? [(string) $c[0], $label, mb_substr($label, 0, $stop)] : [(string) $c[0], $label];
+        }, $list);
     }
 
     /** @param  list<string>  $values */

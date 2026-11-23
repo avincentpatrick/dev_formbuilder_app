@@ -57,7 +57,7 @@ interface Block {
     min_instances: number | null;
     max_instances: number | null;
     /** M185 (`R-0a7275ce`): `table` when the author laid the section out as one. */
-    repeat_layout?: 'table' | null;
+    repeat_layout?: 'table' | null; page_width?: 'wide' | null; // M247 (`D231`): `wide` when the author widened its page.
     fields: EncodeField[];
 }
 
@@ -201,7 +201,7 @@ const isScanning = computed(() => props.scan != null);
  * the save target) keeps reading `isScanning`, so correcting a scanned response is still an ordinary edit.
  */
 const paperPages = computed<ScanPage[]>(() => (isScanning.value ? props.scan!.pages : isEditing.value ? props.scan_pages ?? [] : []));
-const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0);
+const hasPaper = computed(() => isScanning.value || paperPages.value.length > 0); const pageWide = computed(() => !hasPaper.value && shownSteps.value.some((step) => blockFor(step)?.page_width === 'wide')); // M247 (`D231`): every section is on this one page, so it is wide when any shown section is; a scanned paper takes the room instead.
 
 // ── M186 (`R-7a2f4a13`): a list-backed cascade's choices, fetched beside the page ─────────────────────────────────
 // The guest page's shape (`ChoiceListMaterializer::listsForBrowser()`), each choice a tuple to halve a 42,000-row
@@ -522,6 +522,21 @@ function fieldError(fieldKey: string): string | undefined {
     const prefix = `answers.${fieldKey}.`;
     const cellKey = Object.keys(errors).find((key) => key.startsWith(prefix));
     return cellKey !== undefined ? errors[cellKey] : undefined;
+}
+
+/**
+ * M246 (`grid-question-table`): a grid's refusals, each on its own cell — `answers.<field>.<row>[.<col>]` keyed by the
+ * cell's path in the grid. The whole-field line above still carries the first of them, so the page's own summary is
+ * unchanged; the grid then counts them in place of repeating one.
+ */
+function cellErrorsOf(fieldKey: string): Record<string, string> {
+    const prefix = `answers.${fieldKey}.`;
+    const out: Record<string, string> = {};
+    for (const [key, message] of Object.entries(pageErrors.value)) {
+        if (key.startsWith(prefix) && typeof message === 'string') out[key.slice(prefix.length)] = message;
+    }
+
+    return out;
 }
 
 function instanceError(sectionKey: string, index: number, fieldKey: string): string | undefined {
@@ -1219,7 +1234,7 @@ function onConflictKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-    <div ref="pageRoot" class="encode" :class="{ 'encode--scan': hasPaper }">
+    <div ref="pageRoot" class="encode" :class="{ 'encode--scan': hasPaper, 'encode--wide': pageWide }">
         <Head
             :title="isScanning ? `Review a scan — ${form.title}` : isEditing ? `Edit answers — ${form.title}` : `Encode — ${form.title}`"
         />
@@ -1707,6 +1722,8 @@ function onConflictKeydown(event: KeyboardEvent): void {
                                             :model-value="flatValue(field.key)"
                                             :error="fieldError(field.key)"
                                             :read-only="isEditing"
+                                            :grid-relevance="runtime.gridRelevanceFor(field.key)"
+                                            :cell-errors="cellErrorsOf(field.key)"
                                             @update:model-value="setFlatValue(field.key, $event)"
                                         />
                                         <p v-if="scanNotes[field.key]" class="encode__scan-note">{{ scanNotes[field.key].text }}</p>
@@ -2332,5 +2349,18 @@ function onConflictKeydown(event: KeyboardEvent): void {
     margin: var(--mds-space-1) 0 0;
     color: var(--mds-color-text-secondary);
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+/* M247 (`grid-wide-sticky-explorer`, `D231`): a section marked "Wide page" lifts the 45rem reading column so a big grid can be a
+   table; from the 75rem split the form takes every column the side panel leaves. A scanned paper still takes the room
+   instead (`pageWide` is false beside one). */
+.encode--wide .encode__layout {
+    max-inline-size: none;
+}
+
+@container (min-width: 75rem) {
+    .encode.encode--wide:not(.encode--scan) .encode__layout {
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+    }
 }
 </style>

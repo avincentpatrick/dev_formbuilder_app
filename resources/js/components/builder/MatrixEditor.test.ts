@@ -23,11 +23,11 @@ function lastColumns(wrapper: ReturnType<typeof editor>): Record<string, unknown
 }
 
 describe('MatrixEditor — a type for every column (M183)', () => {
-    it('offers the six types a grid cell holds, and writes the choice onto that column alone', async () => {
+    it('offers the seven types a grid cell holds, long text since M246, and writes the choice onto that column alone', async () => {
         const wrapper = editor([{ value: 'c1', label: 'C1' }, { value: 'c2', label: 'C2', label_translations: { fil: 'K2' } }]);
         const select = wrapper.get('[data-column-type="1"]');
 
-        expect(select.findAll('option').map((o) => o.text())).toEqual(['Single choice', 'Multiple choice', 'Short text', 'Whole number', 'Decimal number', 'Date']);
+        expect(select.findAll('option').map((o) => o.text())).toEqual(['Single choice', 'Multiple choice', 'Short text', 'Long text', 'Whole number', 'Decimal number', 'Date']);
 
         await select.setValue('integer');
 
@@ -162,5 +162,37 @@ describe('LikertMatrixEditor — statements from a list or a form (M185)', () =>
 
         expect((wrapper.emitted('update:config') ?? []).at(-1)?.[0]).toEqual({ ...config, rows_source: { form_id: null, field_key: null } });
         expect(wrapper.text()).toContain('Scale points');
+    });
+});
+
+/**
+ * M249 (`dropdown-placeholder`, `D233` answer 3): a grid's dropdown cells take a short label too — on a single-choice
+ * column's own choices and on the shared Cell choices, never on a multiple-choice column's, whose cells are tick boxes.
+ */
+describe('MatrixEditor — a short label for a dropdown cell (M249)', () => {
+    it('offers it on a single-choice column\'s choices and the cell choices, not a multiple-choice column\'s', () => {
+        const wrapper = editor([
+            { value: 'use', label: 'Use', options: [{ value: 'include', label: 'Include. As it stands.' }] },
+            { value: 'svc', label: 'Services', type: 'multi_select', options: [{ value: 'lab', label: 'Lab' }] },
+        ]);
+
+        expect(wrapper.get('[data-column-choices="0"]').find('[data-grid-short-label]').exists()).toBe(true);
+        expect(wrapper.get('[data-column-choices="1"]').find('[data-grid-short-label]').exists()).toBe(false);
+        // The shared cell choices are the last list on the tab.
+        expect(wrapper.findAll('[data-grid-short-label]').map((input) => input.attributes('aria-label'))).toEqual([
+            'Short form of choice 1',
+            'Short form of choice 1',
+        ]);
+    });
+
+    it('writes a column choice\'s short label onto that choice alone, and a blank removes it', async () => {
+        const wrapper = editor([{ value: 'use', label: 'Use', options: [{ value: 'include', label: 'Include. As it stands.', short_label: 'In' }] }]);
+        const input = wrapper.get('[data-column-choices="0"] [data-grid-short-label]');
+
+        await input.setValue('Include');
+        expect(lastColumns(wrapper)).toEqual([{ value: 'use', label: 'Use', options: [{ value: 'include', label: 'Include. As it stands.', short_label: 'Include' }] }]);
+
+        await input.setValue('');
+        expect(lastColumns(wrapper)).toEqual([{ value: 'use', label: 'Use', options: [{ value: 'include', label: 'Include. As it stands.' }] }]);
     });
 });

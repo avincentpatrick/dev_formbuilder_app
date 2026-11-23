@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Explorer\Sources;
 
+use App\Enums\ExplorerChartType;
 use App\Enums\ExplorerFieldType;
 use App\Models\Form;
 use App\Models\User;
@@ -17,6 +18,20 @@ use Illuminate\Support\Str;
  */
 abstract class AbstractExplorerSource implements ExplorerSource
 {
+    /** Every chart that groups and counts; the agreement list is its own source's alone (M250). */
+    public function charts(): array
+    {
+        $charts = [];
+
+        foreach (ExplorerChartType::cases() as $type) {
+            if ($type !== ExplorerChartType::Agreement) {
+                $charts[] = $type;
+            }
+        }
+
+        return $charts;
+    }
+
     public function requiresForm(): bool
     {
         return false;

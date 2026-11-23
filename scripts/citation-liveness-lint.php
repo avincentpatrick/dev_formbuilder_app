@@ -161,7 +161,10 @@ const TIER2_FILES = ['docs/feature-backlog.md'];
 // ⚙️ RATCHETED 17 → 16 BY `M176`, in the same commit as the repair that earned it. Its builder edits turned eight
 // ledger citations blank; re-pointing them (line-count-neutral, inside each line) also landed one that was already dead
 // (`ValidationEditor.vue:93`) on its prop declaration. Three in rows `M176` closes now name the file at `cef2a9b0`.
-const LEDGER_ROT_CEILING = 16;
+// ⚙️ RATCHETED 16 → 15 BY `M249`, in the same commit as the repair that earned it. Its insertions in `ConfigPanel.vue`,
+// `schema-mapping.ts` and the interop spec turned four ledger citations blank, each already describing code that had
+// moved on; all four DROPPED the number (line-count-neutral), and one dead citation fewer than before remained.
+const LEDGER_ROT_CEILING = 15;
 
 /** Another application's tree (M192): resolvable by full path, never by bare or partial name. See git_index(). */
 const GUEST_APP_PREFIX = 'apps/';

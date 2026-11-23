@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Form;
+use App\Models\FormField;
 use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
@@ -65,6 +66,13 @@ it('publishes the NHETE module once, one screen per page with save-and-resume, a
         ->and($form->default_locale)->toBe('en')
         ->and(FormSection::query()->where('form_version_id', $form->current_published_version_id)->count())
         ->toBe(count((new NhetePlan)->sections()));
+
+    // M249 (`D233`): what the walk reads — ten chapters from the import, and the progress labels and dropdown
+    // placeholders the seeder sets because XLSForm has no column for them.
+    $published = $form->current_published_version_id;
+    expect(FormSection::query()->where('form_version_id', $published)->whereNotNull('chapter')->count())->toBe(10)
+        ->and(FormSection::query()->where('form_version_id', $published)->whereNotNull('progress_label')->count())->toBe(48)
+        ->and(FormField::query()->where('form_version_id', $published)->where('field_type', 'dropdown')->whereNull('placeholder')->count())->toBe(0);
 
     // `withoutVite()`: the page's shell names built assets, and CI's Pest job builds none (run 43568612961 failed
     // here on a missing manifest while every local run, with assets built, passed).

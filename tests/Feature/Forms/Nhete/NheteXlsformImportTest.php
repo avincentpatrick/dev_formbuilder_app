@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Form;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
@@ -133,6 +134,14 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
         ->and($outcome['published'])->toBeTrue('publish refused: '.json_encode($outcome['publish_toast']));
 
     $form = $outcome['form'];
+    // M249 (`progress-chapters`, `D233`): each stop is an outer group in the workbook, and imports as the chapter its first
+    // screen starts; the "use" choices' short labels ride the choices sheet. Progress labels have no column.
+    enterTenant($tenant->id, $admin->id);
+    $version = Form::query()->findOrFail($form->id)->current_published_version_id;
+    $planChapters = array_column(array_filter($plan->sections(), static fn (array $s): bool => isset($s['chapter'])), 'chapter', 'key');
+    expect(FormSection::query()->where('form_version_id', $version)->whereNotNull('chapter')->orderBy('sequence')->pluck('chapter', 'key')->all())->toBe($planChapters)
+        ->and(FormSection::query()->where('form_version_id', $version)->count())->toBe(count($plan->sections()))
+        ->and(array_filter(array_column(FormField::query()->where('form_version_id', $version)->where('key', 'a01_use')->value('config')['options'], 'short_label')))->toHaveCount(6);
     // TODAY'S DEFECT (`xlsform-default-language-name`, found by `M239`'s walk): the settings sheet's `default_language`
     // is a language NAME, stored as the locale as it stands, so the guest page writes `<html lang="English">`.
     expect($form->default_locale)->toBe('English');
@@ -161,6 +170,14 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
 
 it('meets each Kobo habit the NHETE module would carry, one at a time', function (): void {
     [$tenant, $admin] = nheteWorkspace();
+
+    // M249 (`D233`): a Kobo author names the ten stops the way ODK does — an outer group around each stop's screens —
+    // and writes no short-label column of ours. (The whole module imports only once `xlsform-import-long-label` is fixed.)
+    $kobo = (new NheteWorkbook(new NhetePlan, NheteWorkbook::KOBO))->sheets();
+    $outer = array_filter($kobo['survey']['rows'], static fn (array $row): bool => $row['type'] === 'begin group' && str_starts_with((string) $row['name'], 'ch_'));
+    expect($outer)->toHaveCount(10)
+        ->and($kobo['choices']['headers'])->not->toContain('short_label');
+
     $choices = [['list_name' => 'l', 'name' => 'a', 'label' => 'A'], ['list_name' => 'l', 'name' => 'b', 'label' => 'B'], ['list_name' => 'l', 'name' => 'change', 'label' => 'Change']];
 
     // A note longer than the 500-character label column is not refused: the INSERT fails, and the request is a server

@@ -21,6 +21,9 @@ enum ExplorerChartType: string
     case Donut = 'donut';
     case Table = 'table';
     case Number = 'number';
+    // M250 (`agreement-report`, `D234`): a list of items, each with how far its respondents agree. It counts answers per
+    // item, so it takes no group-by and no value, and only the agreement source offers it.
+    case Agreement = 'agreement';
 
     public function label(): string
     {
@@ -33,13 +36,14 @@ enum ExplorerChartType: string
             self::Donut => 'Donut',
             self::Table => 'Table',
             self::Number => 'Number',
+            self::Agreement => 'Agreement list',
         };
     }
 
     public function minDimensions(): int
     {
         return match ($this) {
-            self::Table, self::Number => 0,
+            self::Table, self::Number, self::Agreement => 0,
             default => 1,
         };
     }
@@ -47,7 +51,7 @@ enum ExplorerChartType: string
     public function maxDimensions(): int
     {
         return match ($this) {
-            self::Number => 0,
+            self::Number, self::Agreement => 0,
             self::Bar, self::Donut => 1,
             default => 2,
         };
@@ -57,6 +61,7 @@ enum ExplorerChartType: string
     public function maxMeasures(int $dimensions): int
     {
         return match ($this) {
+            self::Agreement => 0,
             self::Bar, self::Donut => 1,
             self::Table, self::Number => 3,
             default => $dimensions === 2 ? 1 : 3,

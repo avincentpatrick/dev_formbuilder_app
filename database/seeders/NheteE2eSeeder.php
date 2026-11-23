@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Form;
+use App\Models\FormField;
+use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\FormService;
@@ -76,6 +78,7 @@ final class NheteE2eSeeder extends Seeder
 
                 $form = app(FormService::class)->create($tenant, $owner, $plan->title());
                 app(XlsformImporter::class)->import($form, $workbook, $owner);
+                self::carryWhatXlsformCannot($form->refresh(), $plan);
                 app(PublishService::class)->publish($form->refresh(), $owner);
 
                 $form->update([
@@ -92,6 +95,31 @@ final class NheteE2eSeeder extends Seeder
             });
         } finally {
             @unlink($path);
+        }
+    }
+
+    /**
+     * M249 (`D233`): what the workbook cannot carry, set on the draft before it is published — each screen's progress
+     * label (`xlsform-progress-label`) and each dropdown's placeholder (`xlsform-placeholder`). The chapters and the
+     * short labels arrive through the import itself.
+     */
+    private static function carryWhatXlsformCannot(Form $form, NhetePlan $plan): void
+    {
+        $draft = (string) $form->draft_version_id;
+        foreach ($plan->sections() as $section) {
+            if (isset($section['progress_label'])) {
+                FormSection::query()->where('form_version_id', $draft)->where('key', $section['key'])->update(['progress_label' => $section['progress_label']]);
+            }
+        }
+
+        $byPlaceholder = [];
+        foreach ($plan->elements() as $element) {
+            if ($element['type'] === 'dropdown' && is_string($element['placeholder'])) {
+                $byPlaceholder[$element['placeholder']][] = $element['key'];
+            }
+        }
+        foreach ($byPlaceholder as $placeholder => $keys) {
+            FormField::query()->where('form_version_id', $draft)->whereIn('key', $keys)->update(['placeholder' => $placeholder]);
         }
     }
 

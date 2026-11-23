@@ -152,3 +152,21 @@ it('reads anything at all as a declaration or as one refusal, never as a type er
     'a limit that is a word' => [explorerDefinition(['limit' => 'ten'])],
     'a form that is not an id' => [explorerDefinition(['form_id' => 12])],
 ]);
+
+it('M247: stores a grid only when one is named, so every chart saved before it keeps its exact shape', function (): void {
+    $plain = ExplorerQuery::fromArray(explorerDefinition())->toArray();
+    $grid = ExplorerQuery::fromArray(explorerDefinition(['grid' => 'indicators']))->toArray();
+
+    expect($plain)->not->toHaveKey('grid')
+        ->and($grid['grid'])->toBe('indicators')
+        ->and(ExplorerQuery::fromArray($grid)->toArray())->toBe($grid)
+        ->and(ExplorerQuery::fromArray(explorerDefinition(['grid' => '']))->grid)->toBeNull();
+});
+
+it('M247: refuses a grid that is not a question key', function (mixed $grid): void {
+    expect(explorerRefusal(explorerDefinition(['grid' => $grid])))->toBe('malformed_definition');
+})->with([
+    'a number' => [7],
+    'a list' => [['a']],
+    'too long' => [str_repeat('g', 151)],
+]);

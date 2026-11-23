@@ -79,6 +79,27 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
     $report['sections'] = count($plan->sections());
     $report['fields'] = count($elements) + $otherBoxes;
 
+    // M249 (`progress-chapters`, `dropdown-placeholder`, `D233`): the module's ten stops are chapters, each screen that
+    // opens with a heading has its short name as its progress label, every dropdown says what to do in its empty box, and
+    // the "use" choices carry the short word a closed dropdown shows.
+    $chaptersOf = static fn (?string $version): array => FormSection::query()->where('form_version_id', $version)
+        ->whereNotNull('chapter')->orderBy('sequence')->pluck('chapter', 'key')->all();
+    $shortLabelsOf = static fn (?string $version): array => array_column(
+        (array) (FormField::query()->where('form_version_id', $version)->where('key', 'a01_use')->value('config')['options'] ?? []), 'short_label', 'value');
+    $planChapters = array_column(array_filter($plan->sections(), static fn (array $s): bool => isset($s['chapter'])), 'chapter', 'key');
+    $use = collect($elements)->firstWhere('key', 'a01_use');
+    $planShort = collect($use['options'])->filter(static fn (array $o): bool => isset($o[2]))->mapWithKeys(static fn (array $o): array => [$o[0] => $o[2]])->all();
+    $dropdowns = FormField::query()->where('form_version_id', $form->draft_version_id)->where('field_type', 'dropdown');
+    expect($planChapters)->toHaveCount(10)
+        ->and($chaptersOf($form->draft_version_id))->toBe($planChapters)
+        // 44 screens open with a heading in the module, and the four parts screens open with the one the plan gives them.
+        ->and(FormSection::query()->where('form_version_id', $form->draft_version_id)->whereNotNull('progress_label')->count())->toBe(48)
+        ->and(count(array_filter($plan->sections(), static fn (array $s): bool => isset($s['progress_label']))))->toBe(48)
+        ->and((clone $dropdowns)->count())->toBeGreaterThan(0)
+        ->and((clone $dropdowns)->where('placeholder', $use['placeholder'])->count())->toBe((clone $dropdowns)->count())
+        ->and($planShort)->toHaveCount(6)
+        ->and($shortLabelsOf($form->draft_version_id))->toBe($planShort);
+
     // ── 2. Publish through the real gates ───────────────────────────────────────────────────────────────────
     $started = hrtime(true);
     $publish = $this->actingAs($admin)->post("http://acme.meridian.test/forms/{$form->id}/publish");
@@ -227,6 +248,9 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         enterTenant($tenant->id, $admin->id);
         $fromTemplate = $publishNew(Form::query()->findOrFail($fromTemplate->id));
     }
+    // M249: a template copy keeps the chapters and the short labels.
+    expect($chaptersOf($fromTemplate->current_published_version_id))->toBe($planChapters)
+        ->and($shortLabelsOf($fromTemplate->current_published_version_id))->toBe($planShort);
     $report['template'] = [
         'instantiate_status' => $made->status(),
         'draft_fields' => $draftFields,
@@ -297,6 +321,13 @@ it('builds the whole NHETE module through the builder routes, publishes it, and 
         array_filter($plan->elements(), static fn (array $e): bool => $e['required'] === 'conditional'),
     ));
     $answeredComments = array_keys(array_intersect_key($base, array_flip($conditional)));
+    // M249: export writes each chapter as an outer group and each short label as a choices column, so both come back;
+    // a progress label has no XLSForm column (`xlsform-progress-label`), so it does not.
+    $reimported = $reimport->current_published_version_id ?? $reimport->draft_version_id;
+    enterTenant($tenant->id, $admin->id); // a request drops the test's RLS context
+    expect($chaptersOf($reimported))->toBe($planChapters)
+        ->and($shortLabelsOf($reimported))->toBe($planShort)
+        ->and(FormSection::query()->where('form_version_id', $reimported)->whereNotNull('progress_label')->count())->toBe(0);
     expect($report['export_reimport']['import_status'])->toBe(302)
         ->and($report['export_reimport']['fields'])->toBe($report['fields'])
         ->and($report['export_reimport']['notes_with_content'])->toBe(0)

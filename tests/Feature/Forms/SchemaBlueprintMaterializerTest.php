@@ -6,6 +6,7 @@ use App\Enums\FieldType;
 use App\Enums\RequiredMode;
 use App\Exceptions\Forms\FormException;
 use App\Models\FormField;
+use App\Models\FormSection;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Forms\SchemaBlueprintMaterializer;
@@ -105,4 +106,20 @@ it('materializes a single library field, minting a unique key on collision', fun
     expect($created->key)->not->toBe('phone')            // minted around the collision
         ->and($created->field_type)->toBe(FieldType::Phone)
         ->and($created->form_version_id)->toBe($this->draft->id);
+});
+
+it('M247: a template or library section keeps its wide page, and anything else is the reading width', function (): void {
+    $blueprint = [
+        'sections' => [
+            ['key' => 'wide', 'label' => 'Indicators', 'sequence' => 1, 'page_width' => 'wide'],
+            ['key' => 'plain', 'label' => 'About you', 'sequence' => 2],
+            ['key' => 'odd', 'label' => 'Notes', 'sequence' => 3, 'page_width' => 'huge'],
+        ],
+        'fields' => [],
+    ];
+
+    app(SchemaBlueprintMaterializer::class)->materializeInto($this->draft, $blueprint, $this->user);
+
+    $widths = FormSection::query()->where('form_version_id', $this->draft->id)->orderBy('sequence')->pluck('page_width', 'key')->all();
+    expect($widths)->toBe(['wide' => 'wide', 'plain' => null, 'odd' => null]);
 });

@@ -10,6 +10,7 @@ use App\Enums\RequiredMode;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\HasUuidv7;
 use App\Models\Concerns\TenantScoped;
+use App\Support\Forms\GridRules;
 use Database\Factories\FormFieldFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -135,5 +136,15 @@ class FormField extends Model implements TenantScoped
     public function validations(): HasMany
     {
         return $this->hasMany(FormFieldValidation::class, 'form_field_id');
+    }
+
+    /**
+     * M246: a grid's own rules — its rows' and columns' conditions ({@see GridRules::sites()}); [] for any other type.
+     *
+     * @return list<array{expression: string, rule: 'row'|'column'|'needed'|'required', row: ?string, column: ?string, row_scope: bool}>
+     */
+    public function gridRuleSites(): array
+    {
+        return GridRules::sites($this->field_type, $this->config);
     }
 }

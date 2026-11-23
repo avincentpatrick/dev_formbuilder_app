@@ -95,6 +95,9 @@ final class XlsformImporter
                 'is_repeatable' => $section->isRepeatable,
                 'min_instances' => $section->minInstances,
                 'max_instances' => $section->maxInstances,
+                // M249 (`D233`): the chapter an outer group of groups became.
+                'chapter' => $section->chapter,
+                'chapter_translations' => $section->chapterTranslations,
                 'relevant_expression' => $section->relevantExpression,
             ]);
             $sectionIdByKey[$section->key] = $row->id;

@@ -48,6 +48,24 @@ final class InvalidExplorerQueryException extends InvalidArgumentException
         return new self('The form this chart reads no longer exists, or you can no longer open it.', 'form_unavailable');
     }
 
+    /** M247 (`D231`): a chart that counts a grid's rows must say which grid. */
+    public static function gridRequired(): self
+    {
+        return new self('Choose the grid whose rows this chart counts.', 'grid_required');
+    }
+
+    /** M247: the grid is gone from the form, is marked personal or sensitive, or cannot be charted by row. */
+    public static function gridUnavailable(): self
+    {
+        return new self('The grid this chart counts is no longer in the form, or cannot be charted by row.', 'grid_unavailable');
+    }
+
+    /** M247: only a source that counts a grid's rows reads a grid. */
+    public static function gridNotAllowed(string $label): self
+    {
+        return new self("A chart of {$label} does not read a grid.", 'grid_not_allowed');
+    }
+
     public static function unknownField(string $field): self
     {
         return new self("'{$field}' is not a field of this data source any more.", 'unknown_field');
@@ -131,6 +149,30 @@ final class InvalidExplorerQueryException extends InvalidArgumentException
     public static function tooManyPeriods(int $periods, int $max): self
     {
         return new self("That range has {$periods} periods, more than the {$max} a chart can show. Group by a longer period or shorten the range.", 'too_many_periods');
+    }
+
+    /** M250 (`D234`): a source offers only the chart types it can fill — the agreement source only its list. */
+    public static function chartNotAllowed(string $chart, string $source): self
+    {
+        return new self("“{$chart}” is not offered for {$source}.", 'chart_not_allowed');
+    }
+
+    /** M250: an agreement list's own rules — what it names, its threshold, its minimum number of views. */
+    public static function agreementShape(string $detail): self
+    {
+        return new self("An agreement list {$detail}.", 'chart_shape');
+    }
+
+    /** M250: a picked question is gone from the form, is marked personal or sensitive, or is not a choice any more. */
+    public static function unknownItem(string $pick): self
+    {
+        return new self("'{$pick}' is not a question this agreement list can report on any more. Open the list and choose its questions again.", 'unknown_item');
+    }
+
+    /** M250: so many answers that reading only some would change which answer is the most common. */
+    public static function tooManyAnswers(int $max): self
+    {
+        return new self('These questions hold more than '.number_format($max).' different answers between them. Report on fewer questions at a time.', 'too_many_answers');
     }
 
     /** Machine-readable, so the page can branch on it without parsing the sentence. */

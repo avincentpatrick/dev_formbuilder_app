@@ -201,20 +201,25 @@
                                 <tr>
                                     <th class="grid__row"></th>
                                     @foreach ($field['grid']['columns'] as $column)
-                                        <th>{{ $column['label'] }}</th>
+                                        <th>{{ $column['label'] }}@if ($column['conditional'] ?? false)<span class="q__flag">(if applicable)</span>@endif</th>
                                     @endforeach
                                 </tr>
                                 @foreach ($field['grid']['rows'] as $row)
                                     <tr>
-                                        <td class="grid__row">{{ $row['label'] }}</td>
+                                        <td class="grid__row">{{ $row['label'] }}@if ($row['conditional'] ?? false)<span class="q__flag">(if applicable)</span>@endif</td>
                                         {{-- M183 (R-51e044a6): each cell by its column - a Likert cell is one box to tick; a
                                              matrix cell is a box per choice beside its words (the column's own, else the
                                              shared cell choices, which before M183 reached the paper nowhere), or a box to
                                              write a number, a text or a date in. Grids are never scanned, so no reader
                                              depends on where these sit. --}}
                                         @foreach ($field['grid']['columns'] as $column)
-                                            @if ($column['kind'] === 'choices')
+                                            {{-- M246: a cell its row marks "Not needed" says so, greyed; a long-text cell is three lines. --}}
+                                            @if (in_array($column['value'], $row['not_needed'] ?? [], true))
+                                                <td class="grid__cell grid__cell--not-needed">Not needed</td>
+                                            @elseif ($column['kind'] === 'choices')
                                                 <td class="grid__cell">@foreach ($column['options'] as $option)<span class="choice"><span class="choice__box"></span>{{ $option['label'] }}</span>@endforeach</td>
+                                            @elseif ($column['kind'] === 'long')
+                                                <td class="grid__cell"><div class="grid__line"></div><div class="grid__line"></div><div class="grid__line"></div></td>
                                             @elseif ($column['kind'] === 'write')
                                                 <td class="grid__cell"><div class="grid__line"></div></td>
                                             @else

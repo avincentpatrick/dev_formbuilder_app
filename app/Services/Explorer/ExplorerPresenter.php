@@ -14,8 +14,11 @@ use App\Exceptions\Explorer\InvalidExplorerQueryException;
 use App\Models\ExplorerChart;
 use App\Models\Form;
 use App\Models\User;
+use App\Services\Explorer\Sources\AgreementSource;
 use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
+use App\Services\Explorer\Sources\GridScopedSource;
+use App\Support\Explorer\ExplorerAgreement;
 use App\Support\Explorer\ExplorerField;
 use App\Support\Explorer\ExplorerQuery;
 use DateTimeZone;
@@ -119,6 +122,17 @@ final class ExplorerPresenter
                     'max_limit' => ExplorerQuery::MAX_LIMIT,
                     'default_limit' => ExplorerQuery::DEFAULT_LIMIT,
                 ],
+                // M250 (`D234`): an agreement list's bounds and the values a new one opens with.
+                'agreement' => [
+                    'max_picks' => ExplorerAgreement::MAX_PICKS,
+                    'max_items' => ExplorerAgreement::MAX_ITEMS,
+                    'max_marks' => ExplorerAgreement::MAX_MARKS,
+                    'min_threshold' => ExplorerAgreement::MIN_THRESHOLD,
+                    'max_threshold' => ExplorerAgreement::MAX_THRESHOLD,
+                    'default_threshold' => ExplorerAgreement::DEFAULT_THRESHOLD,
+                    'max_min_views' => ExplorerAgreement::MAX_MIN_VIEWS,
+                    'default_min_views' => ExplorerAgreement::DEFAULT_MIN_VIEWS,
+                ],
             ],
         ];
     }
@@ -127,9 +141,15 @@ final class ExplorerPresenter
      * The fields of one source — asked for on its own when the source needs a form, because a form's
      * questions are not known until the form is.
      *
-     * @return array{fields: list<array<string, mixed>>, notes: list<string>}
+     * M247 (`D231`): a source that reads one grid also lists the form's grids it may chart (`grids`), and once a grid is
+     * named, its fields and notes are that grid's.
+     *
+     * M250 (`D234`): the agreement source also lists what an author may put on the list (`items`) — every choice
+     * question, every choice column of a question table, every Likert grid — in the form's order.
+     *
+     * @return array{fields: list<array<string, mixed>>, notes: list<string>, grids?: list<array{value: string, label: string}>, items?: list<array<string, mixed>>}
      */
-    public function fields(User $user, string $sourceKey, ?string $formId): array
+    public function fields(User $user, string $sourceKey, ?string $formId, ?string $grid = null): array
     {
         $source = $this->catalog->source($sourceKey);
 
@@ -151,6 +171,32 @@ final class ExplorerPresenter
                     ? InvalidExplorerQueryException::formRequired()
                     : InvalidExplorerQueryException::formUnavailable();
             }
+        }
+
+        if ($source instanceof GridScopedSource && $form !== null) {
+            $grids = [];
+            foreach ($source->grids($user, $form) as $value => $label) {
+                $grids[] = ['value' => (string) $value, 'label' => $label];
+            }
+            $bound = $grid === null ? null : $source->forGrid($user, $form, $grid);
+            if ($grid !== null && $bound === null) {
+                throw InvalidExplorerQueryException::gridUnavailable();
+            }
+            $read = $bound ?? $source;
+
+            return [
+                'fields' => $this->fieldRows($read->fields($user, $form), $user),
+                'notes' => $read->notes($user, $form),
+                'grids' => $grids,
+            ];
+        }
+
+        if ($source instanceof AgreementSource && $form !== null) {
+            return [
+                'fields' => $this->fieldRows($source->fields($user, $form), $user),
+                'notes' => $source->notes($user, $form),
+                'items' => $source->picks($form),
+            ];
         }
 
         return [
@@ -188,6 +234,21 @@ final class ExplorerPresenter
     }
 
     /**
+     * M250 (`D234`): why a saved list cannot be downloaded right now, or null when it can — asked before the stream
+     * starts, through the same checks a save runs, so a list whose question has gone is a toast and not a broken file.
+     */
+    public function exportRefusal(User $user, ExplorerChart $chart): ?string
+    {
+        try {
+            $this->runner->assertRunnable(ExplorerQuery::fromArray($chart->definition), $user);
+
+            return null;
+        } catch (InvalidExplorerQueryException $e) {
+            return $e->getMessage();
+        }
+    }
+
+    /**
      * @param  array<array-key, mixed>  $names  user id → name, for the readers `users` RLS lets this member see
      * @return array<string, mixed>
      */
@@ -207,6 +268,8 @@ final class ExplorerPresenter
             'can' => [
                 'update' => $user->can('update', $chart),
                 'delete' => $user->can('delete', $chart),
+                // M250 (`D234`): only an agreement list downloads, and only for a reader who may download the form's responses.
+                'export' => $user->can('export', $chart),
             ],
             'updated_at' => $chart->updated_at?->toIso8601String(),
         ];
@@ -221,6 +284,10 @@ final class ExplorerPresenter
             'description' => $source->description(),
             'row_noun' => $source->rowNoun(),
             'requires_form' => $source->requiresForm(),
+            // M247 (`D231`): a chart on this source names one of the form's grids too.
+            'requires_grid' => $source instanceof GridScopedSource,
+            // M250 (`D234`): the chart types this source can fill; the agreement source fills only its list.
+            'charts' => array_map(static fn (ExplorerChartType $type): string => $type->value, $source->charts()),
             'default_range_days' => $source->defaultRangeDays(),
             'range_field' => $source->rangeField(),
             // A source that needs a form ships the fields every form has; the questions follow by fetch.

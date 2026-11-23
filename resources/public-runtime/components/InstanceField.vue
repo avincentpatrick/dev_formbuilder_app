@@ -12,7 +12,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import FieldInput, { type AnswerValue, type EncodeField, type GeoEnvelope, type MediaAttachmentRef } from '@/components/submissions/FieldInput.vue';
 import { announcementFor } from '@/components/submissions/note-content';
-import { resolveCascade, resolveText } from '../lib/schema-mapping';
+import { controlOption, resolveCascade } from '../lib/schema-mapping';
 import { useAnnouncer, useRuntime } from '../composables/context';
 import type { RenderField } from '../lib/types';
 
@@ -44,10 +44,8 @@ const encodeField = computed<EncodeField>(() => ({
     hint: runtime.hintFor(props.field, scope.value),
     placeholder: runtime.placeholderFor(props.field, scope.value),
     required: marker.value === 'required',
-    options: props.field.options.map((o) => ({
-        value: o.value,
-        label: resolveText(o.label, o.labelTranslations, runtime.locale.value),
-    })),
+    // M249 (`D233`): a choice keeps its short label — what a closed dropdown shows — when the locale may show it.
+    options: props.field.options.map((o) => controlOption(o, runtime.locale.value)),
     cascade: resolveCascade(props.field.cascade, runtime.locale.value),
     // M130 — the author's choice layout and a note's content blocks, as FieldControl carries them.
     appearance: props.field.appearance,

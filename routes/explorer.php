@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Tenant\ExplorerChartController;
 use App\Http\Controllers\Tenant\ExplorerController;
+use App\Http\Controllers\Tenant\ExplorerExportController;
 use App\Http\Controllers\Tenant\ExplorerQueryController;
 use App\Models\ExplorerChart;
 use App\Policies\ExplorerChartPolicy;
@@ -55,6 +56,10 @@ Route::get('/explore/charts/{explorerChart}', [ExplorerController::class, 'show'
     ->middleware(['can:view,explorerChart', 'feature:advanced_analytics'])->name('explore.charts.show');
 Route::get('/explore/charts/{explorerChart}/result', [ExplorerQueryController::class, 'result'])
     ->middleware(['can:view,explorerChart', 'feature:advanced_analytics'])->name('explore.charts.result');
+// M250 (`D234`): a saved agreement list as CSV or Excel. `can:export` is the bound instance's — only an agreement list,
+// and only for a reader who may download the form's responses — and the download is metered, so it is throttled too.
+Route::get('/explore/charts/{explorerChart}/export', ExplorerExportController::class)
+    ->middleware(['can:export,explorerChart', 'feature:advanced_analytics', 'throttle:30,1'])->name('explore.charts.export');
 Route::patch('/explore/charts/{explorerChart}', [ExplorerChartController::class, 'update'])
     ->middleware(['can:update,explorerChart', 'feature:advanced_analytics'])->name('explore.charts.update');
 Route::delete('/explore/charts/{explorerChart}', [ExplorerChartController::class, 'destroy'])

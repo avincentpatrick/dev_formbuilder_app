@@ -32,12 +32,14 @@ import {
     MdsTextInput,
 } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import ExploreAgreementControls from '@/components/explore/ExploreAgreementControls.vue';
 import ExploreFilters from '@/components/explore/ExploreFilters.vue';
 import ExploreResult from '@/components/explore/ExploreResult.vue';
 import ExploreSaveModal from '@/components/explore/ExploreSaveModal.vue';
 import { fetchFields, runQuery } from '@/components/explore/exploreClient';
 import {
     dropUnknownFields,
+    dropUnknownPicks,
     fieldGroups,
     fieldsForAggregate,
     fitToChart,
@@ -52,6 +54,8 @@ import {
 } from '@/components/explore/definition';
 import type {
     Aggregate,
+    AgreementPick,
+    AgreementSpec,
     Bucket,
     BuilderOptions,
     ChartType,
@@ -82,15 +86,38 @@ function ownTimezone(): string {
     return props.options.timezones.includes(zone) ? zone : 'UTC';
 }
 
+/** M250 (`D234`): the threshold and minimum a new agreement list opens with — the server's, not a second copy. */
+const agreementLimits = computed(
+    () =>
+        props.options.agreement ?? {
+            max_picks: 100,
+            max_items: 500,
+            max_marks: 50,
+            min_threshold: 50,
+            max_threshold: 100,
+            default_threshold: 75,
+            max_min_views: 1000,
+            default_min_views: 6,
+        },
+);
+
+function agreementDefaults(): { threshold: number; min_views: number } {
+    return { threshold: agreementLimits.value.default_threshold, min_views: agreementLimits.value.default_min_views };
+}
+
 function initial(): Definition {
     if (props.chart !== null) return JSON.parse(JSON.stringify(props.chart.definition)) as Definition;
 
-    return newDefinition(props.sources[0], ownTimezone(), today);
+    return newDefinition(props.sources[0], ownTimezone(), today, agreementDefaults());
 }
 
 const definition = ref<Definition>(initial());
 const formFields = ref<Field[] | null>(null);
 const formNotice = ref<string | null>(null);
+/** M247 (`D231`): the chosen form's grids a "Rows of a grid" chart may count. */
+const formGrids = ref<Option[]>([]);
+/** M250 (`D234`): what the chosen form lets an agreement list report on, in the form's order. */
+const formPicks = ref<AgreementPick[]>([]);
 
 const result = ref<Result | null>(null);
 const refusal = ref<Refusal | null>(null);
@@ -114,7 +141,13 @@ const fieldByKey = computed(() => new Map(fields.value.map((field) => [field.key
 const chartOption = computed(() => props.options.charts.find((c) => c.value === definition.value.chart) ?? props.options.charts[0]);
 
 const sourceOptions = computed(() => props.sources.map((s) => ({ value: s.key, label: s.label })));
-const chartOptions = computed(() => props.options.charts.map((c) => ({ value: c.value, label: c.label })));
+// M250 (`D234`): only the charts the source can fill — every one but the agreement list, or on its own source only it.
+const chartOptions = computed(() =>
+    props.options.charts
+        .filter((c) => (source.value?.charts !== undefined ? source.value.charts.includes(c.value) : c.value !== 'agreement'))
+        .map((c) => ({ value: c.value, label: c.label })),
+);
+const isAgreement = computed(() => definition.value.chart === 'agreement');
 const timezoneOptions = computed(() => props.options.timezones.map((zone) => ({ value: zone, label: zone })));
 const groupByGroups = computed(() => fieldGroups(fields.value, isGroupable));
 const splitGroups = computed(() =>
@@ -144,27 +177,54 @@ function setSource(key: string): void {
 
     formFields.value = null;
     formNotice.value = null;
-    definition.value = newDefinition(next, definition.value.timezone, today);
+    formGrids.value = [];
+    formPicks.value = [];
+    definition.value = newDefinition(next, definition.value.timezone, today, agreementDefaults());
+}
+
+/** M250: a new spec from the agreement controls. */
+function setAgreement(spec: AgreementSpec): void {
+    patch({ agreement: spec });
+}
+
+/** M250 (`D234`): a saved list downloads as the saved list, so it waits until changes are saved. */
+function download(format: 'csv' | 'xlsx'): void {
+    if (props.chart === null) return;
+
+    window.location.href = `/explore/charts/${props.chart.id}/export?format=${format}`;
 }
 
 async function setForm(formId: string): Promise<void> {
-    patch({ form_id: formId === '' ? null : formId });
+    // M247: another form has other grids, so the grid a chart named goes with the form.
+    patch({ form_id: formId === '' ? null : formId, ...(source.value?.requires_grid === true ? { grid: null } : {}) });
     await loadFormFields();
+}
+
+/** M247 (`D231`): a grid, counted row by row — grouped by its Row first, unless the chart already groups by the grid. */
+async function setGrid(grid: string): Promise<void> {
+    patch({ grid: grid === '' ? null : grid });
+    await loadFormFields();
+
+    const first = definition.value.dimensions[0]?.field ?? '';
+    if (definition.value.grid != null && fieldByKey.value.has('row') && first !== 'row' && !first.startsWith('column:') && first !== 'rating') {
+        patch({ dimensions: [{ field: 'row', bucket: null }, ...definition.value.dimensions.slice(1)] });
+    }
 }
 
 /** A form's questions arrive by fetch; whatever the chart named that this form does not have is dropped. */
 async function loadFormFields(): Promise<void> {
     const formId = definition.value.form_id;
+    const grid = definition.value.grid ?? null;
 
     formFields.value = null;
     formNotice.value = null;
 
     if (source.value === undefined || !source.value.requires_form || formId === null) return;
 
-    const { payload, message } = await fetchFields(source.value.key, formId);
+    const { payload, message } = source.value.requires_grid === true ? await fetchFields(source.value.key, formId, grid) : await fetchFields(source.value.key, formId);
 
-    // The reader may have moved on to another form while this one was loading.
-    if (definition.value.form_id !== formId) return;
+    // The reader may have moved on to another form, or another grid, while this one was loading.
+    if (definition.value.form_id !== formId || (definition.value.grid ?? null) !== grid) return;
 
     if (payload === null) {
         formNotice.value = message;
@@ -173,7 +233,10 @@ async function loadFormFields(): Promise<void> {
     }
 
     formFields.value = payload.fields;
-    definition.value = dropUnknownFields(definition.value, payload.fields);
+    formGrids.value = payload.grids ?? [];
+    formPicks.value = payload.items ?? [];
+    // M250: a list keeps only the questions the form still lets it report on.
+    definition.value = payload.items === undefined ? dropUnknownFields(definition.value, payload.fields) : dropUnknownPicks(dropUnknownFields(definition.value, payload.fields), payload.items);
 }
 
 function setChart(type: string): void {
@@ -365,6 +428,12 @@ function destroy(): void {
                     <MdsButton variant="tertiary" icon-left="chevron-left">All charts</MdsButton>
                 </Link>
 
+                <!-- M250 (`D234`): a saved agreement list downloads as a spreadsheet, for a reader who may download responses. -->
+                <template v-if="chart !== null && chart.can.export === true">
+                    <MdsButton variant="tertiary" icon-left="download" :disabled="isDirty" @click="download('csv')">Download CSV</MdsButton>
+                    <MdsButton variant="tertiary" icon-left="download" :disabled="isDirty" @click="download('xlsx')">Download Excel</MdsButton>
+                </template>
+
                 <template v-if="chart === null">
                     <MdsButton variant="primary" :disabled="result === null" @click="openSave('create')">Save chart</MdsButton>
                 </template>
@@ -391,6 +460,9 @@ function destroy(): void {
             a copy to keep them.
         </p>
         <p v-if="saveError !== null" class="builder__error" role="alert">{{ saveError }}</p>
+        <p v-if="chart !== null && chart.can.export === true && isDirty" class="builder__hint builder__download-hint">
+            The download is the list as saved. Save your changes to download them.
+        </p>
 
         <div class="builder">
             <div class="builder__controls">
@@ -424,10 +496,40 @@ function destroy(): void {
                                 @update:model-value="setForm"
                             />
                         </MdsFormField>
+
+                        <MdsFormField
+                            v-if="source?.requires_grid && definition.form_id !== null"
+                            label="Grid"
+                            input-id="explore-grid"
+                            :help="formGrids.length === 0 ? 'This form has no grid a chart can count row by row.' : undefined"
+                        >
+                            <MdsSelect
+                                id="explore-grid"
+                                :model-value="definition.grid ?? ''"
+                                :options="formGrids"
+                                placeholder="Choose a grid"
+                                :disabled="formGrids.length === 0"
+                                @update:model-value="setGrid"
+                            />
+                        </MdsFormField>
                     </div>
                 </MdsCard>
 
-                <MdsCard>
+                <!-- M250 (`D234`): an agreement list names its questions and its rule instead of a group-by and a value. -->
+                <MdsCard v-if="isAgreement">
+                    <template #header><h2 class="builder__heading">Agreement</h2></template>
+
+                    <p v-if="definition.form_id === null" class="builder__hint">Choose a form, then the questions to report on.</p>
+                    <ExploreAgreementControls
+                        v-else-if="definition.agreement != null"
+                        :picks="formPicks"
+                        :spec="definition.agreement"
+                        :limits="agreementLimits"
+                        @change="setAgreement"
+                    />
+                </MdsCard>
+
+                <MdsCard v-else>
                     <template #header><h2 class="builder__heading">Chart</h2></template>
 
                     <div class="builder__stack">
@@ -594,7 +696,7 @@ function destroy(): void {
                     <div class="builder__preview-header">
                         <h2 class="builder__heading">Preview</h2>
                         <MdsSwitch
-                            v-if="result !== null && result.chart !== 'table' && result.chart !== 'number'"
+                            v-if="result !== null && result.chart !== 'table' && result.chart !== 'number' && result.chart !== 'agreement'"
                             v-model="showTable"
                             label="Show the numbers"
                         />
@@ -726,6 +828,10 @@ function destroy(): void {
     flex-wrap: wrap;
     align-items: center;
     gap: var(--mds-space-2);
+    margin-bottom: var(--mds-space-4);
+}
+
+.builder__download-hint {
     margin-bottom: var(--mds-space-4);
 }
 

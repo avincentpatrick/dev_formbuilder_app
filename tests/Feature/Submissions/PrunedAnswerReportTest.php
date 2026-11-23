@@ -432,3 +432,34 @@ it('falls back to the key when a field carries no label at all', function (): vo
         // An empty quotation would name nothing; the key is at least findable.
         ->assertSessionHas('prunedAnswers', ['staff_number']);
 });
+
+it('M246: names a grid row its show-when hid, and a cell a row marks "Not needed", as question, row and column', function (): void {
+    $tenant = prunedTenant();
+    $admin = prunedEncoder($tenant);
+    $form = app(FormService::class)->create($tenant, $admin, 'Clinics');
+    $draft = $form->draftVersion;
+    addFormField($draft, $admin, 'role', FieldType::ShortText, 1);
+    addFormField($draft, $admin, 'svc', FieldType::Matrix, 2, ['label' => 'Services', 'config' => [
+        'rows' => [
+            ['value' => 'a', 'label' => 'Clinic A', 'not_needed' => ['cut']],
+            ['value' => 'b', 'label' => 'Clinic B', 'relevant' => '${role} = \'staff\''],
+        ],
+        'columns' => [
+            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'short_text'],
+            ['value' => 'note', 'label' => 'Note', 'type' => 'long_text'],
+        ],
+        'cells' => [],
+    ]]);
+    app(PublishService::class)->publish($form->refresh(), $admin);
+
+    $this->actingAs($admin)
+        ->post("http://acme.meridian.test/forms/{$form->id}/submissions", [
+            'answers' => ['role' => 'visitor', 'svc' => ['a' => ['cut' => '5', 'note' => 'kept'], 'b' => ['note' => 'gone']]],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('prunedAnswers', ['Services — Clinic A — Cut-off', 'Services — Clinic B']);
+
+    enterTenant($tenant->id, $admin->id);
+    expect(SubmissionAnswer::query()->findOrFail(Submission::query()->firstOrFail()->id)->answers)
+        ->toEqual(['role' => 'visitor', 'svc' => ['a' => ['note' => 'kept']]]);
+});

@@ -505,7 +505,7 @@ test('Public runtime — a question with choices from another form is answered o
         .waitFor({ state: 'visible', timeout: 15_000 });
 
     const district = page.getByLabel('District visited');
-    await expect(district.locator('option:not([disabled])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
+    await expect(district.locator('option:not([disabled]):not([value=""])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
     await district.selectOption('Tondo');
     await page.getByRole('button', { name: 'Submit' }).click();
     await expect(page.getByText(/Saved on this device — will send/i)).toBeVisible({ timeout: 15_000 });

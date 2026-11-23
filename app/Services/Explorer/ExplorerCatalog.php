@@ -8,12 +8,15 @@ use App\Exceptions\Explorer\InvalidExplorerQueryException;
 use App\Models\Form;
 use App\Models\User;
 use App\Services\Explorer\Sources\ActivitySource;
+use App\Services\Explorer\Sources\AgreementSource;
 use App\Services\Explorer\Sources\AnswersSource;
 use App\Services\Explorer\Sources\DeliveriesSource;
 use App\Services\Explorer\Sources\ExplorerFormReach;
 use App\Services\Explorer\Sources\ExplorerSource;
 use App\Services\Explorer\Sources\FeedbackReportsSource;
 use App\Services\Explorer\Sources\FormsSource;
+use App\Services\Explorer\Sources\GridRowsSource;
+use App\Services\Explorer\Sources\GridScopedSource;
 use App\Services\Explorer\Sources\MembersSource;
 use App\Services\Explorer\Sources\PointsSource;
 use App\Services\Explorer\Sources\ResponsesSource;
@@ -36,6 +39,10 @@ final class ExplorerCatalog
     private const array SOURCES = [
         ResponsesSource::class,
         AnswersSource::class,
+        // M247 (`D231`): a grid, row by row.
+        GridRowsSource::class,
+        // M250 (`D234`): how far a form's respondents agree, question by question.
+        AgreementSource::class,
         FormsSource::class,
         MembersSource::class,
         ActivitySource::class,
@@ -82,6 +89,16 @@ final class ExplorerCatalog
             throw InvalidExplorerQueryException::sourceForbidden(strtolower($source->label()));
         }
 
+        // M250 (`D234`): a source offers only the charts it can fill — the agreement source its list, and no other source that list.
+        if (! in_array($query->chart, $source->charts(), true)) {
+            throw InvalidExplorerQueryException::chartNotAllowed($query->chart->label(), strtolower($source->label()));
+        }
+
+        // M247 (`D231`): only a source that counts a grid's rows reads a grid, and it reads only a grid it names.
+        if ($query->grid !== null && ! $source instanceof GridScopedSource) {
+            throw InvalidExplorerQueryException::gridNotAllowed(strtolower($source->label()));
+        }
+
         if (! $source->requiresForm()) {
             return [$source, null];
         }
@@ -94,6 +111,14 @@ final class ExplorerCatalog
 
         if ($form === null) {
             throw InvalidExplorerQueryException::formUnavailable();
+        }
+
+        if ($source instanceof GridScopedSource) {
+            if ($query->grid === null) {
+                throw InvalidExplorerQueryException::gridRequired();
+            }
+
+            return [$source->forGrid($user, $form, $query->grid) ?? throw InvalidExplorerQueryException::gridUnavailable(), $form];
         }
 
         return [$source, $form];

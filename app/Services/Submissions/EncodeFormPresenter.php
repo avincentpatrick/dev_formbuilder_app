@@ -195,7 +195,7 @@ final class EncodeFormPresenter
                 'repeatable' => false,
                 'min_instances' => null,
                 'max_instances' => null,
-                'repeat_layout' => null,
+                'repeat_layout' => null, 'page_width' => null,
                 'fields' => $ungrouped->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))->values()->all(),
             ];
         }
@@ -218,7 +218,7 @@ final class EncodeFormPresenter
                 'max_instances' => $section->is_repeatable ? $section->max_instances : null,
                 // M185 (`R-0a7275ce`): `table` when the author laid the section out as one; whether every question fits a
                 // cell is the page's to decide (`repeat-table.ts`), as the guest form decides it.
-                'repeat_layout' => $section->is_repeatable && $section->repeat_layout === 'table' ? 'table' : null,
+                'repeat_layout' => $section->is_repeatable && $section->repeat_layout === 'table' ? 'table' : null, 'page_width' => $section->page_width === 'wide' ? 'wide' : null,
                 'fields' => $sectionFields
                     ->map(fn (FormField $f): array => $this->field($form, $f, $sources, $answers))
                     ->values()->all(),
@@ -563,7 +563,7 @@ final class EncodeFormPresenter
      * shared `cells` for a choice column, so the grid never resolves the fallback itself — and `required`; and both
      * grids carry `layout` (`table`, or `stacked` for cards at every width). Mirrors `schema-mapping.ts buildMatrix`.
      *
-     * @return array{rows: list<array{value: string, label: string}>, columns: list<array<string, mixed>>, cells: list<array{value: string, label: string}>, layout: string}|null
+     * @return array{rows: list<array{value: string, label: string}>, columns: list<array<string, mixed>>, cells: list<array{value: string, label: string}>, layout: string, rowDetails?: array<string, array<array-key, mixed>>}|null
      */
     private function matrix(FormField $field): ?array
     {
@@ -572,18 +572,28 @@ final class EncodeFormPresenter
             return null;
         }
 
-        return [
+        $matrix = [
             'rows' => $this->optionPairs($field, 'rows'),
             'columns' => $type === FieldType::Matrix ? $this->matrixColumns($field) : $this->optionPairs($field, 'columns'),
             'cells' => $type === FieldType::Matrix ? $this->optionPairs($field, 'cells') : [],
             'layout' => data_get($field->config, 'layout') === 'stacked' ? 'stacked' : 'table',
         ];
+
+        // M246 (`grid-question-table`): a row's details, only for a row that has any — the guest runtime's `rowDetails`.
+        $rowDetails = [];
+        foreach ((array) data_get($field->config, 'rows', []) as $row) {
+            if (is_array($row) && (string) ($row['value'] ?? '') !== '' && is_array($row['details'] ?? null) && $row['details'] !== []) {
+                $rowDetails[(string) $row['value']] = $row['details'];
+            }
+        }
+
+        return $rowDetails === [] ? $matrix : [...$matrix, 'rowDetails' => $rowDetails];
     }
 
     /**
      * A matrix's columns with their answer rules resolved (M183, {@see MatrixColumns}).
      *
-     * @return list<array{value: string, label: string, type: string, options: list<array{value: string, label: string}>, required: bool}>
+     * @return list<array{value: string, label: string, type: string, options: list<array{value: string, label: string, shortLabel?: string}>, required: bool}>
      */
     private function matrixColumns(FormField $field): array
     {
@@ -673,7 +683,7 @@ final class EncodeFormPresenter
      * A `config.<key>` option list ({value,label}[]) normalised to `{value,label}` pairs, skipping entries
      * with no value and defaulting a blank label to the value.
      *
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function optionPairs(FormField $field, string $configKey): array
     {
@@ -682,7 +692,7 @@ final class EncodeFormPresenter
 
     /**
      * @param  array<mixed>  $options
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function pairs(array $options): array
     {
@@ -692,17 +702,32 @@ final class EncodeFormPresenter
                 continue;
             }
             $value = (string) $option['value'];
-            $pairs[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+            $pairs[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value), ...self::shortLabelOf($option)];
         }
 
         return $pairs;
     }
 
     /**
+     * M249 (`dropdown-placeholder`, `D233`): a choice's short label — what a closed dropdown shows while it is chosen —
+     * as `shortLabel`, the member the shared `FieldInput` reads; nothing when it has none, so every other choice keeps its
+     * shape. This page shows the form's base language, so the short label's translations are not read.
+     *
+     * @param  array<mixed>  $option
+     * @return array{shortLabel?: string}
+     */
+    private static function shortLabelOf(array $option): array
+    {
+        $short = is_string($option['short_label'] ?? null) ? trim($option['short_label']) : '';
+
+        return $short === '' ? [] : ['shortLabel' => $short];
+    }
+
+    /**
      * The author-defined option list for choice fields, normalised to `{value,label}` pairs (shared with the
      * F7 read side via {@see SchemaValueFormatter}). Empty for non-choice types.
      *
-     * @return list<array{value: string, label: string}>
+     * @return list<array{value: string, label: string, shortLabel?: string}>
      */
     private function options(FormField $field): array
     {
@@ -714,7 +739,18 @@ final class EncodeFormPresenter
             return $this->linkedOptions($field);
         }
 
-        return $this->formatter->options($field->config ?? []);
+        // M249: each choice keeps its short label, matched by value.
+        $short = [];
+        foreach ((array) data_get($field->config, 'options', []) as $option) {
+            if (is_array($option) && isset($option['value'])) {
+                $short[(string) $option['value']] = self::shortLabelOf($option);
+            }
+        }
+
+        return array_map(
+            static fn (array $pair): array => [...$pair, ...($short[$pair['value']] ?? [])],
+            $this->formatter->options($field->config ?? []),
+        );
     }
 
     /**

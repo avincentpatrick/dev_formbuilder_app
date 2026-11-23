@@ -2,7 +2,7 @@
 // `ExplorerPresenter` and `ExplorerQueryRunner`. Every nullable below is nullable on the server too: a
 // value an "Other" bucket cannot carry arrives as `null`, and typing it `number` would render "NaN".
 
-export type ChartType = 'bar' | 'column' | 'stacked' | 'line' | 'area' | 'donut' | 'table' | 'number';
+export type ChartType = 'bar' | 'column' | 'stacked' | 'line' | 'area' | 'donut' | 'table' | 'number' | 'agreement';
 export type Aggregate = 'count' | 'count_distinct' | 'sum' | 'avg' | 'min' | 'max' | 'median';
 export type Bucket = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'weekday' | 'hour';
 export type FieldType = 'category' | 'boolean' | 'multi_category' | 'number' | 'time' | 'date';
@@ -45,7 +45,71 @@ export type Definition = {
     timezone: string;
     sort: Sort;
     limit: number;
+    /** M247 (`D231`): the grid a "Rows of a grid" chart counts. Absent or null for every other source. */
+    grid?: string | null;
+    /** M250 (`D234`): what an agreement list counts. Absent or null for every other chart. */
+    agreement?: AgreementSpec | null;
 };
+
+/** M250 (`D234`): `ExplorerAgreement::toArray()` — the questions on the list and how agreement is counted. */
+export type AgreementSpec = {
+    /** Picks: `answer:{key}`, `grid:{key}:{column}` (every row of a table's column) or `grid:{key}` (a Likert grid). */
+    items: string[];
+    /** Answers that are not a view, such as "No view or opinion". */
+    leave_out: string[];
+    /** Answers that count together as agreeing, where an item offers one; empty means each item's most common answer. */
+    agreeing: string[];
+    threshold: number;
+    min_views: number;
+};
+
+/** M250: one thing an author may tick — a choice question, a table's choice column, or a Likert grid. */
+export interface AgreementPick {
+    value: string;
+    /** The question's wording, or for a table the column's. */
+    label: string;
+    question: string;
+    column: string | null;
+    section: string;
+    kind: 'question' | 'table_column' | 'scale_table';
+    multiple: boolean;
+    /** How many items it puts on the list: 0 for a question (itself), the rows for a table. */
+    rows: number;
+    options: Option[];
+}
+
+export type AgreementStatus = 'short_list' | 'discuss' | 'too_few';
+
+export interface AgreementLine {
+    key: string;
+    pick: string;
+    /** The question's wording, or a table row's label. */
+    label: string;
+    question: string;
+    column: string | null;
+    section: string;
+    position: number;
+    multiple: boolean;
+    responses: number;
+    views: number;
+    left_out: number;
+    answers: { value: string; label: string; responses: number; left_out: boolean; counted: boolean }[];
+    basis: 'agreeing' | 'most_common';
+    counted: Option[];
+    agreeing: number;
+    /** Rounded down to one decimal; null when nobody gave a view. */
+    share: number | null;
+    status: AgreementStatus;
+}
+
+export interface AgreementResult {
+    threshold: number;
+    min_views: number;
+    leave_out: Option[];
+    agreeing: Option[];
+    summary: { items: number; short_list: number; discuss: number; too_few: number };
+    items: AgreementLine[];
+}
 
 export interface Option {
     value: string;
@@ -68,6 +132,10 @@ export interface Source {
     description: string;
     row_noun: string;
     requires_form: boolean;
+    /** M247 (`D231`): a chart on this source names one of the form's grids too. */
+    requires_grid?: boolean;
+    /** M250 (`D234`): the chart types this source can fill; absent means every one but the agreement list. */
+    charts?: ChartType[];
     default_range_days: number;
     /** The key of the field the chart's date range applies to. */
     range_field: string;
@@ -99,6 +167,17 @@ export interface BuilderOptions {
         max_limit: number;
         default_limit: number;
     };
+    /** M250 (`D234`): an agreement list's bounds and the values a new one opens with. */
+    agreement?: {
+        max_picks: number;
+        max_items: number;
+        max_marks: number;
+        min_threshold: number;
+        max_threshold: number;
+        default_threshold: number;
+        max_min_views: number;
+        default_min_views: number;
+    };
 }
 
 export interface SavedChart {
@@ -110,7 +189,8 @@ export interface SavedChart {
     /** The author's name, for a chart that is not the reader's own. */
     owner: string | null;
     source_label: string | null;
-    can: { update: boolean; delete: boolean };
+    /** M250: `export` — a saved agreement list this reader may download (`submissions.export` on its form). */
+    can: { update: boolean; delete: boolean; export?: boolean };
     updated_at: string | null;
 }
 
@@ -156,6 +236,8 @@ export interface Result {
         capped: boolean;
         notes: string[];
     };
+    /** M250 (`D234`): an agreement list's lines; its chart has no categories or series. */
+    agreement?: AgreementResult;
 }
 
 export interface Refusal {
@@ -172,4 +254,8 @@ export interface RunPayload {
 export interface FieldsPayload {
     fields: Field[];
     notes: string[];
+    /** M247: on a source that reads one grid, the form's grids it may chart. */
+    grids?: Option[];
+    /** M250 (`D234`): on the agreement source, what an author may put on the list, in the form's order. */
+    items?: AgreementPick[];
 }

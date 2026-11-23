@@ -7573,7 +7573,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php`
   through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
   **twin**, which this repository treats as a separate obligation:
-  `docs/xlsform-interop-spec.md:139` records both surfaces for the adjacent export, and
+  `docs/xlsform-interop-spec.md` §8 ("Both HTTP surfaces expose export") records both surfaces for the adjacent export, and
   `routes/tenant.php` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
   ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
   fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
@@ -12017,7 +12017,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   strings appear as bare inline disjunctions at eight places in `schema-mapping.ts`,
   `FieldInput.vue:252,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
-  already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
+  already guards** — `schema-mapping.ts` held a fourth four-member media disjunction (number dropped by `M249`: its line went blank), and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
   literal three lines away disagrees. ⚠️ **Neither `R-09f73330` nor `R-c5858976` counts these**, which is why
   their totals differ from each other and from the tree: ten by declaration, six by file, twenty-eight or so
@@ -15023,7 +15023,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The user (2026-10-16): *"lets make the calculate referenced … create a calculated field using the form's own questions by clicking
   or selecting, not by purely typing. not all users are technical. but make sure that formula can still be typed … put presets"*,
   with Fillout's calculation screens (number, text and duration; a duration from a Start and an End in years, months, weeks, days,
-  hours or minutes). `resources/js/components/builder/ConfigPanel.vue:621` is a two-row text box whose help says *"Evaluated on the
+  hours or minutes). the Formula box in `resources/js/components/builder/ConfigPanel.vue` is a two-row text box whose help says *"Evaluated on the
   server"* though both engines compute it; `config.calculated_formula` is the only setting; `tests/golden/validation/calculated.json`
   pins that a calculation cannot read another. The remedy: a Type (**Number · Text · Date · Duration**, decimal places for Number)
   and two modes — **Build it** (presets: Sum, Difference, Average, Count answered, Age from a birth date, Duration between two dates
@@ -15173,7 +15173,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `________` for the person filling it to write in; an escaped `$${` stays literal. **Live.** Filed by `M178`. **Tier: early-testing.** ✅ **CLOSED BY `M178` (2026-10-19):** `BlankFormPrintPresenter::paperText()` prints each reference in a field's label and hint and a section's title and description as `________`, through the render path's own lenient template parser (so `$${` stays literal and a malformed hole prints nothing, as on screen), before the view escapes the text. Red first: 1 Pest case. Built and held for merge point 3 (`D137`); live since it, 2026-10-20.
 
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A question's Default value is saved but never filled in for a respondent, though the Help page says it is.**
-  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue:840`) saves `default_value`, but nothing reads it
+  The Advanced tab's **Default value** (`resources/js/components/builder/ConfigPanel.vue`, its `Default value` field) saves `default_value`, but nothing reads it
   when a form opens — `resources/public-runtime/lib/prefill.ts` seeds only a hidden question's fixed value — and it reaches only the
   XLSForm export (`XlsformExporter::applyDefault()`). `resources/js/components/help/manual.ts:815` says *"an answer filled
   in before the respondent starts, which they can change"*. The remedy (`D148` A, taken by R4): the default fills the answer when the

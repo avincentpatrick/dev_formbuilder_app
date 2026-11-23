@@ -162,8 +162,8 @@ export function NhfrOverview({
             establish current licensing or service availability.
           </p>
           <p>
-            Counts follow the app&apos;s reporting geography. Sulu is grouped under BARMM through
-            the documented code mapping, although the source names Region IX. Do not add parent
+            Counts follow the app&apos;s reporting geography. Sulu is grouped under Region IX,
+            as the source names it, through the documented code mapping. Do not add parent
             areas to their children or compare counts as a measure of need.
           </p>
           <p>

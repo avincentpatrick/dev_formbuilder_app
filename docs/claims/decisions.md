@@ -24,10 +24,24 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D233`, the last filed, was asked and answered on 2026-11-23 in the planning of `M249`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D234`, the last filed, was asked and answered on 2026-11-23 in the planning of `M250`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D234 — A report of how far respondents agree needs a meaning for "agree" on questions that are not agree/disagree, and a way for its list to leave the app: what does an item's share count, and how does the list leave? **The top answer, or the answers a report marks as agreeing (A). A spreadsheet only (A).**
+
+**Asked and answered 2026-11-23 (user decision, in chat), in the planning of `M250` (NHETE recommendation 7).** Two questions, each put with its options and the session's recommendation.
+
+1. **NHETE leaves out "No view or opinion" and short-lists an item when at least 75% agree with at least six views. Most of its questions are not agree/disagree (a big choice has four or five answers), so "agree" there can only mean "gave the same answer". How does the report measure agreement on an item?**
+   - **A — the top answer, or the answers a report marks (chosen, the recommendation).** An item's share is the people giving its most common answer, out of those who gave a view. A report may also name answers that count together as agreeing (Agree + Strongly agree); an item offering any of them uses them instead. It covers NHETE and an ordinary five-point scale.
+   - **B — the top answer only.** Simplest, and covers all of NHETE, but a five-point scale cannot count Agree and Strongly agree together.
+   - **C — the marked answers only.** Items with none of the marked answers (NHETE's big choices, the indicator table's Include/Defer/Drop column) get no share.
+2. **How does the list leave the app?** NHETE sends everyone a one-page summary two working days before the meeting.
+   - **A — a spreadsheet only (chosen, the recommendation).** CSV or Excel: every item with its views, counted answer, share and status, on the monthly export quota. The written summary is made from it; a printable PDF is filed as a later row.
+   - **B — a spreadsheet and a one-page PDF**: the short list, then the items to discuss, most disagreement first.
+
+**What the answer files:** `M250` builds both and closes `R-d39d73e4` (`agreement-report`). It files `agreement-report-pdf` (during-testing) and amends `explorer-export`, whose route, policy ability and exporter now exist for agreement reports.
+
 ### D233 — A long form needs named chapters on its progress bar, and a dropdown needs its own placeholder and a short word when closed: how is a chapter marked, how is the short word shown, where does it work, and what does the bar show? **Starts a chapter (A). Drawn over the box (A). Questions and table columns (A). Chapters and the current chapter's pages (A).**
 
 **Asked and answered 2026-11-23 (user decision, in chat), in the planning of `M249` (NHETE recommendation 6b).** Four questions, each put with its options and the session's recommendation.

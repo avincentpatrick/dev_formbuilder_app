@@ -1,5 +1,75 @@
 [
     {
+        "version": "0.28.0",
+        "title": "Chapters on the progress bar, and clearer dropdowns",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A long form can group its pages into named chapters. In the form builder, select the section that begins a chapter and tick Starts a chapter on its Basics tab. People filling in the form see the chapters on the progress bar, and the pages of the chapter they are in."
+            },
+            {
+                "kind": "new",
+                "text": "A section can have a Progress label: a short name shown on the progress bar instead of a long page title."
+            },
+            {
+                "kind": "new",
+                "text": "A dropdown shows its own Placeholder, such as “Choose…”, instead of “Select an option”. A choice can have a Short label, which the closed dropdown shows once that choice is picked; the open list still shows the full text."
+            },
+            {
+                "kind": "fixed",
+                "text": "An answer to a dropdown that is not required can now be cleared by choosing its placeholder again."
+            }
+        ]
+    },
+    {
+        "version": "0.26.0",
+        "title": "Room for big tables, and grids in your charts",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A section can use the whole width of a big screen, so a wide grid is drawn as a table. In the form builder, select the section and tick Wide page on its Advanced tab. Phones are unchanged."
+            },
+            {
+                "kind": "improved",
+                "text": "In a long grid the row names and the column headings stay in view while you scroll through the table."
+            },
+            {
+                "kind": "new",
+                "text": "Explore can count a grid row by row: choose Rows of a grid, the form and the grid, to see for every row how many chose each answer."
+            }
+        ]
+    },
+    {
+        "version": "0.25.0",
+        "title": "Grids that work like a table of questions",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A grid row can be shown only when an earlier answer calls for it. In the form builder, open the grid's Grid tab and press Row settings under the row."
+            },
+            {
+                "kind": "new",
+                "text": "In each row, a cell can be marked “Not needed”, and a column can be needed or required only when another cell in that row says so — for example, a comment required only where the row’s answer is “Change it”. A column can also be shown only when an earlier answer calls for it. Press Column rules under the column."
+            },
+            {
+                "kind": "new",
+                "text": "Grids can have long-text columns, and a row can carry details under its label, such as a definition."
+            },
+            {
+                "kind": "new",
+                "text": "Conditions, calculations and question text can use one cell of a grid. Pick it as “Grid — Row — Column”."
+            },
+            {
+                "kind": "improved",
+                "text": "Each grid cell now shows its own message, once you leave it or try to move on, instead of one message for the whole grid."
+            },
+            {
+                "kind": "improved",
+                "text": "The paper form marks a grid row or column that is asked only sometimes, and greys out the cells a row marks “Not needed”."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

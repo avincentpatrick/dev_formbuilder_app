@@ -555,7 +555,8 @@ class E2eSeeder extends Seeder
                     ],
                 ]);
                 // Likert matrix (Increment G4b): one radio group per row over a shared 1–5 scale.
-                $sb->addField($showcase, $owner, FieldType::LikertMatrix, $showSection->id)->update([
+                $likertRating = $sb->addField($showcase, $owner, FieldType::LikertMatrix, $showSection->id);
+                $likertRating->update([
                     'label' => 'Rate each aspect of your visit',
                     'config' => [
                         'rows' => [
@@ -598,6 +599,28 @@ class E2eSeeder extends Seeder
                         ],
                     ],
                 ]);
+                // M246 (`grid-question-table`): a question table — a row shown only when the Likert grid's Cleanliness is
+                // rated Excellent, a cut-off cell "Not needed" in one row, a long-text column needed and required only
+                // where its row's cut-off says "Change it", and details under a row's label. The public-runtime scan
+                // reveals the row, opens the comment and leaves it blank, so it meets each of them.
+                $sb->addField($showcase, $owner, FieldType::Matrix, $showSection->id)->update([
+                    'label' => 'Indicators to review',
+                    'config' => [
+                        'rows' => [
+                            ['value' => 'a01', 'label' => 'A01 Visits', 'details' => [['type' => 'paragraph', 'spans' => [['text' => 'Clinic visits per 1,000 people each year.']]]]],
+                            ['value' => 'b03', 'label' => 'B03 Coverage', 'not_needed' => ['cut']],
+                            ['value' => 'c09', 'label' => 'C09 Follow-up', 'relevant' => '${'.$likertRating->key.'.cleanliness} = \'5\''],
+                        ],
+                        'columns' => [
+                            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'single_select', 'options' => [
+                                ['value' => 'use', 'label' => 'Use it'],
+                                ['value' => 'change', 'label' => 'Change it'],
+                            ]],
+                            ['value' => 'why', 'label' => 'Why', 'type' => 'long_text', 'needed_when' => "\${.cut} = 'change'", 'required_when' => "\${.cut} = 'change'"],
+                        ],
+                        'cells' => [],
+                    ],
+                ]);
                 // Geo (Increment G5b2): a point (with altitude + accuracy target), a trace, and a shape. All
                 // optional so an empty guest load stays axe-clean; the Leaflet map is a progressive enhancement
                 // over the always-present manual coordinate inputs + keyboard vertex list.
@@ -623,6 +646,54 @@ class E2eSeeder extends Seeder
                     'allow_guest_submissions' => true,
                     'supported_locales' => ['en'],
                     'single_page_mode' => true,
+                ]);
+            }
+
+            // M247 (`grid-wide-sticky-explorer`, `D231`) — a stepped guest form whose second page is a section marked "Wide page"
+            // holding a 14-row, 7-column grid: the first page keeps the reading width, the second widens, and the table's header
+            // row and first column stay in view while it scrolls in its own box. All optional, so an empty load is axe-clean.
+            // Reached at /f/wide-table by `grid-wide-table.spec.ts`; charted row by row on the explorer board.
+            if (Form::query()->where('title', 'Wide Table')->doesntExist()) {
+                $wideForm = app(FormService::class)->create($tenant, $owner, 'Wide Table', 'A big grid on a wide page (M247 demo).');
+                $wb = app(FormBuilderService::class);
+                $aboutSection = $wb->addSection($wideForm);
+                $aboutSection->update(['label' => 'About your office']);
+                $wb->addField($wideForm, $owner, FieldType::ShortText, $aboutSection->id)->update(['key' => 'office', 'label' => 'Office name']);
+                $tableSection = $wb->addSection($wideForm);
+                $tableSection->update(['label' => 'Indicators', 'page_width' => 'wide']);
+                $choices = static fn (array $pairs): array => array_map(static fn (string $value, string $label): array => ['value' => $value, 'label' => $label], array_keys($pairs), $pairs);
+                $rows = [];
+                for ($n = 1; $n <= 14; $n++) {
+                    $rows[] = [
+                        'value' => sprintf('i%02d', $n),
+                        'label' => sprintf('I%02d Indicator %d', $n, $n),
+                        ...($n === 1 ? ['details' => [['type' => 'paragraph', 'spans' => [['text' => 'Visits to a clinic per 1,000 people each year.']]]]] : []),
+                    ];
+                }
+                $wb->addField($wideForm, $owner, FieldType::Matrix, $tableSection->id)->update([
+                    'key' => 'indicators',
+                    'label' => 'Indicators to review',
+                    'config' => [
+                        'rows' => $rows,
+                        'columns' => [
+                            ['value' => 'use', 'label' => 'Used locally', 'type' => 'single_select', 'options' => $choices(['yes' => 'Yes', 'no' => 'No'])],
+                            ['value' => 'cut', 'label' => 'Cut-off', 'type' => 'single_select', 'options' => $choices(['keep' => 'Keep it', 'change' => 'Change it'])],
+                            ['value' => 'worry', 'label' => 'Main worry', 'type' => 'single_select', 'options' => $choices(['none' => 'None', 'data' => 'Data quality', 'other' => 'Something else'])],
+                            ['value' => 'keep', 'label' => 'Keep the indicator', 'type' => 'single_select', 'options' => $choices(['yes' => 'Yes', 'close' => 'Yes, with changes', 'no' => 'No'])],
+                            ['value' => 'staff', 'label' => 'Staff who report it', 'type' => 'integer'],
+                            ['value' => 'since', 'label' => 'Reported since', 'type' => 'date'],
+                            ['value' => 'comment', 'label' => 'Comment', 'type' => 'long_text'],
+                        ],
+                        'cells' => [],
+                    ],
+                ]);
+                app(PublishService::class)->publish($wideForm->refresh(), $owner);
+
+                $wideForm->update([
+                    'public_slug' => 'wide-table',
+                    'allow_guest_submissions' => true,
+                    'supported_locales' => ['en'],
+                    'single_page_mode' => false,
                 ]);
             }
 
@@ -2521,6 +2592,23 @@ class E2eSeeder extends Seeder
                 'measures' => [['aggregate' => 'count', 'field' => null]],
             ]],
         );
+
+        // M247 (`D231`): a grid, counted row by row — the wide-table form's indicators, by whether each is kept.
+        $wideTable = Form::query()->where('title', 'Wide Table')->whereNotNull('current_published_version_id')->first();
+        if ($wideTable !== null) {
+            ExplorerChart::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Indicators kept, row by row'],
+                ['is_shared' => false, 'definition' => [
+                    ...$base,
+                    'source' => 'grid_rows',
+                    'form_id' => $wideTable->id,
+                    'grid' => 'indicators',
+                    'chart' => 'stacked',
+                    'dimensions' => [['field' => 'row', 'bucket' => null], ['field' => 'column:keep', 'bucket' => null]],
+                    'measures' => [['aggregate' => 'count', 'field' => null]],
+                ]],
+            );
+        }
 
         ExplorerChart::updateOrCreate(
             ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Legacy chart'],

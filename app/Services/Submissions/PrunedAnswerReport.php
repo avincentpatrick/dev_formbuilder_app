@@ -134,10 +134,80 @@ final class PrunedAnswerReport
 
             if (($semantic->fieldRelevance[$key] ?? true) !== true) {
                 $dropped[] = $this->label($field, $sources);
+
+                continue;
+            }
+
+            // M246 (`grid-question-table`): a shown grid drops what its own rules do not ask — a hidden row, a hidden
+            // column, a "Not needed" cell. Each is named as the keyer saw it: question — row — column.
+            foreach ($this->gridDrops($field, $value, $semantic, $sources) as $label) {
+                $dropped[] = $label;
             }
         }
 
         return $dropped;
+    }
+
+    /**
+     * M246: the cells of a shown grid that its own rules pruned, in the grid's order — a whole row once by its label
+     * when the row was hidden, else each cell its column or its row did not ask. Only cells the keyer typed are named:
+     * `$value` is the normalized answer, from which Stage 1 already dropped every empty cell.
+     *
+     * @param  array<string, array{type: FieldType, config: array<string, mixed>}>  $sources
+     * @return list<string>
+     */
+    private function gridDrops(FormField $field, mixed $value, SemanticResult $semantic, array $sources): array
+    {
+        $relevance = $semantic->gridRelevance[$field->key] ?? null;
+        if ($relevance === null || ! $field->field_type->isComposite() || ! is_array($value)) {
+            return [];
+        }
+
+        $config = (array) $field->config;
+        $rowLabels = self::optionLabels($config['rows'] ?? []);
+        $columnLabels = self::optionLabels($config['columns'] ?? []);
+        $label = $this->label($field, $sources);
+        $dropped = [];
+
+        foreach ($value as $row => $cells) {
+            $row = (string) $row;
+            $rowLabel = $label.' — '.($rowLabels[$row] ?? $row);
+            if (($relevance['rows'][$row] ?? true) !== true) {
+                $dropped[] = $rowLabel;
+
+                continue;
+            }
+            if ($field->field_type !== FieldType::Matrix || ! is_array($cells)) {
+                continue;
+            }
+            foreach (array_keys($cells) as $column) {
+                $column = (string) $column;
+                $asked = ($relevance['columns'][$column] ?? true) === true && ($relevance['cells'][$row][$column] ?? true) === true;
+                if (! $asked) {
+                    $dropped[] = $rowLabel.' — '.($columnLabels[$column] ?? $column);
+                }
+            }
+        }
+
+        return $dropped;
+    }
+
+    /**
+     * A grid's rows' or columns' labels by value, the base-language label as the keyer's page shows it.
+     *
+     * @return array<string, string>
+     */
+    private static function optionLabels(mixed $options): array
+    {
+        $labels = [];
+        foreach ((array) $options as $option) {
+            if (is_array($option) && (string) ($option['value'] ?? '') !== '') {
+                $text = $option['label'] ?? null;
+                $labels[(string) $option['value']] = is_string($text) && trim($text) !== '' ? $text : (string) $option['value'];
+            }
+        }
+
+        return $labels;
     }
 
     /**

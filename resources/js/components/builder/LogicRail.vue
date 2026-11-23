@@ -174,7 +174,16 @@ function summary(reading: ConditionReading): string {
                                 <p class="rail__summary" :class="`rail__summary--${field.reading.status}`">
                                     {{ summary(field.reading) }}
                                 </p>
-                                <code class="rail__expression">{{ field.expression }}</code>
+                                <code v-if="field.expression.trim() !== ''" class="rail__expression">{{ field.expression }}</code>
+                                <!-- M246: a grid's own row and column conditions. -->
+                                <ul v-if="field.gridRules.length > 0" class="rail__grid-rules">
+                                    <li v-for="(rule, i) in field.gridRules" :key="i" class="rail__grid-rule">
+                                        <p class="rail__summary" :class="`rail__summary--${rule.reading.status}`">
+                                            <strong>{{ rule.target }}</strong> — {{ summary(rule.reading) }}
+                                        </p>
+                                        <code class="rail__expression">{{ rule.expression }}</code>
+                                    </li>
+                                </ul>
                                 <ul v-if="field.notices.length > 0" class="rail__notices">
                                     <li v-for="(notice, i) in field.notices" :key="i" class="rail__notice">
                                         <MdsIcon name="alert" size="sm" />
@@ -246,6 +255,7 @@ function summary(reading: ConditionReading): string {
 .rail__form-notices,
 .rail__notices,
 .rail__fields,
+.rail__grid-rules,
 .rail__nodes {
     margin: 0;
     padding: 0;
@@ -417,5 +427,18 @@ function summary(reading: ConditionReading): string {
 
 .rail__field-head {
     font-size: var(--mds-type-body-sm-font-size);
+}
+
+/* M246: a grid's row and column conditions, one under another. */
+.rail__grid-rules,
+.rail__grid-rule {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mds-space-1);
+    min-width: 0;
+}
+
+.rail__grid-rules {
+    gap: var(--mds-space-2);
 }
 </style>

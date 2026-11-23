@@ -17,6 +17,7 @@ import type {
     ComparisonOperator,
     GridColumnSpec,
     GridConfig,
+    GridRowRule,
     LogicOperator,
     RenderSources,
     SchemaField,
@@ -88,6 +89,34 @@ export function resolveText(base: string, translations: Record<string, string> |
     return value !== undefined && value !== '' ? value : base;
 }
 
+/**
+ * M249 (`D233`): a SHORT form shown beside a text that may be translated — a page's progress label beside its title, a
+ * choice's short label beside its label. Its own translation for the locale wins; failing that it is used only when the
+ * full text has no translation there either, so a short default-language word never sits beside a translated page or
+ * choice. Null means "show the full text".
+ */
+export function resolveShort(
+    short: string | null,
+    shortTranslations: Record<string, string> | null,
+    fullTranslations: Record<string, string> | null,
+    locale: string,
+): string | null {
+    const own = shortTranslations?.[locale];
+    if (own !== undefined && own !== '') {
+        return own;
+    }
+    const full = fullTranslations?.[locale];
+
+    return full !== undefined && full !== '' ? null : short;
+}
+
+/** M249: a plain-text setting as the server stores it — trimmed, and blank (or absent) as null. */
+export function blankAsNull(value: string | null | undefined): string | null {
+    const text = (value ?? '').trim();
+
+    return text === '' ? null : text;
+}
+
 export function resolveOptional(
     base: string | null,
     translations: Record<string, string> | null,
@@ -147,9 +176,36 @@ function buildOptions(field: RawField): RenderOption[] {
             value,
             label: option.label !== undefined && option.label !== null ? String(option.label) : value,
             labelTranslations: option.label_translations ?? null,
+            ...shortLabelOf(option),
         });
     }
     return out;
+}
+
+/** M249: a stored choice's short label and its translations, or nothing when it has none. */
+function shortLabelOf(option: unknown): Pick<RenderOption, 'shortLabel' | 'shortLabelTranslations'> {
+    const raw = option as { short_label?: unknown; short_label_translations?: unknown };
+    const short = typeof raw.short_label === 'string' ? raw.short_label.trim() : '';
+    if (short === '') {
+        return {};
+    }
+    const translations = raw.short_label_translations;
+
+    return {
+        shortLabel: short,
+        shortLabelTranslations: translations !== null && typeof translations === 'object' && !Array.isArray(translations) ? (translations as Record<string, string>) : null,
+    };
+}
+
+/**
+ * A choice as a control draws it: its label in the locale and, when it has one the locale may show, its short label
+ * (M249, `resolveShort()`). Option labels are never piped (`FieldControl.vue`).
+ */
+export function controlOption(option: RenderOption, locale: string): { value: string; label: string; shortLabel?: string } {
+    const label = resolveText(option.label, option.labelTranslations, locale);
+    const short = resolveShort(option.shortLabel ?? null, option.shortLabelTranslations ?? null, option.labelTranslations, locale);
+
+    return short === null ? { value: option.value, label } : { value: option.value, label, shortLabel: short };
 }
 
 /** The `config.options[].value` set (as strings) the engine membership check reads. Mirror of PHP's optionValueSet. */
@@ -269,7 +325,7 @@ export interface ResolvedMatrixColumn {
     value: string;
     label: string;
     type?: string;
-    options?: { value: string; label: string }[];
+    options?: { value: string; label: string; shortLabel?: string }[];
     required?: boolean;
 }
 
@@ -282,13 +338,14 @@ export interface ResolvedMatrixColumn {
 export function resolveMatrix(
     matrix: RenderMatrix | null,
     locale: string,
-): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string }[]; layout: 'table' | 'stacked' } | null {
+): { rows: { value: string; label: string }[]; columns: ResolvedMatrixColumn[]; cells: { value: string; label: string; shortLabel?: string }[]; layout: 'table' | 'stacked'; rowDetails?: Record<string, unknown[]> } | null {
     if (matrix === null) {
         return null;
     }
 
-    const resolve = (options: RenderOption[]): { value: string; label: string }[] =>
-        options.map((option) => ({ value: option.value, label: resolveText(option.label, option.labelTranslations, locale) }));
+    // M249: a choice keeps its short label (what a closed dropdown cell shows), when it has one the locale may show.
+    const resolve = (options: RenderOption[]): { value: string; label: string; shortLabel?: string }[] =>
+        options.map((option) => controlOption(option, locale));
 
     const columns = matrix.columns.map((column): ResolvedMatrixColumn => ({
         value: column.value,
@@ -296,7 +353,8 @@ export function resolveMatrix(
         ...(column.type !== undefined ? { type: column.type, options: resolve(column.options ?? []), required: column.required === true } : {}),
     }));
 
-    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout };
+    // M246: row details are note content, shown in the form's base language as a note's is (`D70`).
+    return { rows: resolve(matrix.rows), columns, cells: resolve(matrix.cells), layout: matrix.layout, ...(matrix.rowDetails !== undefined ? { rowDetails: matrix.rowDetails } : {}) };
 }
 
 /** A `config.<key>` option-value list (as strings) the engine grid membership check reads. */
@@ -325,7 +383,7 @@ function optionValues(raw: unknown): string[] {
 }
 
 /** The types a matrix column may take (M183, `R-5033e87e`; mirror of PHP `MatrixColumns::TYPES`). */
-const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'integer', 'decimal', 'date'];
+const MATRIX_COLUMN_TYPES = ['single_select', 'multi_select', 'short_text', 'long_text', 'integer', 'decimal', 'date'];
 
 /** A grid's stored column objects, skipping anything that is not one. */
 function rawColumns(field: RawField): Record<string, unknown>[] {
@@ -345,8 +403,23 @@ function engineGridConfig(field: RawField): GridConfig {
         columns: configValueList(field, 'columns'),
         cells: configValueList(field, 'cells'),
     };
+    // M246 (`grid-question-table`): a row's own show-when and (a Grid's) "Not needed" columns, only where a row has one.
+    const rowRules: Record<string, GridRowRule> = {};
+    const rawRows = Array.isArray(field.config?.rows) ? (field.config.rows as unknown[]) : [];
+    for (const row of rawRows) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) continue;
+        const entry = row as Record<string, unknown>;
+        const relevant = ruleText(entry.relevant);
+        const notNeeded = field.field_type === 'matrix' && Array.isArray(entry.not_needed)
+            ? entry.not_needed.filter((column): column is string => typeof column === 'string' && column !== '')
+            : [];
+        if (entry.value === undefined || entry.value === null || (relevant === null && notNeeded.length === 0)) continue;
+        rowRules[String(entry.value)] = { relevant, not_needed: notNeeded };
+    }
+    const withRows: GridConfig = Object.keys(rowRules).length > 0 ? { ...grid, row_rules: rowRules } : grid;
+
     if (field.field_type !== 'matrix') {
-        return grid;
+        return withRows;
     }
 
     const specs: Record<string, GridColumnSpec> = {};
@@ -354,13 +427,24 @@ function engineGridConfig(field: RawField): GridConfig {
         const type = typeof column.type === 'string' && column.type !== '' ? column.type : null;
         const options = optionValues(column.options);
         const required = column.required === true;
-        if (column.value === undefined || column.value === null || (type === null && options.length === 0 && !required)) {
+        const relevant = ruleText(column.relevant);
+        const neededWhen = ruleText(column.needed_when);
+        const requiredWhen = ruleText(column.required_when);
+        const hasRule = relevant !== null || neededWhen !== null || requiredWhen !== null;
+        if (column.value === undefined || column.value === null || (type === null && options.length === 0 && !required && !hasRule)) {
             continue;
         }
-        specs[String(column.value)] = { type, options, required };
+        specs[String(column.value)] = hasRule
+            ? { type, options, required, relevant, needed_when: neededWhen, required_when: requiredWhen }
+            : { type, options, required };
     }
 
-    return Object.keys(specs).length > 0 ? { ...grid, column_specs: specs } : grid;
+    return Object.keys(specs).length > 0 ? { ...withRows, column_specs: specs } : withRows;
+}
+
+/** M246: a grid rule's text, or null when blank. */
+function ruleText(text: unknown): string | null {
+    return typeof text === 'string' && text.trim() !== '' ? text : null;
 }
 
 /** A `config.<key>` option list projected to render {value,label} pairs (labels/translations kept). */
@@ -387,6 +471,7 @@ function optionPairs(raw: unknown): RenderOption[] {
             value: String(value),
             label: label !== undefined && label !== null ? String(label) : String(value),
             labelTranslations: (option as { label_translations?: Record<string, string> | null }).label_translations ?? null,
+            ...shortLabelOf(option),
         });
     }
 
@@ -419,11 +504,22 @@ function buildMatrix(field: RawField): RenderMatrix | null {
             return [{ ...pair, type, options, required: column.required === true }];
         });
 
+    // M246: a row's details, only for a row that has any.
+    const rowDetails: Record<string, unknown[]> = {};
+    for (const row of Array.isArray(field.config?.rows) ? (field.config.rows as unknown[]) : []) {
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) continue;
+        const entry = row as Record<string, unknown>;
+        if (entry.value !== undefined && entry.value !== null && Array.isArray(entry.details) && entry.details.length > 0) {
+            rowDetails[String(entry.value)] = entry.details as unknown[];
+        }
+    }
+
     return {
         rows: configOptionPairs(field, 'rows'),
         columns,
         cells,
         layout: field.config?.layout === 'stacked' ? 'stacked' : 'table',
+        ...(Object.keys(rowDetails).length > 0 ? { rowDetails } : {}),
     };
 }
 /** Read a `config.<key>` value coerced to a finite number, or null. */
@@ -590,7 +686,11 @@ function toRenderSection(section: RawSection): RenderSection {
         isRepeatable: section.is_repeatable,
         minInstances: section.min_instances ?? null,
         maxInstances: section.max_instances ?? null,
-        repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards',
+        repeatLayout: section.repeat_layout === 'table' ? 'table' : 'cards', pageWidth: section.page_width === 'wide' ? 'wide' : 'normal',
+        // M249 (`D233`): blank is none, as the server stores it.
+        chapter: blankAsNull(section.chapter),
+        chapterTranslations: section.chapter_translations ?? null,
+        progressLabel: blankAsNull(section.progress_label),
         relevantExpression: section.relevant_expression,
     };
 }

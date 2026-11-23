@@ -41,3 +41,14 @@ export const Invalid: Story = { args: { invalid: true } };
 export const Disabled: Story = { args: { disabled: true } };
 export const Dark: Story = { decorators: [dark] };
 export const InvalidDark: Story = { args: { invalid: true }, decorators: [dark] };
+
+// M249 (`dropdown-placeholder`, `D233`): a chosen option's short label drawn over the closed box, the full text in the
+// open list; and a placeholder an optional answer can be cleared back to. Both themes, for the Storybook axe scan.
+const indicatorUse = [
+    { value: 'include', label: 'Include. Use this indicator as it stands, with the cut-off it has today.', shortLabel: 'Include' },
+    { value: 'change', label: 'Change it. Keep the indicator, but change how it is measured.', shortLabel: 'Change it' },
+    { value: 'drop', label: 'Drop it' },
+];
+export const ShortLabel: Story = { args: { modelValue: 'include', options: indicatorUse, placeholder: 'Choose…' } };
+export const ShortLabelDark: Story = { args: { modelValue: 'include', options: indicatorUse, placeholder: 'Choose…' }, decorators: [dark] };
+export const Clearable: Story = { args: { modelValue: 'drop', options: indicatorUse, placeholder: 'Choose…', clearable: true } };

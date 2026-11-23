@@ -124,8 +124,15 @@ final class SchemaSnapshotSerializer
     private function section(FormSection $s): array
     {
         // M185 (`R-0a7275ce`): a section laid out as a table says so; one drawn as cards carries no key at all, so every
-        // version and template published before the table existed — and every one since without it — hashes as it did.
-        $layout = $s->repeat_layout === 'table' ? ['repeat_layout' => 'table'] : [];
+        // version and template published before the table existed — and every one since without it — hashes as it did. M247 (`D231`): `page_width` likewise.
+        $layout = [...($s->repeat_layout === 'table' ? ['repeat_layout' => 'table'] : []), ...($s->page_width === 'wide' ? ['page_width' => 'wide'] : [])];
+        // M249 (`progress-chapters`, `D233`): the chapter a section starts, its names per language and its page's progress
+        // label, each only when set — so no version published without them changes its checksum, paper stamp or drift check.
+        $progress = [
+            ...($s->chapter !== null ? ['chapter' => $s->chapter] : []),
+            ...($s->chapter !== null && $s->chapter_translations !== null && $s->chapter_translations !== [] ? ['chapter_translations' => $s->chapter_translations] : []),
+            ...($s->progress_label !== null ? ['progress_label' => $s->progress_label] : []),
+        ];
 
         return [
             'key' => $s->key,
@@ -140,6 +147,7 @@ final class SchemaSnapshotSerializer
             'min_instances' => $s->min_instances,
             'max_instances' => $s->max_instances,
             ...$layout,
+            ...$progress,
             'relevant_expression' => $s->relevant_expression,
         ];
     }

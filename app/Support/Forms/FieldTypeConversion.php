@@ -311,6 +311,11 @@ final class FieldTypeConversion
             // M183 (`R-5033e87e`): a Likert matrix's columns ARE its scale, so a column's own type, choices and
             // required flag have nothing to mean there.
             $config['columns'] = MatrixColumns::asScale($config);
+            // M246: a row's "Not needed" cells name columns a scale does not have.
+            $rows = MatrixColumns::rowsAsScale($config);
+            if ($rows !== null) {
+                $config['rows'] = $rows;
+            }
         }
 
         return $config;

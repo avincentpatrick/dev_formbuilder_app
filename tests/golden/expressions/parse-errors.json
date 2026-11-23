@@ -56,5 +56,14 @@
   {"name":"err_sum_boolean_argument","grammar_version":"2.0","expression":"sum(${a} > 1, 2)","context":{"answers":{}},"expected_error":"non_value_operand"},
   {"name":"err_coalesce_boolean_argument","grammar_version":"2.0","expression":"coalesce(${a} = 1, 0)","context":{"answers":{}},"expected_error":"non_value_operand"},
   {"name":"err_date_add_boolean_count","grammar_version":"2.0","expression":"date_add(${d}, ${a} > 1, 'days')","context":{"answers":{}},"expected_error":"non_value_operand"},
-  {"name":"err_too_deeply_nested","grammar_version":"2.0","expression_repeat":{"prefix":"not(","times":65,"core":"${a} = 1","suffix":")"},"context":{"answers":{}},"expected_error":"too_deeply_nested"}
+  {"name":"err_too_deeply_nested","grammar_version":"2.0","expression_repeat":{"prefix":"not(","times":65,"core":"${a} = 1","suffix":")"},"context":{"answers":{}},"expected_error":"too_deeply_nested"},
+  {"name":"err_cell_trailing_dot","grammar_version":"2.0","expression":"${a.} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_double_dot","grammar_version":"2.0","expression":"${a..b} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_row_cell_bare_dot","grammar_version":"2.0","expression":"${.} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_four_parts","grammar_version":"2.0","expression":"${a.b.c.d} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_row_cell_two_parts","grammar_version":"2.0","expression":"${.a.b} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_segment_leading_hyphen","grammar_version":"2.0","expression":"${a.-b} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_unterminated","grammar_version":"2.0","expression":"${a.b = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_space_in_path","grammar_version":"2.0","expression":"${a. b} = 1","context":{"answers":{}},"expected_error":"malformed_reference"},
+  {"name":"err_cell_hyphenated_key","grammar_version":"2.0","expression":"${a-b.c} = 1","context":{"answers":{}},"expected_error":"malformed_reference"}
 ]

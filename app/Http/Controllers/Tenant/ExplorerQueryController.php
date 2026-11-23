@@ -54,12 +54,14 @@ final class ExplorerQueryController extends Controller
         /** @var User $user */
         $user = $request->user();
         $formId = $request->query('form_id');
+        $grid = $request->query('grid');
 
         try {
             return response()->json($this->presenter->fields(
                 $user,
                 (string) $request->query('source', ''),
                 is_string($formId) && $formId !== '' ? $formId : null,
+                is_string($grid) && $grid !== '' ? $grid : null,
             ));
         } catch (InvalidExplorerQueryException $e) {
             return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason()], 422);

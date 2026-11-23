@@ -40,7 +40,7 @@
  * resolves remains `ExpressionValidationGate`, at publish, in PHP.
  */
 
-import { ExpressionSyntaxError, type Node } from '../../../public-runtime/engine';
+import { cellPath, ExpressionSyntaxError, type Node } from '../../../public-runtime/engine';
 import { parseExpression, toCondition, type Comparator, type Condition, type Operand } from './condition-model';
 
 /** A field/section key → the label an author would recognise. Keys with no entry render as themselves. */
@@ -91,6 +91,15 @@ function collectReferences(node: Node): string[] {
         switch (current.type) {
             case 'field':
                 if (!found.includes(current.key)) found.push(current.key);
+                return;
+            // M246: a grid cell is named by its whole path; this row's cell by `.col`.
+            case 'cell': {
+                const path = cellPath(current);
+                if (!found.includes(path)) found.push(path);
+                return;
+            }
+            case 'row_cell':
+                if (!found.includes(`.${current.column}`)) found.push(`.${current.column}`);
                 return;
             case 'comparison':
             case 'arithmetic':
@@ -186,6 +195,13 @@ function operandOf(operand: Operand, labels: LabelLookup): string {
  */
 function labelFor(key: string, labels: LabelLookup): string {
     const label = labels[key];
+    if (label !== undefined && label.trim() !== '') return label.trim();
 
-    return label === undefined || label.trim() === '' ? key : label.trim();
+    // M246: a cell no lookup names reads as its grid's words and its path — "Indicators — a01 — keep" — and this
+    // row's cell as "this row's keep".
+    if (key.startsWith('.')) return `this row’s ${key.slice(1)}`;
+    const dot = key.indexOf('.');
+    if (dot > 0) return [labelFor(key.slice(0, dot), labels), ...key.slice(dot + 1).split('.')].join(' — ');
+
+    return key;
 }

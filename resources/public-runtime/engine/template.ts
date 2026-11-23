@@ -5,7 +5,8 @@
  *
  *     template  ::= ( literal | escape | hole )*
  *     hole      ::= '${' key '}'
- *     key       ::= [A-Za-z_] [A-Za-z0-9_]*
+ *     key       ::= [A-Za-z_] [A-Za-z0-9_]* ( '.' segment ( '.' segment )? )?   -- M246: a grid row or cell
+ *     segment   ::= [A-Za-z0-9_] [A-Za-z0-9_-]*
  *     escape    ::= '$${'                     -- yields the literal text "${"
  *     literal   ::= any character sequence containing no unescaped '${'
  *
@@ -50,6 +51,19 @@ const isDigit = (c: string): boolean => c >= '0' && c <= '9';
 const isAlnum = (c: string): boolean => isAlpha(c) || isDigit(c);
 
 const byteLength = (s: string): number => new TextEncoder().encode(s).length;
+
+/** M246: one grid path segment from `at` (`[A-Za-z0-9_][A-Za-z0-9_-]*`), the index past it, or null. Mirrors PHP. */
+const segmentEnd = (source: string, length: number, at: number): number | null => {
+    if (at >= length || !(isAlnum(source[at]) || source[at] === '_')) {
+        return null;
+    }
+    let j = at + 1;
+    while (j < length && (isAlnum(source[j]) || source[j] === '_' || source[j] === '-')) {
+        j++;
+    }
+
+    return j;
+};
 
 export type TemplateSegment = { type: 'literal' | 'hole'; value: string };
 
@@ -206,6 +220,17 @@ export class TemplateParser {
         j++;
         while (j < length && (isAlnum(template[j]) || template[j] === '_')) {
             j++;
+        }
+
+        // M246: up to two `.segment` parts — a Likert row `${grid.row}` or a Grid cell `${grid.row.col}`.
+        let segments = 0;
+        while (j < length && template[j] === '.' && segments < 2) {
+            const end = segmentEnd(template, length, j + 1);
+            if (end === null) {
+                return null;
+            }
+            j = end;
+            segments++;
         }
 
         if (j >= length || template[j] !== '}') {

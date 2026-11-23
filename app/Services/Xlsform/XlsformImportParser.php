@@ -91,6 +91,11 @@ final class XlsformImportParser
         $fields = [];
         /** @var list<array{kind: string, sectionKey: ?string}> $stack */
         $stack = [];
+        // M249: each section's enclosing section and its `appearance`, for {@see self::foldChapters()}.
+        /** @var list<SectionSpec|null> $open */
+        $open = [];
+        /** @var array<int, array{parent: ?SectionSpec, appearance: string}> $meta */
+        $meta = [];
 
         foreach ($workbook->rows('survey') as $index => $row) {
             $rowNumber = $index + 2; // header is row 1
@@ -113,19 +118,27 @@ final class XlsformImportParser
                         label: (string) ($this->col($row, 'label') ?? ''),
                     );
                     $stack[] = ['kind' => 'pagebreak', 'sectionKey' => null];
+                    $open[] = null;
 
                     continue;
                 }
 
                 $section = $this->beginSection($lower, $name, $row, $warnings);
+                $parent = null;
+                for ($i = count($open) - 1; $i >= 0 && $parent === null; $i--) {
+                    $parent = $open[$i];
+                }
+                $meta[spl_object_id($section)] = ['parent' => $parent, 'appearance' => strtolower((string) ($this->col($row, 'appearance') ?? ''))];
                 $sections[] = $section;
                 $stack[] = ['kind' => 'section', 'sectionKey' => $section->key];
+                $open[] = $section;
 
                 continue;
             }
 
             if (str_starts_with($lower, 'end ')) {
                 array_pop($stack);
+                array_pop($open);
 
                 continue;
             }
@@ -140,7 +153,90 @@ final class XlsformImportParser
             }
         }
 
-        return [$sections, $fields];
+        return [$this->foldChapters($sections, $fields, $meta, $warnings), $fields];
+    }
+
+    /**
+     * M249 (`progress-chapters`, `D233`): an outermost group that is only a container of groups becomes a CHAPTER — the way
+     * an ODK or Kobo form names a run of pages — instead of an empty section of its own. Its label (and `label::<lang>`)
+     * becomes the chapter its first inner group starts.
+     *
+     * Only a pure container folds: outermost, a plain group (not a repeat), no `relevant`, no `field-list`, no question,
+     * note or page break of its own, at least one group inside, and a label that is plain text. Every other group keeps
+     * the flattening it always had. A label longer than a chapter name may be is cut, and the import says so.
+     *
+     * @param  list<SectionSpec>  $sections
+     * @param  list<FieldSpec>  $fields
+     * @param  array<int, array{parent: ?SectionSpec, appearance: string}>  $meta
+     * @param  list<string>  $warnings
+     * @return list<SectionSpec>
+     */
+    private function foldChapters(array $sections, array $fields, array $meta, array &$warnings): array
+    {
+        $holdsQuestions = [];
+        foreach ($fields as $field) {
+            if ($field->sectionKey !== null) {
+                $holdsQuestions[$field->sectionKey] = true;
+            }
+        }
+        /** @var array<int, list<SectionSpec>> $children */
+        $children = [];
+        foreach ($sections as $section) {
+            $parent = $meta[spl_object_id($section)]['parent'] ?? null;
+            if ($parent !== null) {
+                $children[spl_object_id($parent)][] = $section;
+            }
+        }
+
+        $kept = [];
+        foreach ($sections as $section) {
+            $info = $meta[spl_object_id($section)] ?? ['parent' => null, 'appearance' => ''];
+            $first = ($children[spl_object_id($section)] ?? [])[0] ?? null;
+            $label = trim(preg_replace('/\s+/u', ' ', $section->label) ?? '');
+            $pure = $first !== null
+                && $info['parent'] === null
+                && ! $section->isRepeatable
+                && $section->relevantExpression === null
+                && ! str_contains($info['appearance'], 'field-list')
+                && ! isset($holdsQuestions[$section->key])
+                && $label !== ''
+                && ! str_contains($label, '${');
+            if (! $pure) {
+                $kept[] = $section;
+
+                continue;
+            }
+
+            $first->chapter = self::chapterName($label, $section->key, $warnings);
+            $translations = [];
+            foreach ($section->labelTranslations ?? [] as $locale => $text) {
+                $plain = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+                if ($plain !== '' && ! str_contains($plain, '${')) {
+                    $translations[$locale] = self::chapterName($plain, $section->key, $warnings);
+                }
+            }
+            $first->chapterTranslations = $translations === [] ? null : $translations;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * M249: a group's label as a chapter name — at most the 60 characters `form_sections.chapter` holds, cut at a word.
+     *
+     * @param  list<string>  $warnings
+     */
+    private static function chapterName(string $label, string $group, array &$warnings): string
+    {
+        if (mb_strlen($label) <= 60) {
+            return $label;
+        }
+        $cut = mb_substr($label, 0, 60);
+        $space = mb_strrpos($cut, ' ');
+        $cut = rtrim($space !== false && $space > 30 ? mb_substr($cut, 0, $space) : $cut);
+        $warnings[] = "The group “{$group}” became a chapter, and its name was cut to “{$cut}” — a chapter name holds at most 60 characters.";
+
+        return $cut;
     }
 
     /**
@@ -359,6 +455,9 @@ final class XlsformImportParser
                 'value' => trim((string) ($this->col($row, 'name') ?? '')),
                 'label' => (string) ($this->col($row, 'label') ?? ''),
                 'label_translations' => $this->translations($row, 'label'),
+                // M249 (`D233`): what a closed dropdown shows while this choice is chosen — our own column, and its languages.
+                'short_label' => $this->trimToNull($this->col($row, 'short_label')),
+                'short_label_translations' => $this->translations($row, 'short_label'),
                 'level' => $this->col($row, 'level'),
                 'parent' => $this->col($row, 'parent'),
                 'raw' => $this->lowercaseKeys($row),
@@ -384,6 +483,14 @@ final class XlsformImportParser
             $option = ['value' => $value, 'label' => $row['label'] !== '' ? (string) $row['label'] : $value];
             if (! empty($row['label_translations'])) {
                 $option['label_translations'] = $row['label_translations'];
+            }
+            // M249: a short label is cut to the 60 characters the builder holds, as typed text would be refused past it.
+            if (is_string($row['short_label'] ?? null)) {
+                $option['short_label'] = mb_substr($row['short_label'], 0, 60);
+                $shortTranslations = array_map(static fn (string $text): string => mb_substr($text, 0, 60), array_filter((array) ($row['short_label_translations'] ?? []), 'is_string'));
+                if ($shortTranslations !== []) {
+                    $option['short_label_translations'] = $shortTranslations;
+                }
             }
             $options[] = $option;
         }

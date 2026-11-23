@@ -20,6 +20,7 @@ import { FunctionRegistry } from './function-registry';
 import { age, dateAdd, dateDiff } from './date-math';
 import { plainDecimal, roundHalfAway } from './rounding';
 import { ordersTemporally } from './temporal';
+import { resolveCell, resolveRowCell } from './grid-cells';
 export const GRAMMAR_VERSION = '2.0';
 
 export class ExpressionEvaluator {
@@ -68,6 +69,11 @@ export class ExpressionEvaluator {
                 return node.value;
             case 'field':
                 return context.has(node.key) ? context.answers[node.key] : ABSENT;
+            // M246: a grid cell, or this row's cell inside a grid column's own rule.
+            case 'cell':
+                return context.has(node.key) ? resolveCell(context.answers[node.key], node.row, node.column) : ABSENT;
+            case 'row_cell':
+                return resolveRowCell(context.row, node.column);
             case 'self':
                 return context.hasSelf() ? context.selfValue() : ABSENT;
             case 'not':

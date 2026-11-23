@@ -45,17 +45,32 @@ final class NheteWorkbook
         $this->choices = [];
         $this->lists = [];
         $survey = [];
+        // M249 (`progress-chapters`, `D233`): each stop is an outer group around its screens — the way ODK and Kobo name a
+        // run of pages, which the import folds into a chapter. Both dialects nest groups this way.
+        $chapter = null;
         foreach ($sections ?? $this->plan->sections() as $section) {
+            if (isset($section['chapter'])) {
+                if ($chapter !== null) {
+                    $survey[] = ['type' => 'end group', 'name' => $chapter];
+                }
+                $chapter = 'ch_'.$section['key'];
+                $survey[] = ['type' => 'begin group', 'name' => $chapter, 'label' => $section['chapter']];
+            }
             $survey[] = ['type' => 'begin group', 'name' => $section['key'], 'label' => $section['label'], 'relevant' => $section['relevant'], 'appearance' => 'field-list'];
             foreach ($section['elements'] as $e) {
                 array_push($survey, ...$this->rows($e));
             }
             $survey[] = ['type' => 'end group', 'name' => $section['key']];
         }
+        if ($chapter !== null) {
+            $survey[] = ['type' => 'end group', 'name' => $chapter];
+        }
+        // M249 (`dropdown-placeholder`): a choice's short label is our own column, so only our own dialect writes it.
+        $shortLabels = $this->dialect === self::MERIDIAN && array_filter($this->choices, static fn (array $c): bool => isset($c['short_label'])) !== [];
 
         return [
             'survey' => ['headers' => self::SURVEY_HEADERS, 'rows' => $survey],
-            'choices' => ['headers' => ['list_name', 'name', 'label'], 'rows' => $this->choices],
+            'choices' => ['headers' => ['list_name', 'name', 'label', ...($shortLabels ? ['short_label'] : [])], 'rows' => $this->choices],
             'settings' => ['headers' => ['form_title', 'form_id', 'default_language'], 'rows' => [['form_title' => $this->plan->title(), 'form_id' => 'nhete', 'default_language' => 'English']]],
         ];
     }
@@ -110,8 +125,9 @@ final class NheteWorkbook
             // Kobo authors write "required when" as a formula in the required column.
             $row['required'] = implode(' or ', array_map(static fn (array $w): string => "\${{$w[0]}} = '{$w[1]}'", $e['required_when']));
         }
-        if ($e['placeholder'] !== null && $this->dialect === self::KOBO) {
-            // XLSForm has no placeholder column; Kobo authors use the hint.
+        if ($e['placeholder'] !== null && $e['type'] !== 'dropdown' && $this->dialect === self::KOBO) {
+            // XLSForm has no placeholder column; Kobo authors use the hint. A dropdown's "Choose…" (M249) they leave to
+            // Kobo's own empty box.
             $row['hint'] = trim(($row['hint'] ?? '').' '.$e['placeholder']);
         }
 
@@ -229,8 +245,9 @@ final class NheteWorkbook
         if (! isset($this->lists[$signature])) {
             $name = 'l_'.$e['key'];
             $this->lists[$signature] = $name;
-            foreach ($e['options'] as [$value, $label]) {
-                $this->choices[] = ['list_name' => $name, 'name' => $value, 'label' => $label];
+            foreach ($e['options'] as $option) {
+                [$value, $label] = $option;
+                $this->choices[] = ['list_name' => $name, 'name' => $value, 'label' => $label, ...(isset($option[2]) && $this->dialect === self::MERIDIAN ? ['short_label' => $option[2]] : [])];
             }
         }
 

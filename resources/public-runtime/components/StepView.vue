@@ -20,7 +20,8 @@ import SaveForLater from './SaveForLater.vue';
 import SectionView from './SectionView.vue';
 import SummaryBanner from './SummaryBanner.vue';
 import { useAnnouncer, useRuntime, useSubmitFlow } from '../composables/context';
-import { stepTitle, type ErroredItem, type StepChange } from '../composables/useFormRuntime';
+import type { ErroredItem, StepChange } from '../composables/useFormRuntime';
+import { chapterName, chapterOfStep } from '../lib/chapters';
 
 const runtime = useRuntime();
 const announcer = useAnnouncer();
@@ -68,9 +69,17 @@ function focusHeading(): void {
 }
 
 function stepLabel(): string {
+    const step = runtime.currentStep.value;
+    const title = step ? runtime.progressTextFor(step) : null;
+    // M249 (`D233`): with chapters, said as the bar shows it — the chapter and its place, then the page within it.
+    const chapters = runtime.chapters.value;
+    const place = chapters === null ? null : chapterOfStep(chapters, step?.key);
+    if (chapters !== null && place !== null) {
+        const name = chapterName(place.chapter, (s) => runtime.progressTextFor(s));
+        return `${name} (${place.index + 1} of ${chapters.length}), page ${place.page + 1} of ${place.chapter.steps.length}${title ? `: ${title}` : ''}`;
+    }
     const index = Math.max(runtime.currentStepIndex.value, 0);
     const total = runtime.visibleSteps.value.length;
-    const title = runtime.currentStep.value ? stepTitle(runtime.currentStep.value) : null;
     return `step ${index + 1} of ${total}${title ? `: ${title}` : ''}`;
 }
 

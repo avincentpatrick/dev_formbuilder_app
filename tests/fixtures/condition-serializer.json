@@ -221,5 +221,11 @@
       ]
     },
     "text": "${age} > 18 and ${notes} != '' and count(${roster}) > 0 and not(selected(${colours}, 'red'))"
-  }
+  },
+  {"name": "compare_grid_cell_is_text", "note": "M246: a Grid's cell is a field operand keyed by its whole path, so it round-trips whole and never as its grid's key.", "condition": {"kind": "compare", "op": "eq", "left": {"kind": "field", "key": "mx.a01.keep"}, "right": {"kind": "text", "value": "close"}}, "text": "${mx.a01.keep} = 'close'"},
+  {"name": "compare_likert_row_at_least_number", "condition": {"kind": "compare", "op": "gte", "left": {"kind": "field", "key": "sat.clean"}, "right": {"kind": "number", "value": 4}}, "text": "${sat.clean} >= 4"},
+  {"name": "compare_two_cells_of_one_grid", "note": "Two cells of one grid are two operands — the guard a key-only model would fail by printing ${g} = ${g}.", "condition": {"kind": "compare", "op": "neq", "left": {"kind": "field", "key": "g.r1.c"}, "right": {"kind": "field", "key": "g.r2.c"}}, "text": "${g.r1.c} != ${g.r2.c}"},
+  {"name": "group_row_cells_the_nhete_comment_rule", "note": "M246: this row's cells, `${.col}`, in a column's required-when.", "condition": {"kind": "group", "op": "or", "children": [{"kind": "compare", "op": "eq", "left": {"kind": "field", "key": ".cut"}, "right": {"kind": "text", "value": "change"}}, {"kind": "compare", "op": "eq", "left": {"kind": "field", "key": ".worry"}, "right": {"kind": "text", "value": "other"}}, {"kind": "compare", "op": "eq", "left": {"kind": "field", "key": ".keep"}, "right": {"kind": "text", "value": "close"}}]}, "text": "${.cut} = 'change' or ${.worry} = 'other' or ${.keep} = 'close'"},
+  {"name": "selected_grid_cell_hyphenated_path", "condition": {"kind": "selected", "field": "g.row-1.tags", "value": "lab", "negated": false}, "text": "selected(${g.row-1.tags}, 'lab')"},
+  {"name": "blank_row_cell", "condition": {"kind": "blank", "op": "eq", "subject": {"kind": "field", "key": ".area"}}, "text": "${.area} = ''"}
 ]

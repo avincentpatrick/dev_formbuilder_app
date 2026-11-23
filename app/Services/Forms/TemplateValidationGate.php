@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Forms;
 
+use App\Enums\FieldType;
 use App\Enums\PipingEligibility;
 use App\Exceptions\Forms\PublishValidationException;
 use App\Exceptions\Templates\TemplateSyntaxException;
@@ -13,6 +14,7 @@ use App\Models\FormSection;
 use App\Models\FormVersion;
 use App\Services\Templates\TemplateParser;
 use App\Services\Templates\TemplateScopeResolver;
+use App\Support\Forms\MatrixColumns;
 use Illuminate\Support\Collection;
 
 /**
@@ -184,6 +186,13 @@ final class TemplateValidationGate
                 'position' => TemplateScopeResolver::fieldPosition($section?->sequence, $field->sequence),
                 'repeat' => $section !== null && $section->is_repeatable ? $section->key : null,
             ];
+
+            // M246 (`R-ffd10da2`): each cell of a grid is a source of its own, `grid.row.col` (`grid.row` for a Likert
+            // row), at the grid's place and judged as its column's type — so every scope rule reads a cell as it reads a
+            // question. A grid whose rows come from a list or another form offers none: a later publish may change them.
+            foreach (self::cellSources($field) as $path => $type) {
+                $sources[$path] = ['type' => PipingEligibility::for($type), 'position' => $sources[$field->key]['position'], 'repeat' => $sources[$field->key]['repeat']];
+            }
         }
 
         return [$sources, $sectionKeys];
@@ -301,5 +310,41 @@ final class TemplateValidationGate
         }
 
         return null;
+    }
+
+    /**
+     * M246: a grid's cells by their path, each with the type it is shown as ({@see MatrixColumns::cellSource()}).
+     *
+     * @return array<string, FieldType>
+     */
+    private static function cellSources(FormField $field): array
+    {
+        if (! $field->field_type->isComposite()) {
+            return [];
+        }
+        $config = (array) $field->config;
+        if (($config['rows_list'] ?? null) !== null || ($config['rows_source'] ?? null) !== null) {
+            return [];
+        }
+
+        $cells = [];
+        foreach ((array) ($config['rows'] ?? []) as $row) {
+            $rowValue = is_array($row) ? (string) ($row['value'] ?? '') : '';
+            if ($rowValue === '') {
+                continue;
+            }
+            $columns = $field->field_type === FieldType::LikertMatrix ? [null] : array_map(
+                static fn (array $column): string => (string) ($column['value'] ?? ''),
+                MatrixColumns::columns($config),
+            );
+            foreach ($columns as $columnValue) {
+                $source = MatrixColumns::cellSource($field->field_type, $config, $rowValue, $columnValue);
+                if ($source !== null) {
+                    $cells[$columnValue === null ? "{$field->key}.{$rowValue}" : "{$field->key}.{$rowValue}.{$columnValue}"] = $source['type'];
+                }
+            }
+        }
+
+        return $cells;
     }
 }

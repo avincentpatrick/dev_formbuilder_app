@@ -173,7 +173,9 @@ final class SemanticValidator
         // Composite (grid) fields (Increment G4b) are validated + pruned in their own pass, never routed
         // through the scalar collectFieldErrors path (Coercion::isEmpty diverges on an empty object between
         // the PHP and TS engines). Their relevance-pruned object replaces the raw effective answer.
-        $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $calculated);
+        // M246 (`grid-question-table`): which of each relevant grid's rows, columns and cells are asked, read by the runtime.
+        $gridRelevance = [];
+        $compositeErrors = $this->processComposites($topLevelFields, $fieldRelevance, $effectiveAnswers, $ruleSets, $fieldKeyById, $input->locale, $now, $calculated, $gridRelevance);
 
         // Geospatial fields (Increment G5b1) are validated in their own pass for the same reason as
         // composites (an object answer must not hit scalar isEmpty). Structural geometry checks (type,
@@ -194,6 +196,7 @@ final class SemanticValidator
             $effectiveAnswers,
             $computed,
             $repeatRelevance,
+            $gridRelevance,
         );
     }
 
@@ -793,6 +796,7 @@ final class SemanticValidator
      * @param  array<string, array{constraint: list<list<FormFieldValidation>>, required: list<list<FormFieldValidation>>, skip: list<list<FormFieldValidation>>}>  $ruleSets
      * @param  array<string, string>  $fieldKeyById
      * @param  array{keys: array<string, true>, values: array<string, mixed>}  $calculated  the calculations' values (M180)
+     * @param  array<string, array{rows: array<string, bool>, columns: array<string, bool>, cells: array<string, array<string, bool>>}>  $gridRelevance  MUTATED (M246)
      * @return list<SemanticError>
      */
     private function processComposites(
@@ -804,6 +808,7 @@ final class SemanticValidator
         string $locale,
         ?string $now,
         array $calculated,
+        array &$gridRelevance = [],
     ): array {
         /** @var list<SemanticError> $errors */
         $errors = [];
@@ -824,9 +829,11 @@ final class SemanticValidator
                 : self::DEFAULT_REQUIRED_MESSAGE;
 
             $raw = $effectiveAnswers[$field->key] ?? null;
+            $relevance = ['rows' => [], 'columns' => [], 'cells' => []];
             $pruned = $field->field_type === FieldType::Matrix
-                ? $this->processMatrix($field, $raw, $required, $requiredMessage, $errors)
-                : $this->processLikertMatrix($field, $raw, $required, $requiredMessage, $errors);
+                ? $this->processMatrix($field, $raw, $required, $requiredMessage, $errors, $context, $relevance)
+                : $this->processLikertMatrix($field, $raw, $required, $requiredMessage, $errors, $context, $relevance);
+            $gridRelevance[$field->key] = $relevance;
 
             if ($pruned === []) {
                 unset($effectiveAnswers[$field->key]);
@@ -842,18 +849,26 @@ final class SemanticValidator
      * Likert-matrix (`{row:score}`): each declared row must carry a score drawn from the shared column scale.
      * Returns the pruned `{row:score}` (empty when nothing survives). `cellPath = "<rowKey>"`.
      *
+     * M246: a row with a show-when that does not hold is not asked — pruned, never required, `rows[row] = false`.
+     *
      * @param  list<SemanticError>  $errors
+     * @param  array{rows: array<string, bool>, columns: array<string, bool>, cells: array<string, array<string, bool>>}  $relevance
      * @return array<string, string>
      */
-    private function processLikertMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): array
+    private function processLikertMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors, EvaluationContext $context, array &$relevance): array
     {
         $rowKeys = $this->compositeValues($field, 'rows');
         $scoreSet = array_flip($this->compositeValues($field, 'columns'));
         $rawMap = is_array($raw) && ! array_is_list($raw) ? $raw : [];
+        $rowRules = $this->gridRowRules($field);
 
         /** @var array<string, string> $pruned */
         $pruned = [];
         foreach ($rowKeys as $rowKey) {
+            $relevance['rows'][$rowKey] = $this->evaluateRelevance($rowRules[$rowKey]['relevant'] ?? null, $context);
+            if (! $relevance['rows'][$rowKey]) {
+                continue;
+            }
             $score = $rawMap[$rowKey] ?? null;
             if (! array_key_exists($rowKey, $rawMap) || Coercion::isEmpty($score)) {
                 if ($required) {
@@ -883,31 +898,63 @@ final class SemanticValidator
      * as a whole-number question does; a text, decimal or date cell keeps its value as sent (its shape is Stage 1's).
      * A column with no spec is exactly a pre-M183 column, so every earlier vector holds byte for byte.
      *
+     * M246 (`grid-question-table`): a grid's own rules decide which cells are asked, over the settled context — a rule
+     * elsewhere reads only an always-asked cell (`D230`), so nothing here feeds back into it. A row whose show-when does
+     * not hold, and a column whose show-when does not, are not asked; in a shown row, each shown cell is then decided
+     * left to right — "Not needed" when its row lists it, or when its column's needed-when does not hold, reading
+     * `${.col}` from the row's cells kept so far. A cell not asked is pruned and never required. A shown, needed cell
+     * is required when the grid is, when its column is in every row, or when its column's required-when holds.
+     *
      * @param  list<SemanticError>  $errors
+     * @param  array{rows: array<string, bool>, columns: array<string, bool>, cells: array<string, array<string, bool>>}  $relevance
      * @return array<string, array<string, mixed>>
      */
-    private function processMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors): array
+    private function processMatrix(FormField $field, mixed $raw, bool $required, string $requiredMessage, array &$errors, EvaluationContext $context, array &$relevance): array
     {
         $rowKeys = $this->compositeValues($field, 'rows');
         $colKeys = $this->compositeValues($field, 'columns');
         $cells = $this->compositeValues($field, 'cells');
         $specs = $this->columnSpecs($field);
         $rawMap = is_array($raw) && ! array_is_list($raw) ? $raw : [];
+        $rowRules = $this->gridRowRules($field);
+        $columnRules = $this->gridColumnRules($field);
+
+        foreach ($colKeys as $colKey) {
+            $relevance['columns'][$colKey] = $this->evaluateRelevance($columnRules[$colKey]['relevant'] ?? null, $context);
+        }
 
         /** @var array<string, array<string, mixed>> $pruned */
         $pruned = [];
         foreach ($rowKeys as $rowKey) {
+            $relevance['rows'][$rowKey] = $this->evaluateRelevance($rowRules[$rowKey]['relevant'] ?? null, $context);
+            if (! $relevance['rows'][$rowKey]) {
+                continue;
+            }
+            $relevance['cells'][$rowKey] = [];
             $rowRaw = $rawMap[$rowKey] ?? null;
             $rowMap = is_array($rowRaw) && ! array_is_list($rowRaw) ? $rowRaw : [];
+            $notNeeded = array_flip($rowRules[$rowKey]['not_needed'] ?? []);
 
             /** @var array<string, mixed> $prunedRow */
             $prunedRow = [];
             foreach ($colKeys as $colKey) {
+                if (! $relevance['columns'][$colKey]) {
+                    continue;
+                }
+                $rules = $columnRules[$colKey] ?? ['relevant' => null, 'needed_when' => null, 'required_when' => null];
+                $rowContext = new EvaluationContext($context->answers, now: $context->now, row: $prunedRow);
+                $needed = ! isset($notNeeded[$colKey]) && $this->evaluateRelevance($rules['needed_when'], $rowContext);
+                $relevance['cells'][$rowKey][$colKey] = $needed;
+                if (! $needed) {
+                    continue;
+                }
+
                 $spec = $specs[$colKey] ?? ['type' => null, 'options' => [], 'required' => false];
                 $path = "{$rowKey}.{$colKey}";
                 $cell = $rowMap[$colKey] ?? null;
                 if (! array_key_exists($colKey, $rowMap) || Coercion::isEmpty($cell)) {
-                    if ($required || $spec['required']) {
+                    $requiredWhen = $rules['required_when'] !== null && $this->evaluator->evaluateBoolean($rules['required_when'], $rowContext);
+                    if ($required || $spec['required'] || $requiredWhen) {
                         $errors[] = new SemanticError($field->key, 'field_required', $requiredMessage, null, null, $path);
                     }
 
@@ -954,6 +1001,67 @@ final class SemanticValidator
         }
 
         return $pruned;
+    }
+
+    /**
+     * M246: a grid's rows' own rules, keyed by row value — the show-when, and (a Grid's) the columns marked "Not
+     * needed" in that row. Mirror of the TypeScript engine's `grid.row_rules`.
+     *
+     * @return array<string, array{relevant: ?string, not_needed: list<string>}>
+     */
+    private function gridRowRules(FormField $field): array
+    {
+        $rules = [];
+        foreach ((array) data_get($field->config, 'rows', []) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $value = Coercion::toStr($row['value'] ?? '');
+            if ($value === '' || isset($rules[$value])) {
+                continue;
+            }
+            $notNeeded = [];
+            foreach ((array) ($row['not_needed'] ?? []) as $column) {
+                if (is_string($column) && $column !== '') {
+                    $notNeeded[] = $column;
+                }
+            }
+            $rules[$value] = ['relevant' => self::ruleText($row['relevant'] ?? null), 'not_needed' => $notNeeded];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * M246: a Grid's columns' own rules, keyed by column value — the show-when, the needed-when and the required-when
+     * (null when blank). Mirror of the TypeScript engine's `grid.column_specs`.
+     *
+     * @return array<string, array{relevant: ?string, needed_when: ?string, required_when: ?string}>
+     */
+    private function gridColumnRules(FormField $field): array
+    {
+        $rules = [];
+        foreach ((array) data_get($field->config, 'columns', []) as $column) {
+            if (! is_array($column)) {
+                continue;
+            }
+            $value = Coercion::toStr($column['value'] ?? '');
+            if ($value === '' || isset($rules[$value])) {
+                continue;
+            }
+            $rules[$value] = [
+                'relevant' => self::ruleText($column['relevant'] ?? null),
+                'needed_when' => self::ruleText($column['needed_when'] ?? null),
+                'required_when' => self::ruleText($column['required_when'] ?? null),
+            ];
+        }
+
+        return $rules;
+    }
+
+    private static function ruleText(mixed $text): ?string
+    {
+        return is_string($text) && trim($text) !== '' ? $text : null;
     }
 
     /**

@@ -577,3 +577,48 @@ group('a formula default reaches the preview (M180, R-20784770)', () => {
         expect(shapeOf(formula.schema.version.schema)).not.toBe(shapeOf(fixed.schema.version.schema));
     });
 });
+
+group('M247: a section’s wide page', () => {
+    it('projects a wide page into the preview schema, and anything else as the reading width', () => {
+        const { schema } = projectDraft(
+            input([], [section({ uid: 'w', key: 'wide', page_width: 'wide' }), section({ uid: 'p', key: 'plain', sequence: 1 })]),
+        );
+
+        expect(schema.version.schema.sections.map((s) => [s.key, s.page_width])).toEqual([
+            ['wide', 'wide'],
+            ['plain', null],
+        ]);
+    });
+
+    it('leaves the engine shape alone, as a layout setting the engine never reads', () => {
+        const narrow = projectDraft(input([], [section({ uid: 'w', key: 'wide' })]));
+        const wide = projectDraft(input([], [section({ uid: 'w', key: 'wide', page_width: 'wide' })]));
+
+        expect(shapeOf(wide.schema.version.schema)).toBe(shapeOf(narrow.schema.version.schema));
+    });
+});
+
+group('M249: a section’s chapter and progress label', () => {
+    it('projects both into the preview schema as the server stores them — trimmed, blank as none, no translations', () => {
+        const { schema } = projectDraft(
+            input([], [
+                section({ uid: 'w', key: 'welcome', chapter: ' Welcome ', progress_label: 'Hello' }),
+                section({ uid: 'a', key: 'about', sequence: 1, chapter: '  ', progress_label: '' }),
+                section({ uid: 'b', key: 'plain', sequence: 2 }),
+            ]),
+        );
+
+        expect(schema.version.schema.sections.map((s) => [s.key, s.chapter, s.chapter_translations, s.progress_label])).toEqual([
+            ['welcome', 'Welcome', null, 'Hello'],
+            ['about', null, null, null],
+            ['plain', null, null, null],
+        ]);
+    });
+
+    it('leaves the engine shape alone, as text the engine never reads', () => {
+        const plain = projectDraft(input([], [section({ uid: 'w', key: 'welcome' })]));
+        const named = projectDraft(input([], [section({ uid: 'w', key: 'welcome', chapter: 'Welcome', progress_label: 'Hello' })]));
+
+        expect(shapeOf(named.schema.version.schema)).toBe(shapeOf(plain.schema.version.schema));
+    });
+});

@@ -133,7 +133,11 @@ final class SchemaBlueprintMaterializer
             'min_instances' => $section['min_instances'] ?? null,
             'max_instances' => $section['max_instances'] ?? null,
             // M185: a template or a library section keeps its table layout; absent is the cards.
-            'repeat_layout' => ($section['repeat_layout'] ?? null) === 'table' ? 'table' : null,
+            'repeat_layout' => ($section['repeat_layout'] ?? null) === 'table' ? 'table' : null, 'page_width' => ($section['page_width'] ?? null) === 'wide' ? 'wide' : null,
+            // M249 (`D233`): a template or a library section keeps the chapter it starts and its progress label; absent is none.
+            'chapter' => self::plainOrNull($section['chapter'] ?? null),
+            'chapter_translations' => self::plainOrNull($section['chapter'] ?? null) !== null && is_array($section['chapter_translations'] ?? null) && $section['chapter_translations'] !== [] ? $section['chapter_translations'] : null,
+            'progress_label' => self::plainOrNull($section['progress_label'] ?? null),
             'relevant_expression' => $section['relevant_expression'] ?? null,
         ];
     }
@@ -236,5 +240,15 @@ final class SchemaBlueprintMaterializer
     private function nextFieldSequence(FormVersion $target): int
     {
         return (int) FormField::query()->where('form_version_id', $target->id)->max('sequence') + 1;
+    }
+
+    /**
+     * M249: a plain-text section setting as a template or library entry carries it — trimmed, and blank as null.
+     */
+    private static function plainOrNull(mixed $value): ?string
+    {
+        $text = is_string($value) ? trim($value) : '';
+
+        return $text === '' ? null : $text;
     }
 }

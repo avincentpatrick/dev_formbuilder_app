@@ -51,7 +51,7 @@ final class VersionComparison
     /** A section's settings, in the order `conflict-diff.ts` lists them. Icon and colour are the hub's, not the form's. */
     private const array SECTION_SETTINGS = [
         'label', 'label_translations', 'description', 'description_translations', 'relevant_expression', 'is_repeatable',
-        'min_instances', 'max_instances', 'repeat_layout',
+        'min_instances', 'max_instances', 'repeat_layout', 'page_width', 'chapter', 'chapter_translations', 'progress_label',
     ];
 
     public function __construct(private readonly TemplateParser $templates = new TemplateParser) {}
@@ -241,6 +241,7 @@ final class VersionComparison
         $settings['relevant_expression'] = self::expression($settings['relevant_expression']);
         $settings['label_translations'] = self::emptyAsNull($settings['label_translations']);
         $settings['description_translations'] = self::emptyAsNull($settings['description_translations']);
+        $settings['chapter_translations'] = self::emptyAsNull($settings['chapter_translations']);
 
         return $settings;
     }

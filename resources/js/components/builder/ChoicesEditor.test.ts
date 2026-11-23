@@ -29,3 +29,38 @@ describe('ChoicesEditor — the Yes and No preset (M177)', () => {
         expect(wrapper.get('[data-choices-yes-no]').attributes('disabled')).toBeDefined();
     });
 });
+
+/**
+ * M249 (`dropdown-placeholder`, `D233`): a dropdown's choices take a short label — what the closed box shows while that
+ * choice is chosen. The column shows only where the server says the type takes one, and a blank removes the key with any
+ * imported translations of it, so a choice never given one saves exactly as before.
+ */
+describe('ChoicesEditor — a short label per choice (M249)', () => {
+    it('offers the column only when allowed', () => {
+        const off = mount(ChoicesEditor, { props: { options: [{ value: 'a', label: 'A' }] } });
+        expect(off.find('[data-choice-short-label]').exists()).toBe(false);
+        off.unmount();
+
+        const on = mount(ChoicesEditor, { props: { options: [{ value: 'a', label: 'A' }], allowShortLabel: true } });
+        expect(on.get('[data-choice-short-label]').attributes('aria-label')).toBe('Short form of option 1');
+        expect(on.text()).toContain('Short label');
+        on.unmount();
+    });
+
+    it('sets a short label, and removes it with its translations when emptied', async () => {
+        const wrapper = mount(ChoicesEditor, {
+            props: {
+                options: [{ value: 'include', label: 'Include. As it stands.', short_label: 'Incl', short_label_translations: { fil: 'Isama' } }],
+                allowShortLabel: true,
+            },
+        });
+
+        await wrapper.get('[data-choice-short-label]').setValue('Include');
+        await wrapper.get('[data-choice-short-label]').setValue('');
+
+        const emitted = wrapper.emitted('update:options') as unknown[][];
+        expect(emitted[0][0]).toEqual([{ value: 'include', label: 'Include. As it stands.', short_label: 'Include', short_label_translations: { fil: 'Isama' } }]);
+        expect(emitted[1][0]).toEqual([{ value: 'include', label: 'Include. As it stands.' }]);
+        wrapper.unmount();
+    });
+});

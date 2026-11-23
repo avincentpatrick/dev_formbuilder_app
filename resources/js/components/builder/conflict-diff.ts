@@ -66,6 +66,11 @@ const SECTION_SETTINGS: Record<string, string> = {
     min_instances: 'Min instances',
     max_instances: 'Max instances',
     repeat_layout: 'Layout',
+    page_width: 'Wide page',
+    // M249 (`D233`): the chapter a section starts, its names in other languages, and its page's short name on the bar.
+    chapter: 'Starts a chapter',
+    chapter_translations: 'Chapter name in other languages',
+    progress_label: 'Progress label',
     key: 'Section key',
 };
 

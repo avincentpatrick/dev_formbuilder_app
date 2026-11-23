@@ -159,6 +159,9 @@ final class DraftCopier
         $copy->key = $key;
         $this->rewriter->section($copy, $map);
         $copy->label = self::copyLabel($copy->label, 255);
+        // M249 (`D233`): a copy sits inside its source's chapter, so it never starts a second one of the same name.
+        $copy->chapter = null;
+        $copy->chapter_translations = null;
         $copy->sequence = $section->sequence + 1;
         $copy->save();
 

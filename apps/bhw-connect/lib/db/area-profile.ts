@@ -24,6 +24,7 @@ import { getBhwOverview, type BhwOverview } from "./stepzero";
 import { getUucPhcCounts, type UucPhcCounts } from "./uuc-phc";
 import { getUucBhwCoverage, type UucBhwCoverage } from "./uuc-phc-bhw-coverage";
 import { getUucPhcCriteria, type UucPhcCriteria } from "./uuc-phc-criteria";
+import { defaultUucEdition } from "./uuc-phc-edition";
 
 /**
  * The consolidated area profile (docs/AI_ASSISTANT_PLAN.md §8, Increment 5.4): every dataset that
@@ -155,9 +156,16 @@ export async function getAreaProfile(
     safely(() => getHonorarium(geo.geoCode, level), []),
     safely(() => getHonorariumSufficiency(geo.geoCode, level), null),
     safely(() => getProfilingStatus(geo.geoCode, level), null),
-    safely(() => getUucPhcCounts(geo.geoCode, level), null),
-    safely(() => getUucPhcCriteria(geo.geoCode, level), null),
-    safely(() => getUucBhwCoverage(geo.geoCode, level), null),
+    // The newest UUC for PHC edition loaded — the one the section opens on.
+    safely(async () => getUucPhcCounts(geo.geoCode, level, (await defaultUucEdition()).slug), null),
+    safely(
+      async () => getUucPhcCriteria(geo.geoCode, level, (await defaultUucEdition()).slug),
+      null,
+    ),
+    safely(
+      async () => getUucBhwCoverage(geo.geoCode, level, (await defaultUucEdition()).slug),
+      null,
+    ),
     safely(() => getChildPoverty([geo.geoCode]), new Map<string, PovertyPoint>()),
     safely(() => getCensusPopulation2024(geo.geoCode), null),
     level === "national" || level === "barangay"

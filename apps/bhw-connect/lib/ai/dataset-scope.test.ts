@@ -227,7 +227,7 @@ describe("the facilities system prompt", () => {
     ["forbids treating a blank licensing status as unlicensed", /never "unlicensed"/i],
     ["forbids a percent-licensed figure at any level", /never compute or imply a "% licensed" figure/i],
     ["forbids grouping by facility_major_type", /never facility_major_type/],
-    ["names the Sulu region/code mismatch", /BARMM/],
+    ["files Sulu under Region IX", /Sulu.s 177 facilities are filed under Region IX/],
     ["says contact columns do not exist rather than are hidden", /do not exist in this table at all/i],
     ["forbids reading a missing type row as zero", /NO ROW, not a zero row/],
     ["says the four headline types do not sum to n_facilities", /do NOT sum to n_facilities/],

@@ -25,7 +25,11 @@ describe("map subjects", () => {
     const national = subjectMapHref("bhw", { mode: "all" })!;
     expect(parseMapChoice(params(national))).toMatchObject({ dataset: "bhw-stepzero-2026", level: "national", code: "PH" });
     const region = subjectMapHref("uuc-phc", { mode: "psgc", level: "region", code: "01" })!;
-    expect(parseMapChoice(params(region))).toMatchObject({ dataset: "uuc-phc-2025", level: "region", code: "01" });
+    // The newest UUC edition when the caller does not know what is loaded…
+    expect(parseMapChoice(params(region))).toMatchObject({ dataset: "uuc-phc-2026", level: "region", code: "01" });
+    // …and the edition the catalog actually read when it does (2025 where 2026 is not loaded).
+    const loaded = subjectMapHref("uuc-phc", { mode: "psgc", level: "region", code: "01" }, ["uuc-phc-2025"])!;
+    expect(parseMapChoice(params(loaded))).toMatchObject({ dataset: "uuc-phc-2025", level: "region", code: "01" });
     const district = subjectMapHref("nhfr", { mode: "district", districtCode: "x" })!;
     expect(parseMapChoice(params(district))).toMatchObject({ level: "national" });
   });

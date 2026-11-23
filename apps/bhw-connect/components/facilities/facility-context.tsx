@@ -30,8 +30,17 @@ export function FacilityContext({
         district.
       </p>
     );
-  const { facilities, residents, population, density, workforce, uuc, uucShare, povertyItems } =
-    context;
+  const {
+    facilities,
+    residents,
+    population,
+    density,
+    workforce,
+    uuc,
+    uucYear,
+    uucShare,
+    povertyItems,
+  } = context;
   const href = (dataset: CatalogId) => catalogJourneyHref(catalog.selection, dataset, mapState);
   return (
     <section
@@ -122,7 +131,7 @@ export function FacilityContext({
         >
           <h4 className="font-semibold">Communities listed for primary care</h4>
           <p className="mt-2 text-sm">
-            DOH UUC-PHC list, 2025:{" "}
+            DOH UUC-PHC list{uucYear ? `, ${uucYear}` : ""}:{" "}
             <span className="whitespace-nowrap font-semibold">
               {uuc
                 ? `${formatCount(uuc.values[0].value)} barangays${uucShare === null ? "" : ` (${formatPct(uucShare)})`}`

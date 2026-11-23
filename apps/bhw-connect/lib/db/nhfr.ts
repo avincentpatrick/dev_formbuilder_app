@@ -24,9 +24,9 @@ import type { GeoLevel } from "@/lib/filters/schema";
  * derives a "% licensed" figure — the denominator that would need is not knowable from this
  * export. See `licensingLabel()`.
  *
- * **Sulu is filed where its code says, not where its name does.** The source names all 177 Sulu
- * facilities under Region IX while its codes straddle two vintages; the load resolves both onto
- * `dim_geo`'s BARMM placement, so these rollups report Sulu under BARMM. The section's
+ * **Sulu is filed under Region IX.** The source names all 177 Sulu facilities under Region IX while
+ * its codes straddle two vintages; the load resolves both onto `dim_geo`'s Sulu, which migration
+ * 20261123100000 moved from BARMM to Region IX, so these rollups report Sulu there. The section's
  * methodology page says so.
  */
 export type NhfrCounts = {

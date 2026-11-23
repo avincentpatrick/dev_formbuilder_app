@@ -49,6 +49,7 @@ const periods: Record<string, string> = {
   // The slug says 2026; the data is the 2025 headcount (docs/DECISIONS.md, 2026-07-20).
   "bhw-stepzero-2026": "2025",
   "nhfr-2026-09": "September 2026",
+  "uuc-phc-2026": "2026",
   "uuc-phc-2025": "2025",
   "fhsis-2025": "2025",
   "psa-popcen-2024": "2024",
@@ -99,8 +100,12 @@ function catalogMap(
   source: string,
   disclosure: string,
 ): DatasetMapDefinition {
+  // UUC for PHC editions share one set of catalog indicators (the catalog names the newest); each
+  // edition's map reads them from its own release.
+  const uucEdition = (slug: string) => slug.startsWith("uuc-phc-");
   const indicators = CATALOG.flatMap((d) => d.indicators)
-    .filter((s) => s.source === source)
+    .filter((s) => s.source === source || (uucEdition(source) && uucEdition(s.source)))
+    .map((s) => (s.source === source ? s : { ...s, source }))
     .concat(source === "bhw-stepzero-2026" ? stepzeroContext : [])
     .map(indicator);
   return {
@@ -188,6 +193,12 @@ export const DATASET_MAPS: readonly DatasetMapDefinition[] = [
       denominator: "totalBhw",
       legend: "rate",
     })),
+  ),
+  catalogMap(
+    "uuc-phc-2026",
+    "UUC for PHC 2026",
+    "uuc-phc-2026",
+    "Official list membership is not an inferred classification. Qualification routes overlap. Preserve cleaning rules; never average source percentages.",
   ),
   catalogMap(
     "uuc-phc-2025",

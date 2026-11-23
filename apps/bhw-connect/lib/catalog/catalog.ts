@@ -200,6 +200,10 @@ export async function getPublicCatalog(
   validateSelection(selection);
   const definitions = datasetId ? CATALOG.filter((dataset) => dataset.id === datasetId) : CATALOG;
   const sources = new Map<string, PublicSource>();
+  // The release each spec actually read, by the slug it asked for. They differ only where the
+  // reader stood in an earlier edition (the UUC list's newest, where it is not loaded — see
+  // UUC_FALLBACK in ./reader.ts); the card then reports, and its map opens, the one it read.
+  const readAs = new Map<string, string>();
   const byDataset = new Map<string, CatalogIndicator[]>();
   // One pool across all datasets, not six pools of four requests each.
   await mapBounded(
@@ -232,6 +236,9 @@ export async function getPublicCatalog(
             };
           } else {
             const info = source.value;
+            readAs.set(spec.source, info.slug);
+            // The indicator names the release it was read from, not the one it asked for.
+            item = { ...item, sourceSlug: info.slug };
             sources.set(info.slug, {
               slug: info.slug,
               name: info.name,
@@ -408,7 +415,9 @@ export async function getPublicCatalog(
       totalIndicators: indicators.length,
       supportedLevels: [...new Set(spec.indicators.flatMap((i) => i.levels))],
       detailHref: catalogDetailHref(spec, selection),
-      sources: [...slugs].flatMap((slug) => (sources.has(slug) ? [sources.get(slug)!] : [])),
+      sources: [...new Set([...slugs].map((slug) => readAs.get(slug) ?? slug))].flatMap((slug) =>
+        sources.has(slug) ? [sources.get(slug)!] : [],
+      ),
       indicators,
     };
   });

@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import { getChildGeos } from "./geo";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -277,8 +277,8 @@ export function sizeExplanation(comparison: UucBhwComparison): {
  * page renders as "unavailable" rather than as "no difference here". Per-request `cache()`d.
  */
 export const getUucBhwCoverage = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<UucBhwCoverage | null> => {
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+  async (geoCode: string, geoLevel: GeoLevel, slug: string): Promise<UucBhwCoverage | null> => {
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();
@@ -304,10 +304,14 @@ export const getUucBhwCoverage = cache(
  * listed or entirely not, so there is no split one level below.
  */
 export const getUucBhwCoverageChildren = cache(
-  async (parentCode: string, parentLevel: GeoLevel): Promise<UucBhwCoverageChild[]> => {
+  async (
+    parentCode: string,
+    parentLevel: GeoLevel,
+    slug: string,
+  ): Promise<UucBhwCoverageChild[]> => {
     if (parentLevel === "citymun" || parentLevel === "barangay") return [];
 
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return [];
 
     const children = await getChildGeos(parentCode, parentLevel);
@@ -340,10 +344,10 @@ export const getUucBhwCoverageChildren = cache(
  * Region + province params for `generateStaticParams`, on `getUucPhcStaticParams`' precedent —
  * city/municipality pages are left to ISR. Returns [] on any read failure.
  */
-export async function getUucBhwCoverageStaticParams(): Promise<
-  { geoLevel: GeoLevel; geoCode: string }[]
-> {
-  const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+export async function getUucBhwCoverageStaticParams(
+  slug: string,
+): Promise<{ geoLevel: GeoLevel; geoCode: string }[]> {
+  const datasetId = await getDatasetIdBySlug(slug);
   if (datasetId === null) return [];
 
   const supabase = createSupabaseServerClient();

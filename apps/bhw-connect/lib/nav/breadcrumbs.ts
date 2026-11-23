@@ -30,7 +30,8 @@ export const PROFILING_STATUS_CRUMB: Crumb = {
   label: "2026 BHW Profiling Status",
   href: "/profiling-status",
 };
-export const UUC_PHC_CRUMB: Crumb = { label: "2025 UUC for PHC", href: "/uuc-phc" };
+// No year: the section shows one edition at a time (lib/uuc-phc/editions.ts) and the switch names it.
+export const UUC_PHC_CRUMB: Crumb = { label: "UUC for PHC", href: "/uuc-phc" };
 export const FACILITIES_CRUMB: Crumb = { label: "Health facilities", href: "/facilities" };
 
 export const HEALTH_SERVICES_CRUMB: Crumb = { label: "Health services", href: "/health-services" };
@@ -88,6 +89,7 @@ const UUC_PHC_TRAILS: Record<string, Crumb[]> = {
   "/uuc-phc/criteria": [UUC_PHC_CRUMB, { label: "Qualifying criteria" }],
   "/uuc-phc/bhw-coverage": [UUC_PHC_CRUMB, { label: "BHW coverage" }],
   "/uuc-phc/indicators": [UUC_PHC_CRUMB, { label: "Indicators" }],
+  "/uuc-phc/changes": [UUC_PHC_CRUMB, { label: "Changes" }],
   "/uuc-phc/data-quality": [UUC_PHC_CRUMB, { label: "Data quality" }],
   "/uuc-phc/methodology": [UUC_PHC_CRUMB, { label: "Methodology" }],
 };

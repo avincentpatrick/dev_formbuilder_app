@@ -1,5 +1,5 @@
 import { formatPct } from "@/lib/format";
-import Link from "next/link";
+import { EditionLink as Link } from "./edition-link";
 import { formatCount } from "@/lib/format";
 import {
   coverageDirection,
@@ -93,6 +93,7 @@ export function BhwCoverageSection({
   childHeading,
   childAreas,
   coverageHref,
+  listYear,
 }: {
   coverage: UucBhwCoverage;
   areaLabel: string;
@@ -101,6 +102,8 @@ export function BhwCoverageSection({
   childAreas: UucBhwCoverageChild[];
   /** The matching page on the section's existing coverage drill-down. */
   coverageHref: string;
+  /** The UUC edition compared against (the BHW side is always the 2025 headcount). */
+  listYear: string;
 }) {
   const { comparison } = coverage;
   const direction = coverageDirection(comparison);
@@ -115,12 +118,13 @@ export function BhwCoverageSection({
           This is a consistency check, not a finding
         </h2>
         <p className="mt-2 max-w-3xl text-sm">
-          A barangay reaches the 2025 list partly on <strong>distance to a health facility</strong>{" "}
-          — the physical factor of DOH AO No. 2020-0023. Health-system access is therefore part of
-          the definition of being on this list, so any difference in BHW coverage between listed and
-          unlisted barangays is <strong>partly definitional rather than a discovery</strong>. That
-          holds in both directions: &ldquo;unserved barangays have fewer BHWs&rdquo; and
-          &ldquo;unserved barangays have more BHWs&rdquo; are equally circular as headlines.
+          A barangay reaches the {listYear} list partly on{" "}
+          <strong>distance to a health facility</strong> — the physical factor of DOH AO No.
+          2020-0023. Health-system access is therefore part of the definition of being on this list,
+          so any difference in BHW coverage between listed and unlisted barangays is{" "}
+          <strong>partly definitional rather than a discovery</strong>. That holds in both
+          directions: &ldquo;unserved barangays have fewer BHWs&rdquo; and &ldquo;unserved barangays
+          have more BHWs&rdquo; are equally circular as headlines.
         </p>
         <p className="mt-2 max-w-3xl text-sm">
           What this page can honestly ask is narrower:{" "}
@@ -141,7 +145,7 @@ export function BhwCoverageSection({
             <>
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <SideCard
-                  label="On the 2025 UUC for PHC list"
+                  label={`On the ${listYear} UUC for PHC list`}
                   sublabel={`${formatCount(comparison.listed.nBarangays)} barangays`}
                   side={comparison.listed}
                   emphasis
@@ -203,7 +207,7 @@ export function BhwCoverageSection({
 
           {comparison.kind === "nothing-listed" && (
             <p className="mt-4 max-w-2xl text-sm text-muted">
-              No barangay in {areaLabel} is on the 2025 UUC for PHC list, so there are not two
+              No barangay in {areaLabel} is on the {listYear} UUC for PHC list, so there are not two
               groups to compare. That is a result, not missing data — the list is national and
               complete in a single publication.
             </p>
@@ -211,8 +215,9 @@ export function BhwCoverageSection({
 
           {comparison.kind === "all-listed" && (
             <p className="mt-4 max-w-2xl text-sm text-muted">
-              Every barangay in {areaLabel} is on the 2025 UUC for PHC list, so there is no other
-              group to compare it against. Its coverage figures are the area&rsquo;s own, which the{" "}
+              Every barangay in {areaLabel} is on the {listYear} UUC for PHC list, so there is no
+              other group to compare it against. Its coverage figures are the area&rsquo;s own,
+              which the{" "}
               <Link href={coverageHref} className="underline hover:text-accent">
                 coverage page
               </Link>{" "}

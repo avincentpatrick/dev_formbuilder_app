@@ -1,4 +1,5 @@
 import { DATASET_SLUGS } from "@/lib/db/dataset";
+import { EDITION_PARAM, UUC_EDITIONS, editionByYear } from "@/lib/uuc-phc/editions";
 
 /**
  * Which dataset a page is about, for `feedback.dataset_slug` (plan U6).
@@ -34,7 +35,22 @@ export function datasetSlugForPath(pagePath: string | null | undefined): string 
   // answer, and `/bhwx` must not match `/bhw`.
   const path = pagePath.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
   for (const { prefix, slug } of SECTIONS) {
-    if (path === prefix || path.startsWith(`${prefix}/`)) return slug;
+    if (path === prefix || path.startsWith(`${prefix}/`)) {
+      return prefix === "/uuc-phc" ? uucEditionSlug(pagePath) : slug;
+    }
   }
   return null;
+}
+
+/**
+ * The UUC for PHC section shows one edition at a time: `?edition=<year>` names it, and no parameter
+ * means the newest. A correction is about the list that was on screen, so it is tagged with that
+ * edition. "The newest" is the newest the code knows of — the one the section opens on wherever it
+ * is loaded; the column is not a foreign key and records intent, so that is the right answer even
+ * on a database that has not loaded it.
+ */
+function uucEditionSlug(pagePath: string): string {
+  const query = pagePath.split("#", 1)[0].split("?")[1] ?? "";
+  const year = new URLSearchParams(query).get(EDITION_PARAM);
+  return (editionByYear(year) ?? UUC_EDITIONS[0]).slug;
 }

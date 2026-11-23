@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import { getChildGeos } from "./geo";
 
 /**
@@ -245,8 +245,8 @@ export function toBarangayDetail(row: Row, geoName: string): UucPhcBarangayDetai
  * barangays are listed.
  */
 export const getUucPhcBarangayDetails = cache(
-  async (citymunCode: string): Promise<UucPhcBarangayDetail[]> => {
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+  async (citymunCode: string, slug: string): Promise<UucPhcBarangayDetail[]> => {
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return [];
 
     const barangays = await getChildGeos(citymunCode, "citymun");

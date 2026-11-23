@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { uucContextSentence, uucPhcAreaHref, type UucPhcCounts } from "@/lib/db/uuc-phc";
+import type { UucEdition } from "@/lib/uuc-phc/editions";
 
 /**
  * Cross-dataset context chip (plan §9 U12a): how much of the area a BHW page is describing sits
- * on the 2025 UUC for PHC list, linking through to the section.
+ * on the newest UUC for PHC list loaded, linking through to the section.
  *
  * Reads `agg_uuc_phc_counts` through the existing `getUucPhcCounts` — no new aggregate and no new
  * relation — which is what makes it cheap enough to put on every place. It is how a reader looking
@@ -17,8 +18,15 @@ import { uucContextSentence, uucPhcAreaHref, type UucPhcCounts } from "@/lib/db/
  * objection U12 makes to the choropleth. This is a pointer to another dataset, not a finding of
  * this one, so it stays on the page and off the slides.
  */
-export function UucPhcContextChip({ counts }: { counts: UucPhcCounts | null }) {
-  const sentence = uucContextSentence(counts);
+export function UucPhcContextChip({
+  counts,
+  edition,
+}: {
+  counts: UucPhcCounts | null;
+  /** The edition `counts` was read from — named in the sentence. */
+  edition: UucEdition;
+}) {
+  const sentence = uucContextSentence(counts, edition);
   if (!sentence || !counts) return null;
 
   return (

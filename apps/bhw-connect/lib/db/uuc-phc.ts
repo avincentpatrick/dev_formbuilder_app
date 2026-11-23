@@ -1,13 +1,16 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import { getChildGeos } from "./geo";
 import type { GeoLevel } from "@/lib/filters/schema";
+import { editionListName, type UucEdition } from "@/lib/uuc-phc/editions";
 
 /**
- * UUC for PHC 2025 — the 2025 list of Unserved and Underserved Communities for Primary Health
- * Care (DC No. 2025-0549; criteria per DOH AO No. 2020-0023), read per geo.
+ * UUC for PHC — the Department of Health's list of Unserved and Underserved Communities for
+ * Primary Health Care (criteria per DOH AO No. 2020-0023), read per geo for one edition. Every read
+ * takes the edition's `dim_dataset` slug (`lib/uuc-phc/editions.ts`); none defaults to a year, so a
+ * caller cannot show one edition's figures under another's heading by omission.
  *
  * This dataset is a *membership list*, not a measurement: a barangay is either on it or not. So
  * every figure here is one count against one denominator — `nListed` barangays out of `nBarangays`
@@ -28,7 +31,7 @@ import type { GeoLevel } from "@/lib/filters/schema";
 export type UucPhcCounts = {
   geoCode: string;
   geoLevel: GeoLevel;
-  /** Barangays in this area on the 2025 UUC for PHC list. */
+  /** Barangays in this area on the edition's UUC for PHC list. */
   nListed: number;
   /** Barangays in this area in total, from dim_geo — the share's denominator. */
   nBarangays: number;
@@ -63,9 +66,13 @@ export const UUC_PHC_BRAND_LABEL = "UUC for PHC";
  * number none of the figures on screen support. At national the two coincide, which is the case
  * the plan's example shows.
  */
-export function uucDeckCaption(counts: UucPhcCounts | null, areaLabel: string): string {
+export function uucDeckCaption(
+  counts: UucPhcCounts | null,
+  areaLabel: string,
+  edition: UucEdition,
+): string {
   const n = counts ? counts.nListed.toLocaleString() : "—";
-  return `N = ${n} listed barangays · ${areaLabel} · 2025 list (DC No. 2025-0549)`;
+  return `N = ${n} listed barangays · ${areaLabel} · ${edition.year} list (${edition.issuance})`;
 }
 
 /**
@@ -99,7 +106,10 @@ export function uucPhcAreaHref(geoLevel: GeoLevel, geoCode: string): string {
  * indistinguishable from one that failed to load, and a reader could not tell "none listed here"
  * from "we did not look".
  */
-export function uucContextSentence(counts: UucPhcCounts | null): string | null {
+export function uucContextSentence(
+  counts: UucPhcCounts | null,
+  edition: UucEdition,
+): string | null {
   // Null is a read failure *or* a level the aggregate does not cover — it stops at citymun, so a
   // barangay geo has no row. Neither is a statement about the area, so the chip makes none.
   if (!counts) return null;
@@ -107,9 +117,10 @@ export function uucContextSentence(counts: UucPhcCounts | null): string | null {
   if (counts.nBarangays <= 0) return null;
 
   const suffix = `of this area's ${counts.nBarangays.toLocaleString()} barangays`;
-  if (counts.nListed === 0) return `None ${suffix} are on the 2025 UUC for PHC list`;
-  if (counts.nListed === 1) return `1 ${suffix} is on the 2025 UUC for PHC list`;
-  return `${counts.nListed.toLocaleString()} ${suffix} are on the 2025 UUC for PHC list`;
+  const list = editionListName(edition);
+  if (counts.nListed === 0) return `None ${suffix} are on the ${list}`;
+  if (counts.nListed === 1) return `1 ${suffix} is on the ${list}`;
+  return `${counts.nListed.toLocaleString()} ${suffix} are on the ${list}`;
 }
 
 export type Row = {
@@ -142,8 +153,8 @@ export function toUucPhcCounts(row: Row): UucPhcCounts {
  * not an area with none listed, which is a real row reading 0. Per-request `cache()`d.
  */
 export const getUucPhcCounts = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<UucPhcCounts | null> => {
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+  async (geoCode: string, geoLevel: GeoLevel, slug: string): Promise<UucPhcCounts | null> => {
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();
@@ -169,10 +180,10 @@ export const getUucPhcCounts = cache(
  * citymun, since barangay rows would only restate the fact table.
  */
 export const getUucPhcChildren = cache(
-  async (parentCode: string, parentLevel: GeoLevel): Promise<UucPhcChild[]> => {
+  async (parentCode: string, parentLevel: GeoLevel, slug: string): Promise<UucPhcChild[]> => {
     if (parentLevel === "citymun" || parentLevel === "barangay") return [];
 
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return [];
 
     const children = await getChildGeos(parentCode, parentLevel);
@@ -207,32 +218,34 @@ export const getUucPhcChildren = cache(
  * *not* listed alongside those that are is the point: at this level the reader is looking at their
  * own town, and "which ones" is the actionable question. Ordered by name.
  */
-export const getUucPhcBarangays = cache(async (citymunCode: string): Promise<UucPhcBarangay[]> => {
-  const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
-  if (datasetId === null) return [];
+export const getUucPhcBarangays = cache(
+  async (citymunCode: string, slug: string): Promise<UucPhcBarangay[]> => {
+    const datasetId = await getDatasetIdBySlug(slug);
+    if (datasetId === null) return [];
 
-  const barangays = await getChildGeos(citymunCode, "citymun");
-  if (barangays.length === 0) return [];
+    const barangays = await getChildGeos(citymunCode, "citymun");
+    if (barangays.length === 0) return [];
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("fact_uuc_phc_barangay")
-    .select("geo_code")
-    .eq("dataset_id", datasetId)
-    .in(
-      "geo_code",
-      barangays.map((b) => b.geoCode),
-    );
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("fact_uuc_phc_barangay")
+      .select("geo_code")
+      .eq("dataset_id", datasetId)
+      .in(
+        "geo_code",
+        barangays.map((b) => b.geoCode),
+      );
 
-  if (error || !data) return [];
+    if (error || !data) return [];
 
-  const listed = new Set(data.map((row) => row.geo_code));
-  return barangays.map((b) => ({
-    geoCode: b.geoCode,
-    geoName: b.geoName,
-    listed: listed.has(b.geoCode),
-  }));
-});
+    const listed = new Set(data.map((row) => row.geo_code));
+    return barangays.map((b) => ({
+      geoCode: b.geoCode,
+      geoName: b.geoName,
+      listed: listed.has(b.geoCode),
+    }));
+  },
+);
 
 /**
  * Region + province `{ geoLevel, geoCode }` for `generateStaticParams` and the sitemap —
@@ -240,8 +253,10 @@ export const getUucPhcBarangays = cache(async (citymunCode: string): Promise<Uuc
  * province has a row (including those with none listed), so this is the full set.
  * Returns [] on any read failure.
  */
-export async function getUucPhcStaticParams(): Promise<{ geoLevel: GeoLevel; geoCode: string }[]> {
-  const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+export async function getUucPhcStaticParams(
+  slug: string,
+): Promise<{ geoLevel: GeoLevel; geoCode: string }[]> {
+  const datasetId = await getDatasetIdBySlug(slug);
   if (datasetId === null) return [];
 
   const supabase = createSupabaseServerClient();

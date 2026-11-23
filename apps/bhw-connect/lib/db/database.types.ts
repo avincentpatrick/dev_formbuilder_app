@@ -3647,6 +3647,93 @@ export type Database = {
         };
         Relationships: [];
       };
+      // The edition-aware views (20261124090400_uuc_phc_edition_views.sql).
+      ref_uuc_phc_quality_by_edition: {
+        Row: {
+          dataset_id: number | null;
+          n_barangays_capped: number | null;
+          n_barangays_multi_capped: number | null;
+          n_listed: number | null;
+          n_no_route_as_recorded: number | null;
+          n_no_route_if_recomputed: number | null;
+          n_score_disagreement: number | null;
+          n_score_understated: number | null;
+          n_values_capped: number | null;
+        };
+        Relationships: [];
+      };
+      ref_uuc_phc_benchmark_gaps_by_edition: {
+        Row: {
+          dataset_id: number | null;
+          finding: string | null;
+          kind: string | null;
+          n_affected: number | null;
+          n_listed_province: number | null;
+          province_code: string | null;
+          witness_value: number | null;
+        };
+        Relationships: [];
+      };
+      ref_uuc_phc_edition_pairs: {
+        Row: {
+          dataset_id: number | null;
+          slug: string | null;
+          prev_dataset_id: number | null;
+          prev_slug: string | null;
+        };
+        Relationships: [];
+      };
+      ref_uuc_phc_list_changes: {
+        Row: {
+          dataset_id: number | null;
+          prev_dataset_id: number | null;
+          change: string | null;
+          geo_code: string | null;
+          geo_name: string | null;
+          citymun_code: string | null;
+          citymun_name: string | null;
+          province_code: string | null;
+          province_name: string | null;
+          region_code: string | null;
+          region_name: string | null;
+          source_province: string | null;
+          source_citymun: string | null;
+          source_barangay: string | null;
+        };
+        Relationships: [];
+      };
+      ref_uuc_phc_indicator_changes: {
+        Row: {
+          dataset_id: number | null;
+          prev_dataset_id: number | null;
+          geo_code: string | null;
+          geo_name: string | null;
+          citymun_code: string | null;
+          citymun_name: string | null;
+          province_code: string | null;
+          province_name: string | null;
+          region_code: string | null;
+          region_name: string | null;
+          changed_indicators: string[] | null;
+        };
+        Relationships: [];
+      };
+      ref_uuc_phc_provincial_by_edition: {
+        Row: {
+          dataset_id: number | null;
+          province_code: string | null;
+          n_listed_barangays: number | null;
+          n_with_reference: number | null;
+          ref_imr: number | null;
+          ref_ufmr: number | null;
+          ref_fic: number | null;
+          ref_abr: number | null;
+          ref_pre_natal: number | null;
+          ref_sba: number | null;
+          ref_water: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       analysis_source_api: {

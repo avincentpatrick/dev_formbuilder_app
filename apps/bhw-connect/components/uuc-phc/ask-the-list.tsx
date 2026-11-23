@@ -15,8 +15,8 @@ import type { GeoLevel } from "@/lib/filters/schema";
  * typing a question about their own barangay. Rule 2 of `UUC_PHC_SYSTEM_PROMPT` is what makes the
  * answer land that way.
  */
-const UUC_STARTER_QUESTIONS = [
-  "How many barangays here are on the 2025 list?",
+const starterQuestions = (year: string) => [
+  `How many barangays here are on the ${year} list?`,
   "Which qualifying route did the most barangays here come in on?",
   "Why is a barangay on this list?",
 ];
@@ -25,10 +25,14 @@ export function AskTheList({
   geoCode,
   geoLevel,
   geoName,
+  listYear,
 }: {
   geoCode?: string;
   geoLevel?: GeoLevel;
   geoName?: string;
+  /** The edition on screen. The assistant reads every edition and answers about the newest unless
+   * asked about another (UUC_PHC_SYSTEM_PROMPT), so the questions name this page's year. */
+  listYear: string;
 }) {
   return (
     <ChatLauncher
@@ -36,8 +40,8 @@ export function AskTheList({
       geoCode={geoCode}
       geoLevel={geoLevel}
       geoName={geoName}
-      starterQuestions={UUC_STARTER_QUESTIONS}
-      introLine="Ask a question about the 2025 UUC for PHC list."
+      starterQuestions={starterQuestions(listYear)}
+      introLine={`Ask a question about the ${listYear} UUC for PHC list, or an earlier one.`}
       inputPlaceholder="Ask which barangays are listed, or how they qualified…"
       methodologyHref="/uuc-phc/methodology#ask"
     />

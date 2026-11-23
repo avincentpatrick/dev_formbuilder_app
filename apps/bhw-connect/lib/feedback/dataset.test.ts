@@ -2,11 +2,18 @@ import { describe, expect, it } from "vitest";
 import { datasetSlugForPath } from "./dataset";
 
 describe("datasetSlugForPath", () => {
-  it("routes the UUC for PHC section, at every depth", () => {
-    expect(datasetSlugForPath("/uuc-phc")).toBe("uuc-phc-2025");
-    expect(datasetSlugForPath("/uuc-phc/region/14")).toBe("uuc-phc-2025");
-    expect(datasetSlugForPath("/uuc-phc/citymun/1402706")).toBe("uuc-phc-2025");
-    expect(datasetSlugForPath("/uuc-phc/methodology")).toBe("uuc-phc-2025");
+  it("routes the UUC for PHC section, at every depth, to the newest edition by default", () => {
+    expect(datasetSlugForPath("/uuc-phc")).toBe("uuc-phc-2026");
+    expect(datasetSlugForPath("/uuc-phc/region/14")).toBe("uuc-phc-2026");
+    expect(datasetSlugForPath("/uuc-phc/citymun/1402706")).toBe("uuc-phc-2026");
+    expect(datasetSlugForPath("/uuc-phc/methodology")).toBe("uuc-phc-2026");
+  });
+
+  it("tags UUC feedback with the edition that was on screen", () => {
+    expect(datasetSlugForPath("/uuc-phc/citymun/1402706?edition=2025")).toBe("uuc-phc-2025");
+    expect(datasetSlugForPath("/uuc-phc?from=portal&edition=2025#regions")).toBe("uuc-phc-2025");
+    // An unknown year is not an edition: the section opened on the newest, so that is the answer.
+    expect(datasetSlugForPath("/uuc-phc?edition=1999")).toBe("uuc-phc-2026");
   });
 
   it("routes FHSIS feedback without matching unrelated prefixes", () => {
@@ -45,9 +52,9 @@ describe("datasetSlugForPath", () => {
   });
 
   it("ignores a trailing slash, a query string and a fragment", () => {
-    expect(datasetSlugForPath("/uuc-phc/")).toBe("uuc-phc-2025");
-    expect(datasetSlugForPath("/uuc-phc?from=portal")).toBe("uuc-phc-2025");
-    expect(datasetSlugForPath("/uuc-phc/region/14#regions")).toBe("uuc-phc-2025");
+    expect(datasetSlugForPath("/uuc-phc/")).toBe("uuc-phc-2026");
+    expect(datasetSlugForPath("/uuc-phc?from=portal")).toBe("uuc-phc-2026");
+    expect(datasetSlugForPath("/uuc-phc/region/14#regions")).toBe("uuc-phc-2026");
     expect(datasetSlugForPath("/explore?geoLevel=region")).toBeNull();
   });
 

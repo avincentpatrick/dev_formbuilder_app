@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { EditionLink as Link } from "@/components/uuc-phc/edition-link";
+import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
+import { getUucPhcCounts } from "@/lib/db/uuc-phc";
+import { getAvailableUucEditions } from "@/lib/db/uuc-phc-edition";
+import { formatCount } from "@/lib/format";
+
+// Per request: the editions and their totals are read, not typed (see "The published totals").
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Methodology",
   description:
-    "How the 2025 UUC for PHC list is defined — the physical and socio-economic criteria of DOH AO No. 2020-0023, the denominator, and how the 5,987 barangays were counted.",
+    "How the UUC for PHC list is defined — the physical and socio-economic criteria of DOH AO No. 2020-0023, the denominator, how each year's barangays were counted, and how the editions differ.",
 };
 
-export default function UucPhcMethodology() {
+export default async function UucPhcMethodology() {
+  const editions = await getAvailableUucEditions();
+  const totals = await Promise.all(
+    editions.map((e) => getUucPhcCounts(NATIONAL_GEO_CODE, "national", e.slug)),
+  );
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Methodology</h1>
@@ -17,9 +28,25 @@ export default function UucPhcMethodology() {
         <p className="text-muted">
           The <strong>Unserved and Underserved Communities for Primary Health Care</strong> list
           names the barangays a primary-health-care programme is meant to reach first. It is a
-          published list of places, not a survey of people — a barangay is either on it or not. The
-          2025 edition was issued under <strong>DC No. 2025-0549</strong>.
+          published list of places, not a survey of people — a barangay is either on it or not.
         </p>
+        <p className="text-muted">
+          The list is published every year, and this section carries each edition as its own
+          dataset: one year&rsquo;s figures are never mixed with another&rsquo;s. It opens on the
+          newest edition; the switch beside the title at the top of every page moves to an earlier
+          one and keeps you on the same page and place.
+        </p>
+        <ul className="ml-5 list-disc space-y-1 text-muted">
+          {editions.map((e, i) => {
+            const total = totals[i];
+            return (
+              <li key={e.slug}>
+                <strong>{e.year}</strong> — issued under {e.issuance}
+                {total ? `; ${formatCount(total.nListed)} barangays` : ""}.
+              </li>
+            );
+          })}
+        </ul>
         <p className="text-muted">
           The programme was formerly known as GIDA (Geographically Isolated and Disadvantaged Areas)
           and SEDA (Socio-Economically Disadvantaged Areas). Those names are superseded; the
@@ -78,9 +105,23 @@ export default function UucPhcMethodology() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">The published total</h2>
+        <h2 className="text-lg font-semibold">The published totals</h2>
+        {editions.some((e) => e.year === "2026") && (
+          <p className="text-muted">
+            <strong>2026.</strong> The 2026 list is loaded exactly as the source office published
+            it: its own national summary, region by region, is checked against the loaded barangays
+            before anything is written, with Sulu&rsquo;s 87 barangays under Region IX. Its
+            indicator values were cleaned with the same rules as 2025&rsquo;s, unchanged. Which
+            barangays joined and left the list since 2025 is on the{" "}
+            <Link href="/uuc-phc/changes" className="underline hover:text-accent">
+              changes page
+            </Link>
+            .
+          </p>
+        )}
         <p className="text-muted">
-          This dashboard publishes <strong>5,987</strong> barangays — the source office&rsquo;s
+          <strong>2025.</strong> This dashboard publishes <strong>5,987</strong> barangays for 2025
+          — the source office&rsquo;s
           final list, which is also the figure the 2027 Budget Cue Cards give for the same list as
           of DC No. 2025-0549. The two agree at every one of the 17 regions.
         </p>
@@ -98,10 +139,11 @@ export default function UucPhcMethodology() {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">One geography note</h2>
         <p className="text-muted">
-          Sulu was removed from BARMM in 2024. The source files Sulu&rsquo;s barangays under Region
-          IX by code while naming them under BARMM; this dashboard follows the source&rsquo;s own
-          region names, which keeps every regional count identical to the published table. Sulu
-          therefore appears under BARMM here.
+          Sulu was removed from BARMM in 2024 and is now part of Region IX. Both editions file
+          Sulu&rsquo;s 87 listed barangays under Region IX, and so does this dashboard, which keeps every
+          regional count identical to the published table. Sulu&rsquo;s codes in the app&rsquo;s
+          geography still begin 19066, while the source writes them 09066; the two are matched
+          one to one.
         </p>
       </section>
 
@@ -194,7 +236,7 @@ export default function UucPhcMethodology() {
         </p>
         <p className="text-muted">
           <strong>There is one question it will not answer, and the reason matters.</strong> This
-          dataset records which barangays are on the 2025 list. It does not record the assessment
+          dataset records which barangays are on each year&rsquo;s list. It does not record the assessment
           that put them there, and the barangays that were assessed and <em>not</em> listed are not
           in it at all. So it can tell you whether a barangay is listed and which of the recorded
           criteria its own values meet — and it cannot tell you whether a barangay <em>should</em>{" "}

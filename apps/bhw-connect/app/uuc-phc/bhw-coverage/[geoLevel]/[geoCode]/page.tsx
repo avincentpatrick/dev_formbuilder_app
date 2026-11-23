@@ -1,7 +1,9 @@
-import Link from "next/link";
+import { EditionLink as Link } from "@/components/uuc-phc/edition-link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
 import type { Metadata } from "next";
+import { defaultUucEdition, resolveUucEdition } from "@/lib/db/uuc-phc-edition";
+import { withEdition } from "@/lib/uuc-phc/editions";
 import { notFound } from "next/navigation";
 import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import {
@@ -20,6 +22,8 @@ import { BhwCoverageSection } from "@/components/uuc-phc/bhw-coverage-section";
 import { PresentationProvider } from "@/components/present/presentation-context";
 import { PresentButton } from "@/components/present/present-button";
 import { AskTheList } from "@/components/uuc-phc/ask-the-list";
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 // 1 hour. Region and province are prerendered from the coverage section's params; citymun renders
 // on demand. Same reasoning as the rest of the section.
@@ -43,7 +47,7 @@ type Params = { geoLevel: string; geoCode: string };
 // The same region and province set every other route in this section prerenders, from the same
 // helper: the four routes are one drill-down and should not differ in which areas are built ahead.
 export async function generateStaticParams() {
-  const params = await getUucPhcStaticParams();
+  const params = await getUucPhcStaticParams((await defaultUucEdition()).slug);
   return params.map((p) => ({ geoLevel: p.geoLevel, geoCode: p.geoCode }));
 }
 
@@ -58,11 +62,18 @@ async function loadGeo(params: Params) {
   return geo;
 }
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}): Promise<Metadata> {
   const geo = await loadGeo(await params);
   if (!geo) return { title: "Area not found" };
+  const { edition } = await resolveUucEdition(searchParams);
 
-  const coverage = await getUucBhwCoverage(geo.geoCode, geo.geoLevel);
+  const coverage = await getUucBhwCoverage(geo.geoCode, geo.geoLevel, edition.slug);
   const comparison = coverage?.comparison;
 
   // The description states which way the comparison points but never as a discovery — the page's
@@ -78,29 +89,37 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
           ? ` Listed barangays here carry fewer households per BHW than the rest of the area, mostly because they are smaller.`
           : ` The two groups carry the same households per BHW.`;
   } else if (comparison?.kind === "nothing-listed") {
-    detail = ` No barangay in ${geo.geoName} is on the 2025 list, so there is nothing to compare.`;
+    detail = ` No barangay in ${geo.geoName} is on the ${edition.year} list, so there is nothing to compare.`;
   }
 
   return {
     title: `BHW coverage and the list · ${geo.geoName}`,
     description:
-      `How BHW coverage in ${geo.geoName} compares between the barangays on the 2025 UUC for PHC list and every other barangay in the area.` +
+      `How BHW coverage in ${geo.geoName} compares between the barangays on the ${edition.year} UUC for PHC list and every other barangay in the area.` +
       `${detail} A consistency check, not a finding: UUC status is defined partly on distance to a health facility.`,
   };
 }
 
-export default async function UucPhcBhwCoverageAreaPage({ params }: { params: Promise<Params> }) {
+export default async function UucPhcBhwCoverageAreaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}) {
   const geo = await loadGeo(await params);
   if (!geo) notFound();
+  const { edition, defaultEdition } = await resolveUucEdition(searchParams);
+  const ed = (href: string) => withEdition(href, edition, defaultEdition);
 
   // A barangay is entirely listed or entirely not, so a barangay page would be one side and an
   // empty one. `/uuc-phc/barangay/*` 404s for the same reason.
   if (geo.geoLevel === "barangay") notFound();
 
   const [coverage, counts, children, ancestors] = await Promise.all([
-    getUucBhwCoverage(geo.geoCode, geo.geoLevel),
-    getUucPhcCounts(geo.geoCode, geo.geoLevel),
-    getUucBhwCoverageChildren(geo.geoCode, geo.geoLevel),
+    getUucBhwCoverage(geo.geoCode, geo.geoLevel, edition.slug),
+    getUucPhcCounts(geo.geoCode, geo.geoLevel, edition.slug),
+    getUucBhwCoverageChildren(geo.geoCode, geo.geoLevel, edition.slug),
     getGeoAncestors(geo.geoCode, geo.geoLevel),
   ]);
 
@@ -112,7 +131,7 @@ export default async function UucPhcBhwCoverageAreaPage({ params }: { params: Pr
     pageLabel: "BHW coverage and the list",
     areaName: geo.geoName,
     filterChips: crumbAncestors.map((a) => a.geoName),
-    captionLine: uucDeckCaption(counts, geo.geoName),
+    captionLine: uucDeckCaption(counts, geo.geoName, edition),
     brandLabel: UUC_PHC_BRAND_LABEL,
   };
 
@@ -124,11 +143,11 @@ export default async function UucPhcBhwCoverageAreaPage({ params }: { params: Pr
         <Breadcrumbs
           items={[
             PORTAL_CRUMB,
-            UUC_PHC_CRUMB,
-            { label: "BHW coverage", href: "/uuc-phc/bhw-coverage" },
+            { ...UUC_PHC_CRUMB, href: ed(UUC_PHC_CRUMB.href ?? "/uuc-phc") },
+            { label: "BHW coverage", href: ed("/uuc-phc/bhw-coverage") },
             ...crumbAncestors.map((a) => ({
               label: a.geoName,
-              href: `/uuc-phc/bhw-coverage/${a.geoLevel}/${a.geoCode}`,
+              href: ed(`/uuc-phc/bhw-coverage/${a.geoLevel}/${a.geoCode}`),
             })),
             { label: geo.geoName },
           ]}
@@ -144,6 +163,7 @@ export default async function UucPhcBhwCoverageAreaPage({ params }: { params: Pr
 
         {coverage ? (
           <BhwCoverageSection
+            listYear={edition.year}
             coverage={coverage}
             areaLabel={geo.geoName}
             childHeading={CHILD_HEADING[geo.geoLevel]}
@@ -162,7 +182,12 @@ export default async function UucPhcBhwCoverageAreaPage({ params }: { params: Pr
           </div>
         )}
 
-        <AskTheList geoCode={geo.geoCode} geoLevel={geo.geoLevel} geoName={geo.geoName} />
+        <AskTheList
+          geoCode={geo.geoCode}
+          geoLevel={geo.geoLevel}
+          geoName={geo.geoName}
+          listYear={edition.year}
+        />
       </div>
     </PresentationProvider>
   );

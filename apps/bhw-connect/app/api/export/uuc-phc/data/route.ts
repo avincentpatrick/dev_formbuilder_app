@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { geoLevelSchema } from "@/lib/filters/schema";
-import { DATASET_SLUGS, getDatasetBySlug } from "@/lib/db/dataset";
+import { getDatasetBySlug } from "@/lib/db/dataset";
+import { resolveUucEdition } from "@/lib/db/uuc-phc-edition";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getUucPhcCounts } from "@/lib/db/uuc-phc";
 import { getUucPhcListRows, isExportableLevel } from "@/lib/db/uuc-phc-list";
@@ -55,6 +56,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid export parameters" }, { status: 400 });
   }
   const { geoCode, geoLevel, format } = parsed.data;
+  // `?edition=<year>`, as the page that linked here shows; absent, the default (newest) edition.
+  const { edition } = await resolveUucEdition(Object.fromEntries(searchParams));
 
   // The section publishes nothing at barangay grain — `/uuc-phc/barangay/*` 404s, because a
   // barangay's answer is a single yes/no. A one-row export would be that same non-answer.
@@ -67,9 +70,9 @@ export async function GET(request: Request) {
 
   const [geo, counts, dataset, rows] = await Promise.all([
     getGeoByCode(geoCode),
-    getUucPhcCounts(geoCode, geoLevel),
-    getDatasetBySlug(DATASET_SLUGS.uucPhc),
-    getUucPhcListRows(geoCode, geoLevel),
+    getUucPhcCounts(geoCode, geoLevel, edition.slug),
+    getDatasetBySlug(edition.slug),
+    getUucPhcListRows(geoCode, geoLevel, edition.slug),
   ]);
 
   // No counts row means no such area (or a failed read of the aggregate) — the same 404 the PNG
@@ -104,6 +107,7 @@ export async function GET(request: Request) {
     sourceName: dataset?.sourceName ?? null,
     license: dataset?.license ?? null,
     asOfDate: dataset?.asOfDate ?? null,
+    edition,
     retrievedAt: new Date().toISOString(),
   };
   const filename = uucPhcExportFilename(meta, format);

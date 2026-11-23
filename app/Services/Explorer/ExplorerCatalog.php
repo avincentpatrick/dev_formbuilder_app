@@ -8,6 +8,7 @@ use App\Exceptions\Explorer\InvalidExplorerQueryException;
 use App\Models\Form;
 use App\Models\User;
 use App\Services\Explorer\Sources\ActivitySource;
+use App\Services\Explorer\Sources\AgreementSource;
 use App\Services\Explorer\Sources\AnswersSource;
 use App\Services\Explorer\Sources\DeliveriesSource;
 use App\Services\Explorer\Sources\ExplorerFormReach;
@@ -40,6 +41,8 @@ final class ExplorerCatalog
         AnswersSource::class,
         // M247 (`D231`): a grid, row by row.
         GridRowsSource::class,
+        // M250 (`D234`): how far a form's respondents agree, question by question.
+        AgreementSource::class,
         FormsSource::class,
         MembersSource::class,
         ActivitySource::class,
@@ -84,6 +87,11 @@ final class ExplorerCatalog
 
         if (! $source->allows($user)) {
             throw InvalidExplorerQueryException::sourceForbidden(strtolower($source->label()));
+        }
+
+        // M250 (`D234`): a source offers only the charts it can fill — the agreement source its list, and no other source that list.
+        if (! in_array($query->chart, $source->charts(), true)) {
+            throw InvalidExplorerQueryException::chartNotAllowed($query->chart->label(), strtolower($source->label()));
         }
 
         // M247 (`D231`): only a source that counts a grid's rows reads a grid, and it reads only a grid it names.

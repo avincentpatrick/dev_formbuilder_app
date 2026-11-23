@@ -86,6 +86,9 @@ final readonly class ExplorerQuery
         // M247 (`grid-wide-sticky-explorer`, `D231`): the grid whose rows a "Rows of a grid" chart counts; null for every
         // other source. Added last and stored only when set, so every chart saved before it reads and hashes as it did.
         public ?string $grid = null,
+        // M250 (`agreement-report`, `D234`): what an agreement list counts; null for every other chart. Stored only when
+        // set, as `grid` is, so `SCHEMA_VERSION` stays 1 (ADR-0025 §D10).
+        public ?ExplorerAgreement $agreement = null,
     ) {
         if (! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
             throw InvalidExplorerQueryException::unknownTimezone($timezone);
@@ -147,6 +150,7 @@ final readonly class ExplorerQuery
             'sort' => $this->sort->value,
             'limit' => $this->limit,
             ...($this->grid !== null ? ['grid' => $this->grid] : []),
+            ...($this->agreement !== null ? ['agreement' => $this->agreement->toArray()] : []),
         ];
     }
 
@@ -207,6 +211,7 @@ final readonly class ExplorerQuery
             sort: $sort,
             limit: (int) $limit,
             grid: $grid === '' ? null : $grid,
+            agreement: ($data['agreement'] ?? null) === null ? null : ExplorerAgreement::fromArray($data['agreement']),
         );
     }
 
@@ -226,6 +231,13 @@ final readonly class ExplorerQuery
 
         if (count($this->filters) > self::MAX_FILTERS) {
             throw InvalidExplorerQueryException::tooMany('filters', self::MAX_FILTERS);
+        }
+
+        // M250 (`D234`): an agreement list counts answers per item, so it has its own shape — and only it carries one.
+        if ($this->chart === ExplorerChartType::Agreement || $this->agreement !== null) {
+            $this->assertAgreementShape();
+
+            return;
         }
 
         if ($this->measures === []) {
@@ -264,6 +276,26 @@ final readonly class ExplorerQuery
             if ($measure->aggregate->needsField() && $measure->field === null) {
                 throw InvalidExplorerQueryException::measureNeedsField(strtolower($measure->aggregate->label()));
             }
+        }
+    }
+
+    /** An agreement list names what it counts, and takes no group-by, no value and no grid of its own. */
+    private function assertAgreementShape(): void
+    {
+        if ($this->chart !== ExplorerChartType::Agreement) {
+            throw InvalidExplorerQueryException::malformed('only an agreement list names questions to agree on');
+        }
+
+        if ($this->agreement === null) {
+            throw InvalidExplorerQueryException::agreementShape('needs at least one question to report on');
+        }
+
+        if ($this->dimensions !== [] || $this->measures !== []) {
+            throw InvalidExplorerQueryException::agreementShape('takes no group-by and no value');
+        }
+
+        if ($this->grid !== null) {
+            throw InvalidExplorerQueryException::agreementShape('names its tables among its questions, not as a grid of its own');
         }
     }
 

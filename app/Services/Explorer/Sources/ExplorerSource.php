@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Explorer\Sources;
 
+use App\Enums\ExplorerChartType;
 use App\Models\Form;
 use App\Models\User;
 use App\Support\Explorer\ExplorerField;
@@ -32,6 +33,14 @@ interface ExplorerSource
 
     /** What one row is called, plural, as in "Count of responses". */
     public function rowNoun(): string;
+
+    /**
+     * The chart types this source can fill (M250, `D234`). Every source but one offers every chart that groups and
+     * counts; the agreement source offers only its list, and no other source offers that list.
+     *
+     * @return list<ExplorerChartType>
+     */
+    public function charts(): array;
 
     /** Whether a chart on this source must name a form. */
     public function requiresForm(): bool;

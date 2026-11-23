@@ -151,6 +151,30 @@ final class InvalidExplorerQueryException extends InvalidArgumentException
         return new self("That range has {$periods} periods, more than the {$max} a chart can show. Group by a longer period or shorten the range.", 'too_many_periods');
     }
 
+    /** M250 (`D234`): a source offers only the chart types it can fill — the agreement source only its list. */
+    public static function chartNotAllowed(string $chart, string $source): self
+    {
+        return new self("“{$chart}” is not offered for {$source}.", 'chart_not_allowed');
+    }
+
+    /** M250: an agreement list's own rules — what it names, its threshold, its minimum number of views. */
+    public static function agreementShape(string $detail): self
+    {
+        return new self("An agreement list {$detail}.", 'chart_shape');
+    }
+
+    /** M250: a picked question is gone from the form, is marked personal or sensitive, or is not a choice any more. */
+    public static function unknownItem(string $pick): self
+    {
+        return new self("'{$pick}' is not a question this agreement list can report on any more. Open the list and choose its questions again.", 'unknown_item');
+    }
+
+    /** M250: so many answers that reading only some would change which answer is the most common. */
+    public static function tooManyAnswers(int $max): self
+    {
+        return new self('These questions hold more than '.number_format($max).' different answers between them. Report on fewer questions at a time.', 'too_many_answers');
+    }
+
     /** Machine-readable, so the page can branch on it without parsing the sentence. */
     public function reason(): string
     {

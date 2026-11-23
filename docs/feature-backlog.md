@@ -2262,7 +2262,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `PROGRESS_ARCHIVE.md` keeps what was believed at the time.
   ⚠️⚠️ **AND THIS INCREMENT REPRODUCED THE VERY DEFECT CLASS IT CLOSES — FOUR TIMES, IN ITS OWN PROSE.**
   A +59-line §D32 and a +10-line middleware docblock invalidated M7's own `0016:238`, its `0019:37` /
-  `ACCESS-MATRIX.md:413` evidence list, **and two LIVE rows in this file that M7 never read** — one of
+  `ACCESS-MATRIX.md` evidence list (its "And a Free tenant reaches neither route" note; number dropped by `M250`: an inserted row moved it), **and two LIVE rows in this file that M7 never read** — one of
   them `EnforceTenantTwoFactor.php:33-52`, the sole evidence for the *enrolment-nudge* argument §D32
   leans on twice. M7 had explicitly checked which citations its insertion would move and answered
   *"nothing else moves"* — true of the citations that already existed, and silent about the ones the same

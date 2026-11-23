@@ -211,7 +211,8 @@ const position = computed(() => {
  * pages before the first chapter have no name here.
  */
 const chapter = computed(() => {
-    const chapters = chaptersOf(props.model.sections, steps.value, runtime.locale.value);
+    // The builder holds no chapter translations (`draft-snapshot.ts`), so the form's own language is the only one.
+    const chapters = chaptersOf(props.model.sections, steps.value, props.model.form.default_locale);
 
     return chapters === null ? null : (chapterOfStep(chapters, step.value?.key)?.chapter.name ?? null);
 });

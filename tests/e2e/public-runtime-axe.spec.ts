@@ -237,10 +237,12 @@ for (const theme of themes) {
         await forceTheme(page, theme);
 
         const district = page.getByLabel('District visited');
-        await expect(district.locator('option:not([disabled])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
+        // M249 (`dropdown-cannot-clear`): an optional dropdown's empty choice can be chosen to clear it, so the choices are
+        // the enabled options that have a value.
+        await expect(district.locator('option:not([disabled]):not([value=""])')).toHaveText(['Malate', 'Sampaloc', 'Tondo']);
         await district.selectOption('Sampaloc');
         // M184 (`R-3e7c81bb`): a Dropdown whose choices came from a list file at publish — plain choices in the schema.
-        await expect(page.getByLabel('Facility visited').locator('option:not([disabled])')).toHaveText(['Malate BHS', 'Poblacion BHS', 'San Jose RHU']);
+        await expect(page.getByLabel('Facility visited').locator('option:not([disabled]):not([value=""])')).toHaveText(['Malate BHS', 'Poblacion BHS', 'San Jose RHU']);
         await assertClean(page, 'Field Visit Referral (linked choices)');
     });
 }

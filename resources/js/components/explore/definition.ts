@@ -5,7 +5,7 @@
 // builder never SENDS one the server would refuse for a reason the reader did not cause — switching to a
 // donut with two group-bys chosen, changing the form under a chart that names another form's question.
 
-import type { Aggregate, ChartOption, Definition, Field, FieldType, FilterOperator, Source } from './types';
+import type { Aggregate, AgreementPick, AgreementSpec, ChartOption, Definition, Field, FieldType, FilterOperator, Source } from './types';
 
 const DAY_MS = 86_400_000;
 
@@ -91,8 +91,42 @@ export function fieldGroups(
     return groups;
 }
 
-/** The chart a reader sees first on a source: its rows counted by its first groupable, non-date field. */
-export function newDefinition(source: Source, timezone: string, today: string): Definition {
+/** M250 (`D234`): a source whose only chart is the agreement list — it lists questions instead of grouping a field. */
+export function isAgreementSource(source: Source | undefined): boolean {
+    return source?.charts !== undefined && source.charts.length > 0 && source.charts.every((chart) => chart === 'agreement');
+}
+
+/** M250: the list a new agreement report opens with — no question yet, the server's threshold and minimum. */
+export function newAgreement(defaults: { threshold: number; min_views: number } = { threshold: 75, min_views: 6 }): AgreementSpec {
+    return { items: [], leave_out: [], agreeing: [], threshold: defaults.threshold, min_views: defaults.min_views };
+}
+
+/**
+ * The chart a reader sees first on a source: its rows counted by its first groupable, non-date field. On the agreement
+ * source (M250) it is an empty agreement list instead, which takes no group-by and no value.
+ */
+export function newDefinition(
+    source: Source,
+    timezone: string,
+    today: string,
+    agreementDefaults?: { threshold: number; min_views: number },
+): Definition {
+    if (isAgreementSource(source)) {
+        return {
+            source: source.key,
+            form_id: null,
+            chart: 'agreement',
+            dimensions: [],
+            measures: [],
+            filters: [],
+            ...rangeEnding(today, source.default_range_days),
+            timezone,
+            sort: 'value_desc',
+            limit: 10,
+            agreement: newAgreement(agreementDefaults),
+        };
+    }
+
     const first = source.fields.find((f) => isGroupable(f) && !isTemporal(f.type) && f.type !== 'multi_category');
 
     return {
@@ -128,6 +162,21 @@ export function dropUnknownFields(definition: Definition, fields: Field[]): Defi
 }
 
 /**
+ * M250: drop the picks a form does not offer any more — after the form under a list changed, or a question was marked
+ * personal since the list was saved. "Save changes" then lights up, and saving fixes the list.
+ */
+export function dropUnknownPicks(definition: Definition, picks: AgreementPick[]): Definition {
+    const agreement = definition.agreement ?? null;
+
+    if (agreement === null) return definition;
+
+    const known = new Set(picks.map((pick) => pick.value));
+    const items = agreement.items.filter((item) => known.has(item));
+
+    return items.length === agreement.items.length ? definition : { ...definition, agreement: { ...agreement, items } };
+}
+
+/**
  * Make a declaration fit a chart type: trim the group-bys and values it cannot draw, and give it a group-by
  * when it needs one and has none.
  */
@@ -160,6 +209,10 @@ export function incompleteReason(definition: Definition, source: Source | undefi
     if (source === undefined) return 'Choose a data source.';
     if (source.requires_form && definition.form_id === null) return 'Choose the form whose answers to chart.';
     if (source.requires_grid === true && (definition.grid ?? null) === null) return 'Choose the grid whose rows to count.';
+
+    // M250: an agreement list names questions, not a group-by or a value.
+    const agreement = definition.chart === 'agreement' ? (definition.agreement ?? null) : undefined;
+    if (agreement === null || (agreement !== undefined && agreement.items.length === 0)) return 'Choose the questions to report on.';
 
     const byKey = new Map(fields.map((f) => [f.key, f]));
 
@@ -216,8 +269,13 @@ export function sameDefinition(a: Definition, b: Definition): boolean {
 
 /** The body the server reads: the declaration without the version key, which it alone writes. */
 export function toPayload(definition: Definition): Definition {
-    const { v: _version, grid, ...rest } = definition;
+    const { v: _version, grid, agreement, ...rest } = definition;
 
     // M247: the server stores a grid only when one is named, so an unnamed one is no key at all, here as there.
-    return grid === undefined || grid === null ? rest : { ...rest, grid };
+    // M250: and an agreement list only on its own chart, the same way.
+    return {
+        ...rest,
+        ...(grid === undefined || grid === null ? {} : { grid }),
+        ...(agreement === undefined || agreement === null ? {} : { agreement }),
+    };
 }

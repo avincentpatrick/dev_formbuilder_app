@@ -6,6 +6,7 @@
 // differently.
 import { computed } from 'vue';
 import { MdsEmptyState, MdsSkeleton } from '@meridian/design-system';
+import ExploreAgreementTable from './ExploreAgreementTable.vue';
 import ExploreChart from './ExploreChart.vue';
 import { disclosures, rangeSentence } from './result-view';
 import type { Refusal, Result } from './types';
@@ -44,7 +45,9 @@ const range = computed(() => (props.result === null ? '' : rangeSentence(props.r
         <template v-else-if="result !== null">
             <p class="explore-result__range">{{ range }}</p>
 
-            <ExploreChart :result="result" :title="title" :show-table="showTable" />
+            <!-- M250 (`D234`): an agreement list is a list of items, not a chart of groups. -->
+            <ExploreAgreementTable v-if="result.agreement !== undefined" :list="result.agreement" :title="title" :compact="compact" />
+            <ExploreChart v-else :result="result" :title="title" :show-table="showTable" />
 
             <ul v-if="notes.length > 0 && !compact" class="explore-result__notes">
                 <li v-for="note in notes" :key="note">{{ note }}</li>

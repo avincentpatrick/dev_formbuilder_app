@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\PlanTier;
+use App\Models\ExplorerChart;
 use App\Models\Form;
 use App\Models\FormField;
 use App\Models\FormSection;
@@ -19,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Support\Nhete\NheteAgreementTally;
 use Tests\Support\Nhete\NheteAnswers;
 use Tests\Support\Nhete\NheteBuilderDriver;
 use Tests\Support\Nhete\NhetePlan;
@@ -218,4 +221,71 @@ it('builds NHETE with its tables as grids, publishes it, and takes and refuses r
     expect($answered)->toBeGreaterThan(0)
         ->and($byKeep['totals']['rows'])->toBe($answered)
         ->and($counted)->toBe($kept);
+
+    // ── 9. M250 (`D234`): the agreement list — the short list NHETE's meeting approves in one step ────────────────
+    // Eight more respondents who disagree about something, then the module's own rule: "No view or opinion" left out,
+    // "Agree" counted as agreeing where it is offered (each other question's most common answer elsewhere), 75%, six views.
+    foreach (NheteAgreementTally::variants(NheteAnswers::scenario($plan)) as $index => $answers) {
+        $response = $submit($answers);
+        expect($response->status())->toBe(201, "variant {$index}: ".mb_substr((string) $response->getContent(), 0, 1500));
+    }
+
+    enterTenant($tenant->id, $admin->id);
+    assignPlanTier(PlanTier::Business);
+    $picks = ['grid:tor:agree', 'grid:rule:agree', 'grid:rf:agree'];
+    foreach (['a', 'b', 'c', 'd'] as $domain) {
+        $picks[] = 'grid:'.NhetePlan::indicatorGrid($domain).':use';
+        $picks[] = 'grid:'.NhetePlan::indicatorGrid($domain).':cut';
+    }
+    foreach (['q3_4', 'qm02', 'qm04', 'qm05', 'qm07a', 'qm07b', 'qm07c', 'qs01', 'q3_1'] as $key) {
+        $picks[] = "answer:{$key}";
+    }
+    $definition = [
+        'source' => 'agreement', 'form_id' => (string) $form->id, 'chart' => 'agreement', 'dimensions' => [], 'measures' => [], 'filters' => [],
+        'from' => CarbonImmutable::now('UTC')->subDay()->toDateString(), 'to' => CarbonImmutable::now('UTC')->addDay()->toDateString(), 'timezone' => 'UTC',
+        'agreement' => ['items' => $picks, 'leave_out' => ['noview'], 'agreeing' => ['agree'], 'threshold' => 75, 'min_views' => 6],
+    ];
+    $list = app(ExplorerQueryRunner::class)->run(ExplorerQuery::fromArray($definition), $admin)['agreement'];
+    $lines = array_column($list['items'], null, 'key');
+    $documents = SubmissionAnswer::query()
+        ->whereIn('submission_id', Submission::query()->countable()->where('form_id', $form->id)->pluck('id'))
+        ->pluck('answers')
+        ->all();
+    $tally = NheteAgreementTally::tally($documents, $list['items'], ['noview'], ['agree'], 75, 6);
+    $counted = array_map(static fn (array $line): array => array_intersect_key($line, array_flip(['responses', 'views', 'agreeing', 'status'])), $lines);
+
+    // Six indicators have no cut-off, so the four cut-off columns put 29 of the 35 rows on the list.
+    expect($documents)->toHaveCount(12)
+        ->and(array_filter(array_keys($lines), static fn (string $key): bool => str_ends_with($key, '.cut')))->toHaveCount(29)
+        ->and($counted)->toBe($tally)
+        ->and($lines['tor.t01.agree'])->toMatchArray(['views' => 12, 'agreeing' => 12, 'status' => 'short_list'])
+        ->and($lines['tor.t02.agree'])->toMatchArray(['views' => 5, 'left_out' => 7, 'status' => 'too_few'])
+        ->and($lines['tor.t03.agree'])->toMatchArray(['views' => 12, 'agreeing' => 4, 'share' => 33.3, 'status' => 'discuss', 'basis' => 'agreeing'])
+        ->and($lines["{$a}.a01.use"])->toMatchArray(['views' => 12, 'agreeing' => 6, 'share' => 50, 'status' => 'discuss', 'basis' => 'most_common'])
+        ->and($lines["{$a}.a07.use"])->toMatchArray(['views' => 4, 'status' => 'too_few'])
+        ->and($lines['qm07b'])->toMatchArray(['responses' => 12, 'views' => 0, 'left_out' => 12, 'status' => 'too_few'])
+        ->and($lines['q3_4'])->toMatchArray(['views' => 10, 'agreeing' => 6, 'share' => 60, 'status' => 'discuss'])
+        ->and($lines['q3_1'])->toMatchArray(['multiple' => true, 'views' => 9, 'agreeing' => 9, 'status' => 'short_list']);
+
+    // The order a meeting reads it in: the short list highest first, then the rest most-disagreed first, then too few views.
+    $rank = ['short_list' => 0, 'discuss' => 1, 'too_few' => 2];
+    foreach (array_slice($list['items'], 1) as $index => $line) {
+        $before = $list['items'][$index];
+        expect($rank[$line['status']])->toBeGreaterThanOrEqual($rank[$before['status']]);
+        if ($line['status'] === $before['status'] && $line['status'] !== 'too_few') {
+            $cross = $line['agreeing'] * $before['views'] <=> $before['agreeing'] * $line['views'];
+            expect($line['status'] === 'short_list' ? $cross <= 0 : $cross >= 0)->toBeTrue("{$before['key']} then {$line['key']}");
+        }
+    }
+
+    // Saved as a list and downloaded, the file carries the same lines in the same order.
+    $this->actingAs($admin)->post("{$host}/explore/charts", ['name' => 'NHETE short list', 'definition' => $definition])->assertSessionHasNoErrors();
+    enterTenant($tenant->id, $admin->id);
+    $saved = ExplorerChart::query()->where('name', 'NHETE short list')->sole();
+    // openspout opens a CSV with a UTF-8 byte-order mark; the three bytes are named by code so no editor can lose them.
+    $csv = ltrim($this->actingAs($admin)->get("{$host}/explore/charts/{$saved->id}/export")->assertOk()->streamedContent(), chr(0xEF).chr(0xBB).chr(0xBF));
+    $file = array_map(static fn (string $row): array => str_getcsv($row, escape: ''), explode(chr(10), trim($csv)));
+    $labels = ['short_list' => 'On the short list', 'discuss' => 'To discuss', 'too_few' => 'Too few views'];
+    expect(array_column(array_slice($file, 1), 6))->toBe(array_column($list['items'], 'key'))
+        ->and(array_column(array_slice($file, 1), 1))->toBe(array_map(static fn (array $line): string => $labels[$line['status']], $list['items']));
 })->group('nhete');

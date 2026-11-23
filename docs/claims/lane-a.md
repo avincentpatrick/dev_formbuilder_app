@@ -16,7 +16,95 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M250`, `R-d39d73e4` (`agreement-report`): the Data Explorer lists how far respondents agree — per question, or per row of a question table, the share giving the same answer (or the answers a report counts as agreeing) out of those who gave a view, with chosen answers such as "No view or opinion" left out, a threshold and a minimum number of views, the short list first and the rest most-disagreed first, downloadable as CSV or Excel (m250-agreement-report)
+## Status: ACTIVE CLAIM — `M251`, `R-e6e340c0`, `R-a3918bf4` and `R-5e9f620f`: what this repository says about the testing box is checked against the box — a read-only probe of its Apache configuration and a judge that rules on the probe's output, the port-80 site sends `X-Robots-Tag` too, and the runbook stops saying what the off-repo checklist contains (m251-testing-box-config)
+
+Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/read-claude-md-run-the-curious-nest-of-c59a74b7-149e-4cf2-8ea4-b0ab96bb50ad.md`).
+Branch `m251-testing-box-config`, cut from origin/main at `ddbeb485`, PR into main, held green for a merge point (`D137`) and merged last, after #631. It touches none of the held chain's product files.
+Rows, the first three ready rows of the during-testing tier:
+- `R-e6e340c0`, *"This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can check, and one such assertion was false for at least one increment."*
+- `R-a3918bf4`, *"Everything this repository knows about the testing box's Apache configuration is prose no gate can read, and `M102` added four more sentences of it."*
+- `R-5e9f620f`, *"The testing site's port-80 vhost is outside the crawl-protection gate's reach entirely, and this repository recorded it as having no listener at all."*
+
+**Three rows in one PR: the first use of `D235`** (asked and answered in chat on 2026-11-23, while planning this increment): while merges wait for a merge point, rows whose fixes edit the same hub file may share one PR. All three rewrite `docs/deployment-infrastructure.md` §8.3, a hub. Split, three PRs would each edit it and conflict with one another at the merge point. The user first allowed the batch as a `D13` exception, but it would have been the third for the merge-point reason (after #9 and #10), and #10 says a third calls for an answer instead. So `D235` was asked, and there is no #11. Clause 1 holds: the rows share no non-hub file, because `R-5e9f620f`'s fix is a box edit and the judge `R-a3918bf4` adds is a new file.
+
+Skipped ready rows of the tier, and why:
+- `R-0ceefbb4`: already closed by held #580 (`M244`).
+- `R-4b57090b`: its missing input is a read of the box's access log (on the user's optional list), and no remedy can be chosen before it.
+- `R-2ca49f19`: it edits other hub files (`scripts/pipeline.php`, `next.php`, `state.php`), which `D235` does not let it share with §8.3.
+- `R-0e83f0e3`, `R-db5a14dd`: each needs bake-off samples before a rule is chosen.
+- `R-95dffd45`, `R-ddbf337d`, `R-7b52d58b`: they edit `XlsformExporter.php`, `Builder.vue` or `useBuilderStore.ts`, which six held PRs also edit. Taken after the merge point, they add no conflicts.
+
+### Evidence verified
+**`R-e6e340c0`**
+- *"`R-0855052e` and `docs/deployment-infrastructure.md` §8.3 both stated that the checklist tells the operator to read `md-status`"*: **moved.** `M101` corrected §8.3, which now says the reverse, and in doing so asserts what the checklist does contain (*"it already prescribes `(Get-ScheduledTask …).LastTaskResult` and `Get-Content …\certificate-activation.log -Tail 5`"*). That is the same kind of claim.
+- *"Thirty tracked prose references to it exist"*: **moved.** 44 tracked lines in 12 files name it today, and only **two passages** assert what it contains: §8.2 step 10 (*"the Testing Server Checklist's "remove the hosts entry" step is wrong and is corrected there too"*) and §8.3's `md-status` paragraph. The rest are the obligation to send it (`CLAUDE.md`, the notice lines in `scripts/state.php`, `pipeline.php` and `next.php`, the `testing-server-notified` marker in `PROGRESS.md`) or dated records in the ledger, the claim files, the archive and `decisions.md`, which are not rewritten (`M40`).
+
+**`R-a3918bf4`**
+- `M102`'s four sentences in §8.3: **three held, one gone.**
+  - On the tree: the location of `X-Robots-Tag` (`conf\extra\meridian.conf` at `:22`, inside the `*:443` vhost that opens at `:13`), and the global `ServerName localhost`.
+  - On the tree without its line number: the `*:80` vhost's `Redirect permanent` with no `Header` (its `:47` is gone).
+  - No longer in §8.3: the sentence saying the four includes are explicit filenames.
+- *"`git ls-files` returns exactly two web-server files"*: **held.** They are `docker/nginx/default.conf` and `public/.htaccess`, and no tracked file outside `apps/` holds a `VirtualHost`.
+- *"`scripts/staging-headers-judge.php` deliberately measures the RESPONSE"*: **held.**
+
+**`R-5e9f620f`**
+- `Listen 80`, and a `*:80` vhost in `conf\extra\httpd-vhosts.conf` that is a bare `Redirect permanent` with no `Header`: **held in §8.3** (the `*:80` paragraph and the HSTS section). `M102` measured it on 2026-09-19, and nobody has measured it since `D216`, whose step 4 re-pointed that redirect.
+- *"`scripts/staging-headers-judge.php` probes only `https://` URLs"*: **held.** It builds every probe as `'https://'.STAGING_HOST.$probe`.
+
+### Premise verified
+**`R-e6e340c0`: moved, further than the row knew.** The checklist (`claude.ai/code/artifact/f49fc4a0-3b24-4938-b4aa-3230510fe838`, read 2026-11-23 at version `1794203935-cdf8`) still describes `staging.pitahc.gov.ph`: the testers' address, the `pitahc.gov.ph/admin` console, `CENTRAL_DOMAIN=pitahc.gov.ph`, and `<MDomain staging.pitahc.gov.ph>` in B6. Its last edit was `M216`'s backup note (2026-11-09). `D216` moved the site on 2026-11-13 and left the page alone, so the page is no longer the operator's live surface either; §8 is. That the page lives outside the repository and no gate reads it: held.
+
+**`R-a3918bf4`: moved, and the row is worth more now.**
+- `D216` added a second `*:443` vhost, removed the old one and re-pointed the `*:80` redirect, so nobody has verified the line numbers §8.3 cites since 2026-11-13.
+- §8.3's three traps that take the site down or stop renewal are prose that nothing checks: `MDPrivateKeys secp256r1`, no `MDCertificateFile` inside `<MDomain>`, and keeping the vhost's certificate pair.
+- That the only instrument is a human pasting console output: held. The box is still the user's to drive, one guarded block at a time.
+
+**`R-5e9f620f`: held.**
+- Inbound 80 is still closed from outside: §8.2 says *"Inbound 80 stays closed"*, and `D216` forwarded only 443 to `121.58.210.233`.
+- The network does not hairpin (`M100`), so today only the box itself reaches the `*:80` vhost, through its hosts entries.
+- The exposure stays latent, and *"the day the firewall opens"* still describes when it becomes real.
+
+### Remedy verdict
+**`R-e6e340c0`: option (b) works, extended by the user's choice.**
+- The runbook stops asserting the checklist's contents. One sentence cites it by link, version and read date as the ungated record of the September 2026 build, with §8 as the runbook.
+- The page says the same about itself in a dated banner. In planning, the user chose a banner rather than a rewrite. It is added by `M98`'s method, so the page's two copies of its body stay identical.
+- Option (a), a version beside every claim, would keep claims that nobody re-reads.
+
+**`R-a3918bf4`: works as prescribed.**
+- `scripts/staging-config-probe.ps1` does the fetching, read-only, and `scripts/staging-config-judge.php` rules on its pasted output.
+- The judge uses the headers judge's three-way contract: 0 holds, 1 drifted, 2 not measured.
+- It recognises its input positively, by a signature line and an end count, so a truncated or foreign paste exits 2 rather than giving a false red or green.
+- Its expectations sit in constants, and its Pest floor has fixtures that a mutation can drive.
+- The expectations are §8.3's:
+  - the crawl header and HSTS where they belong;
+  - the three certificate traps;
+  - the `<MDomain>` name and its challenge type;
+  - the global `ServerName`;
+  - explicit includes;
+  - the `*:80` redirect.
+
+**`R-5e9f620f`: arm 2 cannot measure anything; arm 1 is the fix.**
+- An `http://` probe from CI would hit the closed port 80 and report "not measured" every night.
+- Arm 1 adds `Header always set X-Robots-Tag "noindex, nofollow, noarchive"` to the `*:80` vhost: the user backs the file up, runs `httpd -t` and restarts Apache. Both vhosts are then protected the same way.
+- The config judge above asserts the new line, and it is the only instrument that can see that vhost.
+
+Files:
+- **New:** `scripts/staging-config-probe.ps1`, `scripts/staging-config-judge.php`, `tests/Feature/Docs/StagingConfigJudgeTest.php`, `tests/fixtures/staging-config/*`.
+- **Docs:** `docs/deployment-infrastructure.md` (§8.2 step 10, §8.3), `docs/feature-backlog.md` (the three rows closed, plus the row `D235` files), `docs/pipeline.md` (regenerated), `docs/claims/decisions.md` (`D235`), `PROGRESS.md` (own block only).
+- **Off the repository:** one line in the box's `conf\extra\httpd-vhosts.conf`, run by the user, and the banner on the checklist artifact.
+
+Shared artefacts taken: the `docs/**` files above, `PROGRESS.md` (own block only).
+Paired files taken: none.
+Namespaces spent: `M251`, `D235`, nothing from the migration or ADR namespaces. No `VERSION` bump: no tester sees any of it.
+
+Prediction:
+- The first paste from the box is judged (exit 1), and the only drift is the `*:80` vhost's missing `X-Robots-Tag`. After the one-line change, the judge exits 0.
+  ⚠️ **The prediction most likely to be wrong:** the first paste is not judged at all (exit 2), because a console that wraps long lines, or a byte-order mark, breaks the format. Then the probe takes a second round.
+- `D216` moved the lines §8.3 cites, so `:22` and `:13` are no longer where the header and the vhost sit.
+- The `*:80` vhost still carries `ServerName staging.pitahc.gov.ph`, or none, because `D216`'s step 4 changed only its redirect.
+- Pest: the new file passes, and a committed mutation catches every family of expectations. PHPStan cannot move, because the diff is scripts and tests only. CI is green on the first run.
+
+## HELD — `M250`, `R-d39d73e4` (`agreement-report`): the Data Explorer lists how far respondents agree — per question, or per row of a question table, the share giving the same answer (or the answers a report counts as agreeing) out of those who gave a view, with chosen answers such as "No view or opinion" left out, a threshold and a minimum number of views, the short list first and the rest most-disagreed first, downloadable as CSV or Excel (m250-agreement-report) — BUILT AND HELD: PR #631, CI 45147143459 every job green with real step counts
 
 Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-7-prancy-rocket-of-26d345ab-6ce1-4fff-90ed-fcd5390f0633.md`). NHETE recommendation 7, the last of the NHETE plan's seven (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m250-agreement-report`, cut from `origin/m249-chapters-dropdown-labels` at `e9c9652c`, so it is **stacked on #626** (and through it on #610 and #597): the report reads a question table's cells, and `GridRowsSource`, `MatrixColumns`, `GridRules::NOT_NEEDED` and NHETE's TABLE layout exist only there; #626 is last in the held order, so the chain stays linear. `origin/main` is merged in for the claim files. PR into main, held after #626 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.28.0 → 0.29.0 (a feature) with its release notes**, kept on top when the held PRs merge first.

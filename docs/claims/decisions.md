@@ -24,10 +24,27 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D226`, the last filed, was asked and answered on 2026-11-14 in the planning of `M240`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D235`, the last filed, was asked and answered on 2026-11-23 in the planning of `M251`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D235 — While merges wait for a merge point, may rows whose fixes edit the same hub file share one PR? `D13` lets at most one row in a batch touch a hub, and the user had approved three exceptions for that one reason. **A — yes: rows whose fixes edit the same hub file may share one PR, with no exception entry; rows still may not share a non-hub file.**
+
+**Asked and answered 2026-11-23 (user decision, in chat), in the planning of `M251`.**
+
+It was asked because of `D13`'s exception log. #9 and #10 each paired rows because, as separate PRs, each pair would have added a deploy to the merge-point sitting and edited the same hub twice. `M251`'s three rows (`R-e6e340c0`, `R-a3918bf4`, `R-5e9f620f`) all rewrite `docs/deployment-infrastructure.md` §8.3. The user first allowed them as a third exception, but #10 says a third for that reason needs an answer instead.
+
+The options:
+- **A — rows editing the same hub file may share one PR (chosen, the session's recommendation).** This holds while merges wait for a merge point (`D137`), and needs no exception entry. Clause 1 is unchanged: no two rows may edit the same non-hub file. Rows that edit *different* hub files still go in separate PRs.
+- **B — the same section of one hub document only.** This is narrower. Anything wider would still need the user's OK each time.
+- **C — keep asking each time.** The rule stays as written, and every such batch is logged as an exception.
+
+**How it amends `D13`:** item 1's second clause now reads *"at most one row may touch a hub file, unless the rows that do all edit the same hub file — while merges wait for a merge point."* Items 2–5 are untouched: verification still fans out per row, and each row keeps its own `Evidence verified`, `Premise verified` and `Remedy verdict`. The exception log records `M251` as "There is no #11".
+
+**What it creates:**
+- One row, `d235-generator-wording`, tier `during-testing`, filed by `M251` on its branch. Two generators still restate the old clause, word for word, in the line's Next section (`scripts/pipeline.php`) and in the hand-off (`scripts/next-section.php`).
+- `M251` itself, as the answer's first use.
+
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**
 
 **Asked and answered 2026-11-14 (user decision, in chat), in the planning of `M240`.**
@@ -4125,6 +4142,8 @@ saving**, and the saving comes entirely out of overhead rather than out of verif
 
 1. **Batch 3–4 rows per increment.** Selection is a file-overlap check, not a scheduling problem: **no
    two rows in a batch may cite the same non-hub file, and at most one row may touch a hub file.**
+   ⚠️ **Amended by `D235` (2026-11-23):** while merges wait for a merge point, rows whose fixes all edit
+   the same hub file may share one PR. Rows editing *different* hubs still may not.
 2. **Verification fans out; it does not compress.** Read-only subagents over disjoint rows, and the
    claim carries **`Evidence verified` and `Remedy verdict` once per row, never merged into one
    paragraph.** ⛔ That is the whole point: a row's evidence and its remedy are separately trustworthy —
@@ -4265,6 +4284,10 @@ So two rows edit the same files, and both touch a hub. `R-b31f421e` rewrites how
 **Why:** the merge point, as for #9, and one more. Both rows land in a single regeneration of `openapi.json`. As two PRs, the second would regenerate the file the first had just changed, and each would be one more deploy for the sitting.
 
 **Disposition:** the user chose to pair them, in chat on 2026-11-08, in the same answer as #9. Recorded in both places this log requires: inline at the closed rows and in `PROGRESS.md`'s release paragraph. This is the second exception for the merge-point reason, so the escalation rule is not engaged yet. A third for that reason means the rule needs an answer instead: file a decision about batching while merges wait for a merge point.
+
+##### There is no #11 — `M251` (2026-11-23) tripped the escalation, and `D235` is the answer
+
+`M251` takes three rows that all rewrite `docs/deployment-infrastructure.md` §8.3, a hub, so it breached item 1's second clause. The user first allowed the batch in chat as an exception. That would have been the third for the merge-point reason, so, as #10 says, `M251` asked a decision instead. **`D235` (user decision, in chat): while merges wait for a merge point, rows whose fixes edit the same hub file may share one PR.** `M251` is its first use, and is not a deviation. The log resumes at #11 for any deviation after that.
 
 ---
 

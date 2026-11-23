@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.28.0",
+        "title": "Chapters on the progress bar, and clearer dropdowns",
+        "items": [
+            {
+                "kind": "new",
+                "text": "A long form can group its pages into named chapters. In the form builder, select the section that begins a chapter and tick Starts a chapter on its Basics tab. People filling in the form see the chapters on the progress bar, and the pages of the chapter they are in."
+            },
+            {
+                "kind": "new",
+                "text": "A section can have a Progress label: a short name shown on the progress bar instead of a long page title."
+            },
+            {
+                "kind": "new",
+                "text": "A dropdown shows its own Placeholder, such as “Choose…”, instead of “Select an option”. A choice can have a Short label, which the closed dropdown shows once that choice is picked; the open list still shows the full text."
+            },
+            {
+                "kind": "fixed",
+                "text": "An answer to a dropdown that is not required can now be cleared by choosing its placeholder again."
+            }
+        ]
+    },
+    {
         "version": "0.26.0",
         "title": "Room for big tables, and grids in your charts",
         "items": [

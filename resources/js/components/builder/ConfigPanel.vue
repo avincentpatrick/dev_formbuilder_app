@@ -684,7 +684,7 @@ watch(librarySaved, (value) => {
                                 @update:model-value="setField('hint', $event || null)"
                             />
                         </MdsFormField>
-                        <MdsFormField v-if="!isCalculated" label="Placeholder" :error="fieldSaveErrors.inline.placeholder" v-slot="{ id, describedby, invalid }">
+                        <MdsFormField v-if="!isCalculated" label="Placeholder" :help="field.field_type === 'dropdown' ? 'Shown in the box before a choice is made, in place of “Select an option”.' : undefined" :error="fieldSaveErrors.inline.placeholder" v-slot="{ id, describedby, invalid }">
                             <ReferenceInput
                                 single-line :id="id" :describedby="describedby" :invalid="invalid" :candidates="fieldTextReferences"
                                 :model-value="field.placeholder ?? ''"

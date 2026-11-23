@@ -16433,19 +16433,87 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
 
-- **`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `progress-chapters` — The progress bar cannot group pages into named chapters, and a page's progress label is always its section title.**
   Found by `M237` (2026-11-14). NHETE has 10 named stops over about 45 screens, each screen with its own small progress label. `ProgressIndicator.vue` draws one numbered dot per visible step, and `useFormRuntime` labels a step *"Step X of N: {section title}"*. Sections have no parent.
 
   The remedy, when taken: an optional chapter name on a section, drawn as the progress bar's groups, and an optional progress label separate from the section title.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, stacked on #610, held for the merge point (`D233`).** A section's Basics tab gains **Progress label** and **Starts a chapter** with its **Chapter name** (`form_sections.chapter`, `chapter_translations`, `progress_label`, migration `2026_08_17_000153`, additive; plain text, at most 60 characters; snapshotted only when set, so no checksum moves; a copied section never starts a chapter).
+  - With chapters the respondent's bar shows "3 of 10 · {chapter}", one mark per chapter (a visited one jumps to its first visited page), then "Page 2 of 3: {page}" and the current chapter's own page dots (`lib/chapters.ts`). Grouping runs over every section before the visible pages are taken, so a hidden first page still names its chapter. A form with no chapter draws the step dots as before.
+  - A page is named by its progress label, or by its title piped as the heading is (`progress-title-unpiped`, below). In another language the progress label gives way to a translated title.
+  - The screen reader hears the same words; the builder's preview names the chapter; an ODK or Kobo outer group made only of groups imports as a chapter, and export writes each chapter back as one.
+  - NHETE: its ten stops are chapters and 48 screens carry a progress label. Left out, each filed below: `xlsform-progress-label`, `chapters-paper-encode`.
 
-- **`nit` · `dropdown-placeholder` — A dropdown always shows "Select an option" and its full choice text when closed.**
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `dropdown-placeholder` — A dropdown always shows "Select an option" and its full choice text when closed.**
   Found by `M237` (2026-11-14). NHETE asks for *"Choose…"* and for a closed dropdown to show only the words before a choice's first full stop (*"Include"*), with the full text in the open list. `FieldInput.vue` hard-codes the empty option's text, and a choice has one label.
 
   The remedy, when taken: the question's placeholder as the empty option's text, and an optional short label per choice for the closed state.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, stacked on #610, held for the merge point (`D233`).** A dropdown's empty choice reads the question's own Placeholder, else "Select an option". A dropdown choice — and a question table's dropdown cell choice — takes a **Short label** (`config.options[].short_label`, at most 60 characters; `short_label_translations` from XLSForm import only).
+  - `MdsSelect` draws the chosen option's short label over the closed box while the select's own text is transparent; the open list (the phone's own picker) and every screen reader keep the full label, and under `forced-colors` the full label shows alone (`D233` answer 2).
+  - Every other surface keeps the full label: piping, the staff view, exports, the explorer, paper and its scan.
+  - XLSForm carries it in a `short_label` choices column.
+  - NHETE: every dropdown says what to do, and the six "use" choices show their first word closed. Left out, each filed below: `xlsform-placeholder`, `xlsform-short-label-translations`, `placeholder-shown-for-choice-buttons`.
+
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`minor` · `dropdown-cannot-clear` — An optional dropdown, once answered, can never be emptied again.**
+  Found by `M249` (2026-11-23), in planning, beside `dropdown-placeholder`'s citation. `MdsSelect` draws its placeholder as a *disabled* option, so once a respondent picks a choice in an optional dropdown, nothing takes the answer back. Radios have "Clear selection", and a grid's own select already offers a choosable "Select…".
+
+  The remedy, when taken: let the placeholder be chosen in an optional dropdown, emptying the answer; keep it a disabled prompt in a required one.
+
+  **Live** — every optional dropdown on the testing server. Filed by `M249`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, held for the merge point.** `MdsSelect` gains `clearable`; `FieldInput` passes it whenever the question is not required right now (the live marker, so "Required when…" counts).
+
+- ✅ **CLOSED BY `M249` (2026-11-23) — ****`nit` · `progress-title-unpiped` — The progress line, the screen-reader announcement and the welcome-back banner show a section title's `${…}` as typed.**
+  Found by `M249` (2026-11-23), in planning. `ProgressIndicator`, `StepView.stepLabel()` and `WelcomeBackBanner` read `step.title`, which `useFormRuntime` resolves for the locale but deliberately leaves unpiped, while the section's heading pipes it. A section titled "About you, ${name}" reads "Step 2 of 3: About you, ${name}" above a heading that reads "About you, Ana".
+
+  The remedy, when taken: name a page on the bar, in the announcement and on the banner through the same piping the heading uses.
+
+  **Latent** — no published form on the testing server is known to pipe an answer into a section title. Filed by `M249`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M249` (2026-11-23), on its branch, held for the merge point.** `progressTextFor()` names a page by its progress label or its piped title, and all three read it.
+
+- **`nit` · `xlsform-progress-label` — A section's progress label is not carried by XLSForm.**
+  Found by `M249` (2026-11-23). ODK has no column for a page's short name on a progress bar, so export writes none and import reads none; NHETE's seeder sets its 48 after importing the workbook.
+
+  The remedy, when taken: a `#meridian` marker on the group row, or a `progress_label` column our import reads.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-placeholder` — No question's placeholder is carried by XLSForm, export or import.**
+  Found by `M249` (2026-11-23). `XlsformExporter` writes no placeholder column, `XlsformImportParser` reads none, and `docs/xlsform-interop-spec.md` never mentions it; a Kobo author folds it into the hint. A form exported and imported again loses every placeholder, a dropdown's "Choose…" included.
+
+  The remedy, when taken: a `placeholder` survey column our export writes and our import reads (ODK and Kobo pass an unknown column over).
+
+  **Live** — any form with a placeholder, exported and imported on the testing server today. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `xlsform-short-label-translations` — A choice's short label leaves XLSForm export in the form's own language only.**
+  Found by `M249` (2026-11-23). Import reads `short_label::<lang>`, but export writes only `short_label`: a translated extra choices column has not been proven safe in pyxform and Kobo.
+
+  The remedy, when taken: prove `short_label::<lang>` against pyxform, then write it as `label::<lang>` is written.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `chapters-paper-encode` — Paper, the response PDF and staff manual entry show no chapters.**
+  Found by `M249` (2026-11-23). The blank paper form and the response PDF print each section's title only, and the staff entry page keeps its own "Step N of M" and section list. A long form's chapters are only on the respondent's bar and the builder's preview.
+
+  The remedy, when taken: a chapter heading above the section that starts it on paper and in the PDF (the paper layout's version moves, since the scanner reads the geometry), and the chapters as groups in the entry page's section list.
+
+  **Not live** — a request. Filed by `M249`. **Tier: during-testing.**
+
+- **`nit` · `placeholder-shown-for-choice-buttons` — The builder offers a Placeholder for radio and tick-box questions, which never show one.**
+  Found by `M249` (2026-11-23). `ConfigPanel` shows the Placeholder box for every type but a calculation. A single or multiple choice drawn as radios or tick boxes, a Likert scale and a yes/no have no empty box to show it in, so what an author types there goes nowhere.
+
+  The remedy, when taken: offer Placeholder only for the types whose control has an empty box, from a server list as `short_label_types` is.
+
+  **Live** — the builder on the testing server today. Filed by `M249`. **Tier: during-testing.**
+
+- **`minor` · `xlsform-nested-group-relevance` — A condition on an outer XLSForm group is lost for the groups inside it.**
+  Found by `M249` (2026-11-23). Import flattens nested groups into sections of their own, and a section's condition does not reach the sections after it, so an outer group's `relevant` applies to the outer group's own (usually empty) section only. The inner groups' pages show whatever the outer condition says. A pure container with no condition becomes a chapter since `M249`; one with a condition keeps today's flattening, and with it this defect.
+
+  The remedy, when taken: join an outer group's `relevant` onto each inner group's with `and` on import.
+
+  **Live** — any ODK or Kobo workbook with a conditional group of groups, imported on the testing server today. Filed by `M249`. **Tier: during-testing.**
 
 - **`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
   Found by `M237` (2026-11-14). NHETE's rule is that an item goes on the meeting's short list when at least 75% agree and at least six gave a view, with "No view or opinion" left out. The explorer counts a choice question's answers and can exclude a value (`AnswersSource`), for top-level questions only, but it has no agreement share, no threshold and no list across questions.

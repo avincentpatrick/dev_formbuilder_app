@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { assertClean, assertNoHorizontalOverflow, forceTheme } from './support/axe';
 
 /*
@@ -26,12 +26,27 @@ test.use({ storageState: { cookies: [], origins: [] }, actionTimeout: 15_000 });
 
 interface Screen {
     key: string;
+    stop: string;
+    label: string;
 }
 
 const FIXTURE = JSON.parse(readFileSync(join(process.cwd(), 'tests/fixtures/nhete/nhete-shape.json'), 'utf8')) as {
     screens: Screen[];
+    lists: Record<string, [string, string][]>;
+    texts: Record<string, string>;
 };
 const SCREENS = FIXTURE.screens.map((s) => s.key);
+
+/**
+ * M249 (`progress-chapters`, `D233`): each screen's chapter is its stop, ten in all, and its page is named by its short
+ * screen name — the progress label of a screen that opens with a heading, and the title of one that does not.
+ */
+const SCREEN_BY_KEY = new Map(FIXTURE.screens.map((s) => [s.key, s]));
+const CHAPTERS = new Set(FIXTURE.screens.map((s) => s.stop)).size;
+
+/** M249 (`dropdown-placeholder`): every dropdown's empty box, and the short word a closed "use" dropdown shows. */
+const DROPDOWN_PLACEHOLDER = FIXTURE.texts.ph_dropdown;
+const USE_FIRST = { value: FIXTURE.lists.use[0][0], short: FIXTURE.lists.use[0][1].slice(0, FIXTURE.lists.use[0][1].indexOf('.')) };
 
 /** The pages scanned with axe, by section key: the welcome, the first indicator table, the biggest parts table, red flags. */
 const SCANNED: Record<string, string> = { welcome: 'welcome', mx_a: 'first indicator table', cp_d: 'parts, 141 questions', s8_rf: 'red flags' };
@@ -52,6 +67,10 @@ interface Todo {
 
 function step(page: Page) {
     return page.locator('section[data-section]');
+}
+
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 async function currentKey(page: Page): Promise<string> {
@@ -180,6 +199,12 @@ test('NHETE — the whole module answered page by page, left and resumed, and su
         visited.push(key);
         await assertNoHorizontalOverflow(walker, `NHETE page ${key}`);
 
+        // M249: the bar names this screen's chapter and its place among the ten, then the screen itself.
+        const screen = SCREEN_BY_KEY.get(key)!;
+        const bar = walker.locator('nav[aria-label="Form progress"]');
+        await expect(bar.locator('[data-progress-chapter]'), `the chapter on ${key}`).toHaveText(new RegExp(`^\\d+ of ${CHAPTERS} · ${escapeRegExp(screen.stop)}$`));
+        await expect(bar.locator('[data-progress-page]'), `the page on ${key}`).toContainText(`: ${screen.label}`);
+
         if (key === BIGGEST.key) {
             const shown = Date.now();
             await expect(step(walker).locator('[data-field-row]')).toHaveCount(BIGGEST.rows);
@@ -212,8 +237,21 @@ test('NHETE — the whole module answered page by page, left and resumed, and su
             await page.close();
         }
 
+        // M249: the first indicator page's "use" dropdown says what to do while empty, and once answered its closed box
+        // shows the choice's short word while the select itself holds the full choice.
+        let useRow: Locator | null = null;
+        if (key === 'mx_a') {
+            useRow = walker.locator('[id="field-a01_use"]');
+            await expect(useRow.locator('select option[value=""]')).toHaveText(DROPDOWN_PLACEHOLDER);
+        }
+
         const filling = Date.now();
         const answered = await answerPage(walker);
+        if (useRow !== null) {
+            await expect(useRow.locator('select')).toHaveValue(USE_FIRST.value);
+            await expect(useRow.locator('[data-select-short]')).toBeVisible();
+            await expect(useRow.locator('[data-select-short]')).toHaveText(USE_FIRST.short);
+        }
         if (key === BIGGEST.key) {
             metrics.biggest_page_answered = answered;
             metrics.biggest_page_fill_ms = Date.now() - filling;

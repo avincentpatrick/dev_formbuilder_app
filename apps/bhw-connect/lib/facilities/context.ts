@@ -53,7 +53,12 @@ export function facilityContext(catalog: PublicCatalog) {
     UUC_EDITIONS.map((e) => e.slug),
     "barangays",
   );
-  const uucYear = uuc ? (editionBySlug(uuc.sourceSlug)?.year ?? null) : null;
+  // The year names the edition the catalog read, whether or not this place has a usable count —
+  // "No usable count" still has to say which year's list it is about.
+  const uucYear =
+    (get("uuc-phc")?.sources ?? [])
+      .map((source) => editionBySlug(source.slug)?.year)
+      .find((year) => year !== undefined) ?? null;
   const denominator = uuc?.values[0].denominator;
   const uucShare =
     uuc?.state === "available" &&

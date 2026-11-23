@@ -16,7 +16,54 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M249`, `R-ee5e000c` (`progress-chapters`) and `R-359ddb99` (`dropdown-placeholder`): pages grouped into named chapters on the progress bar with a short progress label per page, a dropdown's own placeholder that an optional answer can be cleared back to, and a short label a closed dropdown shows (m249-chapters-dropdown-labels)
+## Status: ACTIVE CLAIM — `M250`, `R-d39d73e4` (`agreement-report`): the Data Explorer lists how far respondents agree — per question, or per row of a question table, the share giving the same answer (or the answers a report counts as agreeing) out of those who gave a view, with chosen answers such as "No view or opinion" left out, a threshold and a minimum number of views, the short list first and the rest most-disagreed first, downloadable as CSV or Excel (m250-agreement-report)
+
+Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-7-prancy-rocket-of-26d345ab-6ce1-4fff-90ed-fcd5390f0633.md`). NHETE recommendation 7, the last of the NHETE plan's seven (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
+Branch `m250-agreement-report`, cut from `origin/m249-chapters-dropdown-labels` at `e9c9652c`, so it is **stacked on #626** (and through it on #610 and #597): the report reads a question table's cells, and `GridRowsSource`, `MatrixColumns`, `GridRules::NOT_NEEDED` and NHETE's TABLE layout exist only there; #626 is last in the held order, so the chain stays linear. `origin/main` is merged in for the claim files. PR into main, held after #626 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.28.0 → 0.29.0 (a feature) with its release notes**, kept on top when the held PRs merge first.
+Row: `R-d39d73e4` (filed by `M237`), *"There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views."*
+
+The user's answers in planning (2026-11-23), recorded on this branch as `D234`:
+- **What "agree" means: the top answer, or the answers a report marks as agreeing.** An item's share is the people giving its most common answer, out of those who gave a view; a report may also name answers that count together as agreeing (Agree + Strongly agree), and an item offering any of them uses them instead.
+- **The list leaves the app as a spreadsheet only** (CSV or Excel, on the export quota); a printable one-page PDF is filed as `agreement-report-pdf`.
+
+### Evidence verified
+- *"The explorer counts a choice question's answers and can exclude a value (`AnswersSource`)"*: **held** — "is none of" (`ExplorerCompiler::membership()`) keeps blanks; values are count, distinct, sum, average, minimum, maximum and median only; `ExplorerResultShaper::order` sorts by value or label.
+- *"for top-level questions only"*: **moved** — `M247` (#610, held) added "Rows of a grid" (`GridRowsSource`), so a grid's rows can be counted too; still one form and one grid per chart, and still no share.
+- *"no agreement share, no threshold and no list across questions"*: **held** — nothing in `app/Services/Explorer/` computes a share, a threshold, a minimum number or a disagreement order, and nothing in the explorer downloads (`explorer-export`).
+
+### Premise verified
+- NHETE's rule, from the real text (session `3df65fc6`'s scratchpad, never committed): answers counted per question, "No view or opinion" left out, short list at ≥ 75% agreeing with ≥ 6 views, the rest discussed most-disagreed first, a one-page summary two working days before the meeting: **held, and wider than the row** — most NHETE items are not agree/disagree (the big choices; the indicator table's Include/Compare/Test only/Defer/Drop), so "agree" there can only mean "gave the same answer" — `D234` answer 1.
+- Answers are one jsonb document per response (`submission_answers.answers`); a not-shown row, a "Not needed" cell and a blank are all **absent** after finalize, so none of them can be counted as a view: **held** (`SemanticValidator` prunes; `GridRowsSource` relies on it).
+- `explorer_charts.definition` stores a declaration as jsonb, and `ExplorerQuery` added `grid` as a member "stored only when set" without a schema bump (ADR 0025 §D2 note): **held**, so a report needs no migration.
+- The explorer is behind `advanced_analytics`; its policy reads `dashboard.org.view` / `dashboard.form.view`, and the answers it reads need `submissions.view`; downloading responses elsewhere needs `submissions.export`: **held** — the export follows `submissions.export`.
+- No NHETE test submits varied responses (every scenario answer is `agree` / `include` but two): **held**, so the suite gains a tally over varied guest responses.
+- Nothing under `apps/` is read or edited, and `.github/` is not touched: **held.**
+
+### Remedy verdict
+**Works, with these corrections to the row's sketch:**
+1. *"each one's share agreeing"* is per **item**, not per question: a question table's choice column is one pick that expands to one item per row (35 indicator rows are one pick, not 35), "Not needed" rows dropped.
+2. The share is the **most common answer**'s, unless the report names answers that count as agreeing and the item offers one (`D234` answer 1); a multi-select's is "ticked the most common choice".
+3. Status is decided in whole numbers (`agreeing × 100 ≥ threshold × views`), and the share shown is rounded down, so an item to discuss never reads 75.0%.
+4. *"exports the list"* is a spreadsheet of a **saved** report (a GET, like every export here), metered, on `submissions.export`; the PDF is filed (`D234` answer 2).
+5. All items are counted in **two statements** — answers split once per response and joined to the bound pick list — never one statement per item; measured on NHETE before the tests are written.
+
+Files:
+- **Server:** `app/Enums/ExplorerChartType.php`; `app/Support/Explorer/ExplorerQuery.php`, new `ExplorerAgreement.php`; `app/Exceptions/Explorer/InvalidExplorerQueryException.php`; `app/Services/Explorer/` `ExplorerCatalog.php`, `ExplorerQueryRunner.php`, `ExplorerPresenter.php`, `Sources/ExplorerSource.php`, `Sources/AbstractExplorerSource.php`, new `Sources/AgreementSource.php`, new `Agreement/` (`AgreementItem.php`, `AgreementShaper.php`, `AgreementReportRunner.php`, `AgreementExporter.php`); `app/Policies/ExplorerChartPolicy.php`; new `app/Http/Requests/Tenant/ExplorerExportRequest.php`, `app/Http/Controllers/Tenant/ExplorerExportController.php`; `routes/explorer.php`; `database/seeders/E2eSeeder.php`.
+- **Page:** `resources/js/Pages/explore/Chart.vue`; `resources/js/components/explore/` `types.ts`, `definition.ts`, `ExploreResult.vue`, `ExploreTile.vue`, new `agreement-view.ts`, `ExploreAgreementControls.vue`, `ExploreAgreementTable.vue`.
+- **Tests:** new `tests/Unit/Explorer/ExplorerAgreementTest.php`, `tests/Feature/Explorer/ExplorerAgreementTest.php`, `ExplorerAgreementExportTest.php`; `ExplorerPageTest.php`, `ExplorerChartWebTest.php`; `tests/Feature/Forms/Nhete/NheteTableRouteTest.php`, new `tests/Support/Nhete/NheteAgreementTally.php`; the Vitest files beside each page file; `tests/e2e/explore-axe.spec.ts`; seeder tests the new chart moves.
+- **Release and docs:** `VERSION`, `database/data/releases.json`, `docs/adr/0025-data-explorer.md` (§D10), `docs/ACCESS-MATRIX.md`, `docs/data-dictionary.md`, `docs/TESTING-GUIDE.md`, `docs/feature-backlog.md` (including `box-c-drive-small`'s measurements of 2026-11-20/21, owed on this PR), `docs/pipeline.md`, `docs/claims/decisions.md` (`D234`), `PROGRESS.md` (own block only).
+
+Shared artefacts taken: `docs/**` above, `tests/e2e/explore-axe.spec.ts`, `PROGRESS.md` (own block only).
+Paired files taken: none of the 7(b-bis) entries by design. `component-import-lint` and `token-references` read every changed `.vue` file and are run before push.
+Namespaces spent: `M250`; `D234`; ADR 0025 §D10 (an amendment, no new ADR number); no migration.
+
+Prediction:
+- Every gate is green on the first CI run, apart from churn in tests that pin the explorer's lists (the sources per role and their count, the chart-type count, the route names) and the E2E seeder's chart count.
+- Every existing chart's result is unchanged: `ExplorerQueryRunnerTest` passes untouched.
+- NHETE's tally over eight varied guest responses equals the report item for item, and the four `cut` picks give 29 items.
+- The one most likely wrong: the statement's speed on a large form — the jsonb split per response is measured, not assumed, and `explorer-answers-scale` is the row it lands on if it is slow.
+
+## HELD — `M249`, `R-ee5e000c` (`progress-chapters`) and `R-359ddb99` (`dropdown-placeholder`): pages grouped into named chapters on the progress bar with a short progress label per page, a dropdown's own placeholder that an optional answer can be cleared back to, and a short label a closed dropdown shows (m249-chapters-dropdown-labels) — BUILT AND HELD: PR #626, CI 45097921825 every job green with real step counts
 
 Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-6b-lively-cloud-of-d7c3a361-1918-4eb3-8b28-2b58cd22945b.md`). NHETE recommendation 6b, the other half of recommendation 6 after `M248` (`~/.claude/plans/this-is-a-working-composed-ripple.md`).
 Branch `m249-chapters-dropdown-labels`, cut from `origin/m247-grid-wide-sticky-explorer` at `67b6ce99`, so it is **stacked on #610** (and through it on #597): `page_width` sits on the very lines a section's new columns take — the serializer's `$layout`, the materializer, `updateSection`, `EncodeFormPresenter`, `toRenderSection` and the section settings in `ConfigPanel` — and NHETE's TABLE layout, whose dropdown columns take a short label, exists only there. `origin/main` is merged in for the claim files. PR into main, held after #625 at the next merge point on the user's word (`D137`). **A change a tester sees: `VERSION` 0.26.0 → 0.28.0 (a feature) with its release notes**, kept on top when the held PRs merge first.

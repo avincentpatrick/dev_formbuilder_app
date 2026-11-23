@@ -98,10 +98,11 @@ export default function UucPhcMethodology() {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">One geography note</h2>
         <p className="text-muted">
-          Sulu was removed from BARMM in 2024. The source files Sulu&rsquo;s barangays under Region
-          IX by code while naming them under BARMM; this dashboard follows the source&rsquo;s own
-          region names, which keeps every regional count identical to the published table. Sulu
-          therefore appears under BARMM here.
+          Sulu was removed from BARMM in 2024 and is now part of Region IX. The source files
+          Sulu&rsquo;s 87 barangays under Region IX, and so does this dashboard, which keeps every
+          regional count identical to the published table. Sulu&rsquo;s codes in the app&rsquo;s
+          geography still begin 19066, while the source writes them 09066; the two are matched
+          one to one.
         </p>
       </section>
 

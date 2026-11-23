@@ -88,7 +88,7 @@ export const UUC_PHC_EXPORT_COLUMNS: readonly UucPhcExportColumn[] = [
     key: "source_geo_code",
     kind: "text",
     meaning:
-      "PSGC code exactly as the source workbook supplies it. Differs from geo_code for Sulu's 87 barangays, which the source files under Region IX and the dashboard under BARMM.",
+      "PSGC code exactly as the source workbook supplies it. Differs from geo_code for Sulu's 87 barangays, which the source writes 09066… and the dashboard's geography keeps as 19066…, both in Region IX.",
   },
   {
     key: "source_region",

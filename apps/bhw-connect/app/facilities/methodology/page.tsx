@@ -70,13 +70,11 @@ export default function FacilitiesMethodology() {
           level that is 108 facilities out of 44,799.
         </p>
         <p className="text-sm text-muted">
-          <strong>Sulu appears under BARMM here, and the source disagrees.</strong> The export
-          names all 177 Sulu facilities under Region IX, following Sulu&apos;s 2024 removal from
-          BARMM, while its codes straddle both vintages — 152 carry BARMM-era codes and 25 carry
-          Region IX ones. This site&apos;s geography is fixed on the vintage that still holds Sulu
-          under BARMM, and the rollups follow the code rather than the name so that a facility
-          lands in exactly one place. The alternative — editing the underlying geography — would
-          retroactively move every existing figure for Sulu in every other dataset on this site.
+          <strong>Sulu appears under Region IX here.</strong> The export names all 177 Sulu
+          facilities under Region IX, following Sulu&apos;s 2024 removal from BARMM, while its
+          codes straddle both vintages — 152 carry BARMM-era codes and 25 carry Region IX ones.
+          This site&apos;s geography files Sulu under Region IX, and the rollups follow the code so
+          that a facility lands in exactly one place, whichever code vintage it was printed with.
         </p>
         <p className="text-sm text-muted">
           A consequence worth stating: <strong>21 Sulu barangays are listed twice</strong> in the

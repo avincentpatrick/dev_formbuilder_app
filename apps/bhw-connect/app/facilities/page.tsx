@@ -103,7 +103,7 @@ export default async function FacilitiesLanding() {
             {children.length > 0 && (
               <p className="mt-3 border-t border-border pt-4 text-xs text-muted">
                 Drill into any region for its provinces, cities and municipalities. Sulu&apos;s
-                facilities appear under BARMM — the source names them under Region IX, and the{" "}
+                facilities appear under Region IX, as the source names them. The{" "}
                 <Link href="/facilities/methodology" className="underline hover:text-accent">
                   methodology
                 </Link>{" "}

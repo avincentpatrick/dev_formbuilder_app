@@ -1,7 +1,9 @@
-import Link from "next/link";
+import { EditionLink as Link } from "@/components/uuc-phc/edition-link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
 import type { Metadata } from "next";
+import { defaultUucEdition, resolveUucEdition } from "@/lib/db/uuc-phc-edition";
+import { withEdition } from "@/lib/uuc-phc/editions";
 import { notFound } from "next/navigation";
 import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import {
@@ -18,6 +20,8 @@ import { PresentationProvider } from "@/components/present/presentation-context"
 import { PresentButton } from "@/components/present/present-button";
 import { AskTheList } from "@/components/uuc-phc/ask-the-list";
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
 // 1 hour. Region and province are prerendered by the coverage section's params; citymun renders on
 // demand. Same reasoning as the rest of the section.
 export const revalidate = 3_600;
@@ -31,7 +35,7 @@ type Params = { geoLevel: string; geoCode: string };
 // helper — the three routes are one drill-down and should not differ in which areas are built
 // ahead of time. City/municipality pages are left to ISR, as there.
 export async function generateStaticParams() {
-  const params = await getUucPhcStaticParams();
+  const params = await getUucPhcStaticParams((await defaultUucEdition()).slug);
   return params.map((p) => ({ geoLevel: p.geoLevel, geoCode: p.geoCode }));
 }
 
@@ -46,15 +50,22 @@ async function loadGeo(params: Params) {
   return geo;
 }
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}): Promise<Metadata> {
   const geo = await loadGeo(await params);
   if (!geo) return { title: "Area not found" };
+  const { edition } = await resolveUucEdition(searchParams);
 
-  const counts = await getUucPhcCounts(geo.geoCode, geo.geoLevel);
+  const counts = await getUucPhcCounts(geo.geoCode, geo.geoLevel, edition.slug);
   if (!counts || counts.nListed === 0) {
     return {
       title: `The indicators behind the list · ${geo.geoName}`,
-      description: `No barangay in ${geo.geoName} is on the 2025 UUC for PHC list, so there are no indicator values to distribute.`,
+      description: `No barangay in ${geo.geoName} is on the ${edition.year} UUC for PHC list, so there are no indicator values to distribute.`,
     };
   }
 
@@ -62,21 +73,29 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     title: `The indicators behind the list · ${geo.geoName}`,
     description: `How ${geo.geoName}'s ${formatCount(
       counts.nListed,
-    )} barangays on the 2025 UUC for PHC list are distributed across the 12 indicators they were assessed on, with the values bounded during cleaning counted separately. No averages.`,
+    )} barangays on the ${edition.year} UUC for PHC list are distributed across the 12 indicators they were assessed on, with the values bounded during cleaning counted separately. No averages.`,
   };
 }
 
-export default async function UucPhcIndicatorsAreaPage({ params }: { params: Promise<Params> }) {
+export default async function UucPhcIndicatorsAreaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}) {
   const geo = await loadGeo(await params);
   if (!geo) notFound();
+  const { edition, defaultEdition } = await resolveUucEdition(searchParams);
+  const ed = (href: string) => withEdition(href, edition, defaultEdition);
 
   // A barangay page would be 12 single values, which is exactly the disclosure the coverage page's
   // city/municipality view already renders — and one value is not a distribution.
   if (geo.geoLevel === "barangay") notFound();
 
   const [counts, dists, ancestors] = await Promise.all([
-    getUucPhcCounts(geo.geoCode, geo.geoLevel),
-    getUucPhcIndicatorDist(geo.geoCode, geo.geoLevel),
+    getUucPhcCounts(geo.geoCode, geo.geoLevel, edition.slug),
+    getUucPhcIndicatorDist(geo.geoCode, geo.geoLevel, edition.slug),
     getGeoAncestors(geo.geoCode, geo.geoLevel),
   ]);
 
@@ -88,7 +107,7 @@ export default async function UucPhcIndicatorsAreaPage({ params }: { params: Pro
     pageLabel: "Indicators",
     areaName: geo.geoName,
     filterChips: crumbAncestors.map((a) => a.geoName),
-    captionLine: uucDeckCaption(counts, geo.geoName),
+    captionLine: uucDeckCaption(counts, geo.geoName, edition),
     brandLabel: UUC_PHC_BRAND_LABEL,
   };
 
@@ -100,11 +119,11 @@ export default async function UucPhcIndicatorsAreaPage({ params }: { params: Pro
         <Breadcrumbs
           items={[
             PORTAL_CRUMB,
-            UUC_PHC_CRUMB,
-            { label: "Indicators", href: "/uuc-phc/indicators" },
+            { ...UUC_PHC_CRUMB, href: ed(UUC_PHC_CRUMB.href ?? "/uuc-phc") },
+            { label: "Indicators", href: ed("/uuc-phc/indicators") },
             ...crumbAncestors.map((a) => ({
               label: a.geoName,
-              href: `/uuc-phc/indicators/${a.geoLevel}/${a.geoCode}`,
+              href: ed(`/uuc-phc/indicators/${a.geoLevel}/${a.geoCode}`),
             })),
             { label: geo.geoName },
           ]}
@@ -120,6 +139,7 @@ export default async function UucPhcIndicatorsAreaPage({ params }: { params: Pro
 
         {counts && (dists.length > 0 || counts.nListed === 0) ? (
           <IndicatorsSection
+            listYear={edition.year}
             dists={dists}
             areaLabel={geo.geoName}
             nListed={counts.nListed}
@@ -138,7 +158,12 @@ export default async function UucPhcIndicatorsAreaPage({ params }: { params: Pro
           </div>
         )}
 
-        <AskTheList geoCode={geo.geoCode} geoLevel={geo.geoLevel} geoName={geo.geoName} />
+        <AskTheList
+          geoCode={geo.geoCode}
+          geoLevel={geo.geoLevel}
+          geoName={geo.geoName}
+          listYear={edition.year}
+        />
       </div>
     </PresentationProvider>
   );

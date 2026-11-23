@@ -4,9 +4,10 @@ import { getUucPhcBarangays, getUucPhcChildren, getUucPhcCounts } from "@/lib/db
 import type { UucPhcChild, UucPhcCounts } from "@/lib/db/uuc-phc";
 import type { GeoLevel } from "@/lib/filters/schema";
 import { escapeXml, resvgFont } from "./render-png";
+import { editionSourceLine, type UucEdition } from "@/lib/uuc-phc/editions";
 
 /**
- * One-page PNG summary of the 2025 UUC for PHC list for a geo (plan U4).
+ * One-page PNG summary of one edition of the UUC for PHC list for a geo (plan U4).
  *
  * Mirrors `profiling-status-figure.ts` — same canvas, same resvg path, same "no system fonts on
  * the serverless runtime" constraint — but renders a membership list rather than a funnel: one
@@ -89,13 +90,14 @@ export type UucPhcFigure = {
 export async function buildUucPhcFigure(
   geoCode: string,
   geoLevel: GeoLevel,
+  edition: UucEdition,
 ): Promise<UucPhcFigure | null> {
   const isCitymun = geoLevel === "citymun";
   const [geo, counts, children, barangays] = await Promise.all([
     getGeoByCode(geoCode),
-    getUucPhcCounts(geoCode, geoLevel),
-    getUucPhcChildren(geoCode, geoLevel),
-    isCitymun ? getUucPhcBarangays(geoCode) : Promise.resolve([]),
+    getUucPhcCounts(geoCode, geoLevel, edition.slug),
+    getUucPhcChildren(geoCode, geoLevel, edition.slug),
+    isCitymun ? getUucPhcBarangays(geoCode, edition.slug) : Promise.resolve([]),
   ]);
   if (!counts) return null;
 
@@ -108,7 +110,7 @@ export async function buildUucPhcFigure(
 
   // ---- Header + meta ----
   parts.push(
-    `<text x="${MARGIN}" y="${y + 24}" font-size="22" font-weight="600" fill="${INK}">UUC for PHC 2025</text>`,
+    `<text x="${MARGIN}" y="${y + 24}" font-size="22" font-weight="600" fill="${INK}">UUC for PHC ${edition.year}</text>`,
   );
   y += 40;
   parts.push(
@@ -164,7 +166,7 @@ export async function buildUucPhcFigure(
     // and not qualifying — not an area the data has yet to reach.
     parts.push(
       `<text x="${MARGIN}" y="${y + 10}" font-size="12" fill="${INK}">${escapeXml(
-        `No barangay in ${geoName} is on the 2025 list. The list is national and complete as published.`,
+        `No barangay in ${geoName} is on the ${edition.year} list. The list is national and complete as published.`,
       )}</text>`,
     );
     y += 22;
@@ -261,7 +263,7 @@ export async function buildUucPhcFigure(
   // ---- Footer ----
   y += 10;
   parts.push(
-    `<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">Source: DOH Bureau of Local Health Systems Development — 2025 list of Unserved and Underserved Communities for PHC (DC No. 2025-0549).</text>`,
+    `<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">Source: ${escapeXml(editionSourceLine(edition))}.</text>`,
   );
   y += 14;
   parts.push(
@@ -269,7 +271,7 @@ export async function buildUucPhcFigure(
   );
   y += 14;
   parts.push(
-    `<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">Denominator is every barangay in the area. National total 5,987, which is also what the 2027 Budget Cue Cards give for this list.</text>`,
+    `<text x="${MARGIN}" y="${y}" font-size="10" fill="${MUTED}">Denominator is every barangay in the area.${edition.year === "2025" ? " National total 5,987, which is also what the 2027 Budget Cue Cards give for this list." : ""}</text>`,
   );
   y += 20;
 
@@ -283,7 +285,7 @@ export async function buildUucPhcFigure(
     </g>
   </svg>`;
 
-  return { svg, filenameParts: [geoName, "uuc-phc-2025"] };
+  return { svg, filenameParts: [geoName, edition.slug] };
 }
 
 /** Rasterizes the one-pager SVG to a PNG buffer with the bundled export fonts. */

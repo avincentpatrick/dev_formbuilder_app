@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EditionLink as Link } from "./edition-link";
 import { formatCount } from "@/lib/format";
 import type { UucPhcIndicatorDist } from "@/lib/db/uuc-phc-indicator-dist";
 import { benchmark, share, showsWitness } from "./quality-format";

@@ -40,6 +40,23 @@ describe("catalog read boundary", () => {
     expect(mock.source).toHaveBeenCalledTimes(3);
   });
 
+  it("reads the UUC list's previous edition where the newest is not loaded, and says which it read", async () => {
+    const info = (slug: string) => ({ state: "available", value: { datasetId: 9, slug } });
+    mock.source.mockImplementation(async (slug: string) =>
+      slug === "uuc-phc-2025" ? info(slug) : { state: "unavailable" },
+    );
+    const read = await createCatalogReader().source("uuc-phc-2026");
+    expect(read).toMatchObject({ state: "available", value: { slug: "uuc-phc-2025" } });
+    expect(mock.source.mock.calls.map((c) => c[0])).toEqual(["uuc-phc-2026", "uuc-phc-2025"]);
+  });
+
+  it("never falls back past a failed read, nor for any dataset but the UUC list", async () => {
+    mock.source.mockResolvedValueOnce({ state: "failed" });
+    expect(await createCatalogReader().source("uuc-phc-2026")).toEqual({ state: "failed" });
+    expect(await createCatalogReader().source("nhfr-2026-09")).toEqual({ state: "unavailable" });
+    expect(mock.source).toHaveBeenCalledTimes(2);
+  });
+
   it("coalesces training topics into one projected area query with exact dataset and geography", async () => {
     const { query, from } = client({ data: [], error: null });
     const db = createCatalogReader();

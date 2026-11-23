@@ -3,6 +3,17 @@ import { createSupabaseServerClient } from "@/lib/db/supabase";
 import { readDatasetBySlug, type DatasetRead } from "@/lib/db/dataset";
 import { ACCEPTED_RELEASES, CATALOG, type IndicatorSpec, type CatalogTable } from "./definitions";
 import { createBarangayReader } from "./barangay";
+import { UUC_EDITIONS } from "@/lib/uuc-phc/editions";
+
+/**
+ * The one accepted release with a stand-in. The UUC for PHC list ships edition by edition, and its
+ * newest edition is written only where the geography is loaded (20261124090000_…uuc_phc_2026.sql):
+ * the testing server has it, CI and the local copy do not. Where an edition is absent its card
+ * reads the edition before it, and says so — the source it reports is the one it read.
+ */
+export const UUC_FALLBACK: Readonly<Record<string, string>> = Object.fromEntries(
+  UUC_EDITIONS.slice(0, -1).map((e, i) => [e.slug, UUC_EDITIONS[i + 1].slug]),
+);
 import type { CatalogSelection, CatalogIndicator } from "./types";
 
 export type Row = Record<string, unknown>;
@@ -61,7 +72,14 @@ export function createCatalogReader(): CatalogReader {
   return {
     source(slug) {
       if (!sources.has(slug))
-        sources.set(slug, readDatasetBySlug(slug, slug === ACCEPTED_RELEASES.bhw));
+        sources.set(
+          slug,
+          readDatasetBySlug(slug, slug === ACCEPTED_RELEASES.bhw).then((read) =>
+            read.state === "unavailable" && UUC_FALLBACK[slug]
+              ? this.source(UUC_FALLBACK[slug])
+              : read,
+          ),
+        );
       return sources.get(slug)!;
     },
     privacy(spec, datasetId) {

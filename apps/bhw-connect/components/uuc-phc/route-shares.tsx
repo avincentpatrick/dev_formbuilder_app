@@ -74,15 +74,18 @@ function RouteRow({ route }: { route: UucPhcRoute }) {
 export function RouteShares({
   criteria,
   areaLabel,
+  listYear,
 }: {
   criteria: UucPhcCriteria;
   areaLabel: string;
+  /** The edition's year, for the copy. */
+  listYear: string;
 }) {
   if (criteria.nListed === 0) {
     return (
       <p className="text-sm text-muted">
-        No barangay in {areaLabel} is on the 2025 list, so there is no qualifying route to break
-        down. The list is national and complete as published, so this is a result rather than
+        No barangay in {areaLabel} is on the {listYear} list, so there is no qualifying route to
+        break down. The list is national and complete as published, so this is a result rather than
         missing data.
       </p>
     );

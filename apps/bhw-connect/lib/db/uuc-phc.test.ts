@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { toUucPhcCounts, uucContextSentence, uucPhcAreaHref, type Row } from "./uuc-phc";
+import { editionBySlug } from "@/lib/uuc-phc/editions";
+
+const E2025 = editionBySlug("uuc-phc-2025")!;
+const E2026 = editionBySlug("uuc-phc-2026")!;
 
 /** National: 5,987 of the country's 41,958 barangays are on the 2025 list. */
 const national: Row = {
@@ -88,7 +92,7 @@ describe("toUucPhcCounts", () => {
  */
 describe("uucContextSentence", () => {
   it("states the count, the denominator and the universe in one sentence", () => {
-    expect(uucContextSentence(toUucPhcCounts(national))).toBe(
+    expect(uucContextSentence(toUucPhcCounts(national), E2025)).toBe(
       "5,987 of this area's 41,958 barangays are on the 2025 UUC for PHC list",
     );
   });
@@ -96,7 +100,7 @@ describe("uucContextSentence", () => {
   it("names barangays as the universe, since the host page's figures are about BHW profiles", () => {
     // The whole reason U12a is a sentence and not a colour ramp: the denominator changes when a
     // reader's eye moves from the BHW figures above it to this line, and the line has to say so.
-    expect(uucContextSentence(toUucPhcCounts(national))).toContain("barangays");
+    expect(uucContextSentence(toUucPhcCounts(national), E2025)).toContain("barangays");
   });
 
   it("renders a zero as a statement rather than disappearing", () => {
@@ -104,6 +108,7 @@ describe("uucContextSentence", () => {
     // from one that failed to load.
     const ncr = uucContextSentence(
       toUucPhcCounts({ geo_code: "13", geo_level: "region", n_listed: 0, n_barangays: 1675 }),
+      E2025,
     );
     expect(ncr).toBe("None of this area's 1,675 barangays are on the 2025 UUC for PHC list");
   });
@@ -112,20 +117,28 @@ describe("uucContextSentence", () => {
     expect(
       uucContextSentence(
         toUucPhcCounts({ geo_code: "0102801", geo_level: "citymun", n_listed: 1, n_barangays: 14 }),
+        E2025,
       ),
     ).toBe("1 of this area's 14 barangays is on the 2025 UUC for PHC list");
+  });
+
+  it("names the edition it was read from", () => {
+    expect(uucContextSentence(toUucPhcCounts(national), E2026)).toBe(
+      "5,987 of this area's 41,958 barangays are on the 2026 UUC for PHC list",
+    );
   });
 
   it("says nothing when there is no row — a read failure or a level the aggregate skips", () => {
     // `agg_uuc_phc_counts` stops at citymun, so a barangay geo has no row at all. Neither that nor
     // a failed read is a statement about the area.
-    expect(uucContextSentence(null)).toBeNull();
+    expect(uucContextSentence(null, E2025)).toBeNull();
   });
 
   it("says nothing when the area has no barangays to count against", () => {
     expect(
       uucContextSentence(
         toUucPhcCounts({ geo_code: "9999999", geo_level: "citymun", n_listed: 0, n_barangays: 0 }),
+        E2025,
       ),
     ).toBeNull();
   });

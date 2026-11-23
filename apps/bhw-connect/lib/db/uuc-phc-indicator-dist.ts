@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import { HEALTH_INDICATORS, type IndicatorKey } from "./uuc-phc-indicators";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -306,8 +306,8 @@ export function toIndicatorDist(row: Row): UucPhcIndicatorDist | null {
  * renders as unavailable rather than as an area with no unserved barangays.
  */
 export const getUucPhcIndicatorDist = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<UucPhcIndicatorDist[]> => {
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+  async (geoCode: string, geoLevel: GeoLevel, slug: string): Promise<UucPhcIndicatorDist[]> => {
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return [];
 
     const supabase = createSupabaseServerClient();

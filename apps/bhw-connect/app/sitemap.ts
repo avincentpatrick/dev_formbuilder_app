@@ -5,6 +5,7 @@ import { getUucPhcStaticParams } from "@/lib/db/uuc-phc";
 import { getDistrictIndex } from "@/lib/db/districts";
 import { SITE_URL } from "@/lib/site-url";
 import { isReleasePublic, PROFILING_STATUS_SLUG } from "@/lib/releases/visibility";
+import { defaultUucEdition } from "@/lib/db/uuc-phc-edition";
 
 const PROFILING_PUBLIC = isReleasePublic(PROFILING_STATUS_SLUG);
 
@@ -52,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Only region/province profiling pages that actually have data (city/mun is ISR).
     PROFILING_PUBLIC ? getProfilingStatusStaticParams() : Promise.resolve([]),
     // Region + province UUC for PHC pages (city/mun is ISR, as above).
-    getUucPhcStaticParams(),
+    defaultUucEdition().then((e) => getUucPhcStaticParams(e.slug)),
     // 250 legislative districts (D2.1/D2.2) — well under the 1,000-row page cap, one request.
     getDistrictIndex(),
   ]);

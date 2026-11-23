@@ -91,3 +91,14 @@ it("uses UUC's own denominator and never reconstructs a suppressed poverty estim
   uuc.indicators[0].values = [{ value: 2, denominator: 1 }];
   expect(facilityContext(build([...datasets, uuc]))?.uucShare).toBeNull();
 });
+it("names the UUC list's year from the edition read, even where this place has no usable count", () => {
+  const read2025 = make("uuc-phc", "uuc.listed", "uuc-phc-2025", "barangays", 2, "2025-01-01");
+  read2025.indicators[0].values = [];
+  expect(facilityContext(build([...datasets, read2025]))).toMatchObject({
+    uuc: null,
+    uucYear: "2025",
+  });
+  const read2026 = make("uuc-phc", "uuc.listed", "uuc-phc-2026", "barangays", 2, "2026-01-01");
+  expect(facilityContext(build([...datasets, read2026]))?.uucYear).toBe("2026");
+  expect(facilityContext(build([...datasets, { ...read2026, sources: [] }]))?.uucYear).toBeNull();
+});

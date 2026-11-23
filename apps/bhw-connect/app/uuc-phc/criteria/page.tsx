@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveUucEdition } from "@/lib/db/uuc-phc-edition";
 import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
 import { UUC_PHC_BRAND_LABEL, uucDeckCaption, getUucPhcCounts } from "@/lib/db/uuc-phc";
 import { getUucPhcCriteria, getUucPhcCriteriaChildren } from "@/lib/db/uuc-phc-criteria";
@@ -7,22 +8,33 @@ import { PresentationProvider } from "@/components/present/presentation-context"
 import { PresentButton } from "@/components/present/present-button";
 import { AskTheList } from "@/components/uuc-phc/ask-the-list";
 
-// 1 hour, matching the rest of the section and for the same reason: the page is statically
-// prerendered, so a transient empty read during (re)generation would otherwise cache an
-// "unavailable" state.
-export const revalidate = 3_600;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export const metadata: Metadata = {
-  title: { absolute: "Why these barangays qualified · UUC for PHC 2025" },
-  description:
-    "How the 5,987 barangays on the 2025 UUC for PHC list qualified: Indigenous Peoples, conflict and displacement, 4Ps enrolment, and health indicators against the province. The four routes overlap.",
-};
+// Per request: the page shows the edition its `?edition=` names (lib/uuc-phc/editions.ts).
+export const dynamic = "force-dynamic";
 
-export default async function UucPhcCriteriaLanding() {
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const { edition } = await resolveUucEdition(searchParams);
+  return {
+    title: { absolute: `Why these barangays qualified · UUC for PHC ${edition.year}` },
+    description: `How the barangays on the ${edition.year} UUC for PHC list qualified: Indigenous Peoples, conflict and displacement, 4Ps enrolment, and health indicators against the province. The four routes overlap.`,
+  };
+}
+
+export default async function UucPhcCriteriaLanding({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const { edition } = await resolveUucEdition(searchParams);
   const [criteria, counts, children] = await Promise.all([
-    getUucPhcCriteria(NATIONAL_GEO_CODE, "national"),
-    getUucPhcCounts(NATIONAL_GEO_CODE, "national"),
-    getUucPhcCriteriaChildren(NATIONAL_GEO_CODE, "national"),
+    getUucPhcCriteria(NATIONAL_GEO_CODE, "national", edition.slug),
+    getUucPhcCounts(NATIONAL_GEO_CODE, "national", edition.slug),
+    getUucPhcCriteriaChildren(NATIONAL_GEO_CODE, "national", edition.slug),
   ]);
 
   if (!criteria) {
@@ -38,7 +50,7 @@ export default async function UucPhcCriteriaLanding() {
     pageLabel: "Qualifying criteria",
     areaName: "Philippines",
     filterChips: [] as string[],
-    captionLine: uucDeckCaption(counts, "Philippines"),
+    captionLine: uucDeckCaption(counts, "Philippines", edition),
     brandLabel: UUC_PHC_BRAND_LABEL,
   };
 
@@ -60,6 +72,7 @@ export default async function UucPhcCriteriaLanding() {
         </section>
 
         <CriteriaSection
+          listYear={edition.year}
           criteria={criteria}
           areaLabel="the Philippines"
           childHeading="Regions"
@@ -68,7 +81,12 @@ export default async function UucPhcCriteriaLanding() {
           indicatorsHref="/uuc-phc/indicators"
         />
 
-        <AskTheList geoCode={NATIONAL_GEO_CODE} geoLevel="national" geoName="Philippines" />
+        <AskTheList
+          geoCode={NATIONAL_GEO_CODE}
+          geoLevel="national"
+          geoName="Philippines"
+          listYear={edition.year}
+        />
       </div>
     </PresentationProvider>
   );

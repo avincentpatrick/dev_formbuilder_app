@@ -119,6 +119,70 @@ EXPECTED_REGION_COUNTS = {
     "REGION VII (CENTRAL VISAYAS)": 82,
 }
 
+# ---------------------------------------------------------------- editions
+#
+# One list per year, each its own dim_dataset row (the slug carries the year because the year
+# names an annual publication). The constants above are the 2025 edition's regression record and
+# stay its figures; a later edition states its own here rather than loosening 2025's.
+#
+# `guard_empty` (2026 on): the seed writes only where dim_geo already holds barangays. CI and the
+# local copy build their database as the committed schema, then every migration newer than it,
+# then the made-up seed (db/load-dev.mjs) — so a migration newer than the schema runs against
+# EMPTY tables there. An unguarded seed would fail on geo_code's NOT NULL (nothing to resolve
+# to). On the testing server the tables are full and the guard is true.
+EDITIONS = {
+    "2025": {
+        "slug": DATASET_SLUG,
+        "src": "ingestion/data/uuc_phc_2025_cleaned.csv",
+        "label": "2025",
+        "rows": EXPECTED_ROWS,
+        "sulu": EXPECTED_SULU,
+        "missing_score": EXPECTED_MISSING_SCORE,
+        "capped": EXPECTED_CAPPED,
+        "capped_rows": EXPECTED_CAPPED_ROWS,
+        "regions": EXPECTED_REGION_COUNTS,
+        "guard_empty": False,
+    },
+    "2026": {
+        "slug": "uuc-phc-2026",
+        "src": "ingestion/data/uuc_phc_2026_cleaned.csv",
+        "label": "2026",
+        "rows": 6129,
+        "sulu": 87,
+        # Every 2026 row carries the source's criterion (d) score.
+        "missing_score": 0,
+        # From ingestion/clean_uuc_phc_2026.py's run on the 2026 workbook, applying the 2025 rules
+        # unchanged. Locked in so the published caveats cannot drift from the load.
+        "capped": {"water": 892, "fic": 466, "pre_natal": 211, "sba": 30, "abr": 2, "imr": 1,
+                   "ufmr": 1},
+        "capped_rows": 1415,
+        # The 2026 list's own NATIONAL summary, Sulu's 87 under Region IX.
+        "regions": {
+            "REGION V (BICOL REGION)": 767,
+            "CORDILLERA ADMINISTRATIVE REGION (CAR)": 624,
+            "REGION IX (ZAMBOANGA PENINSULA)": 613,
+            "MIMAROPA REGION": 465,
+            "REGION X (NORTHERN MINDANAO)": 447,
+            "REGION XI (DAVAO REGION)": 437,
+            "REGION VI (WESTERN VISAYAS)": 400,
+            "REGION VIII (EASTERN VISAYAS)": 365,
+            "BANGSAMORO AUTONOMOUS REGION IN MUSLIM MINDANAO (BARMM)": 331,
+            "REGION XII (SOCCSKSARGEN)": 309,
+            "REGION I (ILOCOS REGION)": 274,
+            "REGION II (CAGAYAN VALLEY)": 268,
+            "REGION XIII (CARAGA)": 268,
+            "REGION IV-A (CALABARZON)": 204,
+            "NEGROS ISLAND REGION (NIR)": 145,
+            "REGION III (CENTRAL LUZON)": 130,
+            "REGION VII (CENTRAL VISAYAS)": 82,
+        },
+        "guard_empty": True,
+    },
+}
+
+# True only where the geography is loaded — see `guard_empty` above.
+GEO_LOADED = "exists (select 1 from dim_geo where geo_level = 'barangay')"
+
 
 def q(value) -> str:
     """SQL string literal, or NULL for an empty cell. Names carry apostrophes (B'LAAN, M'LANG)."""
@@ -132,14 +196,14 @@ def load_rows(path: Path) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-def check(rows: list[dict]) -> None:
+def check(rows: list[dict], ed: dict) -> None:
     """Structural checks on the extract. Every one of these is a load-blocking error: the
     dashboard publishes 5,987 as a headline figure, so a silently short load is worse than a
     failed one."""
     problems = []
 
-    if len(rows) != EXPECTED_ROWS:
-        problems.append(f"expected {EXPECTED_ROWS:,} rows, found {len(rows):,}")
+    if len(rows) != ed["rows"]:
+        problems.append(f"expected {ed['rows']:,} rows, found {len(rows):,}")
 
     codes = [r["psgc"].strip() for r in rows]
     malformed = [c for c in codes if len(c) != 10 or not c.isdigit()]
@@ -155,9 +219,9 @@ def check(rows: list[dict]) -> None:
         problems.append(f"expected only UUA rows, found {sorted(decisions)}")
 
     n_sulu = sum(1 for c in codes if c.startswith(SULU_SOURCE_PREFIX))
-    if n_sulu != EXPECTED_SULU:
+    if n_sulu != ed["sulu"]:
         problems.append(
-            f"expected {EXPECTED_SULU} Sulu '{SULU_SOURCE_PREFIX}…' codes, found {n_sulu} — "
+            f"expected {ed['sulu']} Sulu '{SULU_SOURCE_PREFIX}…' codes, found {n_sulu} — "
             "the crosswalk migration covers exactly Sulu, so a change here needs review"
         )
 
@@ -176,14 +240,15 @@ def check(rows: list[dict]) -> None:
             )
         for f in flags:
             capped[f] += 1
-    if capped_rows != EXPECTED_CAPPED_ROWS:
-        problems.append(f"expected {EXPECTED_CAPPED_ROWS} barangays with a capped value, found {capped_rows}")
-    if dict(capped) != EXPECTED_CAPPED:
-        problems.append(f"capped counts changed: expected {EXPECTED_CAPPED}, found {dict(capped)}")
+    if capped_rows != ed["capped_rows"]:
+        problems.append(f"expected {ed['capped_rows']} barangays with a capped value, found {capped_rows}")
+    if dict(capped) != ed["capped"]:
+        problems.append(f"capped counts changed: expected {ed['capped']}, found {dict(capped)}")
 
     # The source's criterion (d) score. It decides the health route on /uuc-phc/criteria (U7),
     # so a fraction or an out-of-range value has to fail the load rather than become a silently
-    # wrong route count. A blank is allowed only up to EXPECTED_MISSING_SCORE — see there.
+    # wrong route count. A blank is allowed only up to the edition's missing_score — see
+    # EXPECTED_MISSING_SCORE for the 2025 one.
     bad_score, missing_score = [], []
     for r in rows:
         raw = str(r[SCORE_COL]).strip()
@@ -202,17 +267,17 @@ def check(rows: list[dict]) -> None:
             f"{len(bad_score)} rows have a {SCORE_COL} that is not a whole number in 0–{SCORE_MAX}, "
             f"e.g. {bad_score[:3]}"
         )
-    if len(missing_score) != EXPECTED_MISSING_SCORE:
+    if len(missing_score) != ed["missing_score"]:
         problems.append(
-            f"expected {EXPECTED_MISSING_SCORE} row(s) with no {SCORE_COL}, "
+            f"expected {ed['missing_score']} row(s) with no {SCORE_COL}, "
             f"found {len(missing_score)}: {missing_score[:5]}"
         )
 
     counts = Counter(r["region_name"].strip() for r in rows)
-    for region, expected in EXPECTED_REGION_COUNTS.items():
+    for region, expected in ed["regions"].items():
         if counts.get(region, 0) != expected:
             problems.append(f"{region}: expected {expected}, found {counts.get(region, 0)}")
-    for region in set(counts) - set(EXPECTED_REGION_COUNTS):
+    for region in set(counts) - set(ed["regions"]):
         problems.append(f"unexpected region {region!r} ({counts[region]} rows)")
 
     if problems:
@@ -225,8 +290,49 @@ def check(rows: list[dict]) -> None:
     )
 
 
-def emit_sql(rows: list[dict]) -> str:
-    header = (
+def _list_header(ed: dict) -> str:
+    n = ed["rows"]
+    return (
+        f"-- Seed fact_uuc_phc_barangay with the {ed['label']} UUC for PHC list.\n"
+        "--\n"
+        f"-- Generated by ingestion/ingest_uuc_phc.py --edition {ed['label']} from\n"
+        f"-- {ed['src']}, which ingestion/clean_uuc_phc_2026.py writes from the source office's\n"
+        f"-- {ed['label']} workbook and its published list. Do not hand-edit: regenerate both.\n"
+        "--\n"
+        f"-- {n:,} rows, one per listed barangay, under dataset '{ed['slug']}' beside the earlier\n"
+        "-- editions (each list is its own dim_dataset row; nothing earlier is touched). geo_code is\n"
+        f"-- resolved through map_psgc_to_dim_geo(), so Sulu's {ed['sulu']} '09066…' codes resolve via\n"
+        "-- dim_psgc_crosswalk and a missing crosswalk row fails this insert on geo_code's NOT NULL\n"
+        "-- instead of dropping barangays.\n"
+        "--\n"
+        "-- Writes only where dim_geo holds barangays: CI and the local copy run this migration against\n"
+        "-- empty tables before their made-up seed loads (db/load-dev.mjs), and there it does nothing.\n"
+        "-- Idempotent: re-running updates the provenance columns in place.\n\n"
+    )
+
+
+def _indicators_header(ed: dict) -> str:
+    n = ed["rows"]
+    n_capped = sum(ed["capped"].values())
+    return (
+        f"-- Seed fact_uuc_phc_indicators with the {ed['label']} UUC for PHC indicator values.\n"
+        "--\n"
+        f"-- Generated by ingestion/ingest_uuc_phc.py --edition {ed['label']} from {ed['src']}.\n"
+        "-- Do not hand-edit: regenerate both.\n"
+        "--\n"
+        f"-- {n:,} rows, one per listed barangay: 12 indicators, the 7 provincial benchmarks\n"
+        "-- criterion (d) compares against, capped_indicators, and health_indicators (the source\n"
+        "-- office's own criterion (d) score, 0-7, loaded rather than recomputed). The 2025 cleaning\n"
+        f"-- rules applied unchanged bound {n_capped:,} values across {ed['capped_rows']:,} barangays.\n"
+        "--\n"
+        "-- Writes only where dim_geo holds barangays (see the list seed beside this one). The\n"
+        "-- provincial-reference assertion at the end is scoped to this edition: two editions may\n"
+        "-- carry different benchmarks for the same province, and that is not a contradiction.\n"
+        "-- Idempotent: re-running updates every value in place.\n\n"
+    )
+
+def emit_sql(rows: list[dict], ed: dict) -> str:
+    header = (_list_header(ed) if ed["guard_empty"] else (
         "-- Seed fact_uuc_phc_barangay with the 2025 UUC for PHC list (plan U1).\n"
         "--\n"
         "-- Generated by ingestion/ingest_uuc_phc.py from ingestion/data/uuc_phc_2025_cleaned.csv,\n"
@@ -238,8 +344,9 @@ def emit_sql(rows: list[dict]) -> str:
         "-- resolve via dim_psgc_crosswalk and a missing crosswalk row fails this insert on\n"
         "-- geo_code's NOT NULL instead of dropping barangays. Idempotent: re-running updates the\n"
         "-- provenance columns in place.\n\n"
+    )) + (
         "with ds as (\n"
-        f"  select dataset_id from dim_dataset where slug = '{DATASET_SLUG}'\n"
+        f"  select dataset_id from dim_dataset where slug = '{ed['slug']}'\n"
         "),\n"
         "src (source_geo_code, region_name, province_name, citymun_name, barangay_name) as (\n"
         "  values\n"
@@ -268,6 +375,8 @@ def emit_sql(rows: list[dict]) -> str:
         "  src.source_geo_code,\n"
         "  src.region_name, src.province_name, src.citymun_name, src.barangay_name\n"
         "from src\n"
+        + (f"where {GEO_LOADED}\n" if ed["guard_empty"] else "")
+        +
         "on conflict (dataset_id, geo_code) do update set\n"
         "  source_geo_code = excluded.source_geo_code,\n"
         "  source_region = excluded.source_region,\n"
@@ -312,9 +421,9 @@ def arr(value) -> str:
     return "array[" + ", ".join(q(f) for f in flags) + "]"
 
 
-def emit_indicators_sql(rows: list[dict]) -> str:
+def emit_indicators_sql(rows: list[dict], ed: dict) -> str:
     cols = INDICATOR_COLS + ["elcac_brgy"] + HEALTH_COLS + PROV_REF_COLS + [SCORE_COL]
-    header = (
+    header = (_indicators_header(ed) if ed["guard_empty"] else (
         "-- Seed fact_uuc_phc_indicators with the 2025 UUC for PHC indicator values (plan U3).\n"
         "--\n"
         "-- Generated by ingestion/ingest_uuc_phc.py from ingestion/data/uuc_phc_2025_cleaned.csv.\n"
@@ -328,8 +437,9 @@ def emit_indicators_sql(rows: list[dict]) -> str:
         "-- see 20260826150000_fact_uuc_phc_indicators.sql. geo_code resolves\n"
         "-- through map_psgc_to_dim_geo() for the same reason as the classification seed.\n"
         "-- Idempotent: re-running updates every value in place.\n\n"
+    )) + (
         "with ds as (\n"
-        f"  select dataset_id from dim_dataset where slug = '{DATASET_SLUG}'\n"
+        f"  select dataset_id from dim_dataset where slug = '{ed['slug']}'\n"
         "),\n"
         "src (source_geo_code, " + ", ".join(cols) + ", capped_indicators) as (\n"
         "  values\n"
@@ -358,6 +468,8 @@ def emit_indicators_sql(rows: list[dict]) -> str:
         "  " + ", ".join(f"src.{c}" for c in cols) + ",\n"
         "  src.capped_indicators\n"
         "from src\n"
+        + (f"where {GEO_LOADED}\n" if ed["guard_empty"] else "")
+        +
         "on conflict (dataset_id, geo_code) do update set\n"
         + ",\n".join(f"  {c} = excluded.{c}" for c in cols + ["capped_indicators"])
         + ";\n\n"
@@ -373,6 +485,9 @@ def emit_indicators_sql(rows: list[dict]) -> str:
         "    select g.province_code\n"
         "    from fact_uuc_phc_indicators i\n"
         "    join dim_geo g on g.geo_code = i.geo_code\n"
+        + (f"    where i.dataset_id = (select dataset_id from dim_dataset where slug = '{ed['slug']}')\n"
+           if ed["guard_empty"] else "")
+        +
         "    group by g.province_code\n"
         "    having count(distinct i.imr_prov_ref) > 1\n"
         "        or count(distinct i.ufmr_prov_ref) > 1\n"
@@ -394,9 +509,12 @@ def emit_indicators_sql(rows: list[dict]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--edition", choices=sorted(EDITIONS), default="2025", help="Which year's list to load"
+    )
+    parser.add_argument(
         "--src",
-        default="ingestion/data/uuc_phc_2025_cleaned.csv",
-        help="Cleaned extract from clean_uuc_phc_indicators.py",
+        help="Cleaned extract (clean_uuc_phc_indicators.py for 2025, clean_uuc_phc_2026.py for "
+        "2026); defaults to the edition's own",
     )
     parser.add_argument("--out", help="Path to write the classification seed .sql migration")
     parser.add_argument(
@@ -407,13 +525,14 @@ def main() -> None:
     if not args.out and not args.indicators_out:
         raise SystemExit("Nothing to do: pass --out and/or --indicators-out")
 
-    rows = load_rows(Path(args.src))
-    check(rows)
+    ed = EDITIONS[args.edition]
+    rows = load_rows(Path(args.src or ed["src"]))
+    check(rows, ed)
     if args.out:
-        Path(args.out).write_text(emit_sql(rows))
+        Path(args.out).write_text(emit_sql(rows, ed))
         print(f"Wrote {args.out}: {len(rows):,} barangay rows")
     if args.indicators_out:
-        Path(args.indicators_out).write_text(emit_indicators_sql(rows))
+        Path(args.indicators_out).write_text(emit_indicators_sql(rows, ed))
         print(f"Wrote {args.indicators_out}: {len(rows):,} indicator rows")
 
 

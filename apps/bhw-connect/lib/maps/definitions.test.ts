@@ -20,7 +20,7 @@ describe("independent dataset map contracts", () => {
     );
   });
   it("registers planned datasets without claiming verified boundaries or values", () => {
-    expect(DATASET_MAPS).toHaveLength(11);
+    expect(DATASET_MAPS).toHaveLength(12);
     expect(new Set(DATASET_MAPS.map((d) => d.slug)).size).toBe(DATASET_MAPS.length);
     for (const d of DATASET_MAPS) {
       expect(d.boundaryVersion).toBeNull();

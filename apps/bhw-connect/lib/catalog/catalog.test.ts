@@ -65,7 +65,8 @@ describe("public catalog contract", () => {
       bhw: DATASET_SLUGS.profiled,
       stepzero: DATASET_SLUGS.stepzero,
       nhfr: DATASET_SLUGS.nhfr,
-      uuc: DATASET_SLUGS.uucPhc,
+      // The newest edition; the reader falls back to 2025 where 2026 is not loaded.
+      uuc: "uuc-phc-2026",
       fhsis: DATASET_SLUGS.fhsis,
       population: DATASET_SLUGS.popcen2024,
       poverty: POVERTY_SAE_SLUG,

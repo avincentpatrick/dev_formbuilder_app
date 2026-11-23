@@ -92,6 +92,7 @@ import { PresentationProvider } from "@/components/present/presentation-context"
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
 import { withBasePath } from "@/lib/base-path";
+import { defaultUucEdition } from "@/lib/db/uuc-phc-edition";
 
 const CHILD_LEVEL_LABEL: Record<GeoLevel, string> = {
   national: "Region",
@@ -311,10 +312,10 @@ export default async function ExplorePage({
       : Promise.resolve(null),
     wantRegionRow && regionCode ? getCertification(regionCode, "region") : Promise.resolve([]),
     wantNationalRow ? getCertification(NATIONAL_GEO_CODE, "national") : Promise.resolve([]),
-    // Cross-dataset context (U12a): how much of this area is on the 2025 UUC for PHC list. One
+    // Cross-dataset context (U12a): how much of this area is on the newest UUC for PHC list. One
     // extra row from an aggregate that already exists, in the same round trip as the rest — it
     // returns null at barangay grain, where `agg_uuc_phc_counts` has no rows.
-    getUucPhcCounts(geo.geoCode, geo.geoLevel),
+    defaultUucEdition().then((e) => getUucPhcCounts(geo.geoCode, geo.geoLevel, e.slug)),
     // Cross-dataset context (N4): the health infrastructure the DOH registry records here. Same
     // shape and same cost as the line above, and null at barangay grain for the same reason.
     getNhfrCounts(geo.geoCode, geo.geoLevel),
@@ -715,7 +716,7 @@ export default async function ExplorePage({
             deliberately outside every `PresentationSlide`: the deck's caption states a BHW N, and
             a count of barangays projected under it would be a figure that caption's denominator
             cannot carry. */}
-          <UucPhcContextChip counts={uucPhcCounts} />
+          <UucPhcContextChip counts={uucPhcCounts} edition={await defaultUucEdition()} />
 
           {/* Cross-dataset context (N4) — the health facilities registered here, beside the
             workforce figures above. Outside every `PresentationSlide` for the same reason as the

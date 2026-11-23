@@ -72,7 +72,9 @@ export const ACCEPTED_RELEASES = {
   bhw: "bhw-2025",
   stepzero: "bhw-stepzero-2026",
   nhfr: "nhfr-2026-09",
-  uuc: "uuc-phc-2025",
+  // The newest UUC for PHC edition. Where it is not loaded (CI, the local copy) the catalog reader
+  // falls back to the edition before it — see UUC_FALLBACK in ./reader.ts.
+  uuc: "uuc-phc-2026",
   fhsis: "fhsis-2025",
   population: "psa-popcen-2024",
   poverty: "psa-sae-poverty-2023",

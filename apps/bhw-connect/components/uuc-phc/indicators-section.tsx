@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EditionLink as Link } from "./edition-link";
 import { formatCount } from "@/lib/format";
 import type { UucPhcIndicatorDist } from "@/lib/db/uuc-phc-indicator-dist";
 import { IndicatorHistogram } from "./indicator-histogram";
@@ -44,6 +44,7 @@ export function IndicatorsSection({
   nListed,
   coverageHref,
   criteriaHref,
+  listYear,
 }: {
   dists: UucPhcIndicatorDist[];
   areaLabel: string;
@@ -53,6 +54,8 @@ export function IndicatorsSection({
   coverageHref: string;
   /** The matching criteria page: which route carried them onto the list. */
   criteriaHref: string;
+  /** The edition's year, for the copy. */
+  listYear: string;
 }) {
   if (nListed === 0) {
     // An empty state, not an empty chart. Twelve axes with no bars on them would read as twelve
@@ -60,7 +63,7 @@ export function IndicatorsSection({
     return (
       <div className="rounded-lg border border-border bg-background p-5 text-sm text-muted sm:p-6">
         <p>
-          No barangay in {areaLabel} is on the 2025 list, so there are no indicator values to
+          No barangay in {areaLabel} is on the {listYear} list, so there are no indicator values to
           distribute. The list is national and complete as published, so this is a result rather
           than missing data.
         </p>

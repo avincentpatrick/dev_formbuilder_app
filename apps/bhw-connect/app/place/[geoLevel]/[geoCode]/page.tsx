@@ -54,6 +54,7 @@ import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
 import { UucPhcContextChip } from "@/components/uuc-phc/context-chip";
 import { NhfrContextChip } from "@/components/facilities/context-chip";
+import { defaultUucEdition } from "@/lib/db/uuc-phc-edition";
 
 /** R3: at barangay, a figure that renders the barangay's own data (not an
  * ancestor fallback) still has no peer row — `agg_peer_ranks` stops at
@@ -207,10 +208,10 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
     wantNationalRow
       ? getHonorariumSufficiency(NATIONAL_GEO_CODE, "national")
       : Promise.resolve(null),
-    // Cross-dataset context (U12a): how much of this area is on the 2025 UUC for PHC list. One
+    // Cross-dataset context (U12a): how much of this area is on the newest UUC for PHC list. One
     // extra row from an aggregate that already exists, joined into the same round trip as the
     // rest — it returns null at barangay grain, where `agg_uuc_phc_counts` has no rows.
-    getUucPhcCounts(geo.geoCode, geo.geoLevel),
+    defaultUucEdition().then((e) => getUucPhcCounts(geo.geoCode, geo.geoLevel, e.slug)),
     // Cross-dataset context (N4): the health infrastructure the DOH registry records here. Same
     // shape as the line above — one extra row from an aggregate that already exists, in the same
     // round trip — and it returns null at barangay grain, where `agg_nhfr_counts` has no rows.
@@ -352,7 +353,7 @@ export default async function PlacePage({ params }: { params: Promise<PlaceParam
         {/* Cross-dataset context (U12a) — this area on the 2025 UUC for PHC list. Deliberately
           outside every `PresentationSlide`: the deck's caption states a BHW N, and a count of
           barangays projected under it would be a figure that caption's denominator cannot carry. */}
-        <UucPhcContextChip counts={uucPhcCounts} />
+        <UucPhcContextChip counts={uucPhcCounts} edition={await defaultUucEdition()} />
 
         {/* Cross-dataset context (N4) — the health facilities registered here. Outside every
           `PresentationSlide` for the same reason as the chip above: the deck's caption states a

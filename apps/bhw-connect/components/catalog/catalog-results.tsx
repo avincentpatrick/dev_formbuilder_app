@@ -259,7 +259,11 @@ function FullMapLink({
   dataset: CatalogDataset;
   selection: CatalogSelection;
 }) {
-  const href = subjectMapHref(dataset.id, selection);
+  const href = subjectMapHref(
+    dataset.id,
+    selection,
+    dataset.sources.map((s) => s.slug),
+  );
   if (!href) return null;
   return (
     <Link

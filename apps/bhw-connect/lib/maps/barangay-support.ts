@@ -21,6 +21,7 @@ export const BARANGAY_INDICATORS: Readonly<Record<string, readonly string[]>> = 
     "nhfr.beds",
     "nhfr.barangay-presence",
   ],
+  "uuc-phc-2026": ["uuc.listed"],
   "uuc-phc-2025": ["uuc.listed"],
   "bhw-2025": ["bhw.validated-profiles"],
   "bhw-stepzero-2026": [
@@ -34,7 +35,7 @@ export const BARANGAY_INDICATORS: Readonly<Record<string, readonly string[]>> = 
 };
 
 /** Datasets whose barangay values are computed from source facts; the others read barangay aggregate rows. */
-export const BARANGAY_FACT_DATASETS: readonly string[] = ["nhfr-2026-09", "uuc-phc-2025"];
+export const BARANGAY_FACT_DATASETS: readonly string[] = ["nhfr-2026-09", "uuc-phc-2026", "uuc-phc-2025"];
 
 /** Said beside a barangay map of BHW counts, so a missing rate is explained, not mistaken for a gap. */
 export const BARANGAY_BHW_NOTE =

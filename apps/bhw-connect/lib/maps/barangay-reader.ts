@@ -69,7 +69,7 @@ export async function readBarangayRows(
     const unattributed = column === "n_barangays_with_facility" ? 0 : value(unplaced);
     return { data: codes.map((code) => ({ geo_code: code, [column]: value(byBarangay.get(code)!) })), unattributed };
   }
-  if (dataset === "uuc-phc-2025" && column === "n_listed") {
+  if (dataset.startsWith("uuc-phc-") && column === "n_listed") {
     const listed = await readAll((from, to) =>
       db
         .from("fact_uuc_phc_barangay")

@@ -14,7 +14,8 @@ export type MapSubject = { id: CatalogId | "districts"; title: string; releases:
 export const MAP_SUBJECTS: readonly MapSubject[] = [
   { id: "bhw", title: "BHW", releases: ["bhw-stepzero-2026", "bhw-2025", "bhw-profiling-status-2026"] },
   { id: "nhfr", title: "Health facilities", releases: ["nhfr-2026-09"] },
-  { id: "uuc-phc", title: "UUC-PHC", releases: ["uuc-phc-2025"] },
+  // Newest edition first; a caller that knows which edition is loaded passes it (subjectMapHref).
+  { id: "uuc-phc", title: "UUC-PHC", releases: ["uuc-phc-2026", "uuc-phc-2025"] },
   { id: "fhsis", title: "FHSIS", releases: ["fhsis-2025"] },
   { id: "population", title: "Population", releases: ["psa-popcen-2024"] },
   { id: "poverty", title: "Poverty", releases: ["psa-sae-poverty-2023", "lgu-income-class"] },
@@ -31,13 +32,20 @@ export function subjectOfRelease(slug: string): MapSubject | undefined {
 }
 
 /**
- * The full map for a catalog dataset, opened on its first release at the place chosen on the catalog.
+ * The full map for a catalog dataset, opened at the place chosen on the catalog — on the first of
+ * its releases the caller knows to be loaded (`loaded`, the slugs the catalog actually read), or on
+ * its first release when the caller does not know.
  * A place opens with its own children shown; a barangay opens its municipality with the barangay
  * selected, and falls back to the province where the indicator has no barangay figures.
  */
-export function subjectMapHref(id: CatalogId, selection: CatalogSelection): string | null {
+export function subjectMapHref(
+  id: CatalogId,
+  selection: CatalogSelection,
+  loaded?: readonly string[],
+): string | null {
   const subject = MAP_SUBJECTS.find((s) => s.id === id);
-  const release = subject && subjectReleases(subject)[0];
+  const releases = subject ? subjectReleases(subject) : [];
+  const release = releases.find((slug) => loaded?.includes(slug)) ?? releases[0];
   if (!release) return null;
   const choice: MapChoice = initialMapChoice(release);
   if (selection.mode === "psgc" && prototypeIndicators(release).length) {

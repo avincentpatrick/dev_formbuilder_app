@@ -1,8 +1,10 @@
 import { formatPct } from "@/lib/format";
-import Link from "next/link";
+import { EditionLink as Link } from "@/components/uuc-phc/edition-link";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, UUC_PHC_CRUMB } from "@/lib/nav/breadcrumbs";
 import type { Metadata } from "next";
+import { defaultUucEdition, resolveUucEdition } from "@/lib/db/uuc-phc-edition";
+import { withEdition } from "@/lib/uuc-phc/editions";
 import { notFound } from "next/navigation";
 import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import {
@@ -22,6 +24,8 @@ import { CriteriaSection } from "@/components/uuc-phc/criteria-section";
 import { PresentationProvider } from "@/components/present/presentation-context";
 import { PresentButton } from "@/components/present/present-button";
 import { AskTheList } from "@/components/uuc-phc/ask-the-list";
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 // 1 hour. Region and province are prerendered by the coverage section's params; citymun renders on
 // demand. Same reasoning as the rest of the section.
@@ -46,7 +50,7 @@ type Params = { geoLevel: string; geoCode: string };
 // routes are one drill-down and should not differ in which areas are built ahead of time.
 // City/municipality pages are left to ISR, as there.
 export async function generateStaticParams() {
-  const params = await getUucPhcStaticParams();
+  const params = await getUucPhcStaticParams((await defaultUucEdition()).slug);
   return params.map((p) => ({ geoLevel: p.geoLevel, geoCode: p.geoCode }));
 }
 
@@ -71,15 +75,22 @@ function leadingRoute(criteria: UucPhcCriteria): string | null {
   return `${formatCount(top.count)} of them on ${top.label.toLowerCase()} (${formatPct(top.sharePct)})`;
 }
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}): Promise<Metadata> {
   const geo = await loadGeo(await params);
   if (!geo) return { title: "Area not found" };
+  const { edition } = await resolveUucEdition(searchParams);
 
-  const criteria = await getUucPhcCriteria(geo.geoCode, geo.geoLevel);
+  const criteria = await getUucPhcCriteria(geo.geoCode, geo.geoLevel, edition.slug);
   if (!criteria || criteria.nListed === 0) {
     return {
       title: `Why these barangays qualified · ${geo.geoName}`,
-      description: `No barangay in ${geo.geoName} is on the 2025 UUC for PHC list.`,
+      description: `No barangay in ${geo.geoName} is on the ${edition.year} UUC for PHC list.`,
     };
   }
 
@@ -88,21 +99,29 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
     title: `Why these barangays qualified · ${geo.geoName}`,
     description: `How ${geo.geoName}'s ${formatCount(
       criteria.nListed,
-    )} barangays on the 2025 UUC for PHC list qualified${lead ? `: ${lead}` : ""}. The four routes overlap.`,
+    )} barangays on the ${edition.year} UUC for PHC list qualified${lead ? `: ${lead}` : ""}. The four routes overlap.`,
   };
 }
 
-export default async function UucPhcCriteriaAreaPage({ params }: { params: Promise<Params> }) {
+export default async function UucPhcCriteriaAreaPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: SearchParams;
+}) {
   const geo = await loadGeo(await params);
   if (!geo) notFound();
+  const { edition, defaultEdition } = await resolveUucEdition(searchParams);
+  const ed = (href: string) => withEdition(href, edition, defaultEdition);
 
   // Barangay pages would be four yes/nos, which the coverage page's disclosure already renders.
   if (geo.geoLevel === "barangay") notFound();
 
   const [criteria, counts, children, ancestors] = await Promise.all([
-    getUucPhcCriteria(geo.geoCode, geo.geoLevel),
-    getUucPhcCounts(geo.geoCode, geo.geoLevel),
-    getUucPhcCriteriaChildren(geo.geoCode, geo.geoLevel),
+    getUucPhcCriteria(geo.geoCode, geo.geoLevel, edition.slug),
+    getUucPhcCounts(geo.geoCode, geo.geoLevel, edition.slug),
+    getUucPhcCriteriaChildren(geo.geoCode, geo.geoLevel, edition.slug),
     getGeoAncestors(geo.geoCode, geo.geoLevel),
   ]);
 
@@ -114,7 +133,7 @@ export default async function UucPhcCriteriaAreaPage({ params }: { params: Promi
     pageLabel: "Qualifying criteria",
     areaName: geo.geoName,
     filterChips: crumbAncestors.map((a) => a.geoName),
-    captionLine: uucDeckCaption(counts, geo.geoName),
+    captionLine: uucDeckCaption(counts, geo.geoName, edition),
     brandLabel: UUC_PHC_BRAND_LABEL,
   };
 
@@ -126,11 +145,11 @@ export default async function UucPhcCriteriaAreaPage({ params }: { params: Promi
         <Breadcrumbs
           items={[
             PORTAL_CRUMB,
-            UUC_PHC_CRUMB,
-            { label: "Qualifying criteria", href: "/uuc-phc/criteria" },
+            { ...UUC_PHC_CRUMB, href: ed(UUC_PHC_CRUMB.href ?? "/uuc-phc") },
+            { label: "Qualifying criteria", href: ed("/uuc-phc/criteria") },
             ...crumbAncestors.map((a) => ({
               label: a.geoName,
-              href: `/uuc-phc/criteria/${a.geoLevel}/${a.geoCode}`,
+              href: ed(`/uuc-phc/criteria/${a.geoLevel}/${a.geoCode}`),
             })),
             { label: geo.geoName },
           ]}
@@ -146,6 +165,7 @@ export default async function UucPhcCriteriaAreaPage({ params }: { params: Promi
 
         {criteria ? (
           <CriteriaSection
+            listYear={edition.year}
             criteria={criteria}
             areaLabel={geo.geoName}
             childHeading={CHILD_HEADING[geo.geoLevel]}
@@ -165,7 +185,12 @@ export default async function UucPhcCriteriaAreaPage({ params }: { params: Promi
           </div>
         )}
 
-        <AskTheList geoCode={geo.geoCode} geoLevel={geo.geoLevel} geoName={geo.geoName} />
+        <AskTheList
+          geoCode={geo.geoCode}
+          geoLevel={geo.geoLevel}
+          geoName={geo.geoName}
+          listYear={edition.year}
+        />
       </div>
     </PresentationProvider>
   );

@@ -2608,6 +2608,20 @@ class E2eSeeder extends Seeder
                     'measures' => [['aggregate' => 'count', 'field' => null]],
                 ]],
             );
+
+            // M250 (`D234`): the same table as an agreement list — each indicator's "Keep" and "Used locally", at 75% of six views.
+            ExplorerChart::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'user_id' => $owner->id, 'name' => 'Indicators: agreement'],
+                ['is_shared' => false, 'definition' => [
+                    ...$base,
+                    'source' => 'agreement',
+                    'form_id' => $wideTable->id,
+                    'chart' => 'agreement',
+                    'dimensions' => [],
+                    'measures' => [],
+                    'agreement' => ['items' => ['grid:indicators:keep', 'grid:indicators:use'], 'leave_out' => [], 'agreeing' => [], 'threshold' => 75, 'min_views' => 6],
+                ]],
+            );
         }
 
         ExplorerChart::updateOrCreate(

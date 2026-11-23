@@ -18,8 +18,9 @@ import { forceTheme, settlePaint } from './support/axe';
  * ── STATE ──────────────────────────────────────────────────────────────────────────────────────────────
  * This spec CREATES NOTHING. Every project shares one seeded database and `explorer_charts` has a unique
  * name per owner, so a run that died between a save and a delete would turn the next project's run red
- * for a reason that looks like a page bug. E2eSeeder seeds the owner's three charts — one multi-series, one
- * shared donut, one deliberately unreadable — and the builder is driven without ever pressing Save.
+ * for a reason that looks like a page bug. E2eSeeder seeds the owner's charts — one multi-series, one shared donut,
+ * a grid row by row, an agreement list (M250), one deliberately unreadable — and the builder is driven without ever
+ * pressing Save.
  */
 
 const themes = ['light', 'dark'] as const;
@@ -71,6 +72,9 @@ for (const theme of themes) {
         await expect(page.getByRole('link', { name: 'Legacy chart' })).toBeVisible();
         // M247 (`D231`): a grid counted row by row has its own tile, and an empty range is a sentence, not a broken chart.
         await expect(page.getByRole('link', { name: 'Indicators kept, row by row' })).toBeVisible();
+        // M250 (`D234`): an agreement list's tile shows its three counts, never a broken chart.
+        await expect(page.getByRole('link', { name: 'Indicators: agreement' })).toBeVisible();
+        await expect(page.locator('.explore .agreement .mds-stat-tile').first()).toBeVisible();
 
         await scanPane(page, '.explore', `explore board ${theme}`);
     });
@@ -124,6 +128,27 @@ for (const theme of themes) {
         await expect(page.getByText('Choose the grid whose rows to count.')).toBeHidden();
 
         await scanPane(page, '.explore-builder', `explore builder, rows of a grid ${theme}`);
+    });
+
+    test(`Explore — an agreement list (${theme})`, async ({ page }) => {
+        await openBuilder(page);
+        await forceTheme(page, theme);
+
+        // M250 (`D234`): "Agreement across questions" asks for the form, then the questions — a table column is one tick for
+        // all its rows — and draws a captioned table with a status per item. Nothing is saved.
+        await page.getByLabel('Data source').selectOption('agreement');
+        await expect(page.getByLabel('Chart type')).toBeHidden();
+        await page.getByLabel('Form', { exact: true }).selectOption({ label: 'Wide Table' });
+        await expect(page.getByText('Choose the questions to report on.')).toBeVisible();
+
+        // Ticked by its label, as a person does: the design system draws its box over the native input.
+        await page.locator('.agreement-controls').getByText('Keep the indicator · Indicators to review · 14 rows', { exact: true }).click();
+        await expect(page.getByRole('checkbox', { name: 'Keep the indicator · Indicators to review · 14 rows' })).toBeChecked();
+        await expect(page.locator('.explore-builder .agreement table')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('.explore-builder .agreement caption')).toHaveCount(1);
+        await expect(page.locator('.explore-builder .agreement tbody tr')).toHaveCount(14);
+
+        await scanPane(page, '.explore-builder', `explore builder, agreement list ${theme}`);
     });
 
     test(`Explore — the save dialog (${theme})`, async ({ page }) => {

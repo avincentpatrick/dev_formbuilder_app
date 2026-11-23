@@ -1,5 +1,23 @@
 [
     {
+        "version": "0.29.0",
+        "title": "See how far people agree",
+        "items": [
+            {
+                "kind": "new",
+                "text": "The Data Explorer can list how far a form’s respondents agree. In Explore, choose New chart, then Agreement across questions and the form, and tick the questions to report on. A column of a table puts every row of it on the list."
+            },
+            {
+                "kind": "new",
+                "text": "You choose the answers to leave out, such as “No view or opinion”, the share that puts an item on the short list, and how many people must have given a view. Each item shows the share giving its most common answer, or the answers you count as agreeing, such as Agree and Strongly agree."
+            },
+            {
+                "kind": "new",
+                "text": "The list shows the short list first, then the items to discuss with the most divided first. A saved list can be downloaded as CSV or Excel by anyone who may download the form’s responses."
+            }
+        ]
+    },
+    {
         "version": "0.28.0",
         "title": "Chapters on the progress bar, and clearer dropdowns",
         "items": [

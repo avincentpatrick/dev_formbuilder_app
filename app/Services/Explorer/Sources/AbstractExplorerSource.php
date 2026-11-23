@@ -21,10 +21,15 @@ abstract class AbstractExplorerSource implements ExplorerSource
     /** Every chart that groups and counts; the agreement list is its own source's alone (M250). */
     public function charts(): array
     {
-        return array_values(array_filter(
-            ExplorerChartType::cases(),
-            static fn (ExplorerChartType $type): bool => $type !== ExplorerChartType::Agreement,
-        ));
+        $charts = [];
+
+        foreach (ExplorerChartType::cases() as $type) {
+            if ($type !== ExplorerChartType::Agreement) {
+                $charts[] = $type;
+            }
+        }
+
+        return $charts;
     }
 
     public function requiresForm(): bool

@@ -401,6 +401,19 @@ rewriting its answers are different powers.
 15. In **Explore**, **New chart**, choose *Rows of a grid*, the form and the grid. **Expect:** the chart groups by
     **Row**; split it by one of the grid's columns to see, row by row, how many chose each answer — each answered row
     of each response counted once.
+16. (`M250`, `D234`) Build a form with two or three choice questions that each offer **No view or opinion**, and a
+    grid with an "Agree / Disagree / No view" column; publish it and answer it about eight times as a guest, mostly
+    agreeing on one question and splitting on another. In **Explore**, **New chart**, choose *Agreement across
+    questions* and the form. **Expect:** no Chart type or Group by — an **Agreement** card lists the form's choice
+    questions by section, and the grid's column as one tick for all its rows.
+17. Tick the questions and the grid column, tick **No view or opinion** under *Leave out these answers*, and leave the
+    short list at 75% with at least 6 views. **Expect:** three counts (on the short list, to discuss, too few views),
+    the rule in one sentence, and a table: the short list first, highest share first, then the items to discuss with
+    the most-split one first; an item whose answers were all "No view" reads *Too few views* with a dash, not 0%.
+18. Save it as *Short list*, then **Download Excel**. **Expect:** the file lists the same items in the same order with
+    their status, and the download counts as an export on the plan. Change the threshold without saving: the two
+    download buttons are disabled and the page says to save first. Sign in as `viewer@demo.test`, open the list if it
+    is shared: **Expect:** it shows, and there is no download button.
 
 ---
 

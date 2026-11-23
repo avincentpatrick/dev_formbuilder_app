@@ -163,6 +163,7 @@ const ANALYTICS = 'resources/js/Pages/forms/Analytics.vue';
 const EXPLORE_BOARD = 'resources/js/Pages/explore/Index.vue';
 const EXPLORE_CHART = 'resources/js/Pages/explore/Chart.vue';
 const EXPLORE_SAVE = 'resources/js/components/explore/ExploreSaveModal.vue';
+const EXPLORE_AGREEMENT = 'resources/js/components/explore/ExploreAgreementControls.vue';
 // M176 (`R-61d43278`): "No negative numbers" is a kind the builder names itself, stored as a minimum of 0.
 const RULE_WORDS = 'resources/js/components/builder/field-conversion.ts';
 
@@ -643,6 +644,12 @@ const guide: ChapterDraft[] = [
                         ['Click ', ui('Save chart', EXPLORE_CHART), ', give it a ', ui('Name', EXPLORE_SAVE), ', and tick ', ui('Share with the workspace', EXPLORE_SAVE), ' if your colleagues should see it too.'],
                     ),
                     p('Saved charts appear under ', ui('Your charts', EXPLORE_BOARD), '. Charts colleagues shared appear under ', ui('Shared with the workspace', EXPLORE_BOARD), '; you can look at them, and save a copy to change.'),
+                    p(
+                        'To see how far people agree, choose “Agreement across questions” under ', ui('Data source', EXPLORE_CHART), ' and the form, and tick the questions under ',
+                        ui('Questions on the list', EXPLORE_AGREEMENT), ' — a table’s column puts every row of it on the list. Tick the answers that are not a view, such as “No view or opinion”, under ',
+                        ui('Leave out these answers', EXPLORE_AGREEMENT), ', and set ', ui('Short list at (%)', EXPLORE_AGREEMENT), ' and ', ui('With at least (views)', EXPLORE_AGREEMENT),
+                        '. The list shows the short list first, then the items to discuss, the most divided first. Once saved, ', ui('Download Excel', EXPLORE_CHART), ' gives you the list as a spreadsheet.',
+                    ),
                     tip('info', 'A shared chart only ever shows each person what they could already see, so two people may see different numbers on the same chart. Questions marked personal or sensitive are never offered.'),
                 ],
             },

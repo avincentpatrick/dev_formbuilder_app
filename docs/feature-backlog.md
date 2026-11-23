@@ -15921,6 +15921,11 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, to be measured when taken: first read what is using C: and how fast it grows, then choose between a free-space warning and moving folders to E:. Moving the data directory restarts the PostgreSQL server, which also interrupts BHW Connect.
 
   **Latent** — nothing has failed, and the rate of growth is unmeasured. Filed by `M216`. **Tier: during-testing.**
+  *Amended by `M250` (2026-11-23), with the box's read-only measurements of 2026-11-20/21 (taken while BHW Connect's datasets were uploaded):*
+  - **C: free space** read 18.4 GB on 2026-11-08, 15.1 GB on 2026-11-20, 16.1 GB after the move below, and 15.0 GB on 2026-11-21 once the last datasets were in.
+  - **The database** is 1,774 MB (1,531 MB on 2026-11-20). BHW Connect's uploads added about 1.19 GB of stored files (LIPHIS alone 1,069 MiB), and `nightly-dump.ps1` keeps 14 nightly copies of them — about 16.6 GB, more than C: had free.
+  - **BHW Connect's nightly backup moved to E:** on 2026-11-20 (`E:\meridianackupshw`, the task's `-BackupDir`; its own operator's script, shared `ops/`, `D211`). Meridian's backups, the BHW pre-deploy dumps and `env\` stay on C:.
+  - The rate of growth is still unmeasured, and the free-space warning this row asks for is still unbuilt.
 
 - **`minor` · A tier holding only blocked rows leaves the Next section with nothing to take, even when a lower tier has ready rows.** Found by `M215` (2026-11-06) while separating ready rows from blocked ones in the reports. `next_work()` in `scripts/pipeline.php` picks the most urgent tier holding a ready or a blocked row and stops there, so once a tier's ready rows run out, its blocked rows hide every ready row below it. `during-testing` holds 76 blocked rows today, so this is what happens the day its 168 ready rows are done. `M215` made the reports say so (*"holds no ready row, so nothing in it can be started"*) instead of printing an empty list, and left the choice of tier alone. The remedy, to be measured when taken: fall through to the next tier with a ready row and name the blocked tier above it. **Latent.** — needs a tier whose open rows are all blocked. Filed by `M215`. **Tier: during-testing.**
 
@@ -16033,6 +16038,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   Found by `M236` (2026-11-12). `/analytics` has a metered CSV and XLSX export of its tables; `/explore` shows each chart's numbers in a table on the page and offers no download. The remedy, when taken: export the shaped result (the table the page already prints) through the same metered export path, so a chart's download counts against the plan the way an analytics export does.
 
   **Live.** Filed by `M236`. **Tier: during-testing.**
+  *Amended by `M250` (2026-11-23):* the path now exists for one chart type — `GET /explore/charts/{chart}/export` (`ExplorerExportController`, `ExplorerChartPolicy::export`, `AgreementExporter`, metered before the stream) downloads a saved **agreement list**. Every other chart is still refused there (403). What is left: an exporter arm for the grouped result, and the download rule per source (D5 of ADR-0025 says a download follows the source's own page — `submissions.export` for the answer sources; the others need theirs named).
 
 - **`minor` · `explorer-area-and-folder` — The explorer cannot group responses by area (scope node), which `/analytics` offers.**
   Found by `M236` (2026-11-12). `ResponsesSource` offers form, status, channel, language, reviewer and dates as group-bys. The area a response belongs to is one of `/analytics`' five axes, and the reader who moves to `/explore` loses it. The remedy, when taken: a scope-node field on the responses source, labelled through the scope tree and narrowed by the member's own scope grants, as the analytics axis is.
@@ -16418,6 +16424,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: a "form order" sort for a category whose values have an author's order — a grid's rows, a choice's options.
 
   **Not live** — a request. Filed by `M247`. **Tier: during-testing.**
+  *Note by `M250` (2026-11-23):* the agreement list already keeps the form's order — sections, questions, then a table's rows — as its tie-break (`AgreementItem::$position`); a chart's sort still does not.
 
 - **`nit` · `xlsform-page-width` — An exported or imported XLSForm does not carry a section's wide page.**
   Found by `M247` (2026-11-20). `form_sections.page_width` is not written by `XlsformExporter` nor read by the importer, as `repeat_layout` is not; a form re-imported from its own export loses "Wide page".
@@ -16515,12 +16522,20 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Live** — any ODK or Kobo workbook with a conditional group of groups, imported on the testing server today. Filed by `M249`. **Tier: during-testing.**
 
-- **`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
+- ✅ **CLOSED BY `M250` (2026-11-23) — ****`minor` · `agreement-report` — There is no report of how far respondents agree, leaving out "No view or opinion", with a minimum number of views.**
   Found by `M237` (2026-11-14). NHETE's rule is that an item goes on the meeting's short list when at least 75% agree and at least six gave a view, with "No view or opinion" left out. The explorer counts a choice question's answers and can exclude a value (`AnswersSource`), for top-level questions only, but it has no agreement share, no threshold and no list across questions.
 
   The remedy, when taken: a report that, for a chosen set of questions, shows each one's share agreeing over those who gave a view, flags the ones over a threshold with enough views, and exports the list.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+  ✅ **CLOSED BY `M250` (2026-11-23), on its branch, held for the merge point.** The Data Explorer's "Agreement across questions" (ADR-0025 §D10, `D234`): an item is a choice question, or a row of a question table's choice column (one tick for the whole column), or a Likert grid row; its share is the most common answer's, or the answers the list counts as agreeing where the item offers one, out of those who gave a view; on the short list at the threshold with the minimum of views, decided in whole numbers; the short list first, then the rest most-disagreed first; a saved list downloads as CSV or Excel. NHETE's table layout is held against a plain-PHP tally of eight varied guest responses.
+
+- **`nit` · `agreement-report-pdf` — A saved agreement list cannot be printed as a one-page summary.**
+  Found by `M250` (2026-11-23), in planning (`D234` answer 2). NHETE sends every member a one-page summary of the results two working days before the meeting. The list downloads as CSV or Excel, from which the summary is written; nothing prints the list itself.
+
+  The remedy, when taken: `format=pdf` on the list's export, through dompdf as the blank paper form prints (`BlankFormPrintRenderer`, A4): the short list first, then the items to discuss, most disagreement first, then those with too few views, the rule in one line at the top; metered as the spreadsheet is.
+
+  **Not live** — a request. Filed by `M250`. **Tier: during-testing.**
 
 - **`minor` · `xlsform-default-language-name` — An XLSForm whose `default_language` is a language name, as ODK and Kobo write it ("English", "English (en)"), sets the form's locale to that name, and the guest page then carries an invalid `<html lang>` that axe refuses.**
   Found by `M239` (2026-11-14), on the NHETE walk's first axe scan: `html-lang-valid` on the welcome page, *"<html> element must have a valid value for the lang attribute"*.

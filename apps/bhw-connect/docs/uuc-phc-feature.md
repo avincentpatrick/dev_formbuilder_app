@@ -1,5 +1,11 @@
 # UUC for PHC 2025
 
+> **2026-11-23: the 2026 list joins this section as a second edition.** The section now shows one
+> edition at a time behind a 2026 | 2025 switch (`?edition=<year>`, newest by default), and
+> `/uuc-phc/changes` lists what changed between them. Everything below describes the 2025 edition and
+> remains true of it. How the second edition was added, and what reads which edition, is
+> `docs/UUC_PHC_2026_PLAN.md`.
+
 A public view of the **2025 list of Unserved and Underserved Communities for Primary Health
 Care** — the barangays a primary-health-care programme is meant to reach first. **5,987 barangays**
 of the country's 41,958, issued under **DC No. 2025-0549** with criteria set by **DOH AO No.

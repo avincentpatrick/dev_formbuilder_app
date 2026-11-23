@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import type { GeoLevel } from "@/lib/filters/schema";
 
 /**
@@ -122,18 +122,24 @@ export function toQualityTotals(row: TotalsRow): UucPhcQualityTotals {
  * "unavailable" rather than as a clean bill of health, since an empty data-quality page reads as
  * "nothing wrong".
  */
-export const getUucPhcQualityTotals = cache(async (): Promise<UucPhcQualityTotals | null> => {
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("ref_uuc_phc_quality")
-    .select(
-      "n_listed, n_barangays_capped, n_values_capped, n_barangays_multi_capped, n_score_disagreement, n_score_understated, n_no_route_if_recomputed, n_no_route_as_recorded",
-    )
-    .maybeSingle();
+export const getUucPhcQualityTotals = cache(
+  async (slug: string): Promise<UucPhcQualityTotals | null> => {
+    const datasetId = await getDatasetIdBySlug(slug);
+    if (datasetId === null) return null;
 
-  if (error || !data) return null;
-  return toQualityTotals(data as TotalsRow);
-});
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("ref_uuc_phc_quality_by_edition")
+      .select(
+        "n_listed, n_barangays_capped, n_values_capped, n_barangays_multi_capped, n_score_disagreement, n_score_understated, n_no_route_if_recomputed, n_no_route_as_recorded",
+      )
+      .eq("dataset_id", datasetId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return toQualityTotals(data as TotalsRow);
+  },
+);
 
 /**
  * The provinces whose benchmarks carry a finding, largest first within each finding.
@@ -141,11 +147,15 @@ export const getUucPhcQualityTotals = cache(async (): Promise<UucPhcQualityTotal
  * Province names are joined in memory from `dim_geo` rather than by a PostgREST embed: the view has
  * no declared foreign key for the planner to follow, and seven rows do not justify one.
  */
-export const getUucPhcBenchmarkGaps = cache(async (): Promise<UucPhcBenchmarkGap[]> => {
+export const getUucPhcBenchmarkGaps = cache(async (slug: string): Promise<UucPhcBenchmarkGap[]> => {
+  const datasetId = await getDatasetIdBySlug(slug);
+  if (datasetId === null) return [];
+
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
-    .from("ref_uuc_phc_benchmark_gaps")
-    .select("province_code, n_listed_province, kind, n_affected, witness_value, finding");
+    .from("ref_uuc_phc_benchmark_gaps_by_edition")
+    .select("province_code, n_listed_province, kind, n_affected, witness_value, finding")
+    .eq("dataset_id", datasetId);
 
   if (error || !data || data.length === 0) return [];
 
@@ -203,46 +213,48 @@ export const getUucPhcBenchmarkGaps = cache(async (): Promise<UucPhcBenchmarkGap
  * a failure returns `null` and agreement returns an empty array, and the caller renders them
  * differently.
  */
-export const getUucPhcPublishedDeltas = cache(async (): Promise<UucPhcPublishedDelta[] | null> => {
-  const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
-  if (datasetId === null) return null;
+export const getUucPhcPublishedDeltas = cache(
+  async (slug: string): Promise<UucPhcPublishedDelta[] | null> => {
+    const datasetId = await getDatasetIdBySlug(slug);
+    if (datasetId === null) return null;
 
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("ref_uuc_phc_published_delta")
-    .select(
-      "geo_code, geo_level, source_label, n_published, n_listed, delta, source_page, source_as_of",
-    )
-    .eq("dataset_id", datasetId);
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("ref_uuc_phc_published_delta")
+      .select(
+        "geo_code, geo_level, source_label, n_published, n_listed, delta, source_page, source_as_of",
+      )
+      .eq("dataset_id", datasetId);
 
-  if (error || !data) return null;
-  if (data.length === 0) return [];
+    if (error || !data) return null;
+    if (data.length === 0) return [];
 
-  const codes = [...new Set(data.map((row) => row.geo_code))];
-  const { data: geos } = await supabase
-    .from("dim_geo")
-    .select("geo_code, geo_name")
-    .in("geo_code", codes);
-  const nameByCode = new Map((geos ?? []).map((g) => [g.geo_code, g.geo_name]));
+    const codes = [...new Set(data.map((row) => row.geo_code))];
+    const { data: geos } = await supabase
+      .from("dim_geo")
+      .select("geo_code, geo_name")
+      .in("geo_code", codes);
+    const nameByCode = new Map((geos ?? []).map((g) => [g.geo_code, g.geo_name]));
 
-  return (
-    data
-      .map((row) => ({
-        geoCode: row.geo_code,
-        geoLevel: row.geo_level,
-        geoName: nameByCode.get(row.geo_code) ?? row.geo_code,
-        sourceLabel: row.source_label,
-        nPublished: row.n_published,
-        nListed: row.n_listed,
-        delta: row.delta,
-        sourcePage: row.source_page,
-        sourceAsOf: row.source_as_of,
-      }))
-      // National first, then regions by the size of the gap — the national row is the headline the
-      // rest explains.
-      .sort((a, b) => {
-        if (a.geoLevel !== b.geoLevel) return a.geoLevel === "national" ? -1 : 1;
-        return Math.abs(b.delta) - Math.abs(a.delta);
-      })
-  );
-});
+    return (
+      data
+        .map((row) => ({
+          geoCode: row.geo_code,
+          geoLevel: row.geo_level,
+          geoName: nameByCode.get(row.geo_code) ?? row.geo_code,
+          sourceLabel: row.source_label,
+          nPublished: row.n_published,
+          nListed: row.n_listed,
+          delta: row.delta,
+          sourcePage: row.source_page,
+          sourceAsOf: row.source_as_of,
+        }))
+        // National first, then regions by the size of the gap — the national row is the headline the
+        // rest explains.
+        .sort((a, b) => {
+          if (a.geoLevel !== b.geoLevel) return a.geoLevel === "national" ? -1 : 1;
+          return Math.abs(b.delta) - Math.abs(a.delta);
+        })
+    );
+  },
+);

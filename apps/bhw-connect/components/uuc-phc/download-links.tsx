@@ -1,5 +1,6 @@
 import type { GeoLevel } from "@/lib/filters/schema";
 import { withBasePath } from "@/lib/base-path";
+import { EDITION_PARAM, type UucEdition } from "@/lib/uuc-phc/editions";
 
 /**
  * The section's downloads, in one place (plan U11).
@@ -19,6 +20,7 @@ export function DownloadLinks({
   geoLevel,
   geoCode,
   nListed,
+  edition,
 }: {
   geoLevel: GeoLevel;
   geoCode: string;
@@ -26,8 +28,11 @@ export function DownloadLinks({
    * zero area still gets the links: an empty file with its header is a real answer, and NCR's
    * "0 of 1,675" is a finding rather than a missing export. */
   nListed: number;
+  /** The edition the page shows; every download is of that edition, always named in the link so a
+   * file saved from a 2025 page is the 2025 list even after the default moves on. */
+  edition: UucEdition;
 }) {
-  const scope = `geoLevel=${geoLevel}&geoCode=${encodeURIComponent(geoCode)}`;
+  const scope = `geoLevel=${geoLevel}&geoCode=${encodeURIComponent(geoCode)}&${EDITION_PARAM}=${edition.year}`;
   const rowLabel = nListed === 1 ? "1 row" : `${nListed.toLocaleString()} rows`;
 
   return (

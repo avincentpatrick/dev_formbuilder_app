@@ -293,7 +293,7 @@ export function DatasetMapCard({
     return () => controller.abort();
   }, [active, query, key, result?.key]);
   const data = result?.key === key && result.data.state === "available" ? result.data : null;
-  const uucRoute = dataset === "uuc-phc-2025" && choice.indicator.startsWith("uuc.route.");
+  const uucRoute = dataset.startsWith("uuc-phc-") && choice.indicator.startsWith("uuc.route.");
   const declaredAccreditation =
     dataset === "bhw-stepzero-2026" && choice.indicator === STEPZERO_ACCREDITATION_ID;
   const censusMean = dataset === "bhw-2025" && choice.indicator === CENSUS_ACTIVE_YEARS_ID;
@@ -390,8 +390,10 @@ export function DatasetMapCard({
   const dashboard =
     dataset === "nhfr-2026-09"
       ? "/facilities"
-      : dataset === "uuc-phc-2025"
-        ? "/uuc-phc"
+      : dataset.startsWith("uuc-phc-")
+        ? dataset === "uuc-phc-2025"
+          ? "/uuc-phc?edition=2025"
+          : "/uuc-phc"
         : dataset === "bhw-2025" || dataset === "bhw-stepzero-2026"
           ? "/bhw"
           : profiling

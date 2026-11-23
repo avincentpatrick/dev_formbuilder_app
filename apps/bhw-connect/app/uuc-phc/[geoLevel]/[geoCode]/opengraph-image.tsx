@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getUucPhcCounts } from "@/lib/db/uuc-phc";
 import { GEO_LEVELS, type GeoLevel } from "@/lib/filters/schema";
+import { defaultUucEdition } from "@/lib/db/uuc-phc-edition";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -30,17 +31,19 @@ export default async function Image({ params }: { params: Promise<Params> }) {
   const geoLevel = (GEO_LEVELS as readonly string[]).includes(rawLevel)
     ? (rawLevel as GeoLevel)
     : null;
+  // A link preview has no `?edition=`: it shows the section's default (newest) edition.
+  const edition = await defaultUucEdition();
   const [geo, counts] = await Promise.all([
     getGeoByCode(geoCode),
-    geoLevel ? getUucPhcCounts(geoCode, geoLevel) : Promise.resolve(null),
+    geoLevel ? getUucPhcCounts(geoCode, geoLevel, edition.slug) : Promise.resolve(null),
   ]);
 
   const geoName = geo?.geoName ?? "Philippines";
   const share =
     counts?.sharePct === null ? "" : ` · ${formatPct(counts?.sharePct ?? null, "single")}`;
   const figure = counts
-    ? `${counts.nListed.toLocaleString()} of ${counts.nBarangays.toLocaleString()} barangays unserved or underserved${share} · DC No. 2025-0549`
-    : "2025 list of unserved and underserved communities · DC No. 2025-0549";
+    ? `${counts.nListed.toLocaleString()} of ${counts.nBarangays.toLocaleString()} barangays unserved or underserved${share} · ${edition.issuance}`
+    : `${edition.year} list of unserved and underserved communities · ${edition.issuance}`;
 
   return new ImageResponse(
     <div
@@ -56,7 +59,7 @@ export default async function Image({ params }: { params: Promise<Params> }) {
       }}
     >
       <div style={{ display: "flex", fontSize: 26, color: "#0a6e6e", fontWeight: 600 }}>
-        UUC for PHC · 2025
+        {`UUC for PHC · ${edition.year}`}
       </div>
       <div
         style={{

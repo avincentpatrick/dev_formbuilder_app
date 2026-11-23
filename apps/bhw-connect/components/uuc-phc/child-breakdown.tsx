@@ -1,5 +1,5 @@
 import { formatPct } from "@/lib/format";
-import Link from "next/link";
+import { EditionLink as Link } from "./edition-link";
 import { formatCount } from "@/lib/format";
 import type { UucPhcChild } from "@/lib/db/uuc-phc";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { EditionLink as Link } from "./edition-link";
 import { formatCount } from "@/lib/format";
 import type { UucPhcCriteria, UucPhcCriteriaChild } from "@/lib/db/uuc-phc-criteria";
 import { RouteShares } from "./route-shares";
@@ -23,6 +23,7 @@ export function CriteriaSection({
   childAreas,
   coverageHref,
   indicatorsHref,
+  listYear,
 }: {
   criteria: UucPhcCriteria;
   areaLabel: string;
@@ -34,6 +35,8 @@ export function CriteriaSection({
   coverageHref: string;
   /** The matching indicators page — the same area's distributions (plan U9). */
   indicatorsHref: string;
+  /** The edition's year, for the copy. */
+  listYear: string;
 }) {
   return (
     <>
@@ -54,7 +57,7 @@ export function CriteriaSection({
           </p>
 
           <div className="mt-5">
-            <RouteShares criteria={criteria} areaLabel={areaLabel} />
+            <RouteShares criteria={criteria} areaLabel={areaLabel} listYear={listYear} />
           </div>
 
           <RouteNotEvaluable criteria={criteria} areaLabel={areaLabel} />

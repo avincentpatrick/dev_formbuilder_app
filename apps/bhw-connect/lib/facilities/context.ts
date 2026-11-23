@@ -1,14 +1,20 @@
 import { ACCEPTED_RELEASES as R } from "@/lib/catalog/definitions";
 import { populationReading } from "@/lib/catalog/population-reading";
 import type { CatalogDataset, CatalogIndicator, PublicCatalog } from "@/lib/catalog/types";
+import { UUC_EDITIONS, editionBySlug } from "@/lib/uuc-phc/editions";
 
 /** A scalar is usable only within its accepted source/unit and public state. */
-function count(dataset: CatalogDataset | undefined, id: string, slug: string, unit: string) {
+function count(
+  dataset: CatalogDataset | undefined,
+  id: string,
+  slug: string | readonly string[],
+  unit: string,
+) {
   const item = dataset?.indicators.find((i) => i.id === id);
   if (
     !item ||
     !["available", "partial"].includes(item.state) ||
-    item.sourceSlug !== slug ||
+    !(typeof slug === "string" ? [slug] : slug).includes(item.sourceSlug) ||
     item.unit !== unit ||
     item.values.length !== 1
   )
@@ -39,7 +45,15 @@ export function facilityContext(catalog: PublicCatalog) {
       ? (facilities.values[0].value / residents.values[0].value) * 100000
       : null;
   const workforce = count(get("bhw"), "bhw.total", R.stepzero, "people");
-  const uuc = count(get("uuc-phc"), "uuc.listed", R.uuc, "barangays");
+  // Any UUC for PHC edition: the catalog reads the newest loaded one (lib/catalog/reader.ts), and
+  // the line below names whichever year that was.
+  const uuc = count(
+    get("uuc-phc"),
+    "uuc.listed",
+    UUC_EDITIONS.map((e) => e.slug),
+    "barangays",
+  );
+  const uucYear = uuc ? (editionBySlug(uuc.sourceSlug)?.year ?? null) : null;
   const denominator = uuc?.values[0].denominator;
   const uucShare =
     uuc?.state === "available" &&
@@ -72,6 +86,7 @@ export function facilityContext(catalog: PublicCatalog) {
     density,
     workforce,
     uuc,
+    uucYear,
     uucShare,
     povertyItems,
   };

@@ -58,6 +58,13 @@ export type MapPayload = {
 };
 export function prototypeIndicators(slug: string) {
   const supported: Record<string, readonly string[]> = {
+    "uuc-phc-2026": [
+      "uuc.listed",
+      "uuc.route.ip",
+      "uuc.route.conflict",
+      "uuc.route.four_ps",
+      "uuc.route.health",
+    ],
     "uuc-phc-2025": [
       "uuc.listed",
       "uuc.route.ip",

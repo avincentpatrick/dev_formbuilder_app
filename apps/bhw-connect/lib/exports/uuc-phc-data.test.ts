@@ -14,6 +14,7 @@ import {
   uucPhcExportFilename,
   type UucPhcExportMeta,
 } from "./uuc-phc-data";
+import { editionBySlug } from "@/lib/uuc-phc/editions";
 
 /**
  * U11's whole justification is that a spreadsheet can carry the capping marker where U4's PNG could
@@ -77,6 +78,7 @@ const META: UucPhcExportMeta = {
   sourceName: "DOH Bureau of Local Health Systems Development",
   license: null,
   asOfDate: "2025-01-01",
+  edition: editionBySlug("uuc-phc-2025")!,
   retrievedAt: "2026-08-27T00:00:00.000Z",
 };
 

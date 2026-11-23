@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import type { GeoLevel } from "@/lib/filters/schema";
 
 /**
@@ -102,10 +102,10 @@ export function isExportableLevel(geoLevel: GeoLevel): boolean {
  * missing a province. An area with nothing listed returns `[]`, which is a real answer.
  */
 export const getUucPhcListRows = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<UucPhcListRow[] | null> => {
+  async (geoCode: string, geoLevel: GeoLevel, slug: string): Promise<UucPhcListRow[] | null> => {
     if (!isExportableLevel(geoLevel)) return null;
 
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();

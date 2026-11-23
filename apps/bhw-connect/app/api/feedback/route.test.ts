@@ -124,7 +124,7 @@ describe("POST /api/feedback — dataset routing (plan U6)", () => {
     expect(res.status).toBe(200);
     expect(insertMock.mock.calls[0][0]).toMatchObject({
       page_path: "/uuc-phc/citymun/1402706",
-      dataset_slug: "uuc-phc-2025",
+      dataset_slug: "uuc-phc-2026",
     });
   });
 

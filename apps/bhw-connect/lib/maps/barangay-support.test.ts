@@ -4,7 +4,7 @@ import { TRAINING_TOPICS } from "@/lib/catalog/definitions";
 import { initialMapChoice, prototypeIndicators } from "./prototype";
 
 it("lists every NHFR indicator but only the UUC list membership", () => {
-  expect(BARANGAY_DRILL_DATASETS).toEqual(["nhfr-2026-09", "uuc-phc-2025", "bhw-2025", "bhw-stepzero-2026"]);
+  expect(BARANGAY_DRILL_DATASETS).toEqual(["nhfr-2026-09", "uuc-phc-2026", "uuc-phc-2025", "bhw-2025", "bhw-stepzero-2026"]);
   for (const metric of prototypeIndicators("nhfr-2026-09")) expect(barangayIndicatorSupported("nhfr-2026-09", metric.id), metric.id).toBe(true);
   expect(barangayIndicatorSupported("uuc-phc-2025", "uuc.listed")).toBe(true);
   for (const id of ["uuc.route.ip", "uuc.route.conflict", "uuc.route.four_ps", "uuc.route.health"])

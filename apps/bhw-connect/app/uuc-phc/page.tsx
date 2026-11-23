@@ -16,28 +16,42 @@ import { PresentationProvider } from "@/components/present/presentation-context"
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
 import { AskTheList } from "@/components/uuc-phc/ask-the-list";
+import { resolveUucEdition } from "@/lib/db/uuc-phc-edition";
+import { editionIssuanceLine, previousEdition, withEdition } from "@/lib/uuc-phc/editions";
 
-// 1 hour, matching /profiling-status and for the same reason: the page is statically prerendered,
-// so a transient empty read during (re)generation would otherwise cache an "unavailable" state.
-// This list is republished annually, so nothing is lost by refreshing hourly.
-export const revalidate = 3_600;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export const metadata: Metadata = {
-  title: { absolute: "UUC for PHC 2025 · Overview" },
-  description:
-    "The 2025 list of Unserved and Underserved Communities for Primary Health Care: 5,987 barangays across the Philippines, with the share of each region's barangays on the list.",
-};
+// Per request: the page shows the edition its `?edition=` names (lib/uuc-phc/editions.ts).
+export const dynamic = "force-dynamic";
 
-export default async function UucPhcLanding() {
-  const [counts, children] = await Promise.all([
-    getUucPhcCounts(NATIONAL_GEO_CODE, "national"),
-    getUucPhcChildren(NATIONAL_GEO_CODE, "national"),
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const { edition } = await resolveUucEdition(searchParams);
+  const counts = await getUucPhcCounts(NATIONAL_GEO_CODE, "national", edition.slug);
+  const n = counts ? `${formatCount(counts.nListed)} barangays` : "Barangays";
+  return {
+    title: { absolute: `UUC for PHC ${edition.year} · Overview` },
+    description: `The ${edition.year} list of Unserved and Underserved Communities for Primary Health Care: ${n} across the Philippines, with the share of each region's barangays on the list.`,
+  };
+}
+
+export default async function UucPhcLanding({ searchParams }: { searchParams: SearchParams }) {
+  const { edition, defaultEdition } = await resolveUucEdition(searchParams);
+  const ed = (href: string) => withEdition(href, edition, defaultEdition);
+  const previous = previousEdition(edition);
+  const [counts, children, previousCounts] = await Promise.all([
+    getUucPhcCounts(NATIONAL_GEO_CODE, "national", edition.slug),
+    getUucPhcChildren(NATIONAL_GEO_CODE, "national", edition.slug),
+    previous ? getUucPhcCounts(NATIONAL_GEO_CODE, "national", previous.slug) : null,
   ]);
 
   if (!counts) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">UUC for PHC 2025</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">UUC for PHC {edition.year}</h1>
         <p className="text-muted">This dataset is not available right now.</p>
       </div>
     );
@@ -51,7 +65,7 @@ export default async function UucPhcLanding() {
     pageLabel: "National overview",
     areaName: "Philippines",
     filterChips: [] as string[],
-    captionLine: uucDeckCaption(counts, "Philippines"),
+    captionLine: uucDeckCaption(counts, "Philippines", edition),
     brandLabel: UUC_PHC_BRAND_LABEL,
   };
 
@@ -68,13 +82,24 @@ export default async function UucPhcLanding() {
             <strong>Unserved and Underserved Communities for Primary Health Care</strong> —
             barangays that are both hard to reach and socio-economically disadvantaged. A barangay
             qualifies only when <strong>both</strong> a physical and a socio-economic factor are
-            present. This is the 2025 edition.
+            present. This is the {edition.year} edition.
           </p>
+          {previous && previousCounts && (
+            // Only where both editions are loaded: a "changed since" line under a list whose
+            // predecessor is not here would point at a page with nothing to show.
+            <p className="max-w-2xl text-sm text-muted">
+              The {previous.year} list had {formatCount(previousCounts.nListed)} barangays.{" "}
+              <Link href={ed("/uuc-phc/changes")} className="underline hover:text-accent">
+                See which barangays joined and left the list
+              </Link>
+              .
+            </p>
+          )}
           <PresentButton variant="secondary" />
         </section>
 
         {/* National figure */}
-        <PresentationSlide id="coverage" title="Barangays on the 2025 list">
+        <PresentationSlide id="coverage" title={`Barangays on the ${edition.year} list`}>
           <section className="rounded-lg border border-border bg-background p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <CoverageHero counts={counts} areaLabel="the Philippines" />
@@ -84,13 +109,12 @@ export default async function UucPhcLanding() {
               <ShareBar counts={counts} />
             </div>
             <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
-              <p className="text-xs text-muted">
-                Issued under DC No. 2025-0549 · criteria per DOH AO No. 2020-0023
-              </p>
+              <p className="text-xs text-muted">{editionIssuanceLine(edition)}</p>
               <DownloadLinks
                 geoLevel="national"
                 geoCode={NATIONAL_GEO_CODE}
                 nListed={counts.nListed}
+                edition={edition}
               />
             </div>
           </section>
@@ -111,25 +135,30 @@ export default async function UucPhcLanding() {
 
         <p className="text-sm text-muted">
           See{" "}
-          <Link href="/uuc-phc/criteria" className="underline hover:text-accent">
+          <Link href={ed("/uuc-phc/criteria")} className="underline hover:text-accent">
             why these barangays qualified
           </Link>{" "}
           for the four routes onto the list,{" "}
-          <Link href="/uuc-phc/indicators" className="underline hover:text-accent">
+          <Link href={ed("/uuc-phc/indicators")} className="underline hover:text-accent">
             the indicators behind it
           </Link>{" "}
           for how the 12 measurements are distributed,{" "}
-          <Link href="/uuc-phc/bhw-coverage" className="underline hover:text-accent">
+          <Link href={ed("/uuc-phc/bhw-coverage")} className="underline hover:text-accent">
             BHW coverage and the list
           </Link>{" "}
           for how the two datasets here compare, or the{" "}
-          <Link href="/uuc-phc/methodology" className="underline hover:text-accent">
+          <Link href={ed("/uuc-phc/methodology")} className="underline hover:text-accent">
             methodology
           </Link>{" "}
           for how the {formatCount(counts.nListed)} barangays were counted.
         </p>
 
-        <AskTheList geoCode={NATIONAL_GEO_CODE} geoLevel="national" geoName="Philippines" />
+        <AskTheList
+          geoCode={NATIONAL_GEO_CODE}
+          geoLevel="national"
+          geoName="Philippines"
+          listYear={edition.year}
+        />
       </div>
     </PresentationProvider>
   );

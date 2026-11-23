@@ -1,10 +1,11 @@
 import ExcelJS from "exceljs";
+import { UUC_CRITERIA_ORDER, type UucEdition } from "@/lib/uuc-phc/editions";
 import type { UucPhcListRow } from "@/lib/db/uuc-phc-list";
 import type { GeoLevel } from "@/lib/filters/schema";
 import { slugify } from "./query";
 
 /**
- * UUC for PHC 2025 — the list as a spreadsheet (plan U11).
+ * UUC for PHC — one edition of the list as a spreadsheet (plan U11).
  *
  * The one-pager U4 built is a picture, and anyone doing work with this list needs the rows. This
  * module turns `ref_uuc_phc_list` into a CSV or an XLSX for a chosen area.
@@ -99,7 +100,7 @@ export const UUC_PHC_EXPORT_COLUMNS: readonly UucPhcExportColumn[] = [
     key: "source_province",
     kind: "text",
     meaning:
-      "Province name as the source workbook wrote it. 9 of its 88 groups do not match PSA names.",
+      "Province name as the source workbook wrote it. Some of its province groups do not match PSA names.",
   },
   {
     key: "source_citymun",
@@ -147,7 +148,7 @@ export const UUC_PHC_EXPORT_COLUMNS: readonly UucPhcExportColumn[] = [
     key: "health_indicators",
     kind: "number",
     meaning:
-      "The source office's own criterion (d) score, 0-7, loaded as supplied. NOT RECOMPUTABLE from the indicator columns in this file: the source scored it before cleaning bounded the values, so a recomputation disagrees on 664 barangays and would leave 98 qualifying on no route at all.",
+      "The source office's own criterion (d) score, 0-7, loaded as supplied. NOT RECOMPUTABLE from the indicator columns in this file: the source scored it before cleaning bounded the values, so a recomputation disagrees on hundreds of barangays and would leave some qualifying on no route at all (the data-quality page gives each edition's figures).",
   },
 
   // The physical factor and the socio-economic measures. None of these was ever bounded.
@@ -267,6 +268,9 @@ export type UucPhcExportMeta = {
   sourceName: string | null;
   license: string | null;
   asOfDate: string | null;
+  /** The edition this file is of — named in its title, notes and filename, so a file saved today
+   * still says which year's list it holds after the section's default moves on. */
+  edition: UucEdition;
   /** ISO timestamp the file was generated at. Passed in rather than read from the clock here, so
    * the notes block is a pure function of its inputs and can be tested. */
   retrievedAt: string;
@@ -362,13 +366,13 @@ export function buildUucPhcExportNotes(
   );
 
   notes.push(
-    `MEMBERSHIP IS PRESENCE: every row here is a barangay ON the 2025 list. Barangays that were assessed and not listed are not in this dataset at all, so the absence of a barangay means it is not on the list — not that it was found adequate.`,
+    `MEMBERSHIP IS PRESENCE: every row here is a barangay ON the ${meta.edition.year} list. Barangays that were assessed and not listed are not in this dataset at all, so the absence of a barangay means it is not on the list — not that it was found adequate.`,
   );
 
   notes.push(
     `Source: ${meta.sourceName ?? "Department of Health (DOH) Bureau of Local Health Systems Development"}`,
   );
-  notes.push(`Issued under: DC No. 2025-0549 · criteria per DOH AO No. 2020-0023`);
+  notes.push(`Issued under: ${meta.edition.issuance} · criteria per ${UUC_CRITERIA_ORDER}`);
   // The dataset row carries no licence today. Saying so is a fact; naming one would be an
   // invention, and this file is the copy that travels furthest from anyone who could correct it.
   notes.push(`Licence: ${meta.license ?? "not stated by the source"}`);
@@ -384,7 +388,7 @@ export function buildUucPhcExportNotes(
 /** The one-line description of what the file covers, printed under the title. */
 export function buildUucPhcExportSubtitle(meta: UucPhcExportMeta, nRows: number): string {
   const scope = `${LEVEL_LABEL[meta.geoLevel]}: ${meta.geoName}`;
-  return `${scope} — ${fmt(nRows)} of the area's ${fmt(meta.nBarangays)} barangays are on the 2025 UUC for PHC list.`;
+  return `${scope} — ${fmt(nRows)} of the area's ${fmt(meta.nBarangays)} barangays are on the ${meta.edition.year} UUC for PHC list.`;
 }
 
 /** RFC 4180 quoting. 4 barangay names carry a comma, so this is load-bearing rather than
@@ -416,7 +420,7 @@ export function exportValue(row: UucPhcListRow, column: UucPhcExportColumn): str
  */
 export function renderUucPhcCsv(rows: readonly UucPhcListRow[], meta: UucPhcExportMeta): string {
   const lines = [
-    `# UUC for PHC 2025 — ${meta.geoName}`,
+    `# UUC for PHC ${meta.edition.year} — ${meta.geoName}`,
     `# ${buildUucPhcExportSubtitle(meta, rows.length)}`,
     ...buildUucPhcExportNotes(rows, meta).map((note) => `# ${note}`),
     "#",
@@ -460,7 +464,7 @@ export async function renderUucPhcXlsx(
   const sheet = workbook.addWorksheet("Listed barangays");
   const lastColumn = UUC_PHC_EXPORT_COLUMNS.length;
 
-  const titleRow = sheet.addRow([`UUC for PHC 2025 — ${meta.geoName}`]);
+  const titleRow = sheet.addRow([`UUC for PHC ${meta.edition.year} — ${meta.geoName}`]);
   titleRow.font = { bold: true, size: 14 };
   const subtitleRow = sheet.addRow([buildUucPhcExportSubtitle(meta, rows.length)]);
   subtitleRow.font = { italic: true, color: { argb: "FF57616A" } };
@@ -517,7 +521,7 @@ export async function renderUucPhcXlsx(
   const aboutRows: [string, string][] = [
     [
       "Dataset",
-      "UUC for PHC 2025 — the 2025 list of Unserved and Underserved Communities for Primary Health Care",
+      `UUC for PHC ${meta.edition.year} — the ${meta.edition.year} list of Unserved and Underserved Communities for Primary Health Care`,
     ],
     ["Relation", "ref_uuc_phc_list — column names in this file are that relation's, verbatim"],
     ["Scope", buildUucPhcExportSubtitle(meta, rows.length)],
@@ -536,7 +540,7 @@ export async function renderUucPhcXlsx(
   return workbook.xlsx.writeBuffer();
 }
 
-/** `uuc-phc-2025-listed-barangays-<area>.<ext>`, on the section's existing `slugify` convention. */
+/** `uuc-phc-<year>-listed-barangays-<area>.<ext>`, on the section's existing `slugify` convention. */
 export function uucPhcExportFilename(meta: UucPhcExportMeta, format: UucPhcExportFormat): string {
-  return `${slugify("uuc-phc-2025-listed-barangays", meta.geoName)}.${format}`;
+  return `${slugify(`${meta.edition.slug}-listed-barangays`, meta.geoName)}.${format}`;
 }

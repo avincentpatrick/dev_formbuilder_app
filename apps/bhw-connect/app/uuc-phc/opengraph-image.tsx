@@ -2,6 +2,7 @@ import { formatPct } from "@/lib/format";
 import { ImageResponse } from "next/og";
 import { NATIONAL_GEO_CODE } from "@/lib/filters/schema";
 import { getUucPhcCounts } from "@/lib/db/uuc-phc";
+import { defaultUucEdition } from "@/lib/db/uuc-phc-edition";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -23,9 +24,11 @@ export const contentType = "image/png";
  * `display`, and the failure is a 500 on the image route that no type or lint check would catch.
  */
 export default async function Image() {
-  const counts = await getUucPhcCounts(NATIONAL_GEO_CODE, "national");
+  // A link preview has no `?edition=`: it shows the section's default (newest) edition.
+  const edition = await defaultUucEdition();
+  const counts = await getUucPhcCounts(NATIONAL_GEO_CODE, "national", edition.slug);
 
-  const listed = (counts?.nListed ?? 5987).toLocaleString();
+  const listed = counts ? counts.nListed.toLocaleString() : "The";
   const total = (counts?.nBarangays ?? 41958).toLocaleString();
   const share =
     counts?.sharePct === null || counts === undefined
@@ -46,7 +49,7 @@ export default async function Image() {
       }}
     >
       <div style={{ display: "flex", fontSize: 30, color: "#0a6e6e", fontWeight: 600 }}>
-        UUC for PHC · 2025
+        {`UUC for PHC · ${edition.year}`}
       </div>
       <div
         style={{
@@ -60,7 +63,7 @@ export default async function Image() {
         {`${listed} unserved and underserved barangays`}
       </div>
       <div style={{ display: "flex", fontSize: 28, color: "#57616a", marginTop: 30 }}>
-        {`of ${total} in the Philippines${share} · DC No. 2025-0549`}
+        {`of ${total} in the Philippines${share} · ${edition.issuance}`}
       </div>
     </div>,
     { ...size },

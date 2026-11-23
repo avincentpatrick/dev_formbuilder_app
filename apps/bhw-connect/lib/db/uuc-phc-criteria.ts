@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase";
-import { DATASET_SLUGS, getDatasetIdBySlug } from "./dataset";
+import { getDatasetIdBySlug } from "./dataset";
 import { getChildGeos } from "./geo";
 import type { GeoLevel } from "@/lib/filters/schema";
 
@@ -173,8 +173,8 @@ export function toUucPhcCriteria(row: Row): UucPhcCriteria {
  * every geo, on U2's reasoning). Per-request `cache()`d.
  */
 export const getUucPhcCriteria = cache(
-  async (geoCode: string, geoLevel: GeoLevel): Promise<UucPhcCriteria | null> => {
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+  async (geoCode: string, geoLevel: GeoLevel, slug: string): Promise<UucPhcCriteria | null> => {
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();
@@ -200,10 +200,14 @@ export const getUucPhcCriteria = cache(
  * four empty tracks restating that same zero once per row.
  */
 export const getUucPhcCriteriaChildren = cache(
-  async (parentCode: string, parentLevel: GeoLevel): Promise<UucPhcCriteriaChild[]> => {
+  async (
+    parentCode: string,
+    parentLevel: GeoLevel,
+    slug: string,
+  ): Promise<UucPhcCriteriaChild[]> => {
     if (parentLevel === "citymun" || parentLevel === "barangay") return [];
 
-    const datasetId = await getDatasetIdBySlug(DATASET_SLUGS.uucPhc);
+    const datasetId = await getDatasetIdBySlug(slug);
     if (datasetId === null) return [];
 
     const children = await getChildGeos(parentCode, parentLevel);

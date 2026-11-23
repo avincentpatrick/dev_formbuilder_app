@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { EditionLink, EditionText } from "./edition-link";
 
 /**
  * The one correction this dataset actually attracts (plan U6): "that barangay should not be on the
@@ -12,7 +14,7 @@ import { FeedbackForm } from "@/components/feedback/feedback-form";
  * wrong"; it is the wrong shape for "this list is wrong about my barangay".
  *
  * **It says plainly that we cannot change the list.** This is a published DOH issuance
- * (DC No. 2025-0549) reproduced as issued; a correction is a matter for the source office, and
+ * (each edition under its own circular — DC No. 2025-0549 for 2025) reproduced as issued; a correction is a matter for the source office, and
  * routing someone to a bug tracker for it would waste their time. `feedback.dataset_slug` is what
  * makes that routing possible on our side — derived from this page's path at write time, so a
  * correction arrives distinguishable from a UI bug without anyone string-matching a URL.
@@ -20,7 +22,7 @@ import { FeedbackForm } from "@/components/feedback/feedback-form";
  * A `<details>` rather than a dialog: no client JS to open it, and it stays out of the way of the
  * footer's source line until someone wants it.
  */
-export function ListCorrection() {
+export function ListCorrection({ availableYears }: { availableYears: readonly string[] }) {
   return (
     <details className="group w-full">
       <summary className="cursor-pointer text-sm font-medium text-foreground hover:text-accent">
@@ -28,17 +30,28 @@ export function ListCorrection() {
       </summary>
       <div className="mt-4 flex flex-col gap-4 rounded-lg border border-border bg-surface p-4">
         <p className="text-sm text-muted">
-          This list is published by the DOH Bureau of Local Health Systems Development under DC No.
-          2025-0549 and is reproduced here exactly as issued — we cannot add or remove a barangay.
-          Tell us what you found and we will pass it on to the source office. Please name the
-          barangay, its city or municipality, and what looks wrong.
+          This list is published by the DOH Bureau of Local Health Systems Development under{" "}
+          <Suspense fallback="its circular">
+            <EditionText availableYears={availableYears} field="issuance" />
+          </Suspense>{" "}
+          and is reproduced here exactly as issued — we cannot add or remove a barangay. Tell us
+          what you found and we will pass it on to the source office. Please name the barangay, its
+          city or municipality, and what looks wrong.
         </p>
         <p className="text-sm text-muted">
           One thing is already known and does not need reporting: one source row could not be
           resolved to a single barangay. It is written up in the{" "}
-          <Link href="/uuc-phc/methodology" className="underline hover:text-accent">
-            methodology
-          </Link>
+          <Suspense
+            fallback={
+              <Link href="/uuc-phc/methodology" className="underline hover:text-accent">
+                methodology
+              </Link>
+            }
+          >
+            <EditionLink href="/uuc-phc/methodology" className="underline hover:text-accent">
+              methodology
+            </EditionLink>
+          </Suspense>
           .
         </p>
         <FeedbackForm

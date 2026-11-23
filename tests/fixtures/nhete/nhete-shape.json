@@ -185,6 +185,7 @@
         "ph_other": "Ationu llam co labo risnisi uta.",
         "ph_close": "Liquip exea co mmod ocon sequat lorem ipsumdo.",
         "ph_optional": "Lorsitam",
+        "ph_dropdown": "Oremip…",
         "no_cutoff": "Et consectet ura-dip",
         "label_cutoff": "Iscingeli tse-ddo:",
         "label_strength": "Eiusmodt em porincid:",
@@ -242,7 +243,7 @@
         },
         {
             "key": "aboutmat",
-            "stop": "Isiutal",
+            "stop": "Siutali",
             "label": "Iquip exea commod",
             "items": [
                 {
@@ -282,7 +283,7 @@
         },
         {
             "key": "consent",
-            "stop": "Xercita",
+            "stop": "Siutali",
             "label": "Tionul lam colab",
             "items": [
                 {
@@ -322,7 +323,7 @@
         },
         {
             "key": "about",
-            "stop": "Laboree",
+            "stop": "Siutali",
             "label": "Tdolo rem",
             "items": [
                 {
@@ -524,7 +525,7 @@
         },
         {
             "key": "s1b",
-            "stop": "Amet consecte turad",
+            "stop": "Abor isnisiut aliqu",
             "label": "Ipis cingelit seddo",
             "items": [
                 {
@@ -587,7 +588,7 @@
         },
         {
             "key": "s1c",
-            "stop": "Lore magnaali quaut",
+            "stop": "Abor isnisiut aliqu",
             "label": "Enima dminimveni",
             "items": [
                 {
@@ -719,7 +720,7 @@
         },
         {
             "key": "s1d",
-            "stop": "Tcon sectetur adipi",
+            "stop": "Abor isnisiut aliqu",
             "label": "Scing eli",
             "items": [
                 {
@@ -767,7 +768,7 @@
         },
         {
             "key": "s2b",
-            "stop": "Naa liquaut",
+            "stop": "Nul lamcola",
             "label": "Enim ad mi nimve",
             "items": [
                 {
@@ -791,7 +792,7 @@
         },
         {
             "key": "s2c",
-            "stop": "Ect eturadi",
+            "stop": "Nul lamcola",
             "label": "Pis ci ngelitse",
             "items": [
                 {
@@ -891,7 +892,7 @@
         },
         {
             "key": "s3b",
-            "stop": "Orin ci didunt utlabo",
+            "stop": "Inge li tseddo eiusmo",
             "label": "Reetd oloremagn",
             "items": [
                 {
@@ -1055,7 +1056,7 @@
         },
         {
             "key": "s3c",
-            "stop": "Snos tr udexer citati",
+            "stop": "Inge li tseddo eiusmo",
             "label": "O nullamc olaborisnis",
             "items": [
                 {
@@ -1189,7 +1190,7 @@
         },
         {
             "key": "s4a_1",
-            "stop": "Sni NHETE siuta",
+            "stop": "Tam NHETE etcon",
             "label": "NHETE Liquipe",
             "items": [
                 {
@@ -1297,7 +1298,7 @@
         },
         {
             "key": "s4a_2",
-            "stop": "Etc NHETE onsec",
+            "stop": "Tam NHETE etcon",
             "label": "NHETE Teturad (Ipis 2)",
             "items": [
                 {
@@ -1399,7 +1400,7 @@
         },
         {
             "key": "s4a_3",
-            "stop": "Ori NHETE snisi",
+            "stop": "Tam NHETE etcon",
             "label": "UUC Utaliquipexeac",
             "items": [
                 {
@@ -1423,7 +1424,7 @@
         },
         {
             "key": "s4b",
-            "stop": "Lla NHETE mcola",
+            "stop": "Tam NHETE etcon",
             "label": "Borisnisiu",
             "items": [
                 {
@@ -1486,7 +1487,7 @@
         },
         {
             "key": "s4c",
-            "stop": "Dun NHETE tutla",
+            "stop": "Tam NHETE etcon",
             "label": "Bor-eetd olo remagn",
             "items": [
                 {
@@ -1514,7 +1515,7 @@
         },
         {
             "key": "s4d",
-            "stop": "Atl NHETE oremi",
+            "stop": "Tam NHETE etcon",
             "label": "Psu mdol ors",
             "items": [
                 {
@@ -1538,7 +1539,7 @@
         },
         {
             "key": "s4e",
-            "stop": "Dte NHETE mpori",
+            "stop": "Tam NHETE etcon",
             "label": "Ncidi dun tutlabo reet dolo",
             "items": [
                 {
@@ -1605,7 +1606,7 @@
         },
         {
             "key": "tor",
-            "stop": "Quat lo remipsu, mdo lors it amet",
+            "stop": "Etco ns ectetur, adi pisc in geli",
             "label": "Con sec tetur adipi",
             "items": [
                 {
@@ -1676,7 +1677,7 @@
         },
         {
             "key": "s5b",
-            "stop": "Tati on ullamco, lab oris ni siut",
+            "stop": "Etco ns ectetur, adi pisc in geli",
             "label": "Aliquip exeaco",
             "items": [
                 {
@@ -1750,7 +1751,7 @@
         },
         {
             "key": "s5c",
-            "stop": "Mcol ab orisnis, iut aliq ui pexe",
+            "stop": "Etco ns ectetur, adi pisc in geli",
             "label": "Acomm odoc",
             "items": [
                 {
@@ -1774,7 +1775,7 @@
         },
         {
             "key": "s5d",
-            "stop": "Mips um dolorsi, tam etco ns ecte",
+            "stop": "Etco ns ectetur, adi pisc in geli",
             "label": "Tur adip iscinge lit sedd",
             "items": [
                 {
@@ -1838,7 +1839,7 @@
         },
         {
             "key": "s6_s01",
-            "stop": "Gel its eddoeiu",
+            "stop": "Xer cit ationul",
             "label": "Smo dtempo S01",
             "items": [
                 {
@@ -1903,7 +1904,7 @@
         },
         {
             "key": "s6_s03",
-            "stop": "Umd olo rsitame",
+            "stop": "Xer cit ationul",
             "label": "Tco nsecte S03",
             "items": [
                 {
@@ -1968,7 +1969,7 @@
         },
         {
             "key": "s6_s04",
-            "stop": "Iqu aut enimadm",
+            "stop": "Xer cit ationul",
             "label": "Ini mvenia S04",
             "items": [
                 {
@@ -2044,7 +2045,7 @@
         },
         {
             "key": "s6_s07",
-            "stop": "Ost rud exercit",
+            "stop": "Xer cit ationul",
             "label": "Ati onulla S07",
             "items": [
                 {
@@ -2123,7 +2124,7 @@
         },
         {
             "key": "s7c",
-            "stop": "Sed doeiusm odt empori",
+            "stop": "Ddo eiusmod tem porinc",
             "label": "Ncididun tut laboree",
             "items": [
                 {
@@ -2175,7 +2176,7 @@
         },
         {
             "key": "s7d",
-            "stop": "Qua tloremi psu mdolor",
+            "stop": "Ddo eiusmod tem porinc",
             "label": "Sitam etconse",
             "items": [
                 {
@@ -2276,7 +2277,7 @@
         },
         {
             "key": "s7e",
-            "stop": "Ori snisiut ali quipex",
+            "stop": "Ddo eiusmod tem porinc",
             "label": "Eacommo docons",
             "items": [
                 {
@@ -2359,7 +2360,7 @@
         },
         {
             "key": "s8b",
-            "stop": "Tsed doei",
+            "stop": "Iuta liqu",
             "label": "Usm odte mporinc",
             "items": [
                 {
@@ -2411,7 +2412,7 @@
         },
         {
             "key": "mx_a",
-            "stop": "Tcon sect",
+            "stop": "Iuta liqu",
             "label": "Eturad I",
             "items": [
                 {
@@ -2434,13 +2435,13 @@
         },
         {
             "key": "cp_a",
-            "stop": "Nsec tetu",
+            "stop": "Iuta liqu",
             "label": "Radipi S · Cing elit seddoe iusm od?",
             "parts": "a"
         },
         {
             "key": "mx_b",
-            "stop": "Temp orin",
+            "stop": "Iuta liqu",
             "label": "Cididu N",
             "items": [
                 {
@@ -2463,13 +2464,13 @@
         },
         {
             "key": "cp_b",
-            "stop": "Snos trud",
+            "stop": "Iuta liqu",
             "label": "Exerci T · Atio null amcola bori sn?",
             "parts": "b"
         },
         {
             "key": "mx_c",
-            "stop": "Isiu tali",
+            "stop": "Iuta liqu",
             "label": "Quipex E",
             "items": [
                 {
@@ -2492,13 +2493,13 @@
         },
         {
             "key": "cp_c",
-            "stop": "Sumd olor",
+            "stop": "Iuta liqu",
             "label": "Sitame T · Cons ecte turadi pisc in?",
             "parts": "c"
         },
         {
             "key": "mx_d",
-            "stop": "Geli tsed",
+            "stop": "Iuta liqu",
             "label": "Doeius M",
             "items": [
                 {
@@ -2521,13 +2522,13 @@
         },
         {
             "key": "cp_d",
-            "stop": "Itse ddoe",
+            "stop": "Iuta liqu",
             "label": "Iusmod T · Empo rinc ididun tutl ab?",
             "parts": "d"
         },
         {
             "key": "s8_rf",
-            "stop": "Oree tdol",
+            "stop": "Iuta liqu",
             "label": "Ore magna",
             "items": [
                 {
@@ -2665,7 +2666,7 @@
         },
         {
             "key": "s9b",
-            "stop": "Mporin",
+            "stop": "Tionul",
             "label": "Cid idun tutlabor",
             "items": [
                 {

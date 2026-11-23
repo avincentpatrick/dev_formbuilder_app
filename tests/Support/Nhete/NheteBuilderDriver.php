@@ -196,7 +196,7 @@ final class NheteBuilderDriver
         ));
     }
 
-    /** @param  array{key: string, label: string, relevant: ?string, page_width?: string}  $section */
+    /** @param  array{key: string, label: string, relevant: ?string, page_width?: string, chapter?: string, progress_label?: string}  $section */
     public function section(array $section): string
     {
         $made = $this->send('post', 'sections', [], 'add section '.$section['key']);
@@ -210,6 +210,9 @@ final class NheteBuilderDriver
             'relevant_expression' => $section['relevant'],
             // M247 (`D231`): a screen of tables is drawn on a wide page.
             'page_width' => $section['page_width'] ?? null,
+            // M249 (`D233`): the chapter a stop's first screen starts, and a screen's short name on the progress bar.
+            'chapter' => $section['chapter'] ?? null,
+            'progress_label' => $section['progress_label'] ?? null,
             'version' => $made->json('version'),
         ], 'save section '.$section['key']);
 
@@ -276,7 +279,8 @@ final class NheteBuilderDriver
         // M246: a grid's settings — its rows and their details, its columns and their rules — as the Grid tab saves them.
         $config = is_array($e['config'] ?? null) ? $e['config'] : [];
         if ($e['options'] !== []) {
-            $config['options'] = array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1]], $e['options']);
+            // M249: a choice's short label — what the closed dropdown shows — rides as a third entry.
+            $config['options'] = array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1], ...(isset($o[2]) ? ['short_label' => $o[2]] : [])], $e['options']);
         }
         if ($e['type'] === 'note') {
             $config['content'] = $e['content'] === null ? [] : $this->withImages($e['content']);

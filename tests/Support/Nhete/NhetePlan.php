@@ -58,6 +58,9 @@ final class NhetePlan
 
     public const WORD_CAP = 1500;
 
+    /** M249 (`D233`): the lists whose choices read "Short. Longer explanation…" and so carry a short closed label. */
+    public const SHORT_LABEL_LISTS = ['use'];
+
     /** @var array<string, mixed> */
     private array $fixture;
 
@@ -124,7 +127,7 @@ final class NhetePlan
     /**
      * The form as today's builder can hold it: one section per screen, each with its ordered elements.
      *
-     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>, page_width?: string}>
+     * @return list<array{key: string, label: string, stop: string, relevant: ?string, elements: list<array<string, mixed>>, page_width?: string, chapter?: string, progress_label?: string}>
      */
     public function sections(): array
     {
@@ -160,6 +163,45 @@ final class NhetePlan
                 if ($tables !== []) {
                     $sections[$i]['page_width'] = 'wide';
                 }
+            }
+        }
+
+        return $this->chaptered($sections);
+    }
+
+    /**
+     * M249 (`progress-chapters`, `D233`): the module's own way of finding your way, in every layout.
+     *
+     *  - Each STOP is a chapter, started by its first screen (`chapter`).
+     *  - A screen whose page opens with a heading — 44 of 49 — has that heading as its title, and its short screen name
+     *    as its PROGRESS LABEL, as the module draws them. The heading leaves the note (the page would otherwise say it
+     *    twice), and a note left with nothing in it leaves the screen.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    private function chaptered(array $sections): array
+    {
+        $previousStop = null;
+        foreach ($sections as $i => $section) {
+            if ($section['stop'] !== $previousStop) {
+                $sections[$i]['chapter'] = $section['stop'];
+            }
+            $previousStop = $section['stop'];
+
+            $first = $section['elements'][0] ?? null;
+            $heading = $first !== null && $first['type'] === 'note' && is_array($first['content']) ? ($first['content'][0] ?? null) : null;
+            if (! is_array($heading) || ($heading['type'] ?? null) !== 'heading' || ($heading['level'] ?? null) !== 1) {
+                continue;
+            }
+
+            $sections[$i]['progress_label'] = $section['label'];
+            $sections[$i]['label'] = (string) $heading['text'];
+            $rest = array_slice($first['content'], 1);
+            if ($rest === []) {
+                array_shift($sections[$i]['elements']);
+            } else {
+                $sections[$i]['elements'][0]['content'] = $rest;
             }
         }
 
@@ -704,7 +746,7 @@ final class NhetePlan
      */
     private static function optionObjects(array $options): array
     {
-        return array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1]], $options);
+        return array_map(static fn (array $o): array => ['value' => $o[0], 'label' => $o[1], ...(isset($o[2]) ? ['short_label' => $o[2]] : [])], $options);
     }
 
     /** @return list<array<string, mixed>> */
@@ -726,7 +768,8 @@ final class NhetePlan
             'type' => $type,
             'label' => $label,
             'hint' => null,
-            'placeholder' => null,
+            // M249 (`dropdown-placeholder`, `D233`): every dropdown says what to do in its empty box, as the module does.
+            'placeholder' => $type === 'dropdown' ? (string) $this->fixture['texts']['ph_dropdown'] : null,
             'required' => 'optional',
             'required_when' => [],
             'relevant' => null,
@@ -746,12 +789,23 @@ final class NhetePlan
         ];
     }
 
-    /** @return list<array{0: string, 1: string}> */
+    /**
+     * A choice list as `[value, label]` pairs — and, for the lists whose choices are "Short. Longer explanation…"
+     * (M249, `D233`), a third entry: the short label a closed dropdown shows, the words before the first full stop.
+     *
+     * @return list<array{0: string, 1: string, 2?: string}>
+     */
     private function options(mixed $choices): array
     {
         $list = is_string($choices) ? $this->fixture['lists'][$choices] : $choices;
+        $short = is_string($choices) && in_array($choices, self::SHORT_LABEL_LISTS, true);
 
-        return array_map(static fn (array $c): array => [(string) $c[0], self::plain((string) $c[1])], $list);
+        return array_map(static function (array $c) use ($short): array {
+            $label = self::plain((string) $c[1]);
+            $stop = mb_strpos($label, '.');
+
+            return $short && $stop !== false && $stop > 0 ? [(string) $c[0], $label, mb_substr($label, 0, $stop)] : [(string) $c[0], $label];
+        }, $list);
     }
 
     /** @param  list<string>  $values */

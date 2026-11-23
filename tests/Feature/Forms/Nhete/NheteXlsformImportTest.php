@@ -147,12 +147,10 @@ it('imports the Meridian-dialect NHETE workbook, publishes it, and keeps only th
 
     expect($submit($base)->status())->toBe(201);
 
-    // Kept: "up to two" and "No view or opinion stands alone", written as constraints this product reads.
+    // Kept since M243: the 1,500-word cap, "up to two" and "No view or opinion stands alone", as `#meridian` settings.
     expect($refusedOn($submit([...$base, 'q3_1' => ['access', 'results', 'use']])))->toBe(['q3_1'])
-        ->and($refusedOn($submit([...$base, 'q3_2' => ['noview', 'ip']])))->toBe(['q3_2']);
-
-    // LOST: the 1,500-word cap. Expressions here have no `regex()` or `string-length()` (`xlsform-import-odk-functions`).
-    expect($submit([...$base, 'q1_1' => NheteAnswers::words(1501)])->status())->toBe(201);
+        ->and($refusedOn($submit([...$base, 'q3_2' => ['noview', 'ip']])))->toBe(['q3_2'])
+        ->and($refusedOn($submit([...$base, 'q1_1' => NheteAnswers::words(1501)])))->toBe(['q1_1']);
 
     // LOST: "required when". The importer reads `required` as yes or blank only, and the stand-in constraint
     // `not(<when>) or . != ''` never runs on a blank answer, so a missing comment passes (`xlsform-required-when`).

@@ -85,6 +85,18 @@ export interface SchemaField {
     media?: { maxCount: number | null; minCount: number | null } | null;
     /** M177 (`R-f44e9d00`): Show to respondents (`config.visibility`). Absent / null ⇒ the type's own rule. */
     visibility?: 'hidden' | 'shown' | null;
+    /** M243 (`R-1da063f4`): a text question's word limits (`config.min_words`/`max_words`). Absent ⇒ none. */
+    words?: AnswerBounds | null;
+    /** M243: a multi-select's choice limits (`config.min_choices`/`max_choices`). Absent ⇒ none. */
+    choices?: AnswerBounds | null;
+    /** M243: a multi-select's "only answer" choices (`config.options[].exclusive`), with the label its message names. */
+    exclusive?: { value: string; label: string }[] | null;
+}
+
+/** M243: a lower and upper limit, each a whole number of at least 1 or null for none. */
+export interface AnswerBounds {
+    min: number | null;
+    max: number | null;
 }
 
 export interface SchemaSection {

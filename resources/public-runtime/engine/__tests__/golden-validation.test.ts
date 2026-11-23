@@ -54,6 +54,10 @@ type FieldFragment = {
     media?: { min?: number; max?: number };
     // M177 (`R-f44e9d00`): Show to respondents — Never (`hidden`) or Always (`shown`); absent keeps the type's own rule.
     visibility?: 'hidden' | 'shown';
+    // M243 (`R-1da063f4`): answer limits — word limits, choice limits, and the option values that are "only answer" choices.
+    words?: { min?: number; max?: number };
+    choices?: { min?: number; max?: number };
+    exclusive?: string[];
 };
 
 type SectionFragment = { key: string; relevant?: string; repeatable?: boolean; min?: number; max?: number };
@@ -134,6 +138,9 @@ function buildSemanticInput(vector: SemanticVector): SemanticInput {
             grid: field.grid ?? null,
             media: field.media ? { minCount: field.media.min ?? null, maxCount: field.media.max ?? null } : null,
             visibility: field.visibility ?? null,
+            words: field.words ? { min: field.words.min ?? null, max: field.words.max ?? null } : null,
+            choices: field.choices ? { min: field.choices.min ?? null, max: field.choices.max ?? null } : null,
+            exclusive: field.exclusive ? field.exclusive.map((value) => ({ value, label: value })) : null,
         });
 
         (field.rules ?? []).forEach((rule, ruleIndex) => {

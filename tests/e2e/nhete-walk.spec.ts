@@ -14,7 +14,8 @@ import { assertClean, assertNoHorizontalOverflow, forceTheme } from './support/a
  *   - on the welcome, the first indicator, the 141-question parts and the red-flag pages, axe in light and dark;
  *   - "Save and finish later" on the first parts page, then the link opened in a FRESH browser, which must land on that
  *     page with the earlier answers still there;
- *   - the walk visits exactly the fixture's screens, in order, and the submission is accepted.
+ *   - the walk visits exactly the fixture's screens, in order, and the submission is accepted;
+ *   - M243: Q1.1 shows its live word count, and Q3.1 stops a third tick and lets "No view or opinion" clear and lock the rest.
  * What it measures (boot, bytes, the biggest page) is printed as one `NHETE-METRICS` line per width, and attached.
  *
  * Every number here is measured against the same-shape fixture (`D221`), never the review copy's words.
@@ -43,6 +44,36 @@ const RESUME_AT = 'cp_a';
 const BIGGEST = { key: 'cp_d', rows: 141 };
 
 const TEXT_ANSWER = 'A short answer for the walk.';
+
+/**
+ * M243 (`R-1da063f4`): where the answer limits are met. Q1.1 has a 1,500-word cap, so its box shows a live count; Q3.1 is
+ * "choose up to two" with "No view or opinion" as its only answer.
+ */
+const WORD_CAP_AT = { page: 's1a', key: 'q1_1', count: '6 of 1,500 words' };
+const CHOICE_CAP_AT = { page: 's3b', key: 'q3_1', noView: 4 };
+
+/**
+ * Up to two: once two are ticked the third box is locked, and the only answer is not. Ticking it clears the two and locks
+ * every other box; unticking it gives them back. The question is left blank, so the walk then answers it as before.
+ */
+async function checkChoiceLimits(page: Page): Promise<void> {
+    const row = page.locator(`[id="field-${CHOICE_CAP_AT.key}"]`);
+    const labels = row.locator('label.mds-checkbox');
+    const box = (n: number) => row.getByRole('checkbox').nth(n);
+
+    await labels.nth(0).click();
+    await labels.nth(1).click();
+    await expect(box(2), 'a third tick is stopped').toBeDisabled();
+    await expect(box(CHOICE_CAP_AT.noView), 'the only answer is never locked').toBeEnabled();
+
+    await labels.nth(CHOICE_CAP_AT.noView).click();
+    await expect(box(CHOICE_CAP_AT.noView)).toBeChecked();
+    for (const n of [0, 1]) await expect(box(n), 'ticking the only answer clears the others').not.toBeChecked();
+    await expect(box(0), 'and locks them').toBeDisabled();
+
+    await labels.nth(CHOICE_CAP_AT.noView).click();
+    await expect(box(0)).toBeEnabled();
+}
 
 interface Todo {
     key: string;
@@ -212,8 +243,13 @@ test('NHETE — the whole module answered page by page, left and resumed, and su
             await page.close();
         }
 
+        if (key === CHOICE_CAP_AT.page) await checkChoiceLimits(walker);
+
         const filling = Date.now();
         const answered = await answerPage(walker);
+        if (key === WORD_CAP_AT.page) {
+            await expect(walker.locator(`[id="field-${WORD_CAP_AT.key}"] [data-word-count]`), 'the word count follows the answer').toHaveText(WORD_CAP_AT.count);
+        }
         if (key === BIGGEST.key) {
             metrics.biggest_page_answered = answered;
             metrics.biggest_page_fill_ms = Date.now() - filling;

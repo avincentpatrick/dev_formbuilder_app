@@ -6,6 +6,7 @@ namespace App\Services\Xlsform;
 
 use App\Enums\FieldType;
 use App\Services\Xlsform\Dto\TypeMapping;
+use App\Support\Forms\AnswerLimits;
 
 /**
  * The single source of truth for the FieldType ⇄ XLSForm `survey.type` mapping (Increment G7 /
@@ -161,5 +162,79 @@ final class XlsformTypeMap
     public function isImportable(FieldType $type): bool
     {
         return $type !== FieldType::Matrix && $type !== FieldType::LikertMatrix;
+    }
+
+    /**
+     * M243 (`R-1da063f4`): a choice that must stand alone, written to the `#meridian` column of the choices sheet.
+     */
+    public const MARKER_EXCLUSIVE = 'meridian:exclusive';
+
+    /**
+     * M243 (`R-1da063f4`): a question's answer limits as `#meridian` tokens, `meridian:max_words=1500` and the like,
+     * written after the row's type marker, space-separated, only for a type that takes them. XLSForm has no column for a
+     * word or choice limit, and an ODK `constraint` would not round-trip: this product's own import refuses `regex` and
+     * `count-selected` at publish (`xlsform-import-odk-functions`). Read back by {@see answerLimitsFrom()}.
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<string>
+     */
+    public function answerLimitTokens(FieldType $type, array $config): array
+    {
+        $tokens = [];
+        foreach (self::limitKeys($type) as $key) {
+            $value = AnswerLimits::bound($config, $key);
+            if ($value !== null) {
+                $tokens[] = "meridian:{$key}={$value}";
+            }
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * A `#meridian` cell split into its type marker (the one token with no `=`, as every marker before M243 was the
+     * whole cell) and the answer limits it carries for `$type`. A limit that is not a whole number of at least 1, or one
+     * the type does not take, is left out and named in `$warnings`. With no type yet (`null`) only the marker is read.
+     *
+     * @param  list<string>  $warnings
+     * @return array{0: ?string, 1: array<string, int>}
+     */
+    public function answerLimitsFrom(?string $cell, ?FieldType $type, int $rowNumber, array &$warnings): array
+    {
+        $marker = null;
+        $limits = [];
+        foreach (preg_split('/[ ]+/', trim((string) $cell)) ?: [] as $token) {
+            if ($token === '') {
+                continue;
+            }
+            if (! str_contains($token, '=')) {
+                $marker ??= $token;
+
+                continue;
+            }
+            if ($type === null) {
+                continue;
+            }
+            [$name, $value] = explode('=', (string) preg_replace('/^meridian:/', '', $token), 2);
+            $whole = AnswerLimits::bound([$name => $value], $name);
+            if (! str_starts_with($token, 'meridian:') || ! in_array($name, self::limitKeys($type), true) || $whole === null) {
+                $warnings[] = "Row {$rowNumber}: the setting “{$token}” was left out. It is not a limit this question takes, or not a whole number.";
+
+                continue;
+            }
+            $limits[$name] = $whole;
+        }
+
+        return [$marker, $limits];
+    }
+
+    /** @return list<string> the answer-limit keys a type takes */
+    private static function limitKeys(FieldType $type): array
+    {
+        return match (true) {
+            $type->takesWordLimits() => [AnswerLimits::MIN_WORDS, AnswerLimits::MAX_WORDS],
+            $type->takesChoiceLimits() => [AnswerLimits::MIN_CHOICES, AnswerLimits::MAX_CHOICES],
+            default => [],
+        };
     }
 }

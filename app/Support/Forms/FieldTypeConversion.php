@@ -197,7 +197,7 @@ final class FieldTypeConversion
             // `D145`: a Yes/No's answers were never typed choices, so the Single choice gets exactly two; back, it holds none.
             $to === FieldType::SingleSelect && $from === FieldType::YesNo => array_replace($targetDefaultConfig, ['options' => self::YES_NO_OPTIONS]),
             $to === FieldType::YesNo => $targetDefaultConfig,
-            default => self::inFamilyConfig($from, $to, $source, $targetDefaultConfig),
+            default => self::answerLimitsFor($to, self::inFamilyConfig($from, $to, $source, $targetDefaultConfig)),
         };
 
         [$kept, $dropped] = self::partitionRows($from, $to, $validations);
@@ -645,5 +645,30 @@ final class FieldTypeConversion
     private static function emptyList(mixed $value): bool
     {
         return ! is_array($value) || $value === [];
+    }
+
+    /**
+     * M243 (`R-1da063f4`): word limits stay only on a type that takes them, and choice limits likewise, so a Short text
+     * made an Email, or a multi-select made a single choice, does not carry a limit nothing shows and no engine checks.
+     * Each drop is reported (`configDropped`), so the dialog says it.
+     *
+     * An option's "only answer" flag is LEFT on the options. It sits inside `options`, so removing it would report the
+     * whole list as dropped ("Its choices are removed"), which is false; on any other type every engine, the builder and
+     * the XLSForm export ignore it, and converting back to a multi-select brings it back as it was.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    private static function answerLimitsFor(FieldType $to, array $config): array
+    {
+        if (! $to->takesWordLimits()) {
+            unset($config['min_words'], $config['max_words']);
+        }
+
+        if (! $to->takesChoiceLimits()) {
+            unset($config['min_choices'], $config['max_choices']);
+        }
+
+        return $config;
     }
 }

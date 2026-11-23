@@ -7573,7 +7573,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   AND THE ROW MUST NOT REPEAT IT.** The builder ships on the tenant-web surface — `routes/tenant.php`
   through `:587`, all `can:update,form`, all on `FormBuilderController`. What is absent is the `/api/v1`
   **twin**, which this repository treats as a separate obligation:
-  `docs/xlsform-interop-spec.md:139` records both surfaces for the adjacent export, and
+  `docs/xlsform-interop-spec.md` §8 (*"Both HTTP surfaces expose export"*) records both surfaces for the adjacent export, and
   `routes/tenant.php` calls its own route "the browser-facing twin of the doc-pinned /api/v1 endpoint".
   ⚠️ **Two of the four pinned groups are twinned outright, one only partly, one not at all** — sections and
   fields have full web twins, the draft READ exists as `GET /forms/{form}/builder` at
@@ -9161,7 +9161,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ~~**`minor` · Four PHP-enum mirrors live in Vue SFCs and one adds a member its enum does not have, and the
   new mirror gate cannot reach any of them.**~~ Measured by `M89` (2026-09-10) while building
   `DocumentedEnumMirrorDriftTest`. The gate declares twenty mirrors across `.ts` and `.d.ts` files; the
-  census also found unions inside `.vue` files — `resources/js/components/submissions/FieldInput.vue:130`
+  census also found unions inside `.vue` files — `resources/js/components/submissions/FieldInput.vue`'s `EncodeField.field_type`
   (`prefill`) and `:156` (`RequiredMarker`) — plus
   `resources/public-runtime/composables/useFormRuntime.ts:62`'s `Marker`. ⛔ **`RequiredMarker` and `Marker`
   each carry a `none` that `RequiredMode` does not**, so they are near-mirrors rather than mirrors and a
@@ -11353,7 +11353,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   `FormBuilderService::writeField()` then whole-column-replaces with the result. ⛔ **THIS IS REACHABLE DATA LOSS, NOT A
   SHAPE COMPLAINT.** Option `label_translations` is written by XLSForm import (`XlsformImportParser::normalizeChoices()`),
   read by the runtime (`schema-mapping.ts:183,282-289`), re-exported (`XlsformExporter::pushPairList()`), faithfully sent
-  back by the client (`ChoicesEditor.vue:17-20` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
+  back by the client (`ChoicesEditor.vue`'s `update()` spreads `{...opt, ...patch}`) — and is not in the allowed rule set
   (`:159-165`). Import a multilingual form, edit any choice field, and every translation is gone. ⚠️ **Only types
   whose `configRules()` arm is non-empty are affected** — choice, cascading, matrix, likert_matrix, geo, media and
   hidden. A type returning `[]` keeps its config whole, which is why this has stayed invisible. ⚠️ **The remedy is
@@ -11571,7 +11571,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   in this repository could see it** — `.builder__pane { overflow: hidden }` CLIPS the spill instead of
   scrolling it, so `assertNoHorizontalOverflow`'s `.app-shell__content` read is flat over it, axe has no rule,
   and `personalization-axe` had element-level reads for the pane switcher (`M19`) and the config pane (`M109`)
-  but never for this control. Fixed with the host-level `flex-wrap` `ConfigPanel.vue:1076` already applies to
+  but never for this control. Fixed with the host-level `flex-wrap` that `ConfigPanel.vue`'s styles already apply to
   the Requiredness control — `D28`'s measured affordance. ⛔ **THE ROW'S OWN EVIDENCE: ONE CITATION FALSE, FOUR
   ROTTED, AND ONE CLAIM FALSE.** `ConfirmationModal.vue:11` names a file `M117` renamed and a sentence it
   deleted (the in-tree statement moved to `draft-snapshot.ts:7`); `Builder.vue:537-543` and `:462-471` are both
@@ -11680,7 +11680,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   surface rather than the repository. Once authors can compose content, a census over all of `resources/` is what
   keeps a well-meaning future edit from turning a block renderer into a sink. ⚠️ **A gate written here proves
   nothing while green** — it needs a committed mutation that adds a `v-html` and turns it red. **Live.**
-  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue:76`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception. ✅ **CLOSED BY `M130` (2026-10-04) — ONE RENDERER, NO RAW SINK, AND A CENSUS THAT HAS BEEN SEEN RED.** `NoteContent.vue` draws a note's blocks on the guest page, the encode page and the preview, every leaf a text node, a link re-checked at render and opened in a new tab, headings under the page's own; `MdsCallout` is new. The guest page reads pictures from `GET /api/v1/public/content-images/{shareToken}/{image}` (its own limiter, one enveloped 404 for everything a token's version does not show) and caches them without the token. `resources/js/__tests__/raw-html-sink-census.test.ts` refuses any raw-HTML sink but `TwoFactorSetup.vue`'s, and a committed `v-html` in `NoteContent.vue` turned it red before its revert.
+  Filed by `M110`. **Tier: early-testing.** ⚠️ **NOT BUILDABLE BEFORE `R-6dedc3a9` FIXES THE BLOCK SHAPE — recorded by `M121`, 2026-10-01.** It reads `ready` because the line cannot express that ordering (filed below). ⚠️ **The render path is wider than this row says:** `EncodeFormPresenter::field()` carries no config at all, and `InstanceField.vue` builds its own `encodeField` for repeat instances (reached from the builder preview through `RepeatGroup`), so the honest file list is six — three of them census hubs (`FieldInput.vue`, `FieldControl.vue`, `schema-mapping.ts`). It needs its own split. ✅ **`D69` ANSWERED 2026-10-01 (`M122`) — B: once a note has blocks, its label is for the author only** — it names the note in the canvas, the logic rail and the PDF, and the respondent sees the blocks alone. ⛔ **STILL NOT BUILDABLE BEFORE `R-6dedc3a9`** (the block shape this renders), whatever the line now says: it has no grammar for one row waiting on another's code (`R-6175d935`). ✅ **`M125` (2026-10-02) shipped the block shape this renders** (`R-6dedc3a9`'s shape half), so the precondition above now holds. ⚠️ Two facts the renderer inherits: span text may arrive `null` (`ConvertEmptyStringsToNull`), and the render-time link re-check is a TypeScript twin of `ContentBlocks::linkIsSafe()` — which wants a drift test, or it is one more unguarded mirror. ⚠️ **`M129` (2026-10-03) hands this row two pieces of `R-f0c5b682`, because this row is their only consumer.** (1) The GUEST read route for a content-block image: publicly readable for a published form, gated on `ScanStatus::servable()` (an unservable image renders as its alt text), and same-origin with the guest page, whose CSP is `img-src 'self'`. (2) The service worker's caching of those images: `sw.ts`'s network-first `guest-schema` cache holds 20 entries under `/api/v1/public/f/`, so an image routed there would evict a cached schema. It also inherits two things from `M129`'s editor: the Content tab's "respondents do not see this yet" notice, which this row removes, and the shared link-vector fixture that `linkLooksSafe()` and `linkIsSafe()` both read — the drift test asked for above. ⚠️ **VERIFIED BY `M130` (2026-10-04), TAKEN.** `components.test.ts:549` is a comment, not a check, and the only `v-html` assertion pins one file (`ContentBlocksEditor.test.ts`), so the census covers `resources/` and `packages/design-system/src`, which the guest bundle also ships. Five of the six render files are hubs now, not three. The encode page already receives `config.content` inside `version.schema`; it simply never reached `FieldInput`. The guest image route goes OUTSIDE `/api/v1/public/f/` and on its own limiter: under that prefix the schema cache would claim it and `ServiceWorkerCachePrefixRouteTest` refuses it, and on `throttle:guest` a note's 50 images would spend the per-token submit budget. Its offline cache key drops the share token, which is minted on every visit and lives 24 hours. The author-only label still reached screen readers through the "New question" announcement (`FieldRow.vue:61`, `InstanceField.vue`'s `watch(relevant, …)`). `MdsAlert` is a live status region, so a static `MdsCallout` joins the design system rather than a local exception. ✅ **CLOSED BY `M130` (2026-10-04) — ONE RENDERER, NO RAW SINK, AND A CENSUS THAT HAS BEEN SEEN RED.** `NoteContent.vue` draws a note's blocks on the guest page, the encode page and the preview, every leaf a text node, a link re-checked at render and opened in a new tab, headings under the page's own; `MdsCallout` is new. The guest page reads pictures from `GET /api/v1/public/content-images/{shareToken}/{image}` (its own limiter, one enveloped 404 for everything a token's version does not show) and caches them without the token. `resources/js/__tests__/raw-html-sink-census.test.ts` refuses any raw-HTML sink but `TwoFactorSetup.vue`'s, and a committed `v-html` in `NoteContent.vue` turned it red before its revert.
 
 - ✅ **CLOSED BY `M129` (2026-10-04) — `minor` · A content-block image has nowhere to live, and the surfaces that must escape block text are not in
   the output-encoding contract.** Filed 2026-09-25 by `M110` as the third and last content-block row, split off
@@ -11832,14 +11832,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   which must not become a seventh. The PHP `FieldType` enum is authoritative and the builder palette is fully
   server-driven — but the **renderers** carry six hand-written mirrors: `schema-mapping.ts:50-61` (`SUPPORTED`,
   whose own comment admits it mirrors `EncodeFormPresenter::SUPPORTED`), `:72` (`HAS_OPTIONS`), `:75`
-  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue:193` (`NUMERIC_TYPES`). ✅ **Only
+  (`TEXT_TYPES`), `FieldInput.vue` (`MEDIA_TYPES`) and `ConfigPanel.vue` (`NUMERIC_TYPES`). ✅ **Only
   `field-roles.ts`'s `RENDERS_NOTHING` is pinned**, by `tests/Unit/Forms/PdfFieldRoleTest.php`, which regex-parses
   the TypeScript from PHP and asserts set equality — so the instrument already exists in this repository and needs
   copying, not inventing. ⚠️ **`EncodeFormPresenter`'s own docblock (`:64-72`) admits the duplication and records
   that collapsing it was deliberately declined** — which makes a parity test the right answer rather than a
   refactor: it converts five unguarded mirrors into guarded ones **without deleting any of them**. ⚠️ A gate
   written here is green on arrival and therefore proves nothing until a committed mutation — removing one type
-  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:75`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:50`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue:193` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:49`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
+  from one mirror — turns it red. **Live.** Filed by `M110`. **Tier: early-testing.** ✅ **CLOSED BY `M113` (2026-09-26) — AS A PROVEN STRICT SUBSET OF `R-09f73330`, NOT WORKED SEPARATELY.** ✅ Its citations hold, with two off-by-N: `HAS_OPTIONS` is declared at `schema-mapping.ts:75`, not `:72` (`:72` is the comment), and the `EncodeFormPresenter` docblock admission runs `:64-69`, not `:64-72`. ⛔ **ALL FIVE GAPS IT NAMES APPEAR IN `R-09f73330` VERBATIM, AT THE SAME FILE AND LINE** — `schema-mapping.ts:50`/`:73`/`:75`, `FieldInput.vue`'s `MEDIA_TYPES` and `ConfigPanel.vue`'s `NUMERIC_TYPES` — and it names **no** declaration that row does not. (It also cites `field-roles.ts`'s `RENDERS_NOTHING`, but as already-gated *evidence*, not as a gap.) So the single gate written for `R-09f73330` necessarily closes this one too, and **working both would have collided on three production files** under `D13` clause 1. ⚠️ **Its *"six copies, five ungated"* is a FLOOR:** there are **ten** ungated declarations by declaration count, and an eleventh that was already gated. ⚠️ **And its supporting citation is mis-aimed, though its conclusion survives:** `EncodeFormPresenter`'s docblock at `:67-72` declines collapsing the *builder functions*, not the `SUPPORTED` constant — the admission that actually supports the row is on the TypeScript side, at `schema-mapping.ts:49`. ⚠️ **Its *"the instrument exists and needs copying"* is now UNDERSTATED:** the technique has been copied three further times since it was filed — `DraftProjectionMirrorDriftTest`, `DocumentedEnumMirrorDriftTest` (a table-driven generalisation over three grammars) and the `NotificationType`/`ShellAbility` parity tests.
 
 - **`minor` · Three more request paths prune an array key by the same mechanism `B0` just fixed, and one of
   them may be doing it on purpose.** Found by `M111` (2026-09-25) while sweeping for the CLASS behind
@@ -11898,9 +11898,9 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   PHP counterpart at all.** Found by `M112` (2026-09-26) while verifying `R-54a19217`; the row it was verified
   for says "five", counted by file. By declaration there are ten: `schema-mapping.ts:50-63` `SUPPORTED`, `:73`
   `HAS_OPTIONS`, `:75` `TEXT_TYPES`; `display-value.ts:48` `HAS_OPTIONS` (a second copy), `:51` `GEO_TYPES`,
-  `:55` `MEDIA_TYPES`; `semantic-validator.ts:43` `MEDIA_FIELD_TYPES` (a third copy of the media set);
+  `:55` `MEDIA_TYPES`; `semantic-validator.ts`'s `MEDIA_FIELD_TYPES` (a third copy of the media set);
   `FieldInput.vue`'s `MEDIA_TYPES` (a fourth) and its inline text-type literal (a second `TEXT_TYPES`);
-  and `ConfigPanel.vue:193` `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
+  and `ConfigPanel.vue`'s `NUMERIC_TYPES`. ⛔ **`TEXT_TYPES` and `NUMERIC_TYPES` MIRROR NOTHING** — there is no
   PHP predicate or registry either one corresponds to, so they cannot drift from a source; they ARE a source, and
   an undeclared one. ✅ **The technique is proven and is now used twice:** `tests/Unit/Forms/PdfFieldRoleTest.php`
   parses `field-roles.ts` by regex with two anti-vacuity arms, and `M112` built
@@ -11995,7 +11995,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · The builder and PHP disagree about whether a duration field takes an ordered comparison, and the
   disagreement is now pinned rather than resolved.** Found by `M113` (2026-09-26) while building the client
-  field-type mirror census. `ConfigPanel.vue:372`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
+  field-type mirror census. `ConfigPanel.vue`'s `NUMERIC_TYPES` is `['integer', 'decimal', 'calculated',
   'likert_scale']` — four members. `ValueShape::allowsOperator()` (`ValueShape.php:218-242`) permits
   `gt`/`lt`/`gte`/`lte` for `Number`, `Duration` and `Scale`, which is **five** types: the same four plus
   `duration`. ⛔ **`R-09f73330` SAYS THIS SET "MIRRORS NOTHING", AND THAT STOPPED BEING TRUE IN THE INCREMENT
@@ -12015,7 +12015,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   field-type literal in `resources/` while building the census, rather than by trusting either filing row's
   count. Beyond the ten declarations `R-09f73330` names and the already-gated `RENDERS_NOTHING`, the same type
   strings appear as bare inline disjunctions at `schema-mapping.ts:91,94,115,118,377,400,424,553`,
-  `FieldInput.vue:252,240,247,248`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
+  `FieldInput.vue`'s `MEDIA_TYPES` and `computedText`, `semantic-validator.ts:468,474,480,659,806,834`, `MediaEditor.vue:42`,
   `GeoInput.vue:38-43` and `ConfigPanel.vue`'s `config_editor` comparisons (cited as `:113` until `M116`, where that was a bare `);` and went blank — number DROPPED, not repaired). ⛔ **Two of them are ADDITIONAL COPIES of sets the census
   already guards** — `schema-mapping.ts:424` is a fourth four-member media disjunction, and `:115` and `:400`
   are a second and third geo triple — so the census's own equality assertions can be green while a sibling
@@ -14709,7 +14709,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   recorded value in a source form?"*. `app/Support/Forms/ShareableQuestions.php:31-39` never offers a `cascading_select` for
   sharing; a link feeds a flat list of answers for one key (`app/Services/Forms/LinkedChoiceService.php:258-275`, served by
   `app/Http/Controllers/Public/PublicFormSchemaController.php:60-77`) and nothing filters an existing option list by it; the
-  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue:353-390`). The
+  cascade control shows every child of the chosen parent (`resources/js/components/submissions/FieldInput.vue`'s `cascadeViable` and `cascadeOptionsAt()`). The
   remedy: `config.levels[i].filter` and, on a list- or form-sourced choice question, `config.options_filter = {form_id, field_key,
   mode: present | absent}`; `ShareableQuestions` admits the cascade (its shared value set is per level); the linked-choices
   endpoint gains `sets` beside the schema with their own stamp (`D60` A), cached by the worker per version
@@ -14751,7 +14751,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - **`minor` · A condition, a calculation or answer piping cannot read a grid cell.**
   `docs/data-dictionary.md:383` records that no expression may reference a grid (`app/Services/Forms/ExpressionValidationGate.php`),
-  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts:1126` tells authors so.
+  `app/Enums/PipingEligibility.php:110` excludes it from piping, and `resources/js/components/help/manual.ts` tells authors so (its grid tip, *"Grids cannot be used in conditions or formulas"*).
   With typed cells (the grid rows above) a cell becomes a scalar an expression could read as `${grid.row.column}`; both engines
   and their golden vectors would learn it together. Filed so the gap the typed grid opens is queued rather than left in prose.
   **Live.** Filed by `M172`. **Tier: during-testing.**
@@ -14916,7 +14916,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 - ✅ **CLOSED BY `M176` (2026-10-18) — ****`minor` · The "Change question type" dialog speaks in developer words and repeats the type as the question's name.**
   The testers' comment (2026-10-11, comment 1): *"Make the text/instructions more “smart highschooler” friendly"*, on a screenshot of
   this dialog. `resources/js/components/builder/ConvertFieldDialog.vue:39` says *"It keeps its key, so conditions, calculations and
-  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts:204` and
+  text that mention it still point to it"*; `resources/js/components/builder/field-conversion.ts`'s `censusOwner()` and
   `app/Enums/ConversionWarning.php:50` carry the rest, with `app/Enums/ConversionDropReason.php` and `app/Enums/ConversionImpact.php`;
   a new question's label is its type's label (`FormBuilderService::addField()`), so the dialog reads *"Current type of
   “Date & time”: Date & time"*. The remedy: `docs/ux/design-system-reference.md` gains a voice rule — write for a smart
@@ -15181,7 +15181,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
 - ✅ **CLOSED BY `M180` (2026-10-20) — ****`minor` · A condition or a rule can name a calculated question, but always reads it as blank.**
   Both engines work out calculations last and never feed them back into relevance or constraints
-  (`app/Services/Validation/SemanticValidator.php:126`, `resources/public-runtime/engine/semantic-validator.ts:155`), yet the condition
+  (the M180 comment in `SemanticValidator::evaluate()` and in its twin `evaluate()` in `resources/public-runtime/engine/semantic-validator.ts`), yet the condition
   editor offers every calculated question (`resources/js/components/builder/ConfigPanel.vue:367`) and the compared-question lists do too,
   because a calculation's value shape is a number (`app/Enums/ValueShape.php:109`) — so "show when the total is over 10" never shows,
   and a rule against a total never checks. The remedy (`D149` A, taken by R4 with its dependency order): conditions and rules read a
@@ -16210,6 +16210,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   The remedy, when taken: read `count-selected` as `count`, warn on import for every function this product does not have (naming it), and decide whether `regex`/`string-length` join the grammar. The latter needs both engines and golden vectors.
 
+  ➕ **Since `M243`** a word cap, a choice cap and an only answer are settings (`answer-rules-words-choices`), carried by this product's own XLSForm as `#meridian` tokens. A Kobo author writes them as `count-selected(.) <= N`, `not(selected(., 'x') and count-selected(.) > 1)` and a word-cap `regex(…)`, so the import should also recognise those shapes and turn them into the settings rather than keep them as expressions.
+
   **Live.** Filed by `M237`. **Tier: during-testing.**
 
 - **`minor` · `xlsform-required-when` — "Required when…" cannot come in by XLSForm: a `required` formula is dropped without a warning, and a stand-in constraint never runs on a blank answer.**
@@ -16276,7 +16278,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
 
   **Latent** — needs text within a few characters of the limit. Filed by `M240`. **Tier: after-launch.**
 
-- **`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
+- ✅ **CLOSED BY `M243` (2026-11-16) — ****`minor` · `answer-rules-words-choices` — No word limit, no "choose at most N" and no "only answer" choice exist as settings; each needs a hand-written rule that shows an error after the fact.**
   Found by `M237` (2026-11-14). NHETE builds today with three workarounds:
   - a whole-answer pattern for "up to 1,500 words";
   - `count(.) <= 2` for "choose up to two";
@@ -16287,6 +16289,14 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: minimum/maximum words with a counter, a "most choices" setting, and an exclusive choice that clears and locks the rest, in both engines with golden vectors, the builder's panes, and XLSForm export and import.
 
   **Not live** — a request. Filed by `M237`. **Tier: during-testing.**
+
+  ✅ **CLOSED BY `M243` (2026-11-16), on its branch.** Built as the remedy says, with four corrections the row did not know:
+  - **Field settings, not rule rows.** `config.min_words`/`max_words` on a Short or Long text, `min_choices`/`max_choices` and `options[].exclusive` on a multi-select, read by `FormField::answerLimits()` and both engines. A rule row can sit in an any/all group, so it is never absolute, and rule rows never reach the respondent's render model, so neither the count nor the lock could have been built on them.
+  - **Words split on the Unicode White_Space set written out**, in `AnswerLimits` and `words.ts`, never `\s`: the two engines read `\s` differently (`engine-whitespace-class`).
+  - **An "only answer" box is never locked by the cap**, so switching to "No view" never needs every other tick taken back first.
+  - **XLSForm carries the settings as `#meridian` tokens**, not ODK constraints, which this product's own import refuses at publish (`xlsform-import-odk-functions`).
+
+  On the screen: a live count under the box ("12 of 1,500 words", and how many too many once over), a multi-select that cannot take one choice too many, and an only answer that clears and locks the rest; the builder's Validation tab has Words or Choices, and the Options tab an Only answer column. Pinned by `tests/golden/validation/answer_rules.json` (27 vectors, both engines), `AnswerLimitsTest`, `XlsformAnswerLimitsTest`, the Vitest cases, and NHETE: its three workarounds are settings now, refused by their own rules, kept through export and re-import, and met in the browser by `nhete-walk.spec.ts` and `nhete-builder-block.spec.ts`. Version 0.22.0.
 
 - **`minor` · `note-details-block` — A note has no collapsible "details" block, so long optional reading is always open.**
   Found by `M237` (2026-11-14). NHETE keeps each indicator's formula, sources, watch-outs and "Research behind this" under a collapsed *More about this indicator*. Today all 35 are drawn open (`NhetePlan`'s `research-open` count is 30). `ContentBlocks` holds heading, paragraph, callout, divider and image only. Bullet lists are the table item *"Rich-text / media content block (headings, lists, …)"* at the top of this file.
@@ -16362,3 +16372,24 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+
+- **`nit` · `engine-whitespace-class` — The two validation engines disagree on what `\s` matches, so a `pattern` rule can pass in the browser and be refused on submit, or the reverse.**
+  Found by `M243` (2026-11-16), measured with PHP 8.4.14 (PCRE 10.44) and Node 24 while planning the word count. Under the `u` flag, `\s` matches U+0085 (next line) and U+180E (Mongolian vowel separator) in PHP and not in JavaScript, and U+FEFF (zero-width no-break space) in JavaScript and not in PHP. `StructuredRuleEvaluator::compilePattern()` and its TypeScript twin compile an author's pattern as written, so any pattern using `\s` or `\S` inherits the split. No golden vector holds one of the three characters. `M243`'s word count avoids it by splitting on the Unicode White_Space set written out as a list.
+
+  The remedy, when taken: rewrite `\s`/`\S` in an author's pattern to one explicit class in both engines (or refuse the three characters at the save door), with a golden vector for each character.
+
+  **Latent** — needs one of three rare characters inside an answer checked by a pattern that uses `\s`. Filed by `M243`. **Tier: before-launch.**
+
+- **`nit` · `length-rule-value-cast` — A length rule's value is read differently by the two engines, and publish never checks it.**
+  Found by `M243` (2026-11-16). `min_length`/`max_length` read `rule_value` as an integer: PHP's `(int)` reads `"1e3"` as 1000, while the TypeScript twin's `phpIntCast` (`structured-rule-evaluator.ts`) reads it as 1. `ExpressionValidationGate::assertRuleValue()` checks that a pattern compiles and that a minimum or maximum value is numeric, but checks no length value at all, so `"1e3"`, `"-5"` or `"ten"` publishes.
+
+  The remedy, when taken: refuse a length value that is not a plain whole number at the save door and the publish gate, with a golden vector pinning both engines on a refused shape.
+
+  **Latent** — needs an author to type an exponent or a word into a length rule's value. Filed by `M243`. **Tier: before-launch.**
+
+- **`minor` · `print-answer-rule-hints` — A printed blank form shows no word limit, no "choose up to N" and no "only answer" mark, so a paper respondent cannot follow the rules the keyer is later held to.**
+  Found by `M243` (2026-11-16). `BlankFormPrintPresenter::fieldRows()` prints the label, the required mark, "(if applicable)", the author's hint and a box per option. It prints no rule at all; the only one it reads is `max_length`, to size a long answer's ruled lines (`authoredMaxLength()`). `M243` adds word limits, choice limits and "only answer" choices, and the keyer's screen enforces them, so a paper answer that breaks one cannot be keyed as written.
+
+  The remedy, when taken: print a short line under the label ("Up to 1,500 words", "Tick up to 2"), mark an "only answer" option, and size a long answer's lines from its word limit too.
+
+  **Not live** — a request, and it needs a printed form using one of `M243`'s settings. Filed by `M243`. **Tier: before-launch.**

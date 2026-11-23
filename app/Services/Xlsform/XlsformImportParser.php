@@ -179,7 +179,7 @@ final class XlsformImportParser
     private function buildField(string $typeRaw, array $row, ?string $sectionKey, int $rowNumber, array $choicesByList, array &$warnings): FieldSpec
     {
         $appearance = $this->trimToNull($this->col($row, 'appearance'));
-        $marker = $this->trimToNull($this->col($row, '#meridian'));
+        $marker = $this->types->answerLimitsFrom($this->col($row, '#meridian'), null, $rowNumber, $warnings)[0];
 
         $type = $this->types->toFieldType($typeRaw, $appearance, $marker);
         if ($type === null) {
@@ -191,9 +191,9 @@ final class XlsformImportParser
         $key = trim((string) ($this->col($row, 'name') ?? ''));
         $listName = $this->listNameFromType($typeRaw);
 
-        $config = [];
+        $config = $this->types->answerLimitsFrom($this->col($row, '#meridian'), $type, $rowNumber, $warnings)[1];
         if ($type->hasOptions()) {
-            $config['options'] = $this->optionsFromList($choicesByList, $listName);
+            $config['options'] = self::markExclusive($type, $choicesByList[$listName ?? ''] ?? [], $this->optionsFromList($choicesByList, $listName));
         }
 
         [$defaultValue, $defaultIsExpression] = $this->resolveDefault($type, $row, $config);
@@ -605,5 +605,30 @@ final class XlsformImportParser
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * M243 (`R-1da063f4`): a multi-select's "only answer" choices, from the `#meridian` column of the choices sheet
+     * (`meridian:exclusive`). The options are built from the same rows in the same order, so the two lists align. Any other
+     * type takes no such flag, and its marker is left unread.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  list<array<string, mixed>>  $options
+     * @return list<array<string, mixed>>
+     */
+    private static function markExclusive(FieldType $type, array $rows, array $options): array
+    {
+        if (! $type->takesChoiceLimits()) {
+            return $options;
+        }
+
+        foreach ($options as $index => $option) {
+            $cell = (string) ($rows[$index]['raw']['#meridian'] ?? '');
+            if (in_array(XlsformTypeMap::MARKER_EXCLUSIVE, preg_split('/[ ]+/', trim($cell)) ?: [], true)) {
+                $options[$index]['exclusive'] = true;
+            }
+        }
+
+        return $options;
     }
 }

@@ -116,6 +116,11 @@ const CONFIG_SENTENCES: Record<string, string> = {
     accuracy_threshold: 'Its accuracy target is removed.',
     default_center: 'Its default map centre is removed.',
     default_zoom: 'Its default map zoom is removed.',
+    // M243 (`R-1da063f4`): answer limits, which only text (words) and a multi-select (choices) take.
+    min_words: 'Its fewest-words limit is removed.',
+    max_words: 'Its most-words limit is removed.',
+    min_choices: 'Its fewest-choices limit is removed.',
+    max_choices: 'Its most-choices limit is removed.',
 };
 
 function optionLabel(options: readonly { value: string; label: string }[], value: unknown): string {

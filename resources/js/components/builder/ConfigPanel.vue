@@ -49,6 +49,7 @@ import MatrixEditor from './MatrixEditor.vue';
 import MediaEditor from './MediaEditor.vue';
 import PrefillEditor from './PrefillEditor.vue';
 import ValidationEditor from './ValidationEditor.vue';
+import AnswerLimitsEditor from './AnswerLimitsEditor.vue';
 import FieldHistory from './FieldHistory.vue';
 import type { DiffWords } from './conflict-diff';
 import { referenceCandidates, type ReferenceSource } from './reference-candidates';
@@ -572,6 +573,21 @@ watch(librarySaved, (value) => {
         }, 2500);
     }
 });
+
+// M243 (`R-1da063f4`): the answer limits a question's type takes, at the top of its Validation tab — words or choices, by
+// the server's lists (`word_limit_types`, `choice_limit_types`), never a list kept here.
+const answerLimitKind = computed<'words' | 'choices' | null>(() => {
+    const type = field.value?.field_type;
+    if (type === undefined) return null;
+    if (enums.word_limit_types?.includes(type)) return 'words';
+    if (enums.choice_limit_types?.includes(type)) return 'choices';
+    return null;
+});
+function answerLimit(end: 'min' | 'max'): number | null {
+    const raw = answerLimitKind.value === null ? null : field.value?.config[`${end}_${answerLimitKind.value}`];
+    return typeof raw === 'number' ? raw : null;
+}
+
 </script>
 
 <template>
@@ -688,7 +704,7 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'options'">
-                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="choiceSources" :filter-sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
+                        <LinkedChoicesEditor v-if="enums.linked_choice_types?.includes(field.field_type)" :config="field.config" :sources="choiceSources" :filter-sources="props.store.linkableSources" :form-id="store.formId" :field-type="field.field_type" @update:config="field.config = $event; props.store.touch(field.uid, 'field')" /><ChoicesEditor v-if="choiceSourceOf(field.config) === 'typed'" :options="choices" :allow-exclusive="enums.choice_limit_types?.includes(field.field_type) ?? false" @update:options="setConfig('options', $event)" /><OtherSpecifyControl :store="props.store" />
                         <MdsFormField
                             v-if="layoutOptions.length > 0"
                             label="Choice layout"
@@ -790,6 +806,14 @@ watch(librarySaved, (value) => {
                     </template>
 
                     <template v-else-if="activeTab === 'validation'">
+                        <AnswerLimitsEditor
+                            v-if="answerLimitKind"
+                            :kind="answerLimitKind"
+                            :min="answerLimit('min')"
+                            :max="answerLimit('max')"
+                            @update:min="setConfig(`min_${answerLimitKind}`, $event)"
+                            @update:max="setConfig(`max_${answerLimitKind}`, $event)"
+                        />
                         <ValidationEditor
                             :validations="field.validations" combinator-family="constraint"
                             :rule-types="enums.validation_rule_types"

@@ -883,3 +883,33 @@ describe('ConfigPanel — the "Insert a question" picker (M178, R-75719ac4)', ()
         expect(offered).not.toContain('Later one · later_one');
     });
 });
+
+/**
+ * M243 (`R-1da063f4`): the Validation tab opens with the answer limits a question's type takes — by the server's lists
+ * (`word_limit_types`, `choice_limit_types`), never a list kept in the panel. The base fixture sends neither list, which is
+ * the second case: with nothing transmitted, nothing is offered.
+ */
+describe('ConfigPanel — answer limits on the Validation tab (M243)', () => {
+    async function openValidation(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
+        await wrapper.findAll('[role="tab"]').find((t) => t.text() === 'Validation')!.trigger('click');
+    }
+
+    it('offers Words on a type the server lists, and writes the limit into the question', async () => {
+        const target = field();
+        const store = { ...makeStore({ field: target }), enums: { ...ENUMS, word_limit_types: ['short_text'], choice_limit_types: ['multi_select'] } } as unknown as BuilderStore;
+        const wrapper = mountPanel(store);
+        await openValidation(wrapper);
+
+        expect(wrapper.get('[data-answer-limits]').attributes('data-answer-limits')).toBe('words');
+
+        wrapper.getComponent({ name: 'AnswerLimitsEditor' }).vm.$emit('update:max', 1500);
+        expect(target.config.max_words).toBe(1500);
+    });
+
+    it('offers nothing when the server lists no type', async () => {
+        const wrapper = mountPanel(makeStore({ field: field() }));
+        await openValidation(wrapper);
+
+        expect(wrapper.find('[data-answer-limits]').exists()).toBe(false);
+    });
+});

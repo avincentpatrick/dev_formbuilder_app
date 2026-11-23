@@ -499,6 +499,9 @@ final class EncodeFormPresenter
             // M186 (`R-ed7f3127`) — what narrows this question's choices, or a cascade's levels', by what another form
             // recorded; null when nothing does. Display only, as on the guest form: the server checks no answer against it.
             'choice_filter' => $this->choiceFilter($field),
+            // M243 (`R-1da063f4`) — the word limits, the choice limits and the "only answer" values, for the shared FieldInput's
+            // word count and its choice locks; null when the question has none, as the guest adapters send it.
+            'limits' => $field->answerLimits(),
             // `note` is display-only (handled by the page), never an input; a repeatable section's fields are
             // supported and render inside the add/remove-instance loop (Increment G2). A hidden field is
             // keyable ONLY when it is externally sourced — a `fixed` or source-less one has no answer this

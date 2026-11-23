@@ -82,7 +82,8 @@ export default function UucPhcMethodology() {
         <p className="text-muted">
           This dashboard publishes <strong>5,987</strong> barangays — the source office&rsquo;s
           final list, which is also the figure the 2027 Budget Cue Cards give for the same list as
-          of DC No. 2025-0549. The two agree at every one of the 17 regions.
+          of DC No. 2025-0549. The two agree nationally and at 15 of the 17 regions; BARMM and
+          Region IX differ by Sulu&rsquo;s barangays, as the note below explains.
         </p>
         <p className="text-muted">
           It has not always said so. Until the final list arrived, this dashboard published{" "}
@@ -98,11 +99,12 @@ export default function UucPhcMethodology() {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">One geography note</h2>
         <p className="text-muted">
-          Sulu was removed from BARMM in 2024 and is now part of Region IX. The source files
-          Sulu&rsquo;s 87 barangays under Region IX, and so does this dashboard, which keeps every
-          regional count identical to the published table. Sulu&rsquo;s codes in the app&rsquo;s
-          geography still begin 19066, while the source writes them 09066; the two are matched
-          one to one.
+          Sulu was removed from BARMM in 2024 and is now part of Region IX, and this dashboard
+          files Sulu&rsquo;s 87 listed barangays there. The source list and the cue cards still
+          print them under BARMM, so BARMM reads 87 lower and Region IX 87 higher here than in
+          the published table; every other region matches it. The source writes Sulu&rsquo;s
+          codes 09066, which the app&rsquo;s geography keeps as 19066; the two are matched one to
+          one.
         </p>
       </section>
 

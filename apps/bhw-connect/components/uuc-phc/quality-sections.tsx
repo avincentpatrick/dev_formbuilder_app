@@ -229,6 +229,13 @@ export function BenchmarkSection({ gaps }: { gaps: UucPhcBenchmarkGap[] }) {
 
 /* ------------------------------------------------- the published-total reconciliation */
 
+/** BARMM and Region IX differing by the same number in opposite directions: Sulu filed in Region IX. */
+export function isSuluMove(regions: UucPhcPublishedDelta[]): boolean {
+  const barmm = regions.find((r) => r.geoCode === "19");
+  const ix = regions.find((r) => r.geoCode === "09");
+  return !!barmm && !!ix && barmm.delta < 0 && ix.delta === -barmm.delta;
+}
+
 export function ReconciliationSection({ deltas }: { deltas: UucPhcPublishedDelta[] | null }) {
   // `null` is a failed read, `[]` is a checked agreement, and the two must not render alike — a
   // data-quality page that prints "they agree" when it could not check is worse than one that
@@ -260,28 +267,40 @@ export function ReconciliationSection({ deltas }: { deltas: UucPhcPublishedDelta
 
   const national = deltas.find((delta) => delta.geoLevel === "national");
   const regions = deltas.filter((delta) => delta.geoLevel !== "national");
-  if (!national) return null;
+  // Sulu's move to Region IX leaves the national total in agreement while two regions differ by
+  // the same number in opposite directions, so a national row is no longer what makes a gap real.
+  if (!national && regions.length === 0) return null;
+  const suluMove = regions.length === 2 && isSuluMove(regions);
 
   return (
     <section className="rounded-lg border border-border bg-background p-5 sm:p-6">
       <h2 className="text-lg font-semibold tracking-tight">Against the published total</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted">
         The 2027 Budget Cue Cards publish their own distribution of UUC for PHC barangays by region
-        (p{national.sourcePage}, as of {national.sourceAsOf ?? "2025"}, citing DC No. 2025-0549).
+        (p{(national ?? regions[0]).sourcePage}, as of {(national ?? regions[0]).sourceAsOf ?? "2025"},
+        citing DC No. 2025-0549).
         This dashboard renders its own source instead, and the two do not quite agree.
       </p>
 
-      <p className="mt-5 rounded-md bg-surface px-4 py-3 text-sm">
-        This dashboard lists{" "}
-        <strong className="tabular-nums">{formatCount(national.nListed)}</strong> barangays; the cue
-        cards publish <strong className="tabular-nums">{formatCount(national.nPublished)}</strong> —
-        a difference of{" "}
-        <strong className="tabular-nums">
-          {national.delta > 0 ? "+" : ""}
-          {formatCount(national.delta)}
-        </strong>
-        .
-      </p>
+      {national ? (
+        <p className="mt-5 rounded-md bg-surface px-4 py-3 text-sm">
+          This dashboard lists{" "}
+          <strong className="tabular-nums">{formatCount(national.nListed)}</strong> barangays; the
+          cue cards publish{" "}
+          <strong className="tabular-nums">{formatCount(national.nPublished)}</strong> — a
+          difference of{" "}
+          <strong className="tabular-nums">
+            {national.delta > 0 ? "+" : ""}
+            {formatCount(national.delta)}
+          </strong>
+          .
+        </p>
+      ) : (
+        <p className="mt-5 rounded-md bg-surface px-4 py-3 text-sm">
+          The national total agrees with the cue cards to the unit. The difference is between two
+          regions.
+        </p>
+      )}
 
       {regions.length > 0 && (
         <>
@@ -329,16 +348,27 @@ export function ReconciliationSection({ deltas }: { deltas: UucPhcPublishedDelta
         </>
       )}
 
-      {/* The caveat the plan is emphatic about. A vintage gap is the likeliest reading and neither
-          document says so, which makes stating it as the cause a claim neither source supports. */}
-      <p className="mt-4 border-t border-border pt-4 text-xs text-muted">
-        <strong className="font-medium text-foreground">Why they differ is not recorded.</strong>{" "}
-        The workbook corroborates its own figure three independent ways, and the cue cards are a
-        snapshot as of {national.sourceAsOf ?? "2025"} while the workbook file name reads as a later
-        revision — so a vintage difference is the likeliest reading.{" "}
-        <em>Neither document states that</em>, and this page does not assert it. What is recorded is
-        the two figures, their dates, and where the gap sits.
-      </p>
+      {suluMove ? (
+        <p className="mt-4 border-t border-border pt-4 text-xs text-muted">
+          <strong className="font-medium text-foreground">This difference is a geography choice.</strong>{" "}
+          Sulu left BARMM in 2024. This dashboard files Sulu&rsquo;s listed barangays under Region
+          IX, where the current PSGC places the province, while the cue cards print them in BARMM,
+          as the source list does. Nothing about which barangays are listed differs; only the
+          region that counts them.
+        </p>
+      ) : (
+        /* The caveat the plan is emphatic about. A vintage gap is the likeliest reading and
+           neither document says so, which makes stating it as the cause a claim neither source
+           supports. */
+        <p className="mt-4 border-t border-border pt-4 text-xs text-muted">
+          <strong className="font-medium text-foreground">Why they differ is not recorded.</strong>{" "}
+          The workbook corroborates its own figure three independent ways, and the cue cards are a
+          snapshot as of {national?.sourceAsOf ?? regions[0]?.sourceAsOf ?? "2025"} while the
+          workbook file name reads as a later revision — so a vintage difference is the likeliest
+          reading. <em>Neither document states that</em>, and this page does not assert it. What is
+          recorded is the two figures, their dates, and where the gap sits.
+        </p>
+      )}
     </section>
   );
 }

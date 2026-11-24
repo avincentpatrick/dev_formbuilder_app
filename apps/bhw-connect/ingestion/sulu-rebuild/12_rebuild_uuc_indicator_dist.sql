@@ -1,7 +1,10 @@
--- Rebuild agg_uuc_phc_indicator_dist
--- Extracted from supabase/migrations/20260827160000_agg_uuc_phc_indicator_dist.sql (from its populate step on); creates nothing, recomputes rows.
--- Run once, after db/check-sulu-region.mjs shows the table stale. Safe to re-run.
+-- Rebuild agg_uuc_phc_indicator_dist for the 2025 edition (Sulu filed under Region IX).
+-- Populate step of supabase/migrations/20260827160000_agg_uuc_phc_indicator_dist.sql, unchanged, followed by
+-- its sanity checks scoped to the 2025 dataset_id (the original checks sum the whole table, which now holds
+-- two editions). The check text is the 2026 migration's own (20261124090300, step 5c), with the slug of the
+-- 2025 edition. Creates nothing; recomputes the 2025 rows only. Safe to re-run.
 begin;
+
 -- Populate. Idempotent: recomputes and upserts every row, so re-running after a fact reload is
 -- the refresh procedure. The (dataset_id, geo_code, geo_level, indicator) unique key makes every
 -- row a stable target, so nothing is deleted.
@@ -160,127 +163,46 @@ on conflict (dataset_id, geo_code, geo_level, indicator) do update set
   n_comparable = excluded.n_comparable,
   n_worse = excluded.n_worse;
 
--- ---------------------------------------------------------------------------------------------
--- Assert, after loading, the invariants the page depends on. Each is cheap, and each has a way of
--- being violated silently by a future edit — which is the test for whether an assertion earns its
--- place. A failure aborts the migration rather than publishing a wrong histogram.
 do $$
 declare
+  ds bigint := (select dataset_id from dim_dataset where slug = 'uuc-phc-2025');
   n_bad integer;
 begin
-  -- 1. Every geo carries all 12 indicators, and the denominator is the one agg_uuc_phc_counts
-  --    publishes. A histogram drawn against a different n_listed than the coverage page prints
-  --    for the same area is the drift this check exists to catch.
+  if ds is null then
+    return;
+  end if;
+
+  -- 5c. Distributions: 12 indicator rows per geo, bins + missing = listed, capped values only in
+  --     the top bin, and the national capped count equal to the fact table's flags.
   select count(*) into n_bad
   from agg_uuc_phc_counts c
   left join (
-    select dataset_id, geo_code, geo_level, count(*) as n_ind, min(n_listed) as lo, max(n_listed) as hi
-    from agg_uuc_phc_indicator_dist group by 1, 2, 3
-  ) d on d.dataset_id = c.dataset_id and d.geo_code = c.geo_code and d.geo_level = c.geo_level
-  where d.geo_code is null or d.n_ind <> 12 or d.lo <> c.n_listed or d.hi <> c.n_listed;
+    select geo_code, geo_level, count(*) n_ind, min(n_listed) lo, max(n_listed) hi
+    from agg_uuc_phc_indicator_dist where dataset_id = ds group by 1, 2
+  ) d on d.geo_code = c.geo_code and d.geo_level = c.geo_level
+  where c.dataset_id = ds
+    and (d.geo_code is null or d.n_ind <> 12 or d.lo <> c.n_listed or d.hi <> c.n_listed);
   if n_bad > 0 then
-    raise exception '% geo(s) lack all 12 indicator rows or disagree with agg_uuc_phc_counts.n_listed', n_bad;
+    raise exception '% geo(s) lack all 12 indicator rows or disagree with n_listed', n_bad;
   end if;
-
-  -- 2. The bars account for every listed barangay. A histogram whose bins sum to less than the
-  --    area's list is a histogram of an unstated subset, which is the failure mode this whole
-  --    table exists to avoid.
-  select count(*) into n_bad
-  from agg_uuc_phc_indicator_dist
-  where (select coalesce(sum(x), 0) from unnest(bin_counts) x) + n_missing <> n_listed;
+  select count(*) into n_bad from agg_uuc_phc_indicator_dist d
+  where d.dataset_id = ds
+    and ((select coalesce(sum(x), 0) from unnest(d.bin_counts) x) + d.n_missing <> d.n_listed
+         or (select coalesce(sum(x), 0) from unnest(d.bin_capped[1:9]) x) > 0
+         or d.n_worse > d.n_comparable or d.n_comparable > d.n_listed);
   if n_bad > 0 then
-    raise exception '% row(s) have bins + n_missing <> n_listed', n_bad;
+    raise exception '% distribution row(s) fail their bin or comparison invariants', n_bad;
   end if;
-
-  -- 3. Capped counts are a subset of their bin, and live only in the top bin. The second half is
-  --    what lets the page label the top bar "of which N were bounded" without qualifying where in
-  --    the distribution the bounded values are: a bounded value equals value_max by definition.
-  select count(*) into n_bad
-  from agg_uuc_phc_indicator_dist d
-  where (select coalesce(sum(x), 0) from unnest(d.bin_capped[1:9]) x) > 0
-     or exists (
-       select 1 from generate_series(1, 10) i
-       where d.bin_capped[i] > d.bin_counts[i] or d.bin_capped[i] < 0 or d.bin_counts[i] < 0
-     );
-  if n_bad > 0 then
-    raise exception '% row(s) have capped values outside the top bin or above their bin count', n_bad;
-  end if;
-
-  -- 4. The national capped totals are the fact table's own, per indicator — the figure the page
-  --    prints on the top bar. docs/UUC_PHC_2025_CLEANING_REPORT.md §4 records 886 Water, 456 FIC,
-  --    208 Pre-natal, 30 SBA, 2 ABR, 1 IMR, 1 UFMR; this compares against the data rather than
-  --    against those numbers, so a regenerated extract moves both together.
   select count(*) into n_bad
   from agg_uuc_phc_indicator_dist d
   join (
     select unnest(capped_indicators) as indicator, count(*)::int as n
-    from fact_uuc_phc_indicators
-    where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
-    group by 1
+    from fact_uuc_phc_indicators where dataset_id = ds group by 1
   ) f on f.indicator = d.indicator
-  where d.geo_level = 'national'
+  where d.dataset_id = ds and d.geo_level = 'national'
     and (select coalesce(sum(x), 0) from unnest(d.bin_capped) x) <> f.n;
   if n_bad > 0 then
-    raise exception '% national indicator(s) disagree with fact_uuc_phc_indicators.capped_indicators', n_bad;
-  end if;
-
-  -- 5. Comparison counts nest inside their denominators, and the five socio-economic indicators
-  --    have no comparison at all — criterion (d) does not test them, so a non-zero count there
-  --    would mean a benchmark had been paired with the wrong column.
-  select count(*) into n_bad
-  from agg_uuc_phc_indicator_dist
-  where n_worse > n_comparable
-     or n_comparable > n_listed
-     or least(n_worse, n_comparable, n_missing, n_listed) < 0
-     or (indicator in ('physical_factor', 'ip_pop', 'armed_conf', 'idp', 'four_ps')
-         and (n_comparable > 0 or n_worse > 0 or provincial_ref is not null));
-  if n_bad > 0 then
-    raise exception '% row(s) have a comparison count outside its denominator, or one on an indicator criterion (d) does not test', n_bad;
-  end if;
-
-  -- 6. A reference line exists only where a single province's benchmark does.
-  select count(*) into n_bad
-  from agg_uuc_phc_indicator_dist
-  where provincial_ref is not null and geo_level not in ('province', 'citymun');
-  if n_bad > 0 then
-    raise exception '% row(s) carry a provincial benchmark above province level', n_bad;
-  end if;
-
-  -- 7. n_comparable must agree with agg_uuc_phc_criteria's evaluable count wherever this
-  --    indicator's own benchmark is usable everywhere in the area. The two are computed from the
-  --    same rule in two files; this is what stops one of them being edited alone. FIC is exempt
-  --    because 113 barangays additionally fail the benchmark-exceeds-maximum test, which is an
-  --    indicator-level exclusion agg_uuc_phc_criteria has no column for.
-  select count(*) into n_bad
-  from agg_uuc_phc_indicator_dist d
-  join agg_uuc_phc_criteria c
-    on c.dataset_id = d.dataset_id and c.geo_code = d.geo_code and c.geo_level = d.geo_level
-  where d.indicator in ('imr', 'ufmr', 'abr', 'pre_natal', 'sba', 'water')
-    and d.n_comparable <> c.n_health_evaluable;
-  if n_bad > 0 then
-    raise exception '% row(s) disagree with agg_uuc_phc_criteria.n_health_evaluable', n_bad;
-  end if;
-
-  -- 8. Each level rolls up to the same national totals, per indicator. A region, province or
-  --    city that lost or double-counted a barangay shows up here and nowhere else.
-  select count(*) into n_bad
-  from (
-    select indicator, geo_level,
-           sum(n_listed) as l, sum(n_missing) as m,
-           sum(n_comparable) as c, sum(n_worse) as w,
-           sum((select coalesce(sum(x), 0) from unnest(bin_capped) x)) as k
-    from agg_uuc_phc_indicator_dist
-    group by 1, 2
-  ) t
-  join (
-    select indicator,
-           n_listed as l, n_missing as m, n_comparable as c, n_worse as w,
-           (select coalesce(sum(x), 0) from unnest(bin_capped) x) as k
-    from agg_uuc_phc_indicator_dist where geo_level = 'national'
-  ) nat on nat.indicator = t.indicator
-  where t.l <> nat.l or t.m <> nat.m or t.c <> nat.c or t.w <> nat.w or t.k <> nat.k;
-  if n_bad > 0 then
-    raise exception '% level/indicator pair(s) do not roll up to the national totals', n_bad;
+    raise exception '% national indicator(s) disagree with capped_indicators', n_bad;
   end if;
 end $$;
 

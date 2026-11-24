@@ -92,6 +92,7 @@ export async function NhfrDetails({
   return (
     <div className="space-y-5" data-testid="health-facilities-details">
       <FacilityAnalysis
+        locationName={locationName}
         types={types}
         areas={children}
         total={counts.nFacilities}

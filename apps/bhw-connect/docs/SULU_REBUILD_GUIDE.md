@@ -16,7 +16,7 @@ Everything runs on the box against the `bhw_connect` database.
 | 2. Facilities (files 10, 11) | **Done**, both passed their own checks. |
 | 3. UUC files (12, 13) | **Not run.** Since the 2026 edition landed (`#630`), the `agg_uuc_*` tables hold two editions, so these files' whole-table checks would sum both. They must be scoped to the 2025 `dataset_id` before they run; file 13 also needs the Step Zero fix first. |
 | 4. Population | **Not run, and a re-run would not work**: `ingest_population.py` takes each town's region from `dataset.parquet`'s region code, not `dim_geo`, so it keeps Sulu under BARMM. The parquet and workbooks are also not on the box. Needs a different fix. |
-| `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status` | **Still stale** (section 5). Their stored region rows read 9,566 / 8,772 for regions 09 / 19, while their barangays add to 10,689 / 7,645. |
+| `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status` | **Fixed by migration `20261124100000`** (deploys with the next release; it moves Sulu's own figures from BARMM to Region IX where the stored region rows are stale: they read 9,566 / 8,772 for regions 09 / 19 against 10,689 / 7,645 from their barangays). After the deploy, read the migration's `NOTICE` lines in the deploy log: any "left alone" line names a region that was not in the stale state and needs looking at by hand. Then re-run step 1, because `agg_peer_ranks` region rows read these tables. |
 
 Still failing the checker after the run: `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status`,
 `agg_bhw_by_uuc_status`, `agg_uuc_phc_indicator_dist`, `agg_population`. The checker also lists the rebuilt
@@ -117,8 +117,8 @@ python ingestion\ingest_population.py --database-url $env:BHW_DATABASE_URL
 
 - **`agg_bhw_stepzero_counts` and `agg_bhw_profiling_status`**: their region rows were summed from the source
   sheet's own region-code columns, not from `dim_geo`, so `ingest_stepzero.py` would put Sulu back where the
-  sheet has it. They need a small in-database fix that re-sums those two tables' region rows from their province
-  rows. Ask for it as a separate PR. Until then `check-sulu-region.mjs` keeps reporting them: expected.
+  sheet has it. Migration `20261124100000` moves Sulu's own figures between the two regions once; do **not** re-run
+  `ingest_stepzero.py` afterwards without re-checking, because it would undo the move.
 - **`agg_poverty`**: carries no region rows (a rate is never rolled up): nothing to do.
 - **`agg_poverty_official`**: PSA's own published regional estimates, filed as PSA publishes them. Decide
   separately whether Sulu's official estimate should be shown under Region IX.

@@ -14,7 +14,7 @@ Everything runs on the box against the `bhw_connect` database.
 |---|---|
 | 1. `build_aggregates.sql` | **Done.** 13 tables rewritten in one transaction; 0 unexpected row changes. Re-run once the Step Zero fix (below) is in: `agg_peer_ranks` region rows read the stale Step Zero rows. |
 | 2. Facilities (files 10, 11) | **Done**, both passed their own checks. |
-| 3. UUC files (12, 13) | **Not run.** Since the 2026 edition landed (`#630`), the `agg_uuc_*` tables hold two editions, so these files' whole-table checks would sum both. They must be scoped to the 2025 `dataset_id` before they run; file 13 also needs the Step Zero fix first. |
+| 3. UUC files (12, 13) | **Rewritten, not yet run on the box.** Since the 2026 edition landed (`#630`), the `agg_uuc_*` tables hold two editions, and the first versions' whole-table checks summed both. Both files now scope every check and every write to the 2025 `dataset_id`. File 13 needs the Step Zero fix deployed first (`#632`). |
 | 4. Population | **Not run, and a re-run would not work**: `ingest_population.py` takes each town's region from `dataset.parquet`'s region code, not `dim_geo`, so it keeps Sulu under BARMM. The parquet and workbooks are also not on the box. Needs a different fix. |
 | `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status` | **Fixed by migration `20261124100000`** (deploys with the next release; it moves Sulu's own figures from BARMM to Region IX where the stored region rows are stale: they read 9,566 / 8,772 for regions 09 / 19 against 10,689 / 7,645 from their barangays). After the deploy, read the migration's `NOTICE` lines in the deploy log: any "left alone" line names a region that was not in the stale state and needs looking at by hand. Then re-run step 1, because `agg_peer_ranks` region rows read these tables. |
 
@@ -85,10 +85,12 @@ check (rollups agree, by-type sums to the counts) and rolls back if it fails.
 
 ## 3. UUC indicator distribution, then BHW-by-UUC-status (in this order)
 
-> **Do not run files 12 and 13 as they stand.** They were extracted before the 2026 UUC edition (`#630`). The
-> `agg_uuc_*` tables now hold two editions, and these files' whole-table sanity checks would sum both. They need
-> scoping to the 2025 edition's `dataset_id`, the way `#630` scoped its own checks. File 13 also needs the Step Zero
-> fix first, or its unallocated-residual check goes negative for region 09. Both are open follow-ups.
+> **Files 12 and 13 now touch the 2025 edition only.** They used to run whole-table checks, which fail (or worse,
+> pass wrongly) now that `agg_uuc_*` holds two editions. Each statement and each check is pinned to the 2025
+> `dataset_id`; the 2026 rows are never read for writing or changed. Before running 13, make sure the Step Zero fix
+> (`#632`) is deployed and step 1 has been re-run, otherwise its checks 4 and 4b fail for Region IX. Both files run in
+> one transaction and roll back whole if any check fails. A failing check names what disagrees: send it over rather
+> than editing the file.
 
 ```powershell
 & $psql --dbname $env:BHW_DATABASE_URL -v ON_ERROR_STOP=1 -f ingestion\sulu-rebuild\12_rebuild_uuc_indicator_dist.sql

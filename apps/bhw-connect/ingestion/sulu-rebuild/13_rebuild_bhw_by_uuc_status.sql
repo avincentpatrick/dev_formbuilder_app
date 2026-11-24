@@ -1,7 +1,12 @@
--- Rebuild agg_bhw_by_uuc_status
--- Extracted from supabase/migrations/20260827190000_agg_bhw_by_uuc_status.sql (from its populate step on); creates nothing, recomputes rows.
--- Run once, after db/check-sulu-region.mjs shows the table stale. Safe to re-run.
+-- Rebuild agg_bhw_by_uuc_status for the 2025 edition (Sulu filed under Region IX).
+-- Populate, checks and suppression of supabase/migrations/20260827190000_agg_bhw_by_uuc_status.sql, with every
+-- check and every suppression update scoped to the 2025 dataset_id: the original ones read the whole table, which
+-- now holds two editions. Nothing else is changed. Creates nothing; recomputes the 2025 rows only. Safe to re-run.
+--
+-- Needs, already correct: agg_uuc_phc_counts (2025), agg_bhw_stepzero_counts (the Step Zero fix of PR #632 must be
+-- deployed, or check 4 and 4b fail for Region IX) and agg_bhw_counts (step 1 of the guide).
 begin;
+
 -- 2. Populate, unsuppressed. Idempotent: recomputes and upserts every row, so re-running after a
 -- fact reload is the refresh procedure — the same discipline as the other three UUC aggregates.
 --
@@ -170,7 +175,7 @@ begin
   --    section's rule is that a figure is computed or it is not stated, and 1,788 in a `<>` is a
   --    figure.
   select
-    (select count(*) from agg_bhw_by_uuc_status),
+    (select count(*) from agg_bhw_by_uuc_status where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')),
     (select count(*) from agg_uuc_phc_counts
       where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025'))
   into n_rows, n_bad;
@@ -184,6 +189,7 @@ begin
     and not exists (
       select 1 from agg_bhw_by_uuc_status a
       where a.geo_code = c.geo_code and a.geo_level = c.geo_level
+        and a.dataset_id = c.dataset_id
     );
   if n_bad > 0 then
     raise exception '% geo(s) in agg_uuc_phc_counts have no agg_bhw_by_uuc_status row', n_bad;
@@ -197,7 +203,8 @@ begin
   join agg_uuc_phc_counts c
     on c.geo_code = a.geo_code and c.geo_level = a.geo_level
    and c.dataset_id = a.dataset_id
-  where a.n_barangays_listed <> c.n_listed;
+  where a.dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and a.n_barangays_listed <> c.n_listed;
   if n_bad > 0 then
     raise exception '% row(s) disagree with agg_uuc_phc_counts.n_listed', n_bad;
   end if;
@@ -209,7 +216,8 @@ begin
   join agg_uuc_phc_counts c
     on c.geo_code = a.geo_code and c.geo_level = a.geo_level
    and c.dataset_id = a.dataset_id
-  where a.n_barangays_listed + a.n_barangays_other <> c.n_barangays;
+  where a.dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and a.n_barangays_listed + a.n_barangays_other <> c.n_barangays;
   if n_bad > 0 then
     raise exception '% row(s) where listed + other <> the area''s barangay count', n_bad;
   end if;
@@ -223,9 +231,10 @@ begin
   join agg_bhw_stepzero_counts s
     on s.geo_code = a.geo_code and s.geo_level = a.geo_level
    and s.dataset_id = (select dataset_id from dim_dataset where slug = 'bhw-stepzero-2026')
-  where a.listed_n_bhw + a.other_n_bhw + a.unallocated_n_bhw is distinct from s.n_total_bhw
-     or a.listed_households + a.other_households + a.unallocated_households
-        is distinct from s.households;
+  where a.dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and (a.listed_n_bhw + a.other_n_bhw + a.unallocated_n_bhw is distinct from s.n_total_bhw
+         or a.listed_households + a.other_households + a.unallocated_households
+            is distinct from s.households);
   if n_bad > 0 then
     raise exception '% row(s) do not recombine to agg_bhw_stepzero_counts', n_bad;
   end if;
@@ -235,7 +244,8 @@ begin
   --     and must not be published as "unallocated".
   select count(*) into n_bad
   from agg_bhw_by_uuc_status
-  where unallocated_n_bhw < 0 or unallocated_households < 0;
+  where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and (unallocated_n_bhw < 0 or unallocated_households < 0);
   if n_bad > 0 then
     raise exception '% row(s) carry a negative unallocated residual', n_bad;
   end if;
@@ -248,7 +258,8 @@ begin
   join agg_bhw_counts c
     on c.geo_code = a.geo_code and c.geo_level = a.geo_level
    and c.dataset_id = (select dataset_id from dim_dataset where slug = 'bhw-2025')
-  where a.listed_n_profiled + a.other_n_profiled is distinct from c.n_total;
+  where a.dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and a.listed_n_profiled + a.other_n_profiled is distinct from c.n_total;
   if n_bad > 0 then
     raise exception '% row(s) do not recombine to agg_bhw_counts.n_total', n_bad;
   end if;
@@ -256,12 +267,13 @@ begin
   -- 6. No count exceeds the denominator it belongs to.
   select count(*) into n_bad
   from agg_bhw_by_uuc_status
-  where n_listed_with_data > n_barangays_listed
-     or n_other_with_data > n_barangays_other
-     or n_listed_no_bhw > n_listed_with_data
-     or n_other_no_bhw > n_other_with_data
-     or listed_registered_universe > listed_n_bhw
-     or other_registered_universe > other_n_bhw;
+  where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and (n_listed_with_data > n_barangays_listed
+         or n_other_with_data > n_barangays_other
+         or n_listed_no_bhw > n_listed_with_data
+         or n_other_no_bhw > n_other_with_data
+         or listed_registered_universe > listed_n_bhw
+         or other_registered_universe > other_n_bhw);
   if n_bad > 0 then
     raise exception '% row(s) carry a count outside its denominator', n_bad;
   end if;
@@ -276,7 +288,7 @@ begin
       sum(listed_households) lh, sum(other_households) oh,
       sum(listed_n_profiled) lp, sum(other_n_profiled) op
     from agg_bhw_by_uuc_status
-    where geo_level <> 'national'
+    where geo_level <> 'national' and dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
     group by geo_level
   ) lvl
   cross join (
@@ -284,7 +296,8 @@ begin
       listed_n_bhw lb, other_n_bhw ob,
       listed_households lh, other_households oh,
       listed_n_profiled lp, other_n_profiled op
-    from agg_bhw_by_uuc_status where geo_level = 'national'
+    from agg_bhw_by_uuc_status
+    where geo_level = 'national' and dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
   ) nat
   where lvl.l <> nat.l or lvl.o <> nat.o
      or lvl.lb <> nat.lb or lvl.ob <> nat.ob
@@ -319,7 +332,8 @@ update agg_bhw_by_uuc_status set
   listed_households = null,
   listed_registered_universe = null,
   listed_n_profiled = null
-where n_listed_with_data > 0 and n_listed_with_data < 5;
+where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+  and n_listed_with_data > 0 and n_listed_with_data < 5;
 
 update agg_bhw_by_uuc_status set
   other_is_suppressed = true,
@@ -327,7 +341,8 @@ update agg_bhw_by_uuc_status set
   other_households = null,
   other_registered_universe = null,
   other_n_profiled = null
-where n_other_with_data > 0 and n_other_with_data < 5;
+where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+  and n_other_with_data > 0 and n_other_with_data < 5;
 
 -- ---------------------------------------------------------------------------------------------
 -- 5. Assertions on the suppression itself.
@@ -340,8 +355,9 @@ begin
   --    half — that a side is suppressed if and only if 0 < contributing barangays < 5.
   select count(*) into n_bad
   from agg_bhw_by_uuc_status
-  where listed_is_suppressed <> (n_listed_with_data > 0 and n_listed_with_data < 5)
-     or other_is_suppressed <> (n_other_with_data > 0 and n_other_with_data < 5);
+  where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and (listed_is_suppressed <> (n_listed_with_data > 0 and n_listed_with_data < 5)
+         or other_is_suppressed <> (n_other_with_data > 0 and n_other_with_data < 5));
   if n_bad > 0 then
     raise exception '% row(s) where suppression does not match the 0 < n < 5 rule', n_bad;
   end if;
@@ -351,7 +367,8 @@ begin
   --    correct answer is "none".
   select count(*) into n_bad
   from agg_bhw_by_uuc_status
-  where n_barangays_listed = 0 and listed_is_suppressed;
+  where dataset_id = (select dataset_id from dim_dataset where slug = 'uuc-phc-2025')
+    and n_barangays_listed = 0 and listed_is_suppressed;
   if n_bad > 0 then
     raise exception '% area(s) with nothing listed are marked suppressed', n_bad;
   end if;

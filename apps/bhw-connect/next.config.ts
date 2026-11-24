@@ -54,6 +54,7 @@ const nextConfig: NextConfig = {
     "/api/export/facilities/headline": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/mix": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/presence": ["./lib/exports/fonts/*.ttf"],
+    "/api/export/facilities/areas": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/distribution": ["./lib/exports/fonts/*.ttf"],
     // Missing until now: this route rasterizes with the same resvg + bundled-font path and hit
     // the identical blank-text failure on Vercel (its docblock names DejaVu Sans as the fix, but

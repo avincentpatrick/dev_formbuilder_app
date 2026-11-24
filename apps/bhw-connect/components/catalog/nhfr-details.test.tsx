@@ -4,14 +4,16 @@ import type { CatalogDataset } from "@/lib/catalog/types";
 const db = vi.hoisted(() => ({
   counts: vi.fn(),
   types: vi.fn(),
-  children: vi.fn(),
   facilities: vi.fn(),
+  distribution: vi.fn(),
+  presence: vi.fn(),
 }));
+vi.mock("@/lib/db/nhfr-distribution", () => ({ getNhfrDistribution: db.distribution }));
+vi.mock("@/lib/db/nhfr-presence", () => ({ getNhfrPresence: db.presence }));
 vi.mock("@/lib/db/nhfr", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db/nhfr")>()),
   getNhfrCounts: db.counts,
   getNhfrTypes: db.types,
-  getNhfrChildren: db.children,
   getNhfrFacilities: db.facilities,
 }));
 vi.mock("@/lib/db/geo", () => ({
@@ -47,8 +49,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.counts.mockResolvedValue({ nFacilities: 3 });
   db.types.mockResolvedValue(null);
-  db.children.mockResolvedValue([]);
   db.facilities.mockResolvedValue(null);
+  db.distribution.mockResolvedValue(null);
+  db.presence.mockResolvedValue(null);
 });
 it("does not substitute national or municipal details for availability, barangay or district scope", async () => {
   for (const selection of [
@@ -78,17 +81,25 @@ it("withholds mismatched details and keeps failed lists distinct from zero", asy
   expect(html).not.toContain("No health facilities are on");
 });
 it("keeps geographic drill-down inside the same catalog dataset", async () => {
-  db.children.mockResolvedValue([
-    {
-      geoCode: "01",
-      geoLevel: "region",
-      geoName: "Synthetic region",
-      nFacilities: 3,
-      nBarangays: 2,
-      nBarangaysWithFacility: 1,
-      coveragePct: 50,
-    },
-  ]);
+  db.distribution.mockResolvedValue({
+    code: "PH",
+    level: "national",
+    name: "Synthetic",
+    total: { count: 3, government: 1, private: 2 },
+    areas: [
+      {
+        code: "01",
+        level: "region",
+        name: "Synthetic region",
+        count: 3,
+        government: 1,
+        private: 2,
+      },
+    ],
+    types: [{ type: "Clinic", count: 3, government: 1, private: 2 }],
+    cells: [{ code: "01", type: "Clinic", count: 3, government: 1, private: 2 }],
+  });
+
   const html = renderToStaticMarkup(
     await NhfrDetails({
       dataset,
@@ -99,4 +110,5 @@ it("keeps geographic drill-down inside the same catalog dataset", async () => {
   );
   expect(html).toContain("/catalog?mode=psgc&amp;location=region%3A01&amp;dataset=nhfr");
   expect(html).not.toContain("/facilities/region/01");
+  expect(html).not.toContain("Scrollable locality breakdown");
 });

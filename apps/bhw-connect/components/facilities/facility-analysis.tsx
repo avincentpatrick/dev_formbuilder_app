@@ -39,6 +39,7 @@ export function FacilityAnalysis({
           <DistributionCard
             key={JSON.stringify(selection)}
             input={distribution}
+            presence={presence}
             selection={selection}
             locationName={locationName}
             mapState={mapState}

@@ -181,5 +181,7 @@ test("incomplete data is unavailable and a verified zero denominator never becom
   card = await open(page, "zero");
   await expect(card).toContainText("No facilities in this selection");
   await expect(card).toContainText("share unavailable");
-  await expect(card).not.toContainText("0%");
+  await expect(card.getByRole("list", { name: "Areas compared", exact: true })).not.toContainText(
+    "0%",
+  );
 });

@@ -1,3 +1,4 @@
+import { getNhfrDistribution } from "@/lib/db/nhfr-distribution";
 import { FacilityAnalysis } from "@/components/facilities/facility-analysis";
 import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
@@ -58,14 +59,20 @@ export async function NhfrDetails({
       </p>
     );
   const city = selection.level === "citymun";
-  const [counts, types, children, facilities, ancestors, barangays] = await Promise.all([
-    getNhfrCounts(selection.code, selection.level),
-    getNhfrTypes(selection.code, selection.level),
-    getNhfrChildren(selection.code, selection.level),
-    city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
-    city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
-    getNhfrChildGeos(selection.code, selection.level),
-  ]);
+  const [counts, types, children, facilities, ancestors, barangays, distribution] =
+    await Promise.all([
+      getNhfrCounts(selection.code, selection.level),
+      getNhfrTypes(selection.code, selection.level),
+      getNhfrChildren(selection.code, selection.level),
+      city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
+      city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
+      getNhfrChildGeos(selection.code, selection.level),
+      selection.level === "national" ||
+      selection.level === "region" ||
+      selection.level === "province"
+        ? getNhfrDistribution(selection.code, selection.level)
+        : Promise.resolve(null),
+    ]);
   if (!counts || counts.nFacilities !== indicator!.values[0].value)
     return (
       <p role="status">
@@ -92,6 +99,7 @@ export async function NhfrDetails({
   return (
     <div className="space-y-5" data-testid="health-facilities-details">
       <FacilityAnalysis
+        distribution={distribution}
         locationName={locationName}
         types={types}
         areas={children}

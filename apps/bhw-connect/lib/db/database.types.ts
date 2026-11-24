@@ -3736,6 +3736,10 @@ export type Database = {
       };
     };
     Functions: {
+      nhfr_presence_summary: {
+        Args: { p_dataset_id: number; p_root: string; p_types?: string[] };
+        Returns: Json;
+      };
       nhfr_headline_summary: {
         Args: { p_dataset_id: number; p_roots: string[]; p_types?: string[] };
         Returns: Json;

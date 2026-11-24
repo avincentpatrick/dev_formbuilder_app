@@ -1,3 +1,4 @@
+import { getNhfrPresence } from "@/lib/db/nhfr-presence";
 import { getNhfrDistribution } from "@/lib/db/nhfr-distribution";
 import { FacilityAnalysis } from "@/components/facilities/facility-analysis";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export async function NhfrDetails({
       </p>
     );
   const city = selection.level === "citymun";
-  const [counts, types, children, facilities, ancestors, barangays, distribution] =
+  const [counts, types, children, facilities, ancestors, barangays, distribution, presence] =
     await Promise.all([
       getNhfrCounts(selection.code, selection.level),
       getNhfrTypes(selection.code, selection.level),
@@ -71,6 +72,11 @@ export async function NhfrDetails({
       selection.level === "region" ||
       selection.level === "province"
         ? getNhfrDistribution(selection.code, selection.level)
+        : Promise.resolve(null),
+      selection.level === "national" ||
+      selection.level === "region" ||
+      selection.level === "province"
+        ? getNhfrPresence(selection.code, selection.level)
         : Promise.resolve(null),
     ]);
   if (!counts || counts.nFacilities !== indicator!.values[0].value)
@@ -100,11 +106,10 @@ export async function NhfrDetails({
     <div className="space-y-5" data-testid="health-facilities-details">
       <FacilityAnalysis
         distribution={distribution}
+        presence={presence}
         locationName={locationName}
         types={types}
-        areas={children}
         total={counts.nFacilities}
-        expectedCodes={barangays.map((g) => g.geoCode)}
         selection={selection}
         mapState={mapState}
       />

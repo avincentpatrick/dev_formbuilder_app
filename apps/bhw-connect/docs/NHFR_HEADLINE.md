@@ -9,6 +9,8 @@ denominators and limitations sit in closed-by-default “About this figure” se
 
 - Native labelled checkboxes support one or more registry types. Empty selection
   means all types; the reset action explicitly returns to all facility types.
+- The picker lists types from the accepted registry, including types with no
+  facilities in the selected area; their verified count is zero.
 - Types use OR. A facility contributes once, and a barangay with several selected
   types contributes once to presence. The denominator remains all barangays in the
   reporting geography, and the selected share uses all facilities in that geography.

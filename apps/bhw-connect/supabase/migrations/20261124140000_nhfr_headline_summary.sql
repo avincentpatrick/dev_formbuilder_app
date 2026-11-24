@@ -35,7 +35,8 @@ as $$
     'barangays', (select count(*) from scope where geo_level = 'barangay'),
     'unattributed', count(*) filter (where barangay_code is null),
     'types', coalesce((select jsonb_agg(t.facility_type order by t.facility_type)
-      from (select distinct facility_type from facilities) t), '[]'::jsonb)
+      from (select distinct facility_type from fact_nhfr_facility
+        where dataset_id = p_dataset_id) t), '[]'::jsonb)
   ) from selected;
 $$;
 

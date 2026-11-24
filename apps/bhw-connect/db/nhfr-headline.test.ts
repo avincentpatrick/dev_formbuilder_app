@@ -21,7 +21,7 @@ it.skipIf(!database)(
         .replace("set search_path = public", `set search_path = ${schema}`);
       await client.query(migration);
       await client.query(
-        `insert into ${schema}.dim_geo values ('PH','national',null),('city','citymun','PH'),('b1','barangay','city'),('b2','barangay','city'),('b3','barangay','city'),('other','citymun','PH'),('foreign','barangay','other'); insert into ${schema}.fact_nhfr_facility values (1,'Hospital','Government',10,'city','b1'),(1,'Station','Government',0,'city','b1'),(1,'Station','Private',0,'city','b2'),(1,'Hospital','Private',20,'city',null),(1,'Hospital','Government',2,'city','foreign'),(2,'Hospital','Government',100,'city','b3');`,
+        `insert into ${schema}.dim_geo values ('PH','national',null),('city','citymun','PH'),('b1','barangay','city'),('b2','barangay','city'),('b3','barangay','city'),('other','citymun','PH'),('foreign','barangay','other'); insert into ${schema}.fact_nhfr_facility values (1,'Hospital','Government',10,'city','b1'),(1,'Station','Government',0,'city','b1'),(1,'Station','Private',0,'city','b2'),(1,'Hospital','Private',20,'city',null),(1,'Hospital','Government',2,'city','foreign'),(2,'Hospital','Government',100,'city','b3'),(1,'Laboratory','Private',3,'other','foreign');`,
       );
       await client.query("set local role anon");
       const read = async (roots: string[], types: string[]) =>
@@ -57,6 +57,14 @@ it.skipIf(!database)(
         count: 2,
         present: 1,
         barangays: 1,
+      });
+      expect(await read(["city"], ["Laboratory"])).toMatchObject({
+        total: 5,
+        count: 0,
+        present: 0,
+        barangays: 3,
+        beds: 0,
+        types: ["Hospital", "Laboratory", "Station"],
       });
       expect(await read(["b3"], [])).toMatchObject({
         total: 0,

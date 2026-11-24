@@ -2,9 +2,10 @@ import Link from "next/link";
 import type { NhfrChild, NhfrTypeCount } from "@/lib/db/nhfr";
 import type { CatalogSelection } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
-import { facilityMix, facilityPlaces } from "@/lib/facilities/analysis";
+import { facilityPlaces } from "@/lib/facilities/analysis";
 import { formatCount, percentageFormatter } from "@/lib/format";
 import type { ReactNode } from "react";
+import { FacilityMixCard } from "./facility-mix-card";
 
 function Rows({ children }: { children: ReactNode[] }) {
   return (
@@ -41,6 +42,7 @@ export function FacilityAnalysis({
   expectedCodes,
   selection,
   mapState,
+  locationName = "Selected location",
 }: {
   types: NhfrTypeCount[] | null;
   areas: NhfrChild[];
@@ -48,17 +50,9 @@ export function FacilityAnalysis({
   expectedCodes: string[];
   selection: CatalogSelection;
   mapState?: string;
+  locationName?: string;
 }) {
-  const mix = facilityMix(types, total);
   const places = facilityPlaces(areas, total, expectedCodes);
-  const formatMix = percentageFormatter(mix?.map((i) => (i.nFacilities / total) * 100) ?? []);
-  const formatOwnership = percentageFormatter(
-    mix?.flatMap((i) =>
-      i.nFacilities > 0
-        ? [(i.nGovernment / i.nFacilities) * 100, (i.nPrivate / i.nFacilities) * 100]
-        : [],
-    ) ?? [],
-  );
   const byCount = places
     ? [...places].sort(
         (a, b) => b.nFacilities - a.nFacilities || a.geoName.localeCompare(b.geoName),
@@ -79,53 +73,13 @@ export function FacilityAnalysis({
     selection.mode === "psgc" && ["national", "region", "province"].includes(selection.level);
   return (
     <section aria-label="Facility analysis" className="space-y-5" data-testid="facility-analysis">
-      <section
-        className="rounded-lg border border-border p-4 sm:p-6"
-        aria-label="Facility mix chart"
-      >
-        <h3 className="text-lg font-semibold">What kinds of facilities are recorded?</h3>
-        <p className="mt-2 text-sm text-muted">
-          Each bar shows a type’s share of this area’s registered facilities. Ownership shares use
-          that type’s own total. Categories describe registry records, not services available today.
-        </p>
-        {mix ? (
-          <Rows>
-            {mix.map((i) => (
-              <li key={i.facilityType}>
-                <div className="flex flex-wrap justify-between gap-x-4 text-sm">
-                  <span className="font-medium">{i.facilityType}</span>
-                  <span className="whitespace-nowrap tabular-nums">
-                    {formatCount(i.nFacilities)} ({formatMix((i.nFacilities / total) * 100)})
-                  </span>
-                </div>
-                <Bar value={(i.nFacilities / total) * 100} />
-                <p className="mt-1 text-xs text-muted">
-                  Government:{" "}
-                  <span className="whitespace-nowrap">
-                    {formatCount(i.nGovernment)}
-                    {i.nFacilities > 0
-                      ? ` (${formatOwnership((i.nGovernment / i.nFacilities) * 100)})`
-                      : ""}
-                  </span>{" "}
-                  · Private:{" "}
-                  <span className="whitespace-nowrap">
-                    {formatCount(i.nPrivate)}
-                    {i.nFacilities > 0
-                      ? ` (${formatOwnership((i.nPrivate / i.nFacilities) * 100)})`
-                      : ""}
-                  </span>
-                </p>
-              </li>
-            ))}
-          </Rows>
-        ) : (
-          <p role="status" className="mt-3 text-sm">
-            {total === 0
-              ? "No registered facilities to divide into shares."
-              : "Facility mix cannot be compared until all type and ownership counts reconcile with the area total. See the exact detail below."}
-          </p>
-        )}
-      </section>
+      <FacilityMixCard
+        key={JSON.stringify(selection)}
+        items={types}
+        total={total}
+        selection={selection}
+        locationName={locationName}
+      />
       {showPlaces && (
         <div className="grid gap-5 lg:grid-cols-2">
           <section

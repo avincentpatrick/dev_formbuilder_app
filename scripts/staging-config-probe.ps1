@@ -18,14 +18,19 @@
 # record in two, and the judge then refuses the paste as not measured (exit 2) rather than guess.
 #
 # OUTPUT. One record per line, fields separated by `|`:
-#   meridian-config-probe|v1|<UTC time>      the signature the judge recognises; nothing before it counts
+#   meridian-config-probe|v2|<UTC time>      the signature the judge recognises; nothing before it counts
 #   root|<Apache folder>
 #   file|<path>|<sha256>|<lines>             each live file: httpd.conf and every file an Include names
-#   d|<path>|<line>|<directive>              each directive the judge reads, comments skipped
+#   d|<path>|<line>|<directive>              each directive the judge reads, and EVERY section line
+#                                            (<VirtualHost>, <IfModule>, <Location>, their closing tags)
 #   x|<path>|<line>                          an X-Robots-Tag line in a file no Include names (inert)
 #   s|<line of httpd -S>                     the server's own vhost map
 #   end|<number of records above>            so a truncated paste is caught
 # MDContactEmail's value is printed as <redacted>: the judge's fixtures live in a public repository (D48).
+#
+# WHY EVERY SECTION LINE. Without them a `Header` inside a <Location> reads exactly like one that covers
+# the whole vhost, and the judge would pass a crawl header that guards one path. v1 printed only the
+# <VirtualHost> and <MDomain> lines; it ran once on the box (2026-11-24) and the judge refuses it.
 
 param(
     [string] $ApacheRoot = 'C:\Apache24'
@@ -36,9 +41,9 @@ $records = [System.Collections.Generic.List[string]]::new()
 $root = (Resolve-Path -LiteralPath $ApacheRoot).Path.TrimEnd('\')
 $wanted = @(
     'include', 'includeoptional', 'serverroot', 'listen', 'servername', 'serveralias',
-    '<virtualhost', '</virtualhost>', 'header', 'redirect', 'redirectpermanent', 'redirectmatch',
+    'header', 'redirect', 'redirectpermanent', 'redirectmatch',
     'mdcontactemail', 'mdcertificateagreement', 'mdcachallenges', 'mdprivatekeys', 'mdcertificatefile',
-    'mdcertificatekeyfile', 'mdmembers', 'mdrenewmode', 'mdomain', '<mdomain', '</mdomain>',
+    'mdcertificatekeyfile', 'mdmembers', 'mdrenewmode', 'mdomain',
     'sslengine', 'sslcertificatefile', 'sslcertificatekeyfile', 'sslcertificatechainfile'
 )
 
@@ -51,7 +56,7 @@ function Get-ProbeRelative([string] $path) {
     return $full.Replace('\', '/')
 }
 
-$records.Add('meridian-config-probe|v1|' + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))
+$records.Add('meridian-config-probe|v2|' +[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))
 $records.Add('root|' + $root.Replace('\', '/'))
 
 # Walk httpd.conf and every file an Include names, depth first, each file once.
@@ -85,8 +90,7 @@ while ($queue.Count -gt 0) {
         }
 
         $key = $text.Split(' ')[0].ToLowerInvariant()
-        if ($key -ne '</virtualhost>' -and $key -ne '</mdomain>') { $key = $key.TrimEnd('>') }
-        if ($wanted -notcontains $key) { continue }
+        if ($wanted -notcontains $key -and -not $key.StartsWith('<')) { continue }
 
         if ($key -eq 'mdcontactemail') { $text = 'MDContactEmail <redacted>' }
         $records.Add('d|' + $relative + '|' + ($i + 1) + '|' + $text)

@@ -6,6 +6,8 @@ import { facilityPlaces } from "@/lib/facilities/analysis";
 import { formatCount, percentageFormatter } from "@/lib/format";
 import type { ReactNode } from "react";
 import { FacilityMixCard } from "./facility-mix-card";
+import { DistributionCard } from "./distribution-card";
+import type { DistributionInput } from "@/lib/facilities/distribution";
 
 function Rows({ children }: { children: ReactNode[] }) {
   return (
@@ -43,6 +45,7 @@ export function FacilityAnalysis({
   selection,
   mapState,
   locationName = "Selected location",
+  distribution = null,
 }: {
   types: NhfrTypeCount[] | null;
   areas: NhfrChild[];
@@ -51,13 +54,9 @@ export function FacilityAnalysis({
   selection: CatalogSelection;
   mapState?: string;
   locationName?: string;
+  distribution?: DistributionInput | null;
 }) {
   const places = facilityPlaces(areas, total, expectedCodes);
-  const byCount = places
-    ? [...places].sort(
-        (a, b) => b.nFacilities - a.nFacilities || a.geoName.localeCompare(b.geoName),
-      )
-    : null;
   const byPresence = places
     ? [...places].sort(
         (a, b) =>
@@ -81,34 +80,14 @@ export function FacilityAnalysis({
         locationName={locationName}
       />
       {showPlaces && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <section
-            className="min-w-0 rounded-lg border border-border p-4 sm:p-6"
-            aria-label="Facility distribution chart"
-          >
-            <h3 className="text-lg font-semibold">Where are registered facilities concentrated?</h3>
-            <p className="mt-2 text-sm text-muted">
-              Child areas ranked by recorded facility count. Bars share a scale from zero to the
-              largest count. Counts are not adjusted for population or need.
-            </p>
-            {byCount ? (
-              <Rows>
-                {byCount.map((i) => (
-                  <li key={i.geoCode}>
-                    <Link className="text-sm font-medium underline" href={areaLink(i)}>
-                      {i.geoName}
-                    </Link>
-                    <p className="text-sm tabular-nums">{formatCount(i.nFacilities)} facilities</p>
-                    <Bar value={i.nFacilities} max={byCount[0]?.nFacilities ?? 0} />
-                  </li>
-                ))}
-              </Rows>
-            ) : (
-              <p role="status" className="mt-3 text-sm">
-                The complete child-area distribution could not be verified. No ranking is shown.
-              </p>
-            )}
-          </section>
+        <div className="space-y-5">
+          <DistributionCard
+            key={JSON.stringify(selection)}
+            input={distribution}
+            selection={selection}
+            locationName={locationName}
+            mapState={mapState}
+          />
           <section
             className="min-w-0 rounded-lg border border-border p-4 sm:p-6"
             aria-label="Barangay presence chart"

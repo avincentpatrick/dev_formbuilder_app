@@ -345,7 +345,12 @@ export function CatalogDetails({
         />
       )}
       {dataset.id === "nhfr" && (
-        <NhfrOverview dataset={dataset} selection={catalog.selection} locationName={locationName} />
+        <NhfrOverview
+          key={JSON.stringify(catalog.selection)}
+          dataset={dataset}
+          selection={catalog.selection}
+          locationName={locationName}
+        />
       )}
       <FullMapLink dataset={dataset} selection={catalog.selection} />
       {facilityDetails}

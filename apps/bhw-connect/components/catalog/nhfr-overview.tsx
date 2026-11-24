@@ -1,15 +1,20 @@
-import Link from "next/link";
-import { countAndShare, shareOf } from "@/lib/format";
+"use client";
+
+import { useEffect, useState } from "react";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import {
-  nhfrReading,
-  NHFR_DEFINITION,
-  NHFR_BEDS,
-  NHFR_PRESENCE,
-  NHFR_ATTRIBUTION,
-} from "@/lib/catalog/nhfr-reading";
-import { FigureCard } from "@/components/narrative/figure-card";
-import { StatValue } from "@/components/home/stat-value";
+  acceptedHeadline,
+  headlineQuery,
+  headlineSchema,
+  summaryMatches,
+  type HeadlineSummary,
+} from "@/lib/facilities/headline";
+import { withBasePath } from "@/lib/base-path";
+import { HeadlineValues } from "@/components/facilities/headline-values";
+import { Modal } from "@/components/ui/modal";
+import { NhfrOverviewFallback } from "./nhfr-overview-fallback";
+
+const formats = ["png", "svg", "pdf", "csv", "xlsx", "pptx"] as const;
 
 export function NhfrOverview({
   dataset,
@@ -20,160 +25,236 @@ export function NhfrOverview({
   selection: CatalogSelection;
   locationName: string;
 }) {
-  const measures = [
-    ["nhfr.facilities", "Registered facilities", NHFR_DEFINITION],
-    ["nhfr.beds", "Recorded bed capacity", NHFR_BEDS],
-    ["nhfr.barangay-presence", "Barangays with an attributed facility", NHFR_PRESENCE],
-  ];
-  return (
-    <div className="space-y-4" data-testid="nhfr-overview">
-      <FigureCard
-        title="What health facilities are recorded here?"
-        caption={`${locationName} · DOH National Health Facility Registry · September 2026 snapshot`}
-        headline="Read facility counts, beds and barangay presence separately. They do not show staffing, service quality or whether capacity is enough."
-      >
-        {selection.mode === "all" ? (
-          <p role="status">
-            Choose a location above to see its figures. This availability view is not a national
-            facility total.
+  const base = acceptedHeadline(dataset, selection);
+  const [types, setTypes] = useState<string[]>([]);
+  const [options, setOptions] = useState<string[]>([]);
+  const [result, setResult] = useState<{
+    key: string;
+    summary: HeadlineSummary | null;
+    error?: string;
+  } | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [mode, setMode] = useState<"inline" | "maximize" | "present">("inline");
+  const [includeNotes, setIncludeNotes] = useState(false);
+  const key = headlineQuery(selection, types).toString();
+  const baseKey = JSON.stringify(base);
+  useEffect(() => {
+    if (baseKey === "null") return;
+    const accepted = JSON.parse(baseKey) as HeadlineSummary;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(withBasePath(`/api/facilities/headline?${key}`), {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Summary unavailable");
+        const summary = headlineSchema.parse(await response.json());
+        const filtered = new URLSearchParams(key).getAll("type").length > 0;
+        if (
+          summary.total !== accepted.total ||
+          summary.barangays !== accepted.barangays ||
+          (!filtered && !summaryMatches(summary, accepted))
+        )
+          throw new Error("Summary mismatch");
+        if (!controller.signal.aborted) {
+          setResult({ key, summary });
+          setOptions(summary.types);
+        }
+      } catch {
+        if (!controller.signal.aborted)
+          setResult({
+            key,
+            summary: null,
+            error: "The selected figures could not be verified. Please try again.",
+          });
+      }
+    }, 150);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [key, baseKey, retry]);
+  if (!base)
+    return (
+      <NhfrOverviewFallback dataset={dataset} selection={selection} locationName={locationName} />
+    );
+  const current = result?.key === key ? result : null;
+  const summary = current?.summary ?? (types.length === 0 ? base : null);
+  const waiting = !current;
+  const verified = !!current?.summary;
+  const caption = `${locationName} · DOH National Health Facility Registry · September 2026 snapshot`;
+  const content = (presenting = false) => (
+    <div className="@container min-w-0">
+      {!presenting && (
+        <details className="my-5 border-b border-border pb-4">
+          <summary className="min-h-11 cursor-pointer content-center text-sm font-medium">
+            Facility types: {types.length ? `${types.length} selected` : "All facility types"}
+          </summary>
+          <p className="my-2 text-sm text-muted">
+            Choose one or more types. This filter changes the headline only.
           </p>
-        ) : (
-          <dl className="space-y-5">
-            {measures.map(([id, label, definition]) => {
-              const indicator = dataset.indicators.find((item) => item.id === id);
-              const reading = nhfrReading(indicator, selection);
-              const state = indicator?.state ?? dataset.state;
-              const status =
-                state === "failed"
-                  ? "Could not be loaded or verified. Please try again; this is not a reported zero."
-                  : state === "suppressed"
-                    ? "Withheld under the applicable publication rules."
-                    : state === "unsupported"
-                      ? "Not supported for this selection. No larger area's figure is substituted."
-                      : "No usable accepted figure is available. Missing data does not mean zero.";
-              return (
-                <div key={id}>
-                  <dt className="text-sm font-medium">{label}</dt>
-                  <dd className="mt-1">
-                    {reading ? (
-                      <>
-                        {reading.partial && (
-                          <p className="font-medium">Partial total — incomplete coverage</p>
-                        )}
-                        <StatValue value={reading.display} />
-                        {id === "nhfr.barangay-presence" &&
-                          indicator?.state === "available" &&
-                          (indicator.values[0].denominator ?? 0) > 0 && (
-                            <div
-                              aria-hidden="true"
-                              className="mt-3 h-3 overflow-hidden rounded bg-surface"
-                            >
-                              <div
-                                className="h-full bg-accent"
-                                style={{
-                                  width: `${(100 * indicator.values[0].value) / indicator.values[0].denominator!}%`,
-                                }}
-                              />
-                            </div>
-                          )}
-                        {reading.denominatorNote && (
-                          <p className="mt-2 text-sm">{reading.denominatorNote}</p>
-                        )}
-                        {indicator?.coverage && (
-                          <p className="mt-2 text-sm">
-                            {indicator.coverage.label}: {indicator.coverage.covered} of{" "}
-                            {indicator.coverage.total}.
-                          </p>
-                        )}
-                        {indicator?.reason && <p className="mt-2 text-sm">{indicator.reason}</p>}
-                      </>
-                    ) : (
-                      <p role="status" className="text-sm">
-                        {status}
-                      </p>
-                    )}
-                    <p className="mt-2 text-sm text-muted">{definition}</p>
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        )}
-        <p className="mt-4 text-sm">{NHFR_ATTRIBUTION}</p>
-      </FigureCard>
-      {selection.mode !== "all" && (
-        <section
-          aria-label="Facility ownership"
-          className="rounded-lg border border-border p-4 sm:p-6"
-        >
-          <h3 className="font-semibold">Who owns the facilities?</h3>
-          <p className="mt-2 text-sm text-muted">
-            Government and private describe ownership, not cost or eligibility for care.
-          </p>
-          <dl className="mt-3 flex flex-wrap gap-6">
-            {["government", "private"].map((key) => {
-              const total = dataset.indicators.find((i) => i.id === "nhfr.facilities");
-              const item = dataset.indicators.find((i) => i.id === `nhfr.${key}`);
-              const reading = nhfrReading(item, selection);
-              const totalReading = nhfrReading(total, selection);
-              const canShare =
-                reading &&
-                totalReading &&
-                item!.state === "available" &&
-                total!.state === "available" &&
-                item!.values[0].value <= total!.values[0].value;
-              return (
-                <div key={key}>
-                  <dt className="text-sm text-muted">
-                    {key === "government" ? "Government" : "Private"}
-                  </dt>
-                  <dd className="mt-1 whitespace-nowrap font-semibold tabular-nums">
-                    {reading
-                      ? canShare
-                        ? countAndShare(
-                            item!.values[0].value,
-                            shareOf(item!.values[0].value, total!.values[0].value),
-                          )
-                        : reading.display
-                      : "Unavailable"}
-                  </dd>
-                  {reading?.partial && (
-                    <dd className="text-sm">Partial total — see exact data and coverage below.</dd>
-                  )}
-                </div>
-              );
-            })}
-          </dl>
-        </section>
+          <button
+            type="button"
+            className="mb-2 min-h-11 rounded border border-border px-3 text-sm hover:bg-surface"
+            onClick={() => setTypes([])}
+          >
+            All facility types
+          </button>
+          {options.length > 0 ? (
+            <fieldset className="grid gap-1 @xl:grid-cols-2">
+              <legend className="sr-only">Facility types, multiple selection</legend>
+              {options.map((type) => (
+                <label
+                  key={type}
+                  className="flex min-h-11 min-w-0 cursor-pointer items-center gap-3 rounded px-2 text-sm hover:bg-surface"
+                >
+                  <input
+                    className="size-4 shrink-0 accent-accent"
+                    type="checkbox"
+                    checked={types.includes(type)}
+                    onChange={(e) =>
+                      setTypes((prev) =>
+                        e.target.checked ? [...prev, type].sort() : prev.filter((t) => t !== type),
+                      )
+                    }
+                  />
+                  <span className="break-words">{type}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : (
+            <p className="text-sm text-muted">
+              {waiting
+                ? "Loading facility types…"
+                : verified
+                  ? "No facility types are recorded for this location."
+                  : "Facility types are unavailable until the summary can be verified."}
+            </p>
+          )}
+        </details>
       )}
-      <details className="rounded-lg border border-border p-4 text-sm">
-        <summary className="cursor-pointer font-medium">
-          How should I read the types, ownership and source?
+      <p className="my-3 break-words text-sm font-medium">
+        {types.length ? `Selected: ${types.join("; ")}` : "All facility types"}
+      </p>
+      <div aria-live="polite" aria-busy={waiting}>
+        {waiting && types.length > 0 && (
+          <p role="status" className="mb-3 text-sm text-muted">
+            {types.length ? "Updating the selected headline…" : "Checking facility-type details…"}
+          </p>
+        )}
+        {current?.error && (
+          <div role="status" className="mb-3 text-sm">
+            <p>{current.error}</p>
+            <button
+              type="button"
+              onClick={() => setRetry((n) => n + 1)}
+              className="min-h-11 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {summary && (
+          <HeadlineValues
+            summary={summary}
+            types={types}
+            locationName={locationName}
+            presenting={presenting}
+          />
+        )}
+      </div>
+      <footer className="mt-5 flex flex-wrap justify-between gap-2 border-t border-border pt-3 text-xs text-muted">
+        <span>Source: DOH National Health Facility Registry</span>
+        <span>Snapshot: September 2026</span>
+      </footer>
+    </div>
+  );
+  const exportParams = headlineQuery(selection, types);
+  exportParams.set("notes", includeNotes ? "1" : "0");
+  const toolbar = (
+    <div className="flex flex-wrap items-start gap-2 text-sm">
+      <button
+        type="button"
+        onClick={() => setMode("maximize")}
+        className="min-h-11 rounded-md border border-border px-3 hover:bg-surface"
+      >
+        Maximize
+      </button>
+      <details className="max-w-full">
+        <summary className="min-h-11 cursor-pointer content-center rounded-md border border-border px-3 hover:bg-surface">
+          Export
         </summary>
-        <div className="mt-3 space-y-3">
-          <p>{NHFR_DEFINITION}</p>
-          <p>
-            Government and private describe facility ownership. The four headline types are selected
-            categories, not all facility types. The full type breakdown is included below for
-            national, regional, provincial and municipal selections.
-          </p>
-          <p>
-            Missing licence status means not stated, not unlicensed. This snapshot does not
-            establish current licensing or service availability.
-          </p>
-          <p>
-            Counts follow the app&apos;s reporting geography. Sulu is grouped under Region IX,
-            as the source names it, through the documented code mapping. Do not add parent
-            areas to their children or compare counts as a measure of need.
-          </p>
-          <p>
-            <Link href="/facilities/methodology" className="underline">
-              Source and counting methodology
-            </Link>
-            . Source dates below describe the records, not when this page was deployed.
-          </p>
+        <div className="mt-2 flex max-w-full flex-col gap-1 rounded-md border border-border bg-background p-2">
+          {verified ? (
+            formats.map((format) => (
+              <a
+                key={format}
+                className="min-h-11 content-center px-2 underline hover:text-accent"
+                href={withBasePath(
+                  `/api/export/facilities/headline?${exportParams}&format=${format}`,
+                )}
+              >
+                {format.toUpperCase()}
+              </a>
+            ))
+          ) : (
+            <p className="max-w-48 p-2 text-xs text-muted">
+              Exports become available when these figures are verified.
+            </p>
+          )}
+          <label className="flex min-h-11 max-w-48 items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={includeNotes}
+              onChange={(e) => setIncludeNotes(e.target.checked)}
+            />
+            Include technical notes in PDF
+          </label>
         </div>
       </details>
+      <button
+        type="button"
+        disabled={!summary || (waiting && types.length > 0)}
+        onClick={() => setMode("present")}
+        className="min-h-11 rounded-md border border-border px-3 hover:bg-surface disabled:opacity-50"
+      >
+        Present
+      </button>
     </div>
+  );
+  return (
+    <section
+      data-testid="nhfr-overview"
+      className="min-w-0 rounded-lg border border-border bg-background p-4 sm:p-6"
+    >
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 basis-64">
+          <h2 className="text-lg font-semibold tracking-tight">
+            What health facilities are recorded here?
+          </h2>
+          <p className="mt-1 text-xs text-muted">{caption}</p>
+        </div>
+        {toolbar}
+      </div>
+      {content()}
+      <Modal
+        fullScreen={mode === "present"}
+        open={mode !== "inline"}
+        onClose={() => setMode("inline")}
+        title={mode === "present" ? "Health facilities · Present" : "Health facilities · Maximized"}
+        caption={caption}
+      >
+        {mode !== "inline" && (
+          <div
+            className={
+              mode === "present" ? "mx-auto my-auto w-full max-w-6xl [&_h3]:text-lg" : undefined
+            }
+          >
+            {mode === "maximize" && toolbar}
+            {content(mode === "present")}
+          </div>
+        )}
+      </Modal>
+    </section>
   );
 }

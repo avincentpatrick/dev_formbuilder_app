@@ -12,12 +12,12 @@ export function mixSvg(
   types: string[],
   view: MixView,
   notes: boolean,
-  context: { allRows?: NhfrTypeCount[]; pageLabel?: string } = {},
+  context: { allRows?: NhfrTypeCount[]; pageLabel?: string; query?: string } = {},
 ) {
   let y = 44;
   const parts: string[] = [];
-  function text(value: string, size = 16, muted = false) {
-    const max = Math.floor(920 / (size * 0.65));
+  function text(value: string, size = 16, muted = false, maxWidth = 920) {
+    const max = Math.floor(maxWidth / (size * 0.65));
     let line = "";
     const push = (v: string) => {
       parts.push(
@@ -44,16 +44,19 @@ export function mixSvg(
   text("DOH National Health Facility Registry · September 2026 snapshot", 13, true);
   text(types.length ? `Selected: ${types.join("; ")}` : "All recorded types", 13, true);
   text(
-    view === "mix"
-      ? "Facility mix · share of all facilities here"
-      : "Ownership within each facility type",
+    view === "table"
+      ? "Exact figures by facility type · share of all facilities here"
+      : view === "mix"
+        ? "Facility mix · share of all facilities here"
+        : "Ownership within each facility type",
     16,
   );
+  if (context.query) text(`Exact-figure search: ${context.query}`, 13, true);
   y += 8;
-  text(mixReading(context.allRows ?? rows, total, types.length > 0, view), 16);
+  text(mixReading(context.allRows ?? rows, total, types.length > 0 || !!context.query, view), 16);
   if (context.pageLabel) text(context.pageLabel, 14, true);
   y += 12;
-  text("Government: teal · Private: grey", 13, true);
+  if (view !== "table") text("Government: teal · Private: grey", 13, true);
   const series = context.allRows ?? rows;
   const share = percentageFormatter(series.map((r) => (100 * r.nFacilities) / total));
   const ownership = percentageFormatter(
@@ -63,25 +66,65 @@ export function mixSvg(
         : [],
     ),
   );
-  for (const r of rows) {
-    text(r.facilityType, 17);
+  if (view === "table") {
+    const columns = [
+      { x: 490, label: "Facilities" },
+      { x: 650, label: "Share of all" },
+      { x: 820, label: "Government" },
+      { x: 960, label: "Private" },
+    ];
+    parts.push(`<text x="40" y="${y}" font-size="13" fill="#53666a">Facility type</text>`);
+    for (const c of columns)
+      parts.push(
+        `<text x="${c.x}" y="${y}" text-anchor="end" font-size="13" fill="#53666a">${c.label}</text>`,
+      );
+    y += 18;
+    parts.push(
+      `<text x="650" y="${y}" text-anchor="end" font-size="13" fill="#53666a">facilities here</text>`,
+    );
+    y += 28;
+    for (const r of rows) {
+      const baseline = y;
+      text(r.facilityType, 14, false, 370);
+      for (const [x, value] of [
+        [490, formatCount(r.nFacilities)],
+        [650, share((100 * r.nFacilities) / total)],
+        [820, formatCount(r.nGovernment)],
+        [960, formatCount(r.nPrivate)],
+      ] as const)
+        parts.push(
+          `<text x="${x}" y="${baseline}" text-anchor="end" font-size="14" fill="#182629">${escapeXml(value)}</text>`,
+        );
+      y += 8;
+      parts.push(`<line x1="40" x2="960" y1="${y}" y2="${y}" stroke="#d8e0e0"/>`);
+      y += 26;
+    }
+    const shown = series.reduce((n, r) => n + r.nFacilities, 0);
     text(
-      `${formatCount(r.nFacilities)} (${share((100 * r.nFacilities) / total)} of all facilities)`,
+      `All matching rows: ${formatCount(shown)} (${share((100 * shown) / total)}) of all facilities here`,
       14,
     );
-    const denominator = view === "mix" ? total : r.nFacilities;
-    if (denominator > 0) {
-      parts.push(
-        `<rect x="40" y="${y}" width="920" height="14" rx="4" fill="#f3f7f7"/><rect x="40" y="${y}" width="${(920 * r.nGovernment) / denominator}" height="14" fill="#0a6e6e"/><rect x="${40 + (920 * r.nGovernment) / denominator}" y="${y}" width="${(920 * r.nPrivate) / denominator}" height="14" fill="#919da3"/>`,
+  } else {
+    for (const r of rows) {
+      text(r.facilityType, 17);
+      text(
+        `${formatCount(r.nFacilities)} (${share((100 * r.nFacilities) / total)} of all facilities)`,
+        14,
       );
-      y += 32;
+      const denominator = view === "mix" ? total : r.nFacilities;
+      if (denominator > 0) {
+        parts.push(
+          `<rect x="40" y="${y}" width="920" height="14" rx="4" fill="#f3f7f7"/><rect x="40" y="${y}" width="${(920 * r.nGovernment) / denominator}" height="14" fill="#0a6e6e"/><rect x="${40 + (920 * r.nGovernment) / denominator}" y="${y}" width="${(920 * r.nPrivate) / denominator}" height="14" fill="#919da3"/>`,
+        );
+        y += 32;
+      }
+      text(
+        `Government: ${formatCount(r.nGovernment)}${r.nFacilities > 0 ? ` (${ownership((100 * r.nGovernment) / r.nFacilities)})` : ""} · Private: ${formatCount(r.nPrivate)}${r.nFacilities > 0 ? ` (${ownership((100 * r.nPrivate) / r.nFacilities)})` : ""}`,
+        13,
+        true,
+      );
+      y += 18;
     }
-    text(
-      `Government: ${formatCount(r.nGovernment)}${r.nFacilities > 0 ? ` (${ownership((100 * r.nGovernment) / r.nFacilities)})` : ""} · Private: ${formatCount(r.nPrivate)}${r.nFacilities > 0 ? ` (${ownership((100 * r.nPrivate) / r.nFacilities)})` : ""}`,
-      13,
-      true,
-    );
-    y += 18;
   }
   if (notes) {
     text("About this figure", 18);
@@ -104,6 +147,7 @@ export function mixPages(
   types: string[],
   view: MixView,
   notes: boolean,
+  query = "",
 ) {
   const pages = [];
   for (let offset = 0; offset < rows.length; offset += 8)
@@ -117,6 +161,7 @@ export function mixPages(
         notes && offset + 8 >= rows.length,
         {
           allRows: rows,
+          query,
           pageLabel: `Types ${offset + 1}–${Math.min(offset + 8, rows.length)} of ${rows.length}`,
         },
       ),

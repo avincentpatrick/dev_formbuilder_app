@@ -16,7 +16,6 @@ import { getGeoAncestors } from "@/lib/db/geo";
 import { getProvinceBarangayCentroids } from "@/lib/geo/barangay-centroids";
 import { buildFacilityPoints } from "@/lib/geo/facility-points";
 import { withBasePath } from "@/lib/base-path";
-import { TypeBreakdown } from "@/components/facilities/type-breakdown";
 import { ChildBreakdown } from "@/components/facilities/child-breakdown";
 import { FacilityList } from "@/components/facilities/facility-list";
 import { FacilityMap } from "@/components/facilities/facility-map";
@@ -113,9 +112,6 @@ export async function NhfrDetails({
         selection={selection}
         mapState={mapState}
       />
-      <div className="rounded-lg border border-border p-4 sm:p-6">
-        <TypeBreakdown items={types} expectedCount={counts.nFacilities} />
-      </div>
       {city ? (
         <>
           {(!facilities || facilities.length !== counts.nFacilities) && (

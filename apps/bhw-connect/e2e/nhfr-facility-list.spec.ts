@@ -14,6 +14,10 @@ for (const width of [390, 1440]) {
         await expect(
           page.getByRole("heading", { name: "Health facilities", exact: true }),
         ).toBeVisible();
+        await page
+          .getByTestId("facility-mix-card")
+          .getByText("View exact figures", { exact: true })
+          .click();
         await expect(
           page.getByRole("region", { name: "Facilities by type", exact: true }),
         ).toBeVisible();

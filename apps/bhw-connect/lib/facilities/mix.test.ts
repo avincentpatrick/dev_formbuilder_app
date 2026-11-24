@@ -22,3 +22,17 @@ it("rejects unknown types and incomplete ownership/type partitions", () => {
   expect(selectMix([{ ...items[0], nGovernment: 99 }, items[1]], 10, [], "count")).toBeNull();
   expect(selectMix([], 0, [], "count")).toBeNull();
 });
+it("sorts fewest first and searches lookup rows without changing selections or the area denominator", async () => {
+  const { searchMixRows } = await import("./mix");
+  const rows = selectMix(items, 10, [], "lowest")!;
+  expect(rows.map((r) => r.facilityType)).toEqual(["Hospital", "Clinic"]);
+  const found = searchMixRows(rows, "  HOSP  ");
+  expect(found).toHaveLength(1);
+  expect(found[0].nFacilities / 10).toBe(0.4);
+  expect(rows).toHaveLength(2);
+  expect(searchMixRows(rows, "unmatched")).toHaveLength(0);
+  expect(selectMix([items[0], items[0]], 12, [], "count")).toBeNull();
+  expect(
+    selectMix([{ ...items[0], nGovernment: -1, nPrivate: 7 }, items[1]], 10, [], "count"),
+  ).toBeNull();
+});

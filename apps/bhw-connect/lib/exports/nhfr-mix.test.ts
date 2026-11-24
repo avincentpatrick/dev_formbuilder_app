@@ -53,3 +53,22 @@ it("paginates all 45 types without changing the full-comparison reading or losin
   const { PDFDocument } = await import("pdf-lib");
   expect((await PDFDocument.load(result.body as Uint8Array)).getPageCount()).toBe(6);
 });
+it("renders searchable exact tables with fixed denominators and paginates every matching type", () => {
+  const many = Array.from({ length: 18 }, (_, i) => ({
+    facilityType: `Synthetic type ${i}`,
+    nFacilities: 1,
+    nGovernment: 1,
+    nPrivate: 0,
+  }));
+  const pages = mixPages(many, 100, "Synthetic", [], "table", true, "Synthetic");
+  expect(pages).toHaveLength(3);
+  expect(pages[0].svg).toContain("Exact-figure search: Synthetic");
+  expect(pages[0].svg).toContain("18 (18%)");
+  expect(pages[2].svg).toContain("Types 17–18 of 18");
+  expect(pages[2].svg).toContain("About this figure");
+  expect(pages[0].svg).not.toContain("Government: teal");
+  for (const r of many)
+    expect(
+      pages.flatMap((p) => p.svg.match(new RegExp(`>${r.facilityType}<`, "g")) ?? []),
+    ).toHaveLength(1);
+});

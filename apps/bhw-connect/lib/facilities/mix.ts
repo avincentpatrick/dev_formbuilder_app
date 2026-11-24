@@ -2,12 +2,13 @@ import type { NhfrTypeCount } from "@/lib/db/nhfr";
 import { facilityMix } from "./analysis";
 import { formatCount, formatPct } from "@/lib/format";
 
-export type MixView = "mix" | "ownership";
-export type MixOrder = "count" | "name";
+export type MixView = "mix" | "ownership" | "table";
+export type MixOrder = "count" | "lowest" | "name";
 export const MIX_NOTES = [
   "The facility mix uses all registered facilities in the selected location as its denominator. Selecting types does not change that denominator.",
   "Ownership shares use each facility type's own total. Government and private describe ownership, not cost or eligibility for care.",
   "Selected types are combined using OR, with each facility counted once. This card's filter is independent of the headline and other charts.",
+  "Exact-figure search narrows lookup rows only; it does not select facility types or change the chart. When exact figures are open, Export and Present use the matching table rows. All shares retain the full location denominator.",
   "Registry categories describe recorded facilities, not services operating today, care quality or adequate capacity. Types without a recorded row are not ranked here.",
 ];
 
@@ -23,8 +24,11 @@ export function selectMix(
     .filter((i) => !selected.length || selected.includes(i.facilityType))
     .sort(
       (a, b) =>
-        (order === "count" ? b.nFacilities - a.nFacilities : 0) ||
-        a.facilityType.localeCompare(b.facilityType, "en"),
+        (order === "count"
+          ? b.nFacilities - a.nFacilities
+          : order === "lowest"
+            ? a.nFacilities - b.nFacilities
+            : 0) || a.facilityType.localeCompare(b.facilityType, "en"),
     );
 }
 export function mixReading(rows: NhfrTypeCount[], total: number, selected: boolean, view: MixView) {
@@ -42,4 +46,10 @@ export function mixReading(rows: NhfrTypeCount[], total: number, selected: boole
   return leaders.length === 1
     ? `${leaders[0].facilityType} is the most common recorded type here: ${formatCount(largest)} ${largest === 1 ? "facility" : "facilities"} (${formatPct((100 * largest) / total, "single")}).`
     : `${leaders.length} types share the largest recorded count, with ${formatCount(largest)} ${largest === 1 ? "facility" : "facilities"} each.`;
+}
+
+/** Search narrows exact lookup rows, never the multi-type selection or area denominator. */
+export function searchMixRows(rows: NhfrTypeCount[], query: string) {
+  const term = query.trim().toLocaleLowerCase("en");
+  return term ? rows.filter((r) => r.facilityType.toLocaleLowerCase("en").includes(term)) : rows;
 }

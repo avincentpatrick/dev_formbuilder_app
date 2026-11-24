@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseCatalogParams } from "@/lib/catalog/navigation";
 import { getGeoByCode } from "@/lib/db/geo";
 import { getNhfrCounts, getNhfrTypes } from "@/lib/db/nhfr";
-import { selectMix, MIX_NOTES } from "@/lib/facilities/mix";
+import { selectMix, searchMixRows, MIX_NOTES } from "@/lib/facilities/mix";
 import { mixSvg, mixPages } from "@/lib/exports/nhfr-mix";
 import { figureFile } from "@/lib/exports/figure-file";
 import { slugify } from "@/lib/exports/query";
@@ -11,8 +11,8 @@ import { slugify } from "@/lib/exports/query";
 export const runtime = "nodejs";
 const options = z.object({
   format: z.enum(["csv", "xlsx", "svg", "png", "pdf", "pptx"]),
-  view: z.enum(["mix", "ownership"]).default("mix"),
-  order: z.enum(["count", "name"]).default("count"),
+  view: z.enum(["mix", "ownership", "table"]).default("mix"),
+  order: z.enum(["count", "lowest", "name"]).default("count"),
 });
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -22,15 +22,18 @@ export async function GET(request: Request) {
     view: params.get("view") ?? undefined,
     order: params.get("order") ?? undefined,
   });
+  const search = (params.get("q") ?? "").trim();
   const types = [...new Set(params.getAll("type"))].sort();
   if (
     !parsed ||
     parsed.selection.mode !== "psgc" ||
     parsed.selection.level === "barangay" ||
     !settings.success ||
-    ["mode", "location", "format", "view", "order", "notes"].some(
+    ["mode", "location", "format", "view", "order", "notes", "q"].some(
       (k) => params.getAll(k).length > 1,
     ) ||
+    search.length > 200 ||
+    (search.length > 0 && settings.data.view !== "table") ||
     types.length > 200 ||
     types.some((t) => !t || t.length > 200)
   )
@@ -43,8 +46,9 @@ export async function GET(request: Request) {
       getNhfrCounts(selection.code, selection.level),
       getNhfrTypes(selection.code, selection.level),
     ]);
-    const rows = counts ? selectMix(items, counts.nFacilities, types, order) : null;
-    if (!geo || geo.geoLevel !== selection.level || !counts || !rows)
+    const selectedRows = counts ? selectMix(items, counts.nFacilities, types, order) : null;
+    const rows = selectedRows ? searchMixRows(selectedRows, search) : null;
+    if (!geo || geo.geoLevel !== selection.level || !counts || !rows || !rows.length)
       return NextResponse.json(
         { error: "This facility comparison could not be verified. Please try again." },
         { status: 503 },
@@ -73,6 +77,9 @@ export async function GET(request: Request) {
       ["Geographic level", selection.level],
       ["Selected types", types.length ? types.join("; ") : "All recorded types"],
       ["View", view],
+      ["Exact-figure search", search],
+      ["Displayed facilities", rows.reduce((n, r) => n + r.nFacilities, 0)],
+      ["Displayed types", rows.length],
       ["Order", order],
       ["Area facilities", counts.nFacilities],
       ["Source", "DOH National Health Facility Registry"],
@@ -119,6 +126,7 @@ export async function GET(request: Request) {
           types,
           view,
           format === "pdf" && params.get("notes") === "1",
+          { query: search },
         ),
         `Facility types · ${geo.geoName}`,
         metadata.map((r) => r.join(": ")).join("; "),
@@ -130,6 +138,7 @@ export async function GET(request: Request) {
               types,
               view,
               format === "pdf" && params.get("notes") === "1",
+              search,
             )
           : undefined,
       );
@@ -142,6 +151,7 @@ export async function GET(request: Request) {
       selection.code,
       view,
       order,
+      search ? "search-results" : "",
       types.length ? types.slice(0, 2).join("-") : "all-types",
       types.length > 2 ? `and-${types.length - 2}-more` : "",
       "2026-09",

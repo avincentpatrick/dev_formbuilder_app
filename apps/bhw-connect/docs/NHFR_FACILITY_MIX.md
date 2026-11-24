@@ -15,8 +15,9 @@ with government/private stacked bars and two explicitly named comparison views.
   are in a closed “About this figure” disclosure.
 - Labelled native checkboxes support multiple recorded types. The comparison's
   filter is independent of the headline and other figures; reset returns to all
-  recorded types. Counts and name ordering are available. Existing exact tables,
-  geography charts and facility search retain their current readers and scope.
+  recorded types. Most-first, fewest-first and name ordering are available. The
+  catalog exact table now shares these selections and ordering inside the card;
+  geography charts and facility search retain their own scope.
 - The card reuses verified server-loaded aggregate rows, so filtering requires no
   extra client requests. Invalid/incomplete partitions and zero denominators retain
   explicit unavailable/zero states instead of fabricated shares.
@@ -31,6 +32,10 @@ with government/private stacked bars and two explicitly named comparison views.
   area's accepted NHFR total and refuses unsupported scopes or unknown types.
   Existing headline export behavior is unchanged. No dependency or migration is
   added, and the new export route explicitly traces the existing bundled fonts.
+
+The optional exact table adds independent type-name lookup and table exports /
+presentation. See [Exact facility-type figures](NHFR_EXACT_FIGURES.md) for the current
+lookup, denominator and shared-control contracts.
 
 ## Validation
 

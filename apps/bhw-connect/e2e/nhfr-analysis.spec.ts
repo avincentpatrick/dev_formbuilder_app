@@ -10,6 +10,7 @@ for (const width of [390, 1440]) {
     await expect(chart).toContainText("Government:");
     await expect(chart).toContainText("Private:");
     await expect(chart).toContainText("own total");
+    await chart.getByText("View exact figures", { exact: true }).click();
     await expect(
       page.getByRole("region", { name: "Facilities by type", exact: true }),
     ).toBeVisible();

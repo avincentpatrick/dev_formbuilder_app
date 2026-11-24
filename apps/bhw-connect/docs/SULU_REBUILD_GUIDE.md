@@ -6,23 +6,48 @@ rebuilt. Run this **after the testing-server deploy has finished** (about 30-60 
 
 Merge avincentpatrick/dev_formbuilder_app#628 (wording + published-total reconciliation) before or together with this rebuild. The four SQL files are in `ingestion/sulu-rebuild/`.
 
-Everything runs on the box against the `bhw_connect` database. Nothing here needs the private
-`dataset.parquet`, except step 6 (PSA population workbooks).
+Everything runs on the box against the `bhw_connect` database.
+
+## Status after the first run on the box (2026-11-24, operator's report on PR #629)
+
+| Step | State |
+|---|---|
+| 1. `build_aggregates.sql` | **Done.** 13 tables rewritten in one transaction; 0 unexpected row changes. Re-run once the Step Zero fix (below) is in: `agg_peer_ranks` region rows read the stale Step Zero rows. |
+| 2. Facilities (files 10, 11) | **Done**, both passed their own checks. |
+| 3. UUC files (12, 13) | **Not run.** Since the 2026 edition landed (`#630`), the `agg_uuc_*` tables hold two editions, so these files' whole-table checks would sum both. They must be scoped to the 2025 `dataset_id` before they run; file 13 also needs the Step Zero fix first. |
+| 4. Population | **Not run, and a re-run would not work**: `ingest_population.py` takes each town's region from `dataset.parquet`'s region code, not `dim_geo`, so it keeps Sulu under BARMM. The parquet and workbooks are also not on the box. Needs a different fix. |
+| `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status` | **Still stale** (section 5). Their stored region rows read 9,566 / 8,772 for regions 09 / 19, while their barangays add to 10,689 / 7,645. |
+
+Still failing the checker after the run: `agg_bhw_stepzero_counts`, `agg_bhw_profiling_status`,
+`agg_bhw_by_uuc_status`, `agg_uuc_phc_indicator_dist`, `agg_population`. The checker also lists the rebuilt
+non-additive tables as TODO, because it cannot tell rebuilt from not rebuilt; read those lines as "has Sulu rows",
+not "is stale".
+
+## Corrections learned on the box
+
+- **Host:** the testing site is `https://iconnect.com.de/bhw-connect`.
+- **psql is not on PATH:** it is at `C:\Program Files\PostgreSQL\15\bin\psql.exe`. The node scripts need
+  `--env-file=C:\meridian\bhw\.env`, for example `node --env-file=C:\meridian\bhw\.env db\check-sulu-region.mjs`.
+- **Encoding:** set `PGCLIENTENCODING=UTF8` before running any file. psql on Windows otherwise reads the file in
+  the console's code page, and `build_aggregates.sql` has `’` and `₱` in its literals.
+- **Backup:** `ops\nightly-dump.ps1` defaults to C: (about 14 GB free) and copies the storage folder too. A plain
+  `pg_dump --format=custom` to `E:\meridian\backups\bhw` is what worked, then `pg_restore --list` to read it back.
 
 ## 0. Before you start
 
-1. Confirm the deploy is live: `https://staging.pitahc.gov.ph/bhw-connect` answers, and
+1. Confirm the deploy is live: `https://iconnect.com.de/bhw-connect` answers, and
    `node db/check-sulu-region.mjs` shows all five **geography** lines `ok`. If a geography line says FAIL, the
    migration has not run: stop.
-2. Back up. The deploy already dumped before its migration, but take your own now:
-   `ops\nightly-dump.ps1` from the BHW checkout (writes to `C:\meridian\backups\bhw`).
+2. Back up. The deploy already dumped before its migration, but take your own now. Use a plain
+   `pg_dump --format=custom` to `E:\meridian\backups\bhw` (see the corrections above) and check it with `pg_restore --list`.
 3. Take the row-count census: `node db/migrate.mjs --census > census-before.json`.
 4. Set the connection once per PowerShell window (never print it):
 
    ```powershell
    Get-Content C:\meridian\bhw\.env | Where-Object { $_ -match '^BHW_DATABASE_URL=' } |
      ForEach-Object { $env:BHW_DATABASE_URL = ($_ -replace '^BHW_DATABASE_URL=','') }
-   $psql = "<path to psql.exe>"   # ops\pg-tools.ps1 shows how the box finds it
+   $psql = 'C:\Program Files\PostgreSQL\15\bin\psql.exe'
+   $env:PGCLIENTENCODING = 'UTF8'
    ```
 
 5. Record the baseline of what is stale:
@@ -44,7 +69,7 @@ Everything runs on the box against the `bhw_connect` database. Nothing here need
 - Read the header of the file first: it says to bump the dataset's `data_version` after a re-ingestion. This is not
   a re-ingestion, so you normally do not; do it only if the cards are cached against that version and you need
   them to refresh.
-- It is the longest step. On the made-up dev data it stops at section 9b (a Wilson-interval square root);
+- It took about 6 minutes on the box. On the made-up dev data it stops at section 9b (a Wilson-interval square root);
   that is an artefact of the fake counts, so expect it to pass on the real data, and if it fails on the box send me the error.
 
 ## 2. Facilities (two files, in this order)
@@ -60,6 +85,11 @@ check (rollups agree, by-type sums to the counts) and rolls back if it fails.
 
 ## 3. UUC indicator distribution, then BHW-by-UUC-status (in this order)
 
+> **Do not run files 12 and 13 as they stand.** They were extracted before the 2026 UUC edition (`#630`). The
+> `agg_uuc_*` tables now hold two editions, and these files' whole-table sanity checks would sum both. They need
+> scoping to the 2025 edition's `dataset_id`, the way `#630` scoped its own checks. File 13 also needs the Step Zero
+> fix first, or its unallocated-residual check goes negative for region 09. Both are open follow-ups.
+
 ```powershell
 & $psql --dbname $env:BHW_DATABASE_URL -v ON_ERROR_STOP=1 -f ingestion\sulu-rebuild\12_rebuild_uuc_indicator_dist.sql
 & $psql --dbname $env:BHW_DATABASE_URL -v ON_ERROR_STOP=1 -f ingestion\sulu-rebuild\13_rebuild_bhw_by_uuc_status.sql
@@ -70,9 +100,13 @@ Both end in a sanity check against `agg_uuc_phc_counts`.
 
 ## 4. Population
 
-`agg_population` rolls region rows up from the PSA workbooks through `dim_geo`, so re-running the loader follows
-Sulu's new region. It needs the two workbooks in `ingestion\data\` (`psa_popcen_2024_tableB.xlsx`,
-`psa_cph_2020_tableB.xlsx`) on a machine with Python and `psycopg2`:
+> **A re-run of the loader will not move Sulu.** `load_reference()` takes each town's region from
+> `dataset.parquet`'s region code, not from `dim_geo`, so it would keep Sulu under BARMM. On the box the parquet and
+> the two workbooks are also absent and the venv has no `psycopg2` or `pyarrow`. Until the loader reads the region from
+> `dim_geo`, `agg_population` stays stale (region 09 is missing Sulu's 1,146,097 for 2024 and 1,000,108 for 2020).
+
+For reference, the command, once that is fixed. It needs the two workbooks in `ingestion\data\`
+(`psa_popcen_2024_tableB.xlsx`, `psa_cph_2020_tableB.xlsx`) on a machine with Python and `psycopg2`:
 
 ```powershell
 python ingestion\ingest_population.py --verify          # offline reconciliation first

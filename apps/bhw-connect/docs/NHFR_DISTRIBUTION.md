@@ -5,7 +5,10 @@ ranked horizontal bars, with government/private segments, count and share of the
 full parent location, area drill-down links and a data-based reading. The title
 names regions, provinces or cities/municipalities according to the parent level.
 The geographic comparison now has its own full-width card; barangay presence stays
-separate with its existing data and behavior.
+separate with its own data and selections. A closed exact-area table now combines
+facility counts and distinct barangay presence using this distribution card’s
+selections. See [Exact geographic figures](NHFR_EXACT_AREAS.md) for its search,
+loading, verification and export contracts.
 
 ## Selection and denominators
 
@@ -33,7 +36,8 @@ Both area and type ownership margins must reconcile: every area's cross-tab must
 match its accepted counts, and every type must match the parent's accepted type
 count. Duplicate/unknown cells, missing areas, wrong levels and failed reads reject
 the comparison. Only after reconciliation can a sparse missing type cell mean zero.
-Filtering is then local over the compact verified matrix, with no client fetches.
+Count-chart filtering is local over the compact verified matrix, with no client
+fetches. The optional exact table can fetch verified union presence for its types.
 The loader shares the existing request caches and starts alongside other detail reads.
 
 The download endpoint independently loads and verifies the full matrix. It rejects

@@ -5,18 +5,11 @@ import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { nhfrReading } from "@/lib/catalog/nhfr-reading";
-import {
-  getNhfrCounts,
-  getNhfrTypes,
-  getNhfrChildren,
-  getNhfrFacilities,
-  getNhfrChildGeos,
-} from "@/lib/db/nhfr";
+import { getNhfrCounts, getNhfrTypes, getNhfrFacilities, getNhfrChildGeos } from "@/lib/db/nhfr";
 import { getGeoAncestors } from "@/lib/db/geo";
 import { getProvinceBarangayCentroids } from "@/lib/geo/barangay-centroids";
 import { buildFacilityPoints } from "@/lib/geo/facility-points";
 import { withBasePath } from "@/lib/base-path";
-import { ChildBreakdown } from "@/components/facilities/child-breakdown";
 import { FacilityList } from "@/components/facilities/facility-list";
 import { FacilityMap } from "@/components/facilities/facility-map";
 import { DownloadLinks } from "@/components/facilities/download-links";
@@ -59,11 +52,10 @@ export async function NhfrDetails({
       </p>
     );
   const city = selection.level === "citymun";
-  const [counts, types, children, facilities, ancestors, barangays, distribution, presence] =
+  const [counts, types, facilities, ancestors, barangays, distribution, presence] =
     await Promise.all([
       getNhfrCounts(selection.code, selection.level),
       getNhfrTypes(selection.code, selection.level),
-      getNhfrChildren(selection.code, selection.level),
       city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
       city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
       getNhfrChildGeos(selection.code, selection.level),
@@ -95,12 +87,6 @@ export async function NhfrDetails({
           expectedFacilities: counts.nFacilities,
         })
       : null;
-  const heading =
-    selection.level === "national"
-      ? "Regions"
-      : selection.level === "region"
-        ? "Provinces"
-        : "Cities / municipalities";
   return (
     <div className="space-y-5" data-testid="health-facilities-details">
       <FacilityAnalysis
@@ -142,21 +128,7 @@ export async function NhfrDetails({
             />
           </div>
         </>
-      ) : (
-        <div className="rounded-lg border border-border p-4 sm:p-6">
-          <ChildBreakdown
-            heading={heading}
-            items={children}
-            areaHref={(c) =>
-              catalogJourneyHref(
-                { mode: "psgc", level: c.geoLevel, code: c.geoCode },
-                "nhfr",
-                mapState,
-              )
-            }
-          />
-        </div>
-      )}
+      ) : null}
       <DownloadLinks geoLevel={selection.level} geoCode={selection.code} />
     </div>
   );

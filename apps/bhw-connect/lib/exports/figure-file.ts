@@ -39,15 +39,13 @@ export async function figureFile(
   deck.title = title;
   deck.subject = subject;
   for (const page of pages)
-    deck
-      .addSlide()
-      .addImage({
-        data: `image/png;base64,${Buffer.from(raster(page)).toString("base64")}`,
-        x: 0,
-        y: 0,
-        w: 10 * scale,
-        h: (page.height / 100) * scale,
-      });
+    deck.addSlide().addImage({
+      data: `image/png;base64,${Buffer.from(raster(page)).toString("base64")}`,
+      x: 0,
+      y: 0,
+      w: 10 * scale,
+      h: (page.height / 100) * scale,
+    });
   return {
     body: new Uint8Array((await deck.write({ outputType: "uint8array" })) as Uint8Array),
     mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",

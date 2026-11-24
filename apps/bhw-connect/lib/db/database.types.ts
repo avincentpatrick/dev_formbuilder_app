@@ -3736,6 +3736,10 @@ export type Database = {
       };
     };
     Functions: {
+      nhfr_headline_summary: {
+        Args: { p_dataset_id: number; p_roots: string[]; p_types?: string[] };
+        Returns: Json;
+      };
       analysis_source_api: {
         Args: { p_actor: string; p_project: string; p_operation: string; p_payload?: Json };
         Returns: Json;

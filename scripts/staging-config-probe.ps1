@@ -11,11 +11,13 @@
 # without starting a server. tests/Feature/Docs/StagingConfigJudgeTest.php refuses any cmdlet here that
 # writes, moves, stops or restarts something. Run it whenever Apache's configuration has been edited.
 #
-# HOW TO RUN IT, in an administrator PowerShell on the box, then paste the clipboard into the session:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File C:\meridian\test-app\scripts\staging-config-probe.ps1 | Set-Clipboard
-# Before this file is on the box, paste its body inside `& { ... } | Set-Clipboard` instead.
-# Copy through the clipboard, not by selecting console text: a console that wraps a long line breaks a
-# record in two, and the judge then refuses the paste as not measured (exit 2) rather than guess.
+# HOW TO RUN IT, in an administrator PowerShell on the box, then copy the whole Notepad window into the session:
+#   powershell -NoProfile -ExecutionPolicy Bypass -File C:\meridian\test-app\scripts\staging-config-probe.ps1 |
+#       Out-File -FilePath C:\meridian\config-probe.txt -Encoding utf8; notepad C:\meridian\config-probe.txt
+# Before this file is on the box, save it from Notepad as C:\meridian\config-probe.ps1 and run that copy.
+# Through a file, never `| Set-Clipboard` and never console text: on 2026-11-24 the clipboard route returned
+# nothing at all, and a console that wraps a long line breaks a record in two, which the judge refuses as
+# not measured (exit 2) rather than guess.
 #
 # OUTPUT. One record per line, fields separated by `|`:
 #   meridian-config-probe|v2|<UTC time>      the signature the judge recognises; nothing before it counts
@@ -56,7 +58,7 @@ function Get-ProbeRelative([string] $path) {
     return $full.Replace('\', '/')
 }
 
-$records.Add('meridian-config-probe|v2|' +[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))
+$records.Add('meridian-config-probe|v2|' + [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))
 $records.Add('root|' + $root.Replace('\', '/'))
 
 # Walk httpd.conf and every file an Include names, depth first, each file once.

@@ -21,6 +21,8 @@ denominators and limitations sit in closed-by-default “About this figure” se
 - Geographic roots come from verified PSGC geography or verified, non-conflicting
   district membership. Split-city contributions include attributed facilities only;
   incomplete district mappings are not promoted to complete totals.
+- The summary and export endpoints independently check accepted geographic
+  observations, so direct download URLs cannot bypass partial or unavailable states.
 - Complete accepted catalog figures render immediately. Type filtering is enabled
   after the fact summary reconciles with those figures. Partial/unavailable scopes
   retain the existing qualified overview. Requests are debounced and aborted when
@@ -47,7 +49,7 @@ existing bundled fonts, with the new export route explicitly included in tracing
 
 ## Validation
 
-- Full local unit/database suite: 2,260 passed, 13 skipped with the local development
+- Full local unit/database suite: 2,265 passed, 13 skipped with the local development
   database. The new transaction-isolated SQL case covers overlapping types,
   unassigned/misassigned barangays, duplicate roots, split roots and dataset isolation.
 - Fifteen browser cases passed: multi-selection at 320/390/768/1440px, native notes,

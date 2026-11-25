@@ -1,0 +1,44 @@
+meridian-config-probe|v1|2026-11-24T05:21:49Z
+root|C:/Apache24
+file|conf/httpd.conf|8f48b739afa459eb48f3f083b32705a6a6a9038e6b4da2f662f4857c5d3476e5|551
+d|conf/httpd.conf|31|ServerRoot "C:/Apache24"
+d|conf/httpd.conf|52|Listen 80
+d|conf/httpd.conf|513|Include conf/extra/httpd-vhosts.conf
+d|conf/httpd.conf|526|Include conf/extra/proxy-html.conf
+d|conf/httpd.conf|530|Include conf/extra/httpd-ssl.conf
+d|conf/httpd.conf|543|Include conf/extra/meridian.conf
+d|conf/httpd.conf|551|ServerName localhost
+file|conf/extra/httpd-vhosts.conf|a04643501dc6a146a9e94e22a2c8c8c00814395051c0646c5ae39a28ec2adf88|51
+d|conf/extra/httpd-vhosts.conf|47|<VirtualHost *:80>
+d|conf/extra/httpd-vhosts.conf|48|ServerName iconnect.com.de
+d|conf/extra/httpd-vhosts.conf|49|ServerAlias www.iconnect.com.de
+d|conf/extra/httpd-vhosts.conf|50|Redirect permanent / https://iconnect.com.de/
+d|conf/extra/httpd-vhosts.conf|51|</VirtualHost>
+file|conf/extra/proxy-html.conf|15ad995f19d161900897fc928180e592a39703d86e1f21829f86bfc2b4b27105|90
+file|conf/extra/httpd-ssl.conf|4552c18d70f3193b7415dedd77d6a9d105e0b05a6626927b8ae08036c7240cc9|317
+d|conf/extra/httpd-ssl.conf|36|Listen 443
+file|conf/extra/meridian.conf|e96a66540c8dff43767ee35da9d0b0323327396d4a28f7c7cdfeff9b56d93345|65
+d|conf/extra/meridian.conf|4|MDContactEmail <redacted>
+d|conf/extra/meridian.conf|5|MDCertificateAgreement accepted
+d|conf/extra/meridian.conf|6|MDCAChallenges tls-alpn-01
+d|conf/extra/meridian.conf|7|MDPrivateKeys secp256r1
+d|conf/extra/meridian.conf|8|<MDomain iconnect.com.de>
+d|conf/extra/meridian.conf|9|MDMembers manual
+d|conf/extra/meridian.conf|10|MDRenewMode always
+d|conf/extra/meridian.conf|11|</MDomain>
+d|conf/extra/meridian.conf|13|<VirtualHost *:443>
+d|conf/extra/meridian.conf|14|ServerName iconnect.com.de
+d|conf/extra/meridian.conf|17|SSLEngine on
+d|conf/extra/meridian.conf|18|SSLCertificateFile "C:/Apache24/conf/certs/iconnect.com.de-chain.pem"
+d|conf/extra/meridian.conf|19|SSLCertificateKeyFile "C:/Apache24/conf/certs/iconnect.com.de-key.pem"
+d|conf/extra/meridian.conf|22|Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+d|conf/extra/meridian.conf|23|Header always set Strict-Transport-Security "max-age=300"
+d|conf/extra/meridian.conf|32|Header set Cache-Control "public, max-age=31536000, immutable"
+d|conf/extra/meridian.conf|65|</VirtualHost>
+x|conf/extra/meridian.conf.bak-20260920-182015|22
+x|conf/extra/meridian.conf.before-barangay-maps.20261109-182848|22
+x|conf/extra/meridian.conf.before-barangay-maps.20261109-183512|22
+s|*:80 iconnect.com.de (C:/Apache24/conf/extra/httpd-vhosts.conf:47)
+s|*:443 iconnect.com.de (C:/Apache24/conf/extra/meridian.conf:13)
+end|42
+PS C:\Users\Administrator>

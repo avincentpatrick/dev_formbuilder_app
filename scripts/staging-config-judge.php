@@ -383,7 +383,7 @@ function config_parse(string $raw): array|string
 
             default:
                 return "{$where} is not a record this judge knows: '{$line}'. A console that wraps a long line "
-                    .'splits a record in two, so copy the report through a file or the clipboard, never by '
+                    .'splits a record in two, so save the report to a file and copy it out of Notepad, never by '
                     .'selecting console text.';
         }
     }

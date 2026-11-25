@@ -104,6 +104,58 @@ Prediction:
 - The `*:80` vhost still carries `ServerName staging.pitahc.gov.ph`, or none, because `D216`'s step 4 changed only its redirect.
 - Pest: the new file passes, and a committed mutation catches every family of expectations. PHPStan cannot move, because the diff is scripts and tests only. CI is green on the first run.
 
+**BUILT AND HELD (2026-11-25): PR #640, cut from `origin/main` at `a5c8ff7e` (rebased over jong's BHW-only merges, which touch no file of ours), held for the next merge point and merged last, after #631.**
+- **CI:** run 45525334810 on `d2adf157`, every job green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5. Boundary 45525331475 green (5). Pest 7,654 passed, 1 skipped, which is main's run 45427862328 (7,620) plus the 34 new cases; its 2 warnings are `StructuredRuleEvaluatorTest`'s deliberate bad regex, on main too. E2E 924 passed, 84 skipped, in 32.7 min.
+- **The probe**, `scripts/staging-config-probe.ps1`, is read-only and ASCII. It prints `meridian-config-probe|v2|`, the root, each live file's sha256 and line count, the directives the judge reads (`MDContactEmail` as `<redacted>`), every section line, `x|` for an `X-Robots-Tag` line in a file no `Include` names, `httpd -S`'s map, and `end|<count>`.
+- **The judge**, `scripts/staging-config-judge.php`, uses the 0 · 1 · 2 contract.
+  - It reads only from the signature to the end line, with the count checked. It handles a byte-order mark and UTF-16.
+  - It rules by the block `httpd -S` names for each port, which must be in the report with that address. A second block claiming the name is a finding.
+  - A directive counts for a vhost only when no narrowing section sits between them (`<IfModule>` and its kin are transparent unless negated).
+  - It holds sixteen expectations.
+- **The floor**, `tests/Feature/Docs/StagingConfigJudgeTest.php`, is 34 cases over 26 fixtures.
+  - `measured.txt` is the box's report of 2026-11-25, verbatim. `v1.txt` is the first real report.
+  - Each BLOCKED fixture is one line-level edit, asserted to fail exactly one expectation.
+  - It also checks UTF-8 with a byte-order mark, UTF-16, and a console prompt after the end line.
+  - The probe is pinned read-only, ASCII, on the judge's signature, and redacting the contact address. No fixture holds an `@`.
+- **Mutants: 9 of 9 caught** through `mutate.php`, each restored by byte comparison:
+  - the port-80 header no longer required;
+  - scope ignored;
+  - trap 1 dropped;
+  - trap 2 half-dropped;
+  - trap 3 half-dropped;
+  - the end count unchecked;
+  - a second vhost ignored;
+  - the probe piping to `Set-Clipboard`;
+  - the probe's signature bumped to v3.
+- **The box, 2026-11-25 ~08:54.**
+  - One guarded block (`& { … }`) backed up `conf\extra\httpd-vhosts.conf` to `.before-m251.20261125-085402` and inserted `Header always set X-Robots-Tag "noindex, nofollow, noarchive"` under the `*:80` redirect.
+  - `httpd -t` printed Syntax OK, and Apache was restarted once.
+  - `http://iconnect.com.de/` answered `301` to `https://iconnect.com.de/` with the header.
+  - The probe re-ran, and the judge exited 0.
+  - `staging-headers-judge.php` over fresh captures: 6 of 6 measured, exit 0.
+- **The runbook.**
+  - §8.3 is restated from the report without line numbers: the `*:80` vhost, where the crawl line lives, and HSTS's judge.
+  - It gains *Checking the configuration* and a step 5 for a change of name, and it corrects a trap number in the `D216` steps (3, not 2).
+  - §8.2 step 10 and §8.3 no longer assert what the checklist contains.
+- **The checklist**, `claude.ai/code/artifact/f49fc4a0-3b24-4938-b4aa-3230510fe838`, is version `1795568688-426f`: a dated banner opens its lede, and an amber chip leads its facts.
+  - It was rebuilt from its own data model. A control run first reproduced the live body byte for byte (86,252 characters).
+  - All 34 of 34 ticks are kept, and the page was read back after publishing.
+- **Rows.** Closed `R-e6e340c0`, `R-a3918bf4` and `R-5e9f620f`. Filed `R-2732f192` (`during-testing`), the row `D235` created, which its record now cites by id.
+
+**How the prediction fared.**
+- *The first paste is judged exit 1, the only drift the `*:80` header, and exit 0 after the change:* **held.** The first real report (v1, 2026-11-24) failed on that header alone, judged through a relabelled copy, and the v2 report after the change judged 0.
+- *Most likely wrong — exit 2 from a wrapping console or a byte-order mark:* **wrong in kind.** The first failure was earlier: `| Set-Clipboard` on the box returned nothing at all. Saving the script from Notepad and reading the report back through `Out-File` and Notepad worked first time, and the judge strips the byte-order mark that route writes.
+- *`D216` moved `:22` and `:13`:* **wrong.** The header is still at `meridian.conf:22` inside the `*:443` vhost at `:13`, and `*:80` is still at `httpd-vhosts.conf:47`. The runbook drops the numbers anyway, because an edit moves them.
+- *The `*:80` vhost still names `staging.pitahc.gov.ph`, or nothing:* **wrong.** It names `iconnect.com.de`, with `ServerAlias www.iconnect.com.de`. That name has no DNS record (measured 2026-11-25), so it is inert, and §8.3 says so.
+- *Pest passes, a committed mutation catches every family, PHPStan cannot move, CI green first time:* **held, with two corrections.**
+  - The first local Docs run went red on my own test: a negated `toContain` given a message, which `NegatedContainArgumentsTest` refuses. It was fixed before the push.
+  - The mutations were not committed: these tests read the files themselves, not a diff, so the reason `CLAUDE.md` gives for committing does not apply.
+- **Changed from the plan, said here:**
+  - The probe went to v2 (every section line) once the judge needed scope, and the judge refuses v1.
+  - The box change was one guarded block that rolls itself back, not separate steps.
+  - The checklist got an amber chip as well as the banner.
+  - The `D235` row is `R-2732f192`, a ledger row, because `docs/claims/` carries no pipeline markers.
+
 ## HELD — `M250`, `R-d39d73e4` (`agreement-report`): the Data Explorer lists how far respondents agree — per question, or per row of a question table, the share giving the same answer (or the answers a report counts as agreeing) out of those who gave a view, with chosen answers such as "No view or opinion" left out, a threshold and a minimum number of views, the short list first and the rest most-disagreed first, downloadable as CSV or Excel (m250-agreement-report) — BUILT AND HELD: PR #631, CI 45147143459 every job green with real step counts
 
 Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/plan-nhete-recommendation-7-prancy-rocket-of-26d345ab-6ce1-4fff-90ed-fcd5390f0633.md`). NHETE recommendation 7, the last of the NHETE plan's seven (`~/.claude/plans/this-is-a-working-composed-ripple.md`).

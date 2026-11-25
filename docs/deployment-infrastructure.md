@@ -408,8 +408,7 @@ refuse to create an account without a console.
       check, the `/up` check, `Require local`, BHW's sign-in call and the operator's own browser reach the
       site from the box. Removing them breaks every check they protect.
       *(This was a conditional instruction resting on an unmeasured fact until `R-98682188` was closed on the
-      measurement above; the Testing Server Checklist's "remove the hosts entry" step is wrong and is
-      corrected there too.)*
+      measurement above.)*
     - Testers' devices must resolve the name themselves: on a private office network, check the DNS those
       devices use, because a hosts file cannot hold a wildcard.
 
@@ -597,14 +596,12 @@ run returns `CN=tls-alpn-01-challenge`, the mismatch is proven.
 `X-Powered-By: PHP`. ✅ **The activation task's read-back is the check, and it is the design rather than a
 stopgap**: `LastTaskResult` plus `C:\meridian\certificate-activation.log` report what Apache is *serving*,
 read over the loopback with SNI, which is a stronger fact than `mod_md`'s own opinion of its store.
-⛔ **AND THE CLAIM THIS RUNBOOK USED TO MAKE ABOUT THE CHECKLIST WAS ITSELF FALSE — MEASURED, NOT ASSUMED.**
-The sentence here said an operator *is told to read* `md-status`. The live Testing Server Checklist artifact
-contains **no reference to it**: `md-status`, `md_status` and `server-status` each occur **zero** times, none of
-the twelve URLs it tells an operator to open is a status handler, and it already prescribes
-`(Get-ScheduledTask …).LastTaskResult` and `Get-Content …\certificate-activation.log -Tail 5` — the very
-substitute this section recommends. So no checklist edit was owed, and the defect was entirely in the
-repository's description of an artifact no gate can read. ⚠️ **Nothing here may assert what the checklist says
-without opening it**, and a row is open for the fact that such assertions are ungated.
+⚠️ **The Testing Server Checklist is the record of the September 2026 build, and this runbook makes no claim
+about what it says** (`R-e6e340c0`, `M251`). It is a claude.ai page
+(`claude.ai/code/artifact/f49fc4a0-3b24-4938-b4aa-3230510fe838`, read on 2026-11-23 at version `1794203935-cdf8`)
+that no gate can read, and it still names `staging.pitahc.gov.ph`, the address before `D216`; `M251` put a dated
+banner at its top saying so and pointing here. Every operator fact about the box belongs in this section, where a
+row can be filed against it.
 `public/.htaccess` is the **stock Laravel file plus one header** (`X-Content-Type-Options`, `M217`) — routing
 unknown paths to the front controller is its purpose, not a defect — and it is **inert in every environment
 except this box**, since the local stack is nginx and there is no Apache in CI. A rewrite exemption added there
@@ -612,10 +609,16 @@ could not be proved by any gate this repository has, which is the same reason `R
 `.htaccess` arm. A response header can be: `scripts/staging-headers-judge.php` reads that one from outside, on
 the two static probes, every night. Why that header is there and the other three are not is in `AppSecurityHeaders`.
 
-⚠️ **Also on the box, unfiled against any step here:** a `*:80` vhost for the site's name in
-`conf\extra\httpd-vhosts.conf`, carrying a bare `Redirect permanent` to the `https://` origin and **no
-`Header` directive of its own**. `httpd.conf` carries an uncommented `Listen 80`, so there *is* a listener —
-the 21-second timeout measured from outside on 2026-09-19 was the agency firewall, not an absent server.
+**The `*:80` vhost, in `conf\extra\httpd-vhosts.conf`.** It answers the site's name with a bare
+`Redirect permanent / https://iconnect.com.de/`, and since `M251` (2026-11-25, `R-5e9f620f`) it carries the same
+`Header always set X-Robots-Tag "noindex, nofollow, noarchive"` line as the `*:443` vhost, so the 301 itself tells
+a crawler not to index it. Measured on the box right after the edit: `http://iconnect.com.de/` answered `301`, the
+`https://` location and the header. The file as it was before is
+`conf\extra\httpd-vhosts.conf.before-m251.20261125-085402`. `httpd.conf` carries an uncommented `Listen 80`, so
+there *is* a listener: the 21-second timeout measured from outside on 2026-09-19 was the agency firewall, not an
+absent server. Inbound 80 is still closed and the network does not hairpin, so today only the box itself reaches
+this vhost; the line is there for the day the firewall opens. Its `ServerAlias www.iconnect.com.de` is inert:
+that name has no DNS record (measured 2026-11-25), and neither the `*:443` vhost nor the certificate covers it.
 
 #### The crawl protection, and which copy is authoritative
 
@@ -646,10 +649,11 @@ not blocked**; crawlers do fetch it, Googlebot included.
   NOT `docs/gate-baselines.md`.** `scripts/gate-baselines.php`'s metric list is *declared, not derived*,
   and a metric whose pattern is absent writes `NOT FOUND` **and exits 1** — so declaring a `schedule`-only
   gate there would fail every close-out regeneration, which runs from a `push`.
-- ✅ **The directive lives in `conf\extra\meridian.conf` at `:22`, measured on the box by `M102`.** A recursive
-  search of every file under the Apache `conf` tree returns exactly one hit, inside the `*:443` vhost that opens
-  at `:13`, and `httpd -S` maps that vhost to the same file and line from the server's own parse. The `*:80`
-  paragraph above names a different file for a different vhost; both listings of `meridian.conf` here are excerpts.
+- ✅ **Where the line lives is checked, not recalled** (`M251`). It must sit in each vhost that `httpd -S` says
+  answers the site: the `*:443` vhost in `conf\extra\meridian.conf` and the `*:80` vhost in
+  `conf\extra\httpd-vhosts.conf`. It must cover the whole vhost, not one `<Location>` inside it. Copies in backup
+  files that no `Include` names are reported as inert and never counted. *Checking the configuration*, below, is
+  how; both listings of `meridian.conf` in this section are excerpts.
 
 #### HSTS, and why the number is deliberately small
 
@@ -686,6 +690,40 @@ from outside on 2026-09-19 was the **agency firewall**, not an absent listener.
   **semicolon**-delimited, so `max-age=300; includeSubDomains` was reported as *missing* `max-age=300`
   while carrying it. `M106` replaced the map's values with a `separator` / `require` / `forbid` policy.
   **Read this before pricing any future header as one line.**
+- `scripts/staging-config-judge.php` holds the same policy for the file, so a weakened value is caught by the
+  next run of the probe, not only by the next night's response. A change to `D54` edits both judges.
+
+#### Checking the configuration
+
+**Run the probe after any edit to Apache's configuration on the box, and before trusting any sentence in this
+section about what the files say.** Nothing else checks them: the nightly headers judge sees only what 443 sends,
+it cannot reach the `*:80` vhost, and it cannot see a certificate trap until the certificate has already failed.
+
+- **The probe, `scripts/staging-config-probe.ps1`, runs on the box and changes nothing.** It walks `httpd.conf`
+  and every file an `Include` names, prints the directives the judge reads and every section line, hashes each
+  file, lists `X-Robots-Tag` lines in files no `Include` names, and adds `httpd -S`'s map. It prints
+  `MDContactEmail` as `<redacted>`. In an administrator PowerShell:
+
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File C:\meridian\test-app\scripts\staging-config-probe.ps1 |
+      Out-File -FilePath C:\meridian\config-probe.txt -Encoding utf8; notepad C:\meridian\config-probe.txt
+  ```
+
+  Until `M251` is deployed, the copy is `C:\meridian\config-probe.ps1`. ⚠️ **Copy the report out of Notepad.**
+  On 2026-11-24 `| Set-Clipboard` returned nothing at all, and console text wraps long lines, which the judge
+  refuses.
+- **The judge, `scripts/staging-config-judge.php`, runs here**: save the paste to a file in the session's
+  scratchpad and run `php scripts/staging-config-judge.php --report=<file>`. `0` every expectation holds; `1` one
+  does not, named with its file and line; `2` the report was not recognised, so **nothing** was judged. It holds
+  the crawl header on both vhosts, `D54`'s HSTS, traps 1–3, the `<MDomain>` with `tls-alpn-01`, the global
+  `ServerName localhost`, `Include` lines that each name one file, the port-80 redirect target, and exactly one
+  vhost per port claiming the site's name. It rules by the vhost `httpd -S` names, never by line number.
+- ⚠️ **Its floor is the Pest control, `tests/Feature/Docs/StagingConfigJudgeTest.php`, and not
+  `docs/gate-baselines.md`**, for the same reason as the headers judge's. It has no CI step, because CI cannot
+  reach the box.
+- **Measured:** on 2026-11-24 the first report failed only on the `*:80` vhost's missing crawl header; on
+  2026-11-25, after `M251`'s edit, the judge reported every expectation holding (`0`) and the nightly headers
+  judge still passed on all six probes.
 
 #### Moving the testing site to a new name (`D216`)
 
@@ -700,7 +738,7 @@ edit and one `domains` value, and the old name goes last.
    - Hosts entries `127.0.0.1 <name>` and `127.0.0.1 <its central domain>`.
    - A second `*:443` vhost, copied from the first, with `ServerName <name>` and the same `X-Robots-Tag`,
      HSTS and BHW proxy lines. Its floor `SSLCertificateFile` points at the CURRENT certificate's files,
-     because a vhost with no floor serves a 503 (trap 2).
+     because a vhost with no floor serves a 503 (trap 3).
    - A `<MDomain <name>>` beside the first.
    - `httpd -t`, restart, wait for `AH10059`, then restart again (trap 4). At `D216` the line came ten
      seconds after the first restart, and the second restart served the new leaf.
@@ -722,6 +760,8 @@ edit and one `domains` value, and the old name goes last.
    - Copy the new certificate into `conf\certs\<name>-{chain,key}.pem` and point the floor there.
    - Point the `*:80` vhost's redirect at the new name.
    - Drop the old hosts entries.
+5. **Check it.** Change `CONFIG_SITE` in `scripts/staging-config-judge.php` and `STAGING_HOST` in
+   `scripts/staging-headers-judge.php`, then run the probe and the judge (*Checking the configuration*, above).
 
 **Rollback before step 4:** restore the `.env` backup and run the same cache commands, set the `domains`
 value back, and run `deploy-bhw.ps1 -Rollback`. **Everyone signs in again after a move**, because the session

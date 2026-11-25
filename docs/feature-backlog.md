@@ -10817,7 +10817,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   container that actually serves this file, or say in the file's own header that it is unexercised and that any
   change to it ships unproved. **Live** — the next handler path added to that box is swallowed the same way.
   Filed by `M101`. **Tier: during-testing.** ⚠️ **Amended by `M217` (2026-11-07):** the file is no longer stock (one `X-Content-Type-Options` line), and that line is exercised, from outside and at night, by `scripts/staging-headers-judge.php`. The rewrite rules this row is about still are not.
-- **`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
+- ✅ **CLOSED BY `M251` (2026-11-25) — ****`minor` · This repository asserts what the off-repo Testing Server Checklist says, in prose no gate can
   check, and one such assertion was false for at least one increment.** Found by `M101` (2026-09-19) while
   taking `R-0855052e`, whose remedy was *"delete the check from the checklist"* — and there was nothing there to
   delete. `R-0855052e` and `docs/deployment-infrastructure.md` §8.3 both stated that the checklist *tells the
@@ -10829,7 +10829,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   references to it exist. ⚠️ Either record the artifact's version beside every claim about it — `M100` and
   `M101` both had one to hand — so a reader can tell a live claim from a dated one, or stop asserting its
   contents and cite it only as the operator's surface. **Live** — the references are in the tree today and
-  nothing re-derives them. Filed by `M101`. **Tier: during-testing.**
+  nothing re-derives them. Filed by `M101`. **Tier: during-testing.** ✅ **CLOSED BY `M251` (2026-11-25):** the second option, extended to the page itself. Only two passages asserted what the checklist contains — §8.2 step 10's "remove the hosts entry" clause and §8.3's `md-status` paragraph — and both are gone. §8.3 now cites the page once, by link and the version read (`1794203935-cdf8`, 2026-11-23), as the record of the September 2026 build that no gate can read, and says that this runbook makes no claim about its contents. The page says the same about itself: a dated banner and an amber chip at its top, rebuilt from its own data model after a control run reproduced the live body byte for byte, every tick kept (34 of 34, version `1795568688-426f`). The other references in the tree are obligation sentences or dated records; they assert nothing about its contents and stay (`M40`). Shared one PR with `R-a3918bf4` and `R-5e9f620f` under `D235`.
 - ✅ **CLOSED BY `M161` (2026-10-12) — ****`minor` · A claim file's line citations are wrong the moment they are pushed, and three of them in one
   paragraph show the mechanism rather than a mistake.** Found by `M102` (2026-09-19) while verifying
   `R-4b5bc076`'s evidence before taking it. `M101`'s `### Row 1 — R-562bcc2a` evidence paragraph in
@@ -10846,7 +10846,7 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   citing a claim file, or a document the same push edits, by line at all — cite the `### Row n —` heading, which
   is stable across releases. **Live** — the three citations are on the tree today. Filed by `M102`.
   **Tier: during-testing.** ✅ **CLOSED BY `M161` (2026-10-12):** `docs/claims/TEMPLATE.md`'s opening block now asks for the row's id — never its `file:line` — and a note under it says to cite a claim by its heading, never by line, and not to repair a moved citation by its delta. The three citations in `M101`'s released block stay as written: a dated record is not rewritten (`M40`).
-- **`minor` · Everything this repository knows about the testing box's Apache configuration is prose no gate can
+- ✅ **CLOSED BY `M251` (2026-11-25) — ****`minor` · Everything this repository knows about the testing box's Apache configuration is prose no gate can
   read, and `M102` added four more sentences of it.** Found by `M102` (2026-09-19) while settling `R-4b5bc076`
   with a console session. §8.3 now asserts which file holds `Header always set X-Robots-Tag`, that `httpd.conf`
   carries a global `ServerName`, that the `*:80` vhost is a permanent redirect carrying no `Header` of its own,
@@ -10861,8 +10861,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   the pasted report, modelled on the headers judge — the same present · drifted · CANNOT MEASURE contract,
   positive recognition, and fixtures a mutation can drive — because `scripts/mutate.php` drives Pest and nothing
   else, so a `.ps1` alone can never be proved. **Live** — the assertions are in the tree today, and the increment
-  that added them could verify them only by asking a human. Filed by `M102`. **Tier: during-testing.**
-- **`nit` · The testing site's port-80 vhost is outside the crawl-protection gate's reach entirely, and this
+  that added them could verify them only by asking a human. Filed by `M102`. **Tier: during-testing.** ✅ **CLOSED BY `M251` (2026-11-25):** built as prescribed. `scripts/staging-config-probe.ps1` runs on the box, changes nothing, and is copied out through a file: on 2026-11-24 `| Set-Clipboard` returned nothing. It prints each live file's hash, the directives the judge reads, every section line, `X-Robots-Tag` copies in files no `Include` names, and `httpd -S`'s map. `scripts/staging-config-judge.php` rules on that print by the vhost `httpd -S` names, never by line number, with the headers judge's 0 · 1 · 2 contract and positive recognition. It holds sixteen expectations, and a `Header` inside a narrowing section such as `<Location>` does not count for the vhost. Its floor is `tests/Feature/Docs/StagingConfigJudgeTest.php`, over the real report and one-edit fixtures, proved red by mutation (`M251`'s claim). The box's report of 2026-11-25 judged 0. §8.3's four sentences are restated from it without line numbers, and *Checking the configuration* says how to run it. ⚠️ The judge's header policy repeats `STAGING_REQUIRED_HEADERS`'s decisions on purpose, because one reads the file and the other the response; §8.3 says a change to `D54` edits both.
+- ✅ **CLOSED BY `M251` (2026-11-25) — ****`nit` · The testing site's port-80 vhost is outside the crawl-protection gate's reach entirely, and this
   repository recorded it as having no listener at all.** Found by `M102` (2026-09-19) while settling
   `R-4b5bc076` on the box. `httpd.conf` carries an uncommented `Listen 80`, and `httpd -S` maps a live `*:80`
   vhost for `staging.pitahc.gov.ph` to `conf\extra\httpd-vhosts.conf` at `:47` — so the earlier record that a
@@ -10875,7 +10875,15 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   X-Robots-Tag` line to the `*:80` vhost so both are protected identically, or give the judge one `http://`
   probe asserting a 301 and recording that the redirect target is what carries the header. §8.3 is corrected by
   this increment to describe the vhost that exists. **Live** — the vhost is serving on the box today.
-  Filed by `M102`. **Tier: during-testing.**
+  Filed by `M102`. **Tier: during-testing.** ✅ **CLOSED BY `M251` (2026-11-25):** the first option. Since 2026-11-25 the `*:80` vhost carries `Header always set X-Robots-Tag "noindex, nofollow, noarchive"` under its redirect, added on the box by a guarded block: backup `conf\extra\httpd-vhosts.conf.before-m251.20261125-085402`, `httpd -t` Syntax OK, then one restart. From the box, `http://iconnect.com.de/` answered `301` to the `https://` origin carrying the header, and the nightly headers judge still passed on all six probes. The second option was refused: inbound 80 is closed, so a nightly `http://` probe could never reach the vhost and would be exit 2 every night, a gate that never measures. `scripts/staging-config-judge.php` holds the line in the file instead (`R-a3918bf4`).
+- **`minor` · Two generators still print `D13`'s hub clause as it read before `D235`.** Found by `M251` (2026-11-23) while
+  answering `D235`. The line's Next section (`scripts/pipeline.php`) and the generated hand-off
+  (`scripts/next-section.php`) each print, in their own words, that at most one row in a batch may touch a hub.
+  Since `D235`, rows whose fixes all edit the same hub file may share one PR while merges wait for a merge point.
+  So the two texts a session reads first contradict the decision record, and a session that trusts them splits a
+  batch `D235` allows, or asks the user again a question already answered. ⚠️ Change both sentences together, and
+  regenerate `docs/pipeline.md` and the hand-off in the same push. **Live** — both print the old clause on the
+  tree today. Filed by `M251`. **Tier: during-testing.**
 - **`minor` · `'Unknown user'` is a literal duplicated at six call sites and owned by nothing.**
   Found by `M103` (2026-09-19) while closing the member-roster row, which needed a sixth copy.
   `AuditLogPresenter` uses it twice, `SuperAdminService` twice, `AuditExporter` once, and

@@ -245,6 +245,6 @@ it('keeps the contact address out of every report', function (): void {
     expect(stagingConfigProbeCode())->toContain("if (\$key -eq 'mdcontactemail') { \$text = 'MDContactEmail <redacted>' }");
 
     foreach (glob(base_path('tests/fixtures/staging-config/*.txt')) ?: [] as $fixture) {
-        expect((string) file_get_contents($fixture))->not->toContain('@', basename($fixture));
+        expect(str_contains((string) file_get_contents($fixture), '@'))->toBeFalse(basename($fixture));
     }
 });

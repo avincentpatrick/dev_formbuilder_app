@@ -42,7 +42,7 @@ The options:
 **How it amends `D13`:** item 1's second clause now reads *"at most one row may touch a hub file, unless the rows that do all edit the same hub file — while merges wait for a merge point."* Items 2–5 are untouched: verification still fans out per row, and each row keeps its own `Evidence verified`, `Premise verified` and `Remedy verdict`. The exception log records `M251` as "There is no #11".
 
 **What it creates:**
-- One row, `d235-generator-wording`, tier `during-testing`, filed by `M251` on its branch. Two generators still restate the old clause, word for word, in the line's Next section (`scripts/pipeline.php`) and in the hand-off (`scripts/next-section.php`).
+- One row, filed by `M251` on its branch as `R-2732f192`, tier `during-testing`. Two generators still restate the old clause, word for word, in the line's Next section (`scripts/pipeline.php`) and in the hand-off (`scripts/next-section.php`).
 - `M251` itself, as the answer's first use.
 
 ### D226 — Renaming a question's key leaves every condition, formula and piped `${…}` that names it broken until publish refuses it (`R-ade0b598`). The copy feature needs the same rewriting engine. Is that fix folded into the copy increment? **A — no: its own increment, straight after, on the copy's rewriter.**

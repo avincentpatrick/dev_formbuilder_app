@@ -129,7 +129,11 @@ export async function NhfrDetails({
           </div>
         </>
       ) : null}
-      <DownloadLinks geoLevel={selection.level} geoCode={selection.code} />
+      <DownloadLinks
+        geoLevel={selection.level}
+        geoCode={selection.code}
+        locationName={locationName}
+      />
     </div>
   );
 }

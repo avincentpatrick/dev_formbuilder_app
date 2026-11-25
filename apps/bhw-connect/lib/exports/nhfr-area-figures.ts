@@ -4,7 +4,7 @@ import type { DistributionInput } from "@/lib/facilities/distribution";
 import { formatCount, percentageFormatter } from "@/lib/format";
 import { escapeXml } from "./render-png";
 export function areaFiguresSvg(
-  input: DistributionInput,
+  input: Pick<DistributionInput, "name" | "areas">,
   result: AreaFigures,
   areas: string[],
   types: string[],

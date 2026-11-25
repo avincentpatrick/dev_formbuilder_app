@@ -185,7 +185,11 @@ export default async function FacilitiesAreaPage({
                   </div>
                 </div>
                 <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
-                  <DownloadLinks geoLevel={geo.geoLevel} geoCode={geo.geoCode} />
+                  <DownloadLinks
+                    geoLevel={geo.geoLevel}
+                    geoCode={geo.geoCode}
+                    locationName={geo.geoName}
+                  />
                 </div>
               </section>
             </PresentationSlide>

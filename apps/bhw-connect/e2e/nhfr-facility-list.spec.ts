@@ -30,7 +30,9 @@ for (const width of [390, 1440]) {
         ? page.getByTestId("nhfr-overview")
         : page.getByRole("group", { name: "Facility totals" });
       const originalTotals = await totals.innerText();
-      const download = page.getByRole("link", { name: "Summary (PNG)", exact: true });
+      const report = page.getByRole("region", { name: "Full location report", exact: true });
+      await report.getByText("Choose report downloads", { exact: true }).click();
+      const download = report.getByRole("link", { name: "Download report (PDF)", exact: true });
       const originalDownload = await download.getAttribute("href");
       const form = page.getByRole("search", { name: "Facility list" });
       const input = form.getByRole("searchbox");
@@ -46,6 +48,8 @@ for (const width of [390, 1440]) {
       await expect(list).toContainText("Synthetic Station 2 with a long complete facility name");
       await expect(list).not.toContainText("Synthetic Station 10");
       await expect(totals).toHaveText(originalTotals, { useInnerText: true });
+      if ((await report.locator("details").getAttribute("open")) === null)
+        await report.getByText("Choose report downloads", { exact: true }).click();
       await expect(download).toHaveAttribute("href", originalDownload!);
       await expect(list).toContainText("Area totals, map and downloads stay unchanged");
       await page.reload();

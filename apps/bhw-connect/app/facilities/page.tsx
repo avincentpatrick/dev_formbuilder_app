@@ -86,7 +86,11 @@ export default async function FacilitiesLanding() {
               </div>
             </div>
             <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4">
-              <DownloadLinks geoLevel="national" geoCode={NATIONAL_GEO_CODE} />
+              <DownloadLinks
+                geoLevel="national"
+                geoCode={NATIONAL_GEO_CODE}
+                locationName="Philippines"
+              />
             </div>
           </section>
         </PresentationSlide>

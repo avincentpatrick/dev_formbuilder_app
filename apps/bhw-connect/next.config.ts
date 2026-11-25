@@ -50,6 +50,7 @@ const nextConfig: NextConfig = {
     "/api/export/png": ["./lib/exports/fonts/*.ttf"],
     "/api/export/pptx": ["./lib/exports/fonts/*.ttf"],
     "/api/export/profiling-status": ["./lib/exports/fonts/*.ttf"],
+    "/api/export/facilities/report": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/headline": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/mix": ["./lib/exports/fonts/*.ttf"],

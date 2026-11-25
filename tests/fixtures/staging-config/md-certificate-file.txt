@@ -1,0 +1,85 @@
+check|status|301
+check|location|https://iconnect.com.de/
+check|x-robots-tag|noindex, nofollow, noarchive
+meridian-config-probe|v2|2026-11-25T00:54:18Z
+root|C:/Apache24
+file|conf/httpd.conf|8f48b739afa459eb48f3f083b32705a6a6a9038e6b4da2f662f4857c5d3476e5|551
+d|conf/httpd.conf|31|ServerRoot "C:/Apache24"
+d|conf/httpd.conf|52|Listen 80
+d|conf/httpd.conf|190|<IfModule unixd_module>
+d|conf/httpd.conf|202|</IfModule>
+d|conf/httpd.conf|237|<Directory />
+d|conf/httpd.conf|240|</Directory>
+d|conf/httpd.conf|255|<Directory "C:/Apache24/htdocs">
+d|conf/httpd.conf|281|</Directory>
+d|conf/httpd.conf|287|<IfModule dir_module>
+d|conf/httpd.conf|289|</IfModule>
+d|conf/httpd.conf|295|<Files ".ht*">
+d|conf/httpd.conf|297|</Files>
+d|conf/httpd.conf|315|<IfModule log_config_module>
+d|conf/httpd.conf|323|<IfModule logio_module>
+d|conf/httpd.conf|326|</IfModule>
+d|conf/httpd.conf|342|</IfModule>
+d|conf/httpd.conf|344|<IfModule alias_module>
+d|conf/httpd.conf|373|</IfModule>
+d|conf/httpd.conf|375|<IfModule cgid_module>
+d|conf/httpd.conf|381|</IfModule>
+d|conf/httpd.conf|387|<Directory "C:/Apache24/cgi-bin">
+d|conf/httpd.conf|391|</Directory>
+d|conf/httpd.conf|393|<IfModule headers_module>
+d|conf/httpd.conf|400|</IfModule>
+d|conf/httpd.conf|402|<IfModule mime_module>
+d|conf/httpd.conf|448|</IfModule>
+d|conf/httpd.conf|513|Include conf/extra/httpd-vhosts.conf
+d|conf/httpd.conf|525|<IfModule proxy_html_module>
+d|conf/httpd.conf|526|Include conf/extra/proxy-html.conf
+d|conf/httpd.conf|527|</IfModule>
+d|conf/httpd.conf|530|Include conf/extra/httpd-ssl.conf
+d|conf/httpd.conf|536|<IfModule ssl_module>
+d|conf/httpd.conf|539|</IfModule>
+d|conf/httpd.conf|543|Include conf/extra/meridian.conf
+d|conf/httpd.conf|551|ServerName localhost
+file|conf/extra/httpd-vhosts.conf|37ff36eda60b3d1b5954b224fe3ce522cc8eae5949197228eb0ae513eec65dbd|52
+d|conf/extra/httpd-vhosts.conf|47|<VirtualHost *:80>
+d|conf/extra/httpd-vhosts.conf|48|ServerName iconnect.com.de
+d|conf/extra/httpd-vhosts.conf|49|ServerAlias www.iconnect.com.de
+d|conf/extra/httpd-vhosts.conf|50|Redirect permanent / https://iconnect.com.de/
+d|conf/extra/httpd-vhosts.conf|51|Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+d|conf/extra/httpd-vhosts.conf|52|</VirtualHost>
+file|conf/extra/proxy-html.conf|15ad995f19d161900897fc928180e592a39703d86e1f21829f86bfc2b4b27105|90
+file|conf/extra/httpd-ssl.conf|4552c18d70f3193b7415dedd77d6a9d105e0b05a6626927b8ae08036c7240cc9|317
+d|conf/extra/httpd-ssl.conf|36|Listen 443
+file|conf/extra/meridian.conf|e96a66540c8dff43767ee35da9d0b0323327396d4a28f7c7cdfeff9b56d93345|65
+d|conf/extra/meridian.conf|4|MDContactEmail <redacted>
+d|conf/extra/meridian.conf|5|MDCertificateAgreement accepted
+d|conf/extra/meridian.conf|6|MDCAChallenges tls-alpn-01
+d|conf/extra/meridian.conf|7|MDPrivateKeys secp256r1
+d|conf/extra/meridian.conf|8|<MDomain iconnect.com.de>
+d|conf/extra/meridian.conf|9|MDCertificateFile "C:/Apache24/conf/certs/iconnect.com.de-chain.pem"
+d|conf/extra/meridian.conf|10|MDRenewMode always
+d|conf/extra/meridian.conf|11|</MDomain>
+d|conf/extra/meridian.conf|13|<VirtualHost *:443>
+d|conf/extra/meridian.conf|14|ServerName iconnect.com.de
+d|conf/extra/meridian.conf|17|SSLEngine on
+d|conf/extra/meridian.conf|18|SSLCertificateFile "C:/Apache24/conf/certs/iconnect.com.de-chain.pem"
+d|conf/extra/meridian.conf|19|SSLCertificateKeyFile "C:/Apache24/conf/certs/iconnect.com.de-key.pem"
+d|conf/extra/meridian.conf|22|Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+d|conf/extra/meridian.conf|23|Header always set Strict-Transport-Security "max-age=300"
+d|conf/extra/meridian.conf|28|<Directory "C:/meridian/bhw/maps/">
+d|conf/extra/meridian.conf|32|Header set Cache-Control "public, max-age=31536000, immutable"
+d|conf/extra/meridian.conf|34|</Directory>
+d|conf/extra/meridian.conf|37|<Location "/bhw-connect">
+d|conf/extra/meridian.conf|40|</Location>
+d|conf/extra/meridian.conf|42|<Directory "C:/meridian/test-app/public">
+d|conf/extra/meridian.conf|48|</Directory>
+d|conf/extra/meridian.conf|50|<Proxy "balancer://meridian-php/">
+d|conf/extra/meridian.conf|53|</Proxy>
+d|conf/extra/meridian.conf|54|<FilesMatch "[.]php$">
+d|conf/extra/meridian.conf|56|</FilesMatch>
+d|conf/extra/meridian.conf|65|</VirtualHost>
+x|conf/extra/meridian.conf.bak-20260920-182015|22
+x|conf/extra/meridian.conf.before-barangay-maps.20261109-182848|22
+x|conf/extra/meridian.conf.before-barangay-maps.20261109-183512|22
+s|*:80 iconnect.com.de (C:/Apache24/conf/extra/httpd-vhosts.conf:47)
+s|*:443 iconnect.com.de (C:/Apache24/conf/extra/meridian.conf:13)
+end|81

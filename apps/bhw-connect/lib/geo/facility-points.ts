@@ -3,7 +3,7 @@
  * its barangays (from `dim_geo`), its barangay centroids (from the boundary pipeline), and its
  * facility list (from `fact_nhfr_facility`).
  *
- * **One point per barangay, not one per facility.** The registry has no lat/long, so every
+ * **One point per barangay, not one per facility.** The loaded inventory has no lat/long, so every
  * facility in a barangay would be drawn at the *same* coordinate — twelve identical dots claiming
  * twelve distinct locations, which is a claim the data cannot support and which no amount of
  * clustering makes true. So a point is a barangay, sized by how many facilities are registered
@@ -118,10 +118,9 @@ export function buildFacilityPoints({
 /**
  * Circle radius in px for a barangay with `n` facilities, given the area's largest count.
  *
- * Area-proportional (radius ∝ √n), which is the encoding that does not exaggerate — a barangay
- * with four facilities gets four times the ink of one with one, not sixteen times. Empty
- * barangays get a fixed small dot: they are a category, not a zero on the same scale, and they
- * render hollow so "none here" never reads as "a very small number here".
+ * A minimum visible radius plus square-root scaling; this is not strictly area-proportional.
+ * The numeric legend and exact table are needed for comparisons. Zero recorded facilities
+ * use a separate hollow-ring category.
  */
 export const EMPTY_POINT_RADIUS = 2.5;
 const MIN_RADIUS = 4;

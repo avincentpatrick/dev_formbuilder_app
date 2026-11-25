@@ -47,7 +47,8 @@ it("searches name/type/barangay without mutating or truncating the source list",
   const html = list(rows, 2, "north");
   expect(html).toContain(row.facilityName);
   expect(html).toContain("1 matching facility of 2 loaded");
-  expect(html).toContain("Area totals, map and downloads stay unchanged");
+  expect(html).toContain("Area totals, map and map downloads stay unchanged");
+  expect(html).toContain("Matching-facility downloads follow this search");
   expect(html).toContain('name="facilitySearch"');
   expect(html).toContain("Licence status not stated");
   expect(facilitySearchQuery(["a", "b"])).toBe("");

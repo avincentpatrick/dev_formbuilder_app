@@ -7,7 +7,9 @@ const db = vi.hoisted(() => ({
   facilities: vi.fn(),
   distribution: vi.fn(),
   presence: vi.fn(),
+  exploration: vi.fn(),
 }));
+vi.mock("@/lib/db/nhfr-exploration", () => ({ getNhfrExploration: db.exploration }));
 vi.mock("@/lib/db/nhfr-distribution", () => ({ getNhfrDistribution: db.distribution }));
 vi.mock("@/lib/db/nhfr-presence", () => ({ getNhfrPresence: db.presence }));
 vi.mock("@/lib/db/nhfr", async (importOriginal) => ({
@@ -52,6 +54,7 @@ beforeEach(() => {
   db.facilities.mockResolvedValue(null);
   db.distribution.mockResolvedValue(null);
   db.presence.mockResolvedValue(null);
+  db.exploration.mockResolvedValue(null);
 });
 it("does not substitute national or municipal details for availability, barangay or district scope", async () => {
   for (const selection of [
@@ -77,7 +80,7 @@ it("withholds mismatched details and keeps failed lists distinct from zero", asy
   expect(renderToStaticMarkup(await NhfrDetails(props))).toContain("could not be verified");
   const html = renderToStaticMarkup(await NhfrDetails(props));
   expect(html).toContain("not a reported zero");
-  expect(html).toContain("map is unavailable");
+  expect(html).toContain("map and list are unavailable");
   expect(html).not.toContain("No health facilities are on");
 });
 it("keeps geographic drill-down inside the same catalog dataset", async () => {

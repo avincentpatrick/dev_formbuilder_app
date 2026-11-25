@@ -1,17 +1,16 @@
+import { getNhfrExploration } from "@/lib/db/nhfr-exploration";
+import { BarangayExplorer } from "@/components/facilities/barangay-explorer";
 import { facilitySearchQuery } from "@/lib/facilities/search";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PORTAL_CRUMB, FACILITIES_CRUMB } from "@/lib/nav/breadcrumbs";
-import { getChildGeos, getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
-import { getProvinceBarangayCentroids } from "@/lib/geo/barangay-centroids";
-import { buildFacilityPoints } from "@/lib/geo/facility-points";
+import { getGeoAncestors, getGeoByCode } from "@/lib/db/geo";
 import {
   NHFR_BRAND_LABEL,
   getNhfrChildren,
   getNhfrCounts,
-  getNhfrFacilities,
   getNhfrStaticParams,
   getNhfrTypes,
   nhfrCaption,
@@ -23,15 +22,12 @@ import { FacilityStats } from "@/components/facilities/facility-stats";
 import { CoverageBar } from "@/components/facilities/coverage-bar";
 import { ChildBreakdown } from "@/components/facilities/child-breakdown";
 import { TypeBreakdown } from "@/components/facilities/type-breakdown";
-import { FacilityList } from "@/components/facilities/facility-list";
-import { FacilityMap } from "@/components/facilities/facility-map";
 import { DownloadLinks } from "@/components/facilities/download-links";
 import { AskFacilities } from "@/components/facilities/ask-facilities";
 import { AiInsight } from "@/components/narrative/ai-insight";
 import { PresentationProvider } from "@/components/present/presentation-context";
 import { PresentationSlide } from "@/components/present/presentation-slide";
 import { PresentButton } from "@/components/present/present-button";
-import { withBasePath } from "@/lib/base-path";
 
 // 1 hour. ISR: citymun render on demand; region/province are prerendered. Same reasoning as the
 // landing page — a shorter window bounds how long a transient empty read can stay cached.
@@ -102,39 +98,17 @@ export default async function FacilitiesAreaPage({
   }
 
   const isCitymun = geo.geoLevel === "citymun";
-  const [counts, children, types, facilities, ancestors, barangays] = await Promise.all([
+  const [counts, children, types, exploration, ancestors] = await Promise.all([
     getNhfrCounts(geo.geoCode, geo.geoLevel),
     getNhfrChildren(geo.geoCode, geo.geoLevel),
     getNhfrTypes(geo.geoCode, geo.geoLevel),
-    isCitymun ? getNhfrFacilities(geo.geoCode) : Promise.resolve([]),
+    isCitymun ? getNhfrExploration(geo.geoCode) : Promise.resolve(null),
     getGeoAncestors(geo.geoCode, geo.geoLevel),
-    // The map's barangays come from dim_geo, not from the facility rows: a barangay with no
-    // facility has no row to be found in, and those are exactly the ones the map exists to show.
-    isCitymun ? getChildGeos(geo.geoCode, "citymun") : Promise.resolve([]),
   ]);
 
   const crumbAncestors = [ancestors.region, ancestors.province, ancestors.citymun].filter(
     (a): a is NonNullable<typeof a> => a !== null && a.geoCode !== geo.geoCode,
   );
-
-  // Point-map data, city/municipality only. Higher levels get the choropleth-shaped question
-  // ("how many, per area") answered by ChildBreakdown; a national canvas of 42,000 barangay dots
-  // would be neither readable nor within the mobile payload budget (BUILD_PLAN §5).
-  const pointData =
-    isCitymun &&
-    counts &&
-    facilities !== null &&
-    facilities.length === counts.nFacilities &&
-    barangays.length > 0
-      ? buildFacilityPoints({
-          barangays,
-          centroids: ancestors.province
-            ? await getProvinceBarangayCentroids(ancestors.province.geoCode)
-            : new Map(),
-          facilities,
-          expectedFacilities: counts.nFacilities,
-        })
-      : null;
 
   const childHeading = CHILD_HEADING[geo.geoLevel];
 
@@ -201,43 +175,14 @@ export default async function FacilitiesAreaPage({
             </PresentationSlide>
 
             {isCitymun ? (
-              <>
-                {/* Rendered only when there is something to place. A city/municipality whose
-                    barangays are all missing from the boundary source (Manila's 14
-                    sub-municipalities — see docs/BARANGAY_CENTROID_RECONCILIATION.md) gets no
-                    empty map frame; the facility list below is the whole figure there. */}
-                {(!facilities || facilities.length !== counts.nFacilities) && (
-                  <p role="status" className="text-sm">
-                    The facility map is unavailable until the complete list can be loaded.
-                  </p>
-                )}
-                {pointData && pointData.points.length > 0 && (
-                  <PresentationSlide id="facility-map" title="Which barangays have facilities">
-                    <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
-                      <FacilityMap
-                        data={pointData}
-                        areaName={geo.geoName}
-                        outlineUrl={
-                          ancestors.province
-                            ? withBasePath(`/geo/citymun/${ancestors.province.geoCode}.json`)
-                            : null
-                        }
-                        outlineGeoCode={geo.geoCode}
-                      />
-                    </div>
-                  </PresentationSlide>
-                )}
-                <PresentationSlide id="facility-list" title="Facilities">
-                  <div className="rounded-lg border border-border bg-background p-5 sm:p-6">
-                    <FacilityList
-                      facilities={facilities}
-                      expectedCount={counts.nFacilities}
-                      query={query}
-                      areaHref={nhfrAreaHref(geo.geoLevel, geo.geoCode)}
-                    />
-                  </div>
-                </PresentationSlide>
-              </>
+              <PresentationSlide id="facility-map" title="Facilities recorded by barangay">
+                <BarangayExplorer
+                  key={geo.geoCode}
+                  input={exploration}
+                  query={query}
+                  areaHref={nhfrAreaHref(geo.geoLevel, geo.geoCode)}
+                />
+              </PresentationSlide>
             ) : (
               childHeading && (
                 <PresentationSlide id="areas" title={childHeading}>

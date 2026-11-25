@@ -115,11 +115,7 @@ export function nhfrAreaHref(geoLevel: GeoLevel, geoCode: string): string {
  * How a licensing status renders. The source's blank is the common case and it is not a verdict,
  * so it never renders as "unlicensed" — it renders as what it is.
  */
-export function licensingLabel(status: string | null): string {
-  if (status === "With License") return "Licensed";
-  if (status === "Without License") return "No current licence recorded";
-  return "Licence status not stated";
-}
+export { licensingLabel } from "@/lib/facilities/licensing-label";
 
 /**
  * The cross-dataset context chip's sentence for `/place/*` and `/explore`, or null when there is
@@ -300,11 +296,8 @@ export const getNhfrTypes = cache(
  * Every facility in a city/municipality — the leaf of the drill-down, and the one place the fact
  * table is read directly. Ordered by facility name.
  *
- * Bounded by `LIST_LIMIT` because PostgREST caps a response at 1,000 rows by default and the
- * largest city/municipality carries several hundred: taking the cap silently would truncate the
- * list with no sign on the page, which is the failure D3.3 had to fix on the district export.
- * The caller renders the count from `agg_nhfr_counts` alongside, so a truncated list is visible
- * as a shortfall rather than a quiet omission.
+ * Pages through the complete inventory with exact totals and unique-code ordering.
+ * Failed, duplicate or changing reads return null; callers also reconcile aggregate totals.
  */
 const LIST_LIMIT = 1000;
 
@@ -314,17 +307,42 @@ export const getNhfrFacilities = cache(
     if (datasetId === null) return null;
 
     const supabase = createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("fact_nhfr_facility")
-      .select(
-        "facility_code, facility_name, facility_type, ownership_major, ownership_sub, barangay_geo_code, source_barangay_name, bed_capacity, licensing_status",
+    const data = [];
+    const seen = new Set<string>();
+    let total: number | null = null;
+    // Exact totals and a unique ordering detect capped, duplicate or changing reads.
+    for (let offset = 0; ;) {
+      const page = await supabase
+        .from("fact_nhfr_facility")
+        .select(
+          "facility_code, facility_name, facility_type, ownership_major, ownership_sub, barangay_geo_code, source_barangay_name, bed_capacity, licensing_status",
+          { count: "exact" },
+        )
+        .eq("dataset_id", datasetId)
+        .eq("geo_code", citymunCode)
+        .order("facility_code", { ascending: true })
+        .range(offset, offset + LIST_LIMIT - 1);
+      if (
+        page.error ||
+        !page.data ||
+        page.count === null ||
+        !Number.isSafeInteger(page.count) ||
+        page.count < 0
       )
-      .eq("dataset_id", datasetId)
-      .eq("geo_code", citymunCode)
-      .order("facility_name", { ascending: true })
-      .limit(LIST_LIMIT);
+        return null;
+      if (total !== null && total !== page.count) return null;
+      total = page.count;
+      for (const row of page.data) {
+        if (!row.facility_code || seen.has(row.facility_code)) return null;
+        seen.add(row.facility_code);
+        data.push(row);
+      }
+      if (data.length > total) return null;
+      if (data.length === total) break;
+      if (!page.data.length) return null;
+      offset += page.data.length;
+    }
 
-    if (error || !data) return null;
     return data.map((row) => ({
       facilityCode: row.facility_code,
       facilityName: row.facility_name,

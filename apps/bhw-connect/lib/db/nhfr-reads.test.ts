@@ -12,8 +12,9 @@ function response(data: unknown[] | null, error: unknown = null) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    then: (resolve: (r: unknown) => unknown) => Promise.resolve(resolve({ data, error })),
+    range: vi.fn().mockReturnThis(),
+    then: (resolve: (r: unknown) => unknown) =>
+      Promise.resolve(resolve({ data, error, count: data?.length ?? null })),
   };
   mock.client.mockReturnValue({ from: () => query });
   return query;
@@ -49,5 +50,36 @@ it("retains source and locality filters and excludes contact fields from project
     ["geo_code", "0102801"],
   ]);
   expect(query.select.mock.calls[0][0]).not.toMatch(/email|contact|phone|street/);
-  expect(query.limit).toHaveBeenCalledWith(1000);
+  expect(query.range).toHaveBeenCalledWith(0, 999);
+});
+
+it("reads beyond 1000 with deterministic codes and rejects later failure or duplicate", async () => {
+  const first = Array.from({ length: 1000 }, (_, i) => ({ facility_code: `f${i}` }));
+  for (const next of [
+    { data: [{ facility_code: "last" }], error: null, count: 1001 },
+    { data: null, error: { message: "failed" }, count: null },
+    { data: [{ facility_code: "f1" }], error: null, count: 1001 },
+    { data: [], error: null, count: 1001 },
+    { data: [{ facility_code: "last" }], error: null, count: 1002 },
+  ]) {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi
+        .fn()
+        .mockResolvedValueOnce({ data: first, error: null, count: 1001 })
+        .mockResolvedValueOnce(next),
+    };
+    mock.client.mockReturnValue({ from: () => query });
+    const result = await getNhfrFacilities("synthetic");
+    if (next.data?.[0]?.facility_code === "last" && next.count === 1001)
+      expect(result).toHaveLength(1001);
+    else expect(result).toBeNull();
+    expect(query.range.mock.calls).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+    expect(query.order).toHaveBeenCalledWith("facility_code", { ascending: true });
+  }
 });

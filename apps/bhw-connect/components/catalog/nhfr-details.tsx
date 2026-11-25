@@ -1,3 +1,5 @@
+import { getNhfrExploration } from "@/lib/db/nhfr-exploration";
+import { BarangayExplorer } from "@/components/facilities/barangay-explorer";
 import { getNhfrPresence } from "@/lib/db/nhfr-presence";
 import { getNhfrDistribution } from "@/lib/db/nhfr-distribution";
 import { FacilityAnalysis } from "@/components/facilities/facility-analysis";
@@ -5,13 +7,7 @@ import Link from "next/link";
 import type { CatalogDataset, CatalogSelection } from "@/lib/catalog/types";
 import { catalogJourneyHref } from "@/lib/catalog/journey";
 import { nhfrReading } from "@/lib/catalog/nhfr-reading";
-import { getNhfrCounts, getNhfrTypes, getNhfrFacilities, getNhfrChildGeos } from "@/lib/db/nhfr";
-import { getGeoAncestors } from "@/lib/db/geo";
-import { getProvinceBarangayCentroids } from "@/lib/geo/barangay-centroids";
-import { buildFacilityPoints } from "@/lib/geo/facility-points";
-import { withBasePath } from "@/lib/base-path";
-import { FacilityList } from "@/components/facilities/facility-list";
-import { FacilityMap } from "@/components/facilities/facility-map";
+import { getNhfrCounts, getNhfrTypes } from "@/lib/db/nhfr";
 import { DownloadLinks } from "@/components/facilities/download-links";
 
 /** Reuse the facility dashboard's readers and views inside the selected catalog card. */
@@ -52,41 +48,23 @@ export async function NhfrDetails({
       </p>
     );
   const city = selection.level === "citymun";
-  const [counts, types, facilities, ancestors, barangays, distribution, presence] =
-    await Promise.all([
-      getNhfrCounts(selection.code, selection.level),
-      getNhfrTypes(selection.code, selection.level),
-      city ? getNhfrFacilities(selection.code) : Promise.resolve(null),
-      city ? getGeoAncestors(selection.code, selection.level) : Promise.resolve(null),
-      getNhfrChildGeos(selection.code, selection.level),
-      selection.level === "national" ||
-      selection.level === "region" ||
-      selection.level === "province"
-        ? getNhfrDistribution(selection.code, selection.level)
-        : Promise.resolve(null),
-      selection.level === "national" ||
-      selection.level === "region" ||
-      selection.level === "province"
-        ? getNhfrPresence(selection.code, selection.level)
-        : Promise.resolve(null),
-    ]);
+  const [counts, types, exploration, distribution, presence] = await Promise.all([
+    getNhfrCounts(selection.code, selection.level),
+    getNhfrTypes(selection.code, selection.level),
+    city ? getNhfrExploration(selection.code) : Promise.resolve(null),
+    selection.level === "national" || selection.level === "region" || selection.level === "province"
+      ? getNhfrDistribution(selection.code, selection.level)
+      : Promise.resolve(null),
+    selection.level === "national" || selection.level === "region" || selection.level === "province"
+      ? getNhfrPresence(selection.code, selection.level)
+      : Promise.resolve(null),
+  ]);
   if (!counts || counts.nFacilities !== indicator!.values[0].value)
     return (
       <p role="status">
         Facility details could not be verified against this area’s total. Reload to try again.
       </p>
     );
-  const pointData =
-    city && facilities && facilities.length === counts.nFacilities && barangays.length > 0
-      ? buildFacilityPoints({
-          barangays,
-          centroids: ancestors?.province
-            ? await getProvinceBarangayCentroids(ancestors.province.geoCode)
-            : new Map(),
-          facilities,
-          expectedFacilities: counts.nFacilities,
-        })
-      : null;
   return (
     <div className="space-y-5" data-testid="health-facilities-details">
       <FacilityAnalysis
@@ -98,37 +76,14 @@ export async function NhfrDetails({
         selection={selection}
         mapState={mapState}
       />
-      {city ? (
-        <>
-          {(!facilities || facilities.length !== counts.nFacilities) && (
-            <p role="status">
-              The facility map is unavailable until the complete list can be loaded.
-            </p>
-          )}
-          {pointData && pointData.points.length > 0 && (
-            <div className="rounded-lg border border-border p-4 sm:p-6">
-              <FacilityMap
-                data={pointData}
-                areaName={locationName}
-                outlineUrl={
-                  ancestors?.province
-                    ? withBasePath(`/geo/citymun/${ancestors.province.geoCode}.json`)
-                    : null
-                }
-                outlineGeoCode={selection.code}
-              />
-            </div>
-          )}
-          <div className="rounded-lg border border-border p-4 sm:p-6">
-            <FacilityList
-              facilities={facilities}
-              expectedCount={counts.nFacilities}
-              query={query}
-              areaHref={catalogJourneyHref(selection, "nhfr", mapState)}
-            />
-          </div>
-        </>
-      ) : null}
+      {city && (
+        <BarangayExplorer
+          key={selection.code}
+          input={exploration}
+          query={query}
+          areaHref={catalogJourneyHref(selection, "nhfr", mapState)}
+        />
+      )}
       <DownloadLinks
         geoLevel={selection.level}
         geoCode={selection.code}

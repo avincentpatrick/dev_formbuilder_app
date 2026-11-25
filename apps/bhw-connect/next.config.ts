@@ -41,6 +41,8 @@ const nextConfig: NextConfig = {
       "./scripts/statistics/requirements.txt",
       "./node_modules/unpdf/**/*",
     ],
+    "/catalog": ["./public/geo/**/*"],
+    "/facilities/[geoLevel]/[geoCode]": ["./public/geo/**/*"],
     "/place/[geoLevel]/[geoCode]": ["./public/geo/**/*"],
     // Server-side PNG/PPTX exports rasterize with @resvg/resvg-js, which needs
     // real font files at runtime (lib/exports/render-png.ts) — Vercel's
@@ -54,6 +56,7 @@ const nextConfig: NextConfig = {
     "/api/export/facilities": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/headline": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/mix": ["./lib/exports/fonts/*.ttf"],
+    "/api/export/facilities/exploration": ["./lib/exports/fonts/*.ttf", "./public/geo/**/*"],
     "/api/export/facilities/presence": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/areas": ["./lib/exports/fonts/*.ttf"],
     "/api/export/facilities/distribution": ["./lib/exports/fonts/*.ttf"],

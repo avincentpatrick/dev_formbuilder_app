@@ -51,7 +51,7 @@ for (const width of [390, 1440]) {
       if ((await report.locator("details").getAttribute("open")) === null)
         await report.getByText("Choose report downloads", { exact: true }).click();
       await expect(download).toHaveAttribute("href", originalDownload!);
-      await expect(list).toContainText("Area totals, map and downloads stay unchanged");
+      await expect(list).toContainText("Area totals, map and map downloads stay unchanged");
       await page.reload();
       await expect(input).toHaveValue("clinic north");
       await input.fill("no-synthetic-match");

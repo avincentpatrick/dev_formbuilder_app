@@ -64,7 +64,7 @@ Prediction:
 - `DeployWorkflowTest` reddens on the literal deploy-bhw call until it is updated with the health URL.
 - **The one I most expect to be wrong:** the second guard. Every `RequestGuard` resolves its user once per request, and the `rls_aware` provider reads `users` on its own connection, so the pass's user lookup may need that provider rather than `User::find()`.
 
-## HELD — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename) — BUILT: PR #644; its CI's record follows below once every job is green
+## HELD — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename) — BUILT AND HELD: PR #644, CI 45772526551 every job green with real step counts
 
 Taken 2026-11-26, from the plan the user approved in chat the same day (`~/.claude/plans/lets-rename-the-following-frolicking-curry-of-c1c815ee-ed31-4db4-acc6-18d73249c3a9.md`).
 Branch `m252-iconnect-rename`, cut from origin/main at `6de682a8`, PR into main, held green for the next merge point (`D137`) and merged after #640.
@@ -122,6 +122,23 @@ Prediction:
 - Pest, Vitest and Contract are green once the listed tests are updated.
 - PHPStan does not move, because only strings and config defaults change in `app/`.
 - **The one I most expect to be wrong:** a test the inventory missed that asserts "Meridian", most likely an e2e spec or a `truncation-title` case on the longer wordmark at 375 px.
+
+**BUILT AND HELD (2026-11-26): PR #644, cut from `origin/main` at `6de682a8`, held for the next merge point and merged after #640, with #645 (`M253`) straight after it.**
+- **CI:** run 45772526551 on `2d6bcd60`, every job green with real step counts: Static analysis 33 · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5. Boundary 45777017005 green (5).
+  - The first run, 45765805430, was red on Frontend alone. Two Vitest files the local run had not covered failed. `letter-spacing-tokens.test.ts`'s allow-list only shrinks, and the first build had changed the wordmarks' letting. `MaintenanceCard.test.ts`'s Inertia mock had no `usePage`. Fixed in `2d6bcd60`. The whole suite was then green locally: 292 of 292 files, 4,654 tests.
+- **Built:**
+  - The cookie and both cache prefixes are literals now (`ProductNameTest`, 3 of 3 mutants caught).
+  - The name is `config('app.name')` and `app.short_name`, shared with every page and read through `useAppName()`. The tab title is read from the props, not `VITE_APP_NAME`. 19 Vue/TS and 6 PHP strings read it.
+  - The icon is drawn by `scripts/generate-app-icons.php`. The links to BHW read "iConnect Analytics", pointed by `ANALYTICS_URL`.
+- **Measured in a browser** at 375, 481, 768, 1025 and 1280 px:
+  - The full name needs 177–183 px, so "iConnect" shows up to the 1024 px band. On phones the bar's gap is halved and the wordmark is one step smaller.
+  - The search field now takes the squeeze (`flex-basis: 0`); at 481 px the name used to get only 56 px. The old uppercase MERIDIAN needed 94 px on a phone and was cut off there too.
+  - E2E `whats-new` and `search-nav` at three widths: 28 passed, 2 skipped (desktop-only by design).
+- **How the prediction fared:**
+  - The test it named was right in kind: `truncation-title` did need its wordmark entry, which was removed, not changed, because the wordmark now carries a `title`.
+  - But the miss was elsewhere: two Vitest files the inventory could not see, because neither asserts the name. Each reacts to an edit made for the rename.
+  - PHPStan: 0 on the host (the container's 54 are `M193`'s known phantoms).
+  - Pest, Contract and E2E were green on the first run, as predicted.
 
 ## HELD — `M251`, `R-e6e340c0`, `R-a3918bf4` and `R-5e9f620f`: what this repository says about the testing box is checked against the box — a read-only probe of its Apache configuration and a judge that rules on the probe's output, the port-80 site sends `X-Robots-Tag` too, and the runbook stops saying what the off-repo checklist contains (m251-testing-box-config) — BUILT AND HELD: PR #640, CI 45525334810 every job green with real step counts
 

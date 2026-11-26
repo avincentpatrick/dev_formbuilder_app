@@ -16,7 +16,7 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M254`, `R-ae22eae2`: `symfony/routing` 8.1.11 → 8.1.12, clearing CVE-2026-133746 and CVE-2026-133754, which fail `composer audit` on every Meridian CI run (m254-symfony-routing-advisory)
+## HELD — `M254`, `R-ae22eae2`: `symfony/routing` 8.1.11 → 8.1.12, clearing CVE-2026-133746 and CVE-2026-133754, which fail `composer audit` on every Meridian CI run — and, as built, `http-kernel`, `http-foundation` and `mailer` with it (m254-symfony-routing-advisory) — BUILT AND HELD: PR #646, CI 45783901161 every job green with real step counts
 
 Taken 2026-11-26. Found by #645's run 45776980298, the first to fail on these advisories. #644's run passed the same step earlier the same day, so the advisory database changed between the two runs.
 Branch `m254-symfony-routing-advisory`, cut from origin/main at `0a11f6bd`, PR into main, held for the next merge point and merged **first** there: every held Meridian PR's static-analysis job is red until the trunk carries this.
@@ -43,6 +43,13 @@ Prediction:
 - `composer audit` clean, and every job green.
 - PHPStan cannot move, because the diff is the lock only.
 - **The one I most expect to be wrong:** a routing behaviour change inside the patch release, which Pest's route-group and URL tests would show.
+
+**BUILT AND HELD (2026-11-26): PR #646, cut from `origin/main` at `4ed7c4d8`, held for the next merge point and merged FIRST there.**
+- **CI:** run 45783901161 on `384c560e`, every job green with real step counts: Static analysis 33 (Composer audit clean) · BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5. Boundary 45783895218 green (5).
+- **Built:** a lock-only bump of four packages. `symfony/routing`, `symfony/http-kernel` and `symfony/http-foundation` went 8.1.11 → 8.1.12, and `symfony/mailer` 8.1.1 → 8.1.12. `composer audit` is clean, and Pest over Mail, Auth, Api, Tenancy, Http and Guest passed 995.
+- **How the prediction fared:**
+  - **Wrong in scope.** The claim and its dry run named `symfony/routing` alone. Once it was bumped, the audit named the rest of the same Symfony batch: `http-kernel` (CVE-2026-133743, and it requires `http-foundation` 8.1.12) and `mailer` (CVE-2026-133751, CVE-2026-133755). The audit reports only one package's table before it fails, so a first fix is not the whole fix. Run it again after each bump.
+  - No routing behaviour changed: Pest and E2E were green on the first run.
 
 ## HELD — `M253`, `R-43038865` by `D236`: the portal at `iconnect.com.de`, iConnect Analytics at `analytics.iconnect.com.de` and iConnect Collection at `collection.iconnect.com.de` — the repository half: a shared sign-in pass that only `whoami` honours, the layout pinned by a test, the portal's redirect block generated from the route table, the BHW deploy's health URL taken from the box, a retiring service worker for the old address, ADR-0024 amended, and the runbook (m253-three-addresses) — BUILT AND HELD: PR #645, CI 45776980298 green but for Composer audit (an external advisory, cleared by `M254`)
 

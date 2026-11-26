@@ -161,13 +161,13 @@ describe('mappingProblem', () => {
 
 describe('mappingSummary / suggestedTitle', () => {
     it('counts columns and bindings separately, and singularises one column', () => {
-        expect(mappingSummary(rows(['A', 'full_name'], ['B', null]))).toBe('2 columns, 1 filled by Meridian');
-        expect(mappingSummary(rows(['A', null]))).toBe('1 column, 0 filled by Meridian');
+        expect(mappingSummary(rows(['A', 'full_name'], ['B', null]))).toBe('2 columns, 1 filled by iConnect Collection');
+        expect(mappingSummary(rows(['A', null]))).toBe('1 column, 0 filled by iConnect Collection');
     });
 
     it('names a created spreadsheet after the FORM, since it lands in the tenant’s own Drive', () => {
         expect(suggestedTitle('Clinic Intake')).toBe('Clinic Intake — responses');
-        expect(suggestedTitle(null)).toBe('Meridian form responses');
+        expect(suggestedTitle(null)).toBe('iConnect Collection form responses');
     });
 });
 

@@ -29,11 +29,13 @@ import ThemeQuickToggle from './ThemeQuickToggle.vue';
 import NotificationBell from './NotificationBell.vue';
 import FeedbackButton from './FeedbackButton.vue';
 import AccountMenu from './AccountMenu.vue';
+import { useAppName } from '@/composables/useAppName';
 
 defineProps<{ scrolled: boolean; drawerOpen: boolean }>();
 const emit = defineEmits<{ 'toggle-drawer': [] }>();
 
 const page = usePage();
+const { name: appName, shortName: appShortName } = useAppName();
 
 /**
  * The query the search RESULTS page is currently showing — and nothing else's.
@@ -93,7 +95,15 @@ const activeQuery = computed(() => {
             >
                 <MdsIcon name="menu" size="md" aria-hidden="true" />
             </button>
-            <span class="topnav__wordmark">Meridian</span>
+            <!--
+                M252 (`D236`): the full name where it fits, "iConnect" alone in §6's phone band — this file's own note
+                above `.topnav__left` records ~31px of headroom at 375px, and the full name is eleven letters longer
+                than the old one. Only one of the two is ever displayed, so a screen reader reads one name.
+            -->
+            <span class="topnav__wordmark" :title="appName">
+                <span class="topnav__wordmark-full">{{ appName }}</span>
+                <span class="topnav__wordmark-short">{{ appShortName }}</span>
+            </span>
         </div>
 
         <!--
@@ -279,17 +289,22 @@ const activeQuery = computed(() => {
     outline-offset: 2px;
 }
 
+/* No `text-transform: uppercase` since M252 (`D236`): the name is "iConnect", and its lowercase "i" is the brand. */
 .topnav__wordmark {
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.01em;
     color: var(--mds-color-action-primary-fg);
     /* Truncate rather than force the bar wide (see .topnav__left). */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* The short name shows only in §6's phone band (the media query below). */
+.topnav__wordmark-short {
+    display: none;
 }
 
 .topnav__right {
@@ -345,9 +360,18 @@ const activeQuery = computed(() => {
 
     /* Buys back the width the icon costs. At extra_large with OpenDyslexic's wider advances the display-face
        wordmark is the single widest item in the bar, and `min-width: 0` would otherwise resolve the squeeze
-       by ellipsising it to "MERI…" — contained, but not a wordmark. */
+       by ellipsising it to "iCon…" — contained, but not a wordmark. */
     .topnav__wordmark {
         font-size: var(--mds-type-body-lg-font-size);
+    }
+
+    /* M252 (`D236`): "iConnect" alone here; the full name is eleven letters longer than "Meridian" was. */
+    .topnav__wordmark-full {
+        display: none;
+    }
+
+    .topnav__wordmark-short {
+        display: inline;
     }
 }
 </style>

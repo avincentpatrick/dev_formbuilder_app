@@ -4,6 +4,7 @@
 // heading rather than merely showing the wrong label.
 
 import type { MappableColumn, MappingColumn, Option, SheetMapping, TabularDestination } from './types';
+import { currentAppName } from '@/composables/useAppName';
 
 /** The option value meaning "write nothing into this column". Never a real field key — those never start `–`. */
 export const UNBOUND = '';
@@ -146,7 +147,7 @@ export function mappingSummary(rows: MappingRow[]): string {
     const bound = rows.filter((row) => row.fieldKey).length;
     const columns = rows.length === 1 ? '1 column' : `${rows.length} columns`;
 
-    return `${columns}, ${bound} filled by Meridian`;
+    return `${columns}, ${bound} filled by ${currentAppName()}`;
 }
 
 /**
@@ -156,7 +157,7 @@ export function mappingSummary(rows: MappingRow[]): string {
  * "Meridian export 3" is noise. Falls back only when the rule is not scoped to one form.
  */
 export function suggestedTitle(formTitle: string | null): string {
-    return formTitle ? `${formTitle} — responses` : 'Meridian form responses';
+    return formTitle ? `${formTitle} — responses` : `${currentAppName()} form responses`;
 }
 
 // ── M96: Submission ID, and re-opening a saved rule ───────────────────────────────────────────────────────

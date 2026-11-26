@@ -19,7 +19,7 @@ return [
     'info' => [
         'version' => '1.0',
         'title' => 'Form-Builder SaaS API',
-        'description' => 'The versioned REST API for the Meridian form-builder platform. Served per tenant on '
+        'description' => 'The versioned REST API for the iConnect Collection form-builder platform. Served per tenant on '
             .'the tenant subdomain (https://{tenant}.meridian.test/api/v1) and authenticated with Sanctum '
             .'personal-access-token API keys. See docs/api-specification.md.',
     ],

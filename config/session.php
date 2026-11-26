@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     /*
@@ -125,12 +123,14 @@ return [
     | the framework. Typically, you should not need to change this value
     | since doing so does not grant a meaningful security improvement.
     |
+    | ⛔ A LITERAL, NOT THE SLUG OF APP_NAME (M252, D236). The product was renamed iConnect Collection, and
+    | the stock default would have renamed the cookie with it: every session signed out at once, and BHW
+    | Connect's admin sign-in broken, because its server forwards this cookie BY NAME
+    | (apps/bhw-connect/lib/db/meridian-identity-cookie.ts). The name is an identifier nobody sees.
+    |
     */
 
-    'cookie' => env(
-        'SESSION_COOKIE',
-        Str::slug((string) env('APP_NAME', 'laravel')).'-session'
-    ),
+    'cookie' => env('SESSION_COOKIE', 'meridian-session'),
 
     /*
     |--------------------------------------------------------------------------

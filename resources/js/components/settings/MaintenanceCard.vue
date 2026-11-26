@@ -18,6 +18,10 @@
 import { computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { MdsButton, MdsCard, MdsFormField, MdsIcon, MdsSwitch, MdsTextarea } from '@meridian/design-system';
+import { useAppName } from '@/composables/useAppName';
+
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName } = useAppName();
 
 const props = defineProps<{ maintenance: { enabled: boolean; message: string | null } }>();
 
@@ -54,7 +58,7 @@ function save(): void {
                 <div class="settings-row__text">
                     <p class="settings-row__label">Pause public forms</p>
                     <p class="settings-row__hint">
-                        Stops new responses on every public form and shows your message instead. Meridian
+                        Stops new responses on every public form and shows your message instead. {{ appName }}
                         itself keeps working for your team, so you can turn this back off.
                     </p>
                 </div>

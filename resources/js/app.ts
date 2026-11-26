@@ -2,8 +2,7 @@ import { createApp, h, type DefineComponent } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import AppLayout from '@/Layouts/AppLayout.vue';
-
-const appName = import.meta.env.VITE_APP_NAME ?? 'Meridian';
+import { currentAppName } from '@/composables/useAppName';
 
 // Guest/central surfaces manage their own chrome and must NOT get the tenant app shell:
 // the auth + invitation pages wrap themselves in AuthLayout in-template; the admin console and the
@@ -14,7 +13,9 @@ const isSelfLaidOut = (name: string): boolean =>
 type PageModule = { default: DefineComponent & { layout?: unknown } };
 
 void createInertiaApp({
-    title: (title) => (title ? `${title} · ${appName}` : appName),
+    // M252 (`D236`): the name comes from the page props (`app.name`), not a build-time VITE_ value, so the box's
+    // APP_NAME renames every tab title without a rebuild. Read per call, because the props arrive with each page.
+    title: (title) => (title ? `${title} · ${currentAppName()}` : currentAppName()),
     resolve: (name) =>
         resolvePageComponent<PageModule>(
             `./Pages/${name}.vue`,

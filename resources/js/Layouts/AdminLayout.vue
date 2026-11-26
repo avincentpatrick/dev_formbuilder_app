@@ -11,6 +11,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { MdsIcon, MdsToastHost, type IconName } from '@meridian/design-system';
 import { useToast } from '@/composables/useToast';
 import { versionLabel } from '@/components/whats-new/version-label';
+import { useAppName } from '@/composables/useAppName';
 
 defineProps<{ title: string; icon?: IconName }>();
 
@@ -18,6 +19,8 @@ const page = usePage();
 const email = computed(() => page.props.auth.user?.email ?? '');
 // M181 (`R-c7247dbf`, `D124`): the release the console is running, beside the operator.
 const version = computed(() => versionLabel(page.props.app?.version));
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName } = useAppName();
 
 const { toasts, push, dismiss } = useToast();
 watch(
@@ -54,7 +57,7 @@ function logout(): void {
     <div class="admin">
         <header class="admin__bar">
             <div class="admin__brand">
-                <span class="admin__wordmark">Meridian</span>
+                <span class="admin__wordmark">{{ appName }}</span>
                 <span class="admin__tag">Admin</span>
             </div>
             <nav class="admin__nav" aria-label="Admin sections">
@@ -114,12 +117,12 @@ function logout(): void {
     gap: var(--mds-space-2);
 }
 
+/* No `text-transform: uppercase` since M252 (`D236`): the lowercase "i" of "iConnect" is the brand. */
 .admin__wordmark {
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.01em;
     color: var(--mds-color-action-primary-fg);
 }
 

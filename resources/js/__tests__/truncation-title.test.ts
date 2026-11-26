@@ -19,7 +19,6 @@ const SCAN_ROOTS = [join(repoRoot, 'resources'), join(repoRoot, 'packages/design
 
 /** `<file>  →  <selector>` for each clipped string that is fixed words, not a value. */
 const KEPT: Record<string, string> = {
-    'resources/js/components/shell/TopNav.vue  →  .topnav__wordmark': 'the product name, "Meridian"',
     'resources/js/components/forms/FormCard.vue  →  .form-card__stat dt': 'the stat labels: Responses, In progress, Last',
 };
 

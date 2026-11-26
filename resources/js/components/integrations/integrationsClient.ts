@@ -15,6 +15,7 @@
 
 import { builderClient, BuilderRequestError } from '@/components/builder/builderClient';
 import type { ChannelsPayload, MappableColumnsPayload, TabularDestinationPayload } from './types';
+import { currentAppName } from '@/composables/useAppName';
 
 /**
  * The destinations this grant can deliver into. Returns null only when the request itself failed (403/404/419
@@ -121,6 +122,6 @@ export async function createDestination(
 function transportFailure(): TabularDestinationPayload {
     return {
         destination: null,
-        error: 'We couldn’t reach Meridian just then. Check your connection and try again.',
+        error: `We couldn’t reach ${currentAppName()} just then. Check your connection and try again.`,
     };
 }

@@ -130,7 +130,14 @@ declare module '@inertiajs/core' {
          * M181 (`D124`) — the release this page belongs to: the committed VERSION file (three numbers) under the
          * APP_VERSION override, or `dev`. Shared on every page, the sign-in and console pages included.
          */
-        app: { version: string };
+        app: {
+            version: string;
+            /** M252 (`D236`) — the product's name ("iConnect Collection") and its short form ("iConnect"). */
+            name: string;
+            short_name: string;
+            /** Where the shell's "iConnect Analytics" links point (BHW Connect). */
+            analytics_url: string;
+        };
         auth: {
             user: AppUser | null;
             can: AppAbilities;

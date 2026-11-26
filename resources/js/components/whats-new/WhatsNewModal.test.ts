@@ -62,7 +62,7 @@ describe('WhatsNewModal — when it opens', () => {
         const wrapper = mountPrompt([release('0.10.0', 'Grids'), release('0.9.0', 'Version numbers')]);
 
         expect(wrapper.find('[role="dialog"]').exists()).toBe(true);
-        expect(wrapper.get('.mds-modal__title').text()).toBe("What's new in Meridian 0.10.0");
+        expect(wrapper.get('.mds-modal__title').text()).toBe("What's new in iConnect Collection 0.10.0");
         expect(wrapper.findAll('.release__title').map((h) => h.text())).toEqual(['Grids', 'Version numbers']);
         expect(wrapper.text()).toContain('Something new in 0.10.0.');
         expect(wrapper.text()).toContain('Fixed');

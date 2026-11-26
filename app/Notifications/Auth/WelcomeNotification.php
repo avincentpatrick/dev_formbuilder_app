@@ -91,7 +91,7 @@ final class WelcomeNotification extends Notification implements ShouldQueue
         $joinedAWorkspace = $this->tenantName !== '';
 
         $mail = (new MailMessage)
-            ->subject($joinedAWorkspace ? "Welcome to {$this->tenantName}" : 'Welcome to Meridian')
+            ->subject($joinedAWorkspace ? "Welcome to {$this->tenantName}" : 'Welcome to '.(string) config('app.name'))
             ->greeting("Welcome, {$this->name}.")
             ->line($joinedAWorkspace
                 ? "Your email address is confirmed and you're a member of {$this->tenantName}."
@@ -116,7 +116,7 @@ final class WelcomeNotification extends Notification implements ShouldQueue
             // No "if you did not create this account" line: they just clicked a signed link in that mailbox,
             // which is the strongest evidence available that the address is theirs. A security disclaimer
             // here would undercut the one thing this email is for.
-            ->salutation('— The Meridian team');
+            ->salutation('— The '.(string) config('app.name').' team');
 
         return $this->branded($mail);
     }

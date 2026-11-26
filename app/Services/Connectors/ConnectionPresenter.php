@@ -212,7 +212,7 @@ final class ConnectionPresenter
         return match ($key) {
             ConnectorProviderKey::Slack => null,
             ConnectorProviderKey::GoogleSheets => config('connectors.providers.google_sheets.publishing_status') === 'testing'
-                ? 'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in Meridian.'
+                ? 'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in '.(string) config('app.name').'.'
                 : null,
             // H16c. Airtable has no verification review and no equivalent of Google's 7-day testing expiry, so
             // there is no standing deployment condition to warn about. Null because there is nothing true to

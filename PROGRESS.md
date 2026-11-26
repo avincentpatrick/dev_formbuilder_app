@@ -214,7 +214,7 @@ lives in [PROGRESS_ARCHIVE.md](PROGRESS_ARCHIVE.md) and in git — do **not** re
 
 ## Current Status
 
-- **🅰️ `M254` IS BUILT AND HELD, CUT FROM MAIN, AND MERGES FIRST AT THE NEXT MERGE POINT: FOUR SYMFONY PACKAGES TO 8.1.12, CLEARING FIVE ADVISORIES PUBLISHED 2026-11-25 THAT FAIL `composer audit` ON EVERY MERIDIAN CI RUN. Nothing a tester sees changes.**
+- **🅰️ `M254` IS BUILT AND HELD (PR #646), CUT FROM MAIN, AND MERGES FIRST AT THE NEXT MERGE POINT: FOUR SYMFONY PACKAGES TO 8.1.12, CLEARING FIVE ADVISORIES PUBLISHED 2026-11-25 THAT FAIL `composer audit` ON EVERY MERIDIAN CI RUN. Nothing a tester sees changes.**
   - Closed: `R-ae22eae2`. `#645`'s run was the first to fail. `symfony/routing`, `symfony/http-kernel` and `symfony/http-foundation` 8.1.11 → 8.1.12, and `symfony/mailer` 8.1.1 → 8.1.12, by a lock-only bump (`-W` would have moved 18 packages). `composer audit` is clean.
   - Every held Meridian PR's static-analysis job is red until the trunk carries this, so it goes first; each then takes the trunk. The record is `M254`'s claim in `docs/claims/lane-a.md`.
 - **🅰️ `M240` IS MERGED (#526, `eaa3a39b`, 0.21.0), LAST OF FIVE AT THE MERGE POINT OF 2026-11-15, WHICH RELEASED #520, #537, #519, #521 AND #526 IN THAT ORDER, EVERY PR RUN AND TRUNK RUN GREEN WITH REAL STEP COUNTS AND NO DEPLOY WITH ANYTHING TO MIGRATE (`builder-copy-section`, `D224` to `D226`): COPY A WHOLE SECTION, OR SEVERAL TICKED QUESTIONS AT ONCE, WITH EVERY LINK INSIDE THE COPY POINTING AT THE COPIES. A change testers see: 0.21.0.**

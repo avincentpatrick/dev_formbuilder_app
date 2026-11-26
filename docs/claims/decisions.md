@@ -57,7 +57,7 @@ The questions and answers:
 
 **What the answer files:**
 - `R-54516e0c` (the rename), tier `during-testing`, built by `M252`.
-- `R-43038865` (the three addresses and the sign-in pass), tier `during-testing`, built by `M253`, with a new ADR (0027, because held #625 takes 0026).
+- `R-43038865` (the three addresses and the sign-in pass), tier `during-testing`, built by `M253`. ADR-0024 is amended in place rather than a new ADR written: held #625 takes 0026, and a reservation for it would break `state.php` the moment #625 merges first (corrected by `M253`'s claim, 2026-11-26).
 - The box steps and the message to jongsky25 are in the approved plan. His steps are his (`D210`), so none of them is a row in our line.
 
 ### D235 — While merges wait for a merge point, may rows whose fixes edit the same hub file share one PR? `D13` lets at most one row in a batch touch a hub, and the user had approved three exceptions for that one reason. **A — yes: rows whose fixes edit the same hub file may share one PR, with no exception entry; rows still may not share a non-hub file.**

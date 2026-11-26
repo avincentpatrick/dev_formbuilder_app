@@ -16,7 +16,55 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename)
+## Status: ACTIVE CLAIM — `M253`, `R-43038865` by `D236`: the portal at `iconnect.com.de`, iConnect Analytics at `analytics.iconnect.com.de` and iConnect Collection at `collection.iconnect.com.de` — the repository half: a shared sign-in pass that only `whoami` honours, the layout pinned by a test, the portal's redirect block generated from the route table, the BHW deploy's health URL taken from the box, a retiring service worker for the old address, ADR-0024 amended, and the runbook (m253-three-addresses)
+
+Taken 2026-11-26, from the same approved plan as `M252` (Part 2).
+Branch `m253-three-addresses`, **stacked on #644** (cut from `m252-iconnect-rename` at `2d6bcd60`), PR into main, so its diff shows #644 until #644 merges. It is held green for the next merge point (`D137`) and merges straight after #644, in the same sitting as the box switch (the plan, Part 3).
+Row, filed by `M252` on #644's branch, tier `during-testing`:
+- `R-43038865`, *"Collection, Analytics and the portal still share one address, though the user gave each its own."*
+
+### Evidence verified
+Measured at `2d6bcd60`.
+- **`iconnect.com.de/` is Collection's workspace itself, held.** Runbook §8.3: `CENTRAL_DOMAIN=com.de`, `domains` label `iconnect`, and the console at `com.de/admin` through the box's hosts file only.
+- **BHW sits under it at `/bhw-connect`, held.** §8.4's `ProxyPass` sits in Collection's own `*:443` vhost, with `basePath` from `NEXT_PUBLIC_BASE_PATH`.
+- **Collection's session cookie is host-only, held:** `SESSION_DOMAIN=null` (`config/session.php`; §8.2 step 3 "⛔ Keep it"; ADR-0009, ADR-0019, ADR-0012).
+- **`whoami` is reachable by a session alone, held.** It sits in `routes/api.php`'s Group A behind `auth` (the `web` guard), and BHW forwards `meridian-session` by name.
+
+### Premise verified
+- **Collection cannot live under a path** (`D46`), so it takes a host. A workspace host is exactly one label plus `CENTRAL_DOMAIN`: `SubdomainLabel` refuses a dot, and `PlatformHost::subdomainLabel()` reads one label. So `collection.iconnect.com.de` means `CENTRAL_DOMAIN=iconnect.com.de` with the label `collection`. The central host is then the portal's own host, and the console moves to `iconnect.com.de/admin`. That is box-only today (`com.de` is not ours), and it stays box-only: Apache serves `/admin` there to loopback alone.
+- **A middleware "before `auth`" cannot be relied on.** `auth` is in `bootstrap/app.php`'s priority list and is pulled ahead of every non-priority middleware written before it (`routes/tenant.php`'s own note). So the pass is a **second guard**, `auth:web,signin-pass`, on `whoami` alone, not a pre-auth middleware.
+- **The configuration judge is `M251`'s, held in #640, and is not on main.** This branch cannot edit it. Its three-name extension is filed as a row by this increment, for after #640 merges and the switch gives a real report to fixture (`M251`'s own method).
+- **ADR numbering:** held #625 adds ADR 0026, so a new ADR here would need a reservation in `state.php`, and that reservation breaks the moment #625 merges first (`state.php` refuses a recorded gap that no longer exists). So ADR-0024 is **amended in place**, as 0005 and 0023 were. `D236`'s "ADR 0027" line is corrected in this push.
+- **What jongsky25's app needs is his** (`D210`, the user's answer to `D236`'s third question). The message is drafted for the user to send, and none of it is a row in our line.
+- **Stacked on #644** because `R-43038865` and `config('app.analytics_url')` exist only on that branch, and the two merge in that order in one sitting.
+
+### Remedy verdict
+The plan's Part 2 works as prescribed, with two changes measured above:
+- the configuration judge part becomes a row for after the switch;
+- the new ADR becomes an amendment to ADR-0024.
+
+Files:
+- `config/session.php`, `config/auth.php`
+- new `app/Support/Auth/SignInPass.php`, `app/Http/Middleware/IssueSignInPass.php`, `app/Listeners/Auth/ForgetSignInPass.php` (or the provider's closure)
+- `app/Providers/AppServiceProvider.php`, `routes/api.php`, `routes/tenant.php`
+- new `app/Console/Commands/PortalRedirectsCommand.php`, new `public/sw-retire.js`
+- `.github/workflows/deploy.yml`, `.github/workflows/bhw-settings.yml`, `scripts/staging-headers-judge.php`, `scripts/feedback-pull.php` (its docblock), `deploy.ps1` (one comment)
+- `.env.example`
+- tests: new `SignInPassTest`, `CollectionLayoutTest`, `PortalRedirectsCommandTest`; `WhoamiTest`, `DeployWorkflowTest`, the headers judge's test
+- `docs/adr/0024-second-application-under-one-host.md`, `docs/deployment-infrastructure.md`, `docs/working-agreement.md`
+- `VERSION`, `database/data/releases.json`
+- `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block)
+
+Shared artefacts taken: `docs/**` as listed, `PROGRESS.md` (own block).
+Paired files taken: `.github/workflows/deploy.yml` with `bhw-settings.yml` (the same BHW step, `DeployWorkflowTest` pins both).
+Namespaces spent: none. There is no migration (the pass is checked against the existing `sessions` table) and no new ADR (ADR-0024 is amended). `VERSION` becomes 0.30.1, the number it holds after #644, following `M235`'s precedent that a new address is the last number.
+Prediction:
+- Pest green with the new cases.
+- PHPStan on the host at 0.
+- `DeployWorkflowTest` reddens on the literal deploy-bhw call until it is updated with the health URL.
+- **The one I most expect to be wrong:** the second guard. Every `RequestGuard` resolves its user once per request, and the `rls_aware` provider reads `users` on its own connection, so the pass's user lookup may need that provider rather than `User::find()`.
+
+## HELD — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename) — BUILT: PR #644; its CI's record follows below once every job is green
 
 Taken 2026-11-26, from the plan the user approved in chat the same day (`~/.claude/plans/lets-rename-the-following-frolicking-curry-of-c1c815ee-ed31-4db4-acc6-18d73249c3a9.md`).
 Branch `m252-iconnect-rename`, cut from origin/main at `6de682a8`, PR into main, held green for the next merge point (`D137`) and merged after #640.

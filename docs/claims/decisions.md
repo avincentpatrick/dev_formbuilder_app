@@ -24,10 +24,42 @@ gamification last (2026-08-09) · the held list stays held until the user signal
 
 ## OPEN
 
-_None open._ `D235`, the last filed, was asked and answered on 2026-11-23 in the planning of `M251`. A new one is appended here **and asked by name before its session ends** (`D102`).
+_None open._ `D236`, the last filed, was asked and answered on 2026-11-26 in the planning of `M252`. A new one is appended here **and asked by name before its session ends** (`D102`).
 
 
 ## ANSWERED
+### D236 — The user asked for Meridian to be renamed iConnect Collection, for BHW Connect to be renamed iConnect Analytics, and for BHW's home page (`iconnect.com.de/bhw-connect`) to become `iconnect.com.de` itself, with no `/bhw-connect`. Where does each app live, and how does it work across addresses? **A portal at `iconnect.com.de`, Analytics at `analytics.iconnect.com.de`, Collection at `collection.iconnect.com.de`; a shared sign-in pass; jongsky25 makes his app's edits from a message we draft; the bare Analytics address goes to the portal; an "iC" icon with "iConnect" alone on phones; Collection's own "Analytics" menu item keeps its name.**
+
+**Asked and answered 2026-11-26 (user decision, in chat), in the planning of `M252`.**
+
+It was asked because `iconnect.com.de/` is Meridian's workspace itself: its sign-in, dashboard and every form link (`/f/…`) live there. Serving Meridian under a path prefix was measured impossible (`D46`), so the front page could change only if Meridian moved or both apps shared one set of top-level paths.
+
+The questions and answers:
+1. **Where iConnect Collection lives.** The session offered two options:
+   - the same address, with the two apps sharing top-level paths (the session's recommendation);
+   - its own address, `collection.iconnect.com.de`.
+   **The user answered in their own words:** *"current BHW connect = analytics.iconnect.com.de, current form builder = collection.iconnect.com.de, the https://iconnect.com.de/bhw-connect will be the iconnect.com.de — this will be the portal to the 2 apps."* So there are three addresses. Today's BHW home page, already a portal (`apps/bhw-connect/app/page.tsx`), is served at `iconnect.com.de`.
+2. **Analytics' admin sign-in across addresses.** Collection's session cookie is host-only (`SESSION_DOMAIN=null`, kept by ADR-0009 and ADR-0019), so it never reaches `analytics.`.
+   - **A — a shared sign-in pass (chosen, the session's recommendation).** Collection also sets a small encrypted cookie for `*.iconnect.com.de` that only `whoami` honours. It is bound to the live session, so signing out cancels it. jongsky25 changes one cookie name.
+   - **B — a one-time hand-off code.** Cleaner, but much of the work is in jongsky25's app, and the move would wait for it.
+3. **Who edits `apps/bhw-connect/`.**
+   - **A — jongsky25, from a message we draft (chosen, the session's recommendation).** That follows `D210` and the working agreement. The move does not wait for him, and server redirects cover the gaps.
+   - **B — us, in a PR he labels.** That would be an exception to the root `CLAUDE.md`.
+4. **The bare `analytics.iconnect.com.de/`.**
+   - **A — it redirects to the portal (chosen, the session's recommendation).** One copy of the home page.
+   - **B — it shows the same page.**
+5. **The icon and the name on phones.**
+   - **A — a new "iC" icon, and "iConnect" alone in the phone-size top bar (chosen, the session's recommendation).**
+   - **B — keep the M icon for now.**
+6. **Collection's own "Analytics" menu item.**
+   - **A — it keeps its name (chosen, the session's recommendation).** It sits inside Collection's menu, and the link to the other app always reads "iConnect Analytics" in full.
+   - **B — rename it "Reports".**
+
+**What the answer files:**
+- `R-54516e0c` (the rename), tier `during-testing`, built by `M252`.
+- `R-43038865` (the three addresses and the sign-in pass), tier `during-testing`, built by `M253`, with a new ADR (0027, because held #625 takes 0026).
+- The box steps and the message to jongsky25 are in the approved plan. His steps are his (`D210`), so none of them is a row in our line.
+
 ### D235 — While merges wait for a merge point, may rows whose fixes edit the same hub file share one PR? `D13` lets at most one row in a batch touch a hub, and the user had approved three exceptions for that one reason. **A — yes: rows whose fixes edit the same hub file may share one PR, with no exception entry; rows still may not share a non-hub file.**
 
 **Asked and answered 2026-11-23 (user decision, in chat), in the planning of `M251`.**

@@ -16,7 +16,66 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M251`, `R-e6e340c0`, `R-a3918bf4` and `R-5e9f620f`: what this repository says about the testing box is checked against the box — a read-only probe of its Apache configuration and a judge that rules on the probe's output, the port-80 site sends `X-Robots-Tag` too, and the runbook stops saying what the off-repo checklist contains (m251-testing-box-config)
+## Status: ACTIVE CLAIM — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename)
+
+Taken 2026-11-26, from the plan the user approved in chat the same day (`~/.claude/plans/lets-rename-the-following-frolicking-curry-of-c1c815ee-ed31-4db4-acc6-18d73249c3a9.md`).
+Branch `m252-iconnect-rename`, cut from origin/main at `6de682a8`, PR into main, held green for the next merge point (`D137`) and merged after #640.
+Row, filed by this increment on its branch, tier `during-testing`:
+- `R-54516e0c`, *"The product still calls itself Meridian everywhere a person sees it, though the user renamed it iConnect Collection."*
+
+**Forward queue, which is part of this claim:** `M253`, `R-43038865`, *"Collection, Analytics and the portal still share one address, though the user gave each its own."* It covers the portal at `iconnect.com.de`, Analytics at `analytics.iconnect.com.de`, Collection at `collection.iconnect.com.de`, and the sign-in pass (`D236`), plus ADR 0027. Its branch is cut from origin/main once this PR is held, and it merges straight after this one, in the same sitting as the box switch. The box steps and the message to jongsky25 are in the plan, Parts 3 and 4.
+
+### Evidence verified
+Measured at `6de682a8`.
+- **The display name has one partial source.** `APP_NAME=Meridian` (`.env.example`) reaches:
+  - the three Blade `<title>`s (`app.blade.php`, `public-runtime.blade.php`, `partials/maintenance-page.blade.php`);
+  - email's brand through `BrandPalette::product()`;
+  - the Welcome page's `appName` (`PlatformLandingController`);
+  - the authenticator-app issuer, and the Inertia title through `VITE_APP_NAME` (`resources/js/app.ts`).
+  The shared page data (`HandleInertiaRequests`) carries `app.version` and no name.
+- **19 hard-coded Vue/TS sites, held:**
+  - the shell wordmarks: `TopNav`, `AdminLayout`, `AuthLayout` ×2, the `AppLayout` footer;
+  - `Welcome`'s version line;
+  - `Settings/Index` ×2 and `admin/Settings` ×2;
+  - `MaintenanceCard`, `Templates` ×2 and `LibraryPicker`;
+  - `WhatsNewModal` and `whats-new/Index`;
+  - `integrationsClient`, and `mapping-model` ×2.
+- **6 hard-coded PHP strings, held:** `WelcomeNotification` ×2, `PlatformSettings` (the default maintenance message), `TabularDestinationDirectory`, `ConnectionPresenter`, and `GoogleSheetsDirectory` (the fallback Drive title).
+- **The links to BHW, held:** `AppLayout.vue`'s footer link and `AccountMenu.vue`'s `BHW_CONNECT_HREF` plus its label.
+
+### Premise verified
+- **Renaming is not one setting, and that is the sentence most likely to be wrong in a reader's head.** `APP_NAME` also names three things:
+  - the session cookie (`config/session.php`, `Str::slug(APP_NAME).'-session'`);
+  - the cache prefix (`config/cache.php`);
+  - the Redis prefix (`config/database.php`).
+  None is pinned in `.env.example`. BHW forwards the cookie **by that name**, as `MERIDIAN_SESSION_COOKIE = "meridian-session"` in `apps/bhw-connect/lib/db/meridian-identity-cookie.ts`. So changing `APP_NAME` alone would sign everyone out, break BHW's admin sign-in, and orphan every cache key, `queue:restart`'s signal included.
+- **The identifiers named `meridian` stay.** IndexedDB `meridian-offline` holds unsent answers on testers' devices. The `meridian:*` storage keys, `X-Meridian-Challenge`, the `#meridian` XLSForm markers in exported workbooks, the `_meridian-*` DNS records, the database roles and `C:\meridian\…` are each read back by something already deployed or already in a user's hands.
+- **`apps/bhw-connect/` is jongsky25's** (`.github/CODEOWNERS`), and `D236` gives his app's own name to him. This PR changes only the text of Meridian's two links to his app.
+- **The box's `.env` is not in the repository.** `deploy.ps1` copies it into the build stage, and `VITE_APP_NAME` is compiled in. So the title must come from the shared page data, and then the box's `APP_NAME` edit at the sitting needs no rebuild.
+
+### Remedy verdict
+No row prescribed a fix, because the row is new. `D236`'s answers prescribe three things: the name, an "iC" icon, and "iConnect" alone in the phone-size top bar.
+- **Measured:** `TopNav.vue`'s own note says the wordmark has about 31 px to spare at 375 px, and "iConnect Collection" is eleven characters longer than "Meridian". The short name below the phone breakpoint is therefore required, not cosmetic.
+- **Works:** pinning the three names as literal defaults in `config/` keeps them independent of `APP_NAME`, whatever the box's `.env` says.
+
+Files:
+- `config/session.php`, `config/cache.php`, `config/database.php`, `config/app.php`, `config/scramble.php`, `.env.example`
+- `app/Http/Middleware/HandleInertiaRequests.php`, `resources/js/app.ts`, one new composable
+- the 14 Vue/TS files and 5 PHP files above
+- `openapi.json`, `public/icons/*`, `public/favicon.ico`, one new icon generator under `scripts/`
+- the tests that assert the name
+- `VERSION`, `database/data/releases.json`
+- `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block)
+
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `openapi.json`, `PROGRESS.md` (own block), `tests/e2e/whats-new.spec.ts`.
+Paired files taken: `openapi.json` with `config/scramble.php`, re-exported together.
+Namespaces spent: nothing from either namespace. `D236` is recorded with this claim. `VERSION` becomes 0.30.0, the number it holds once the held chain's 0.29.0 is merged.
+Prediction:
+- Pest, Vitest and Contract are green once the listed tests are updated.
+- PHPStan does not move, because only strings and config defaults change in `app/`.
+- **The one I most expect to be wrong:** a test the inventory missed that asserts "Meridian", most likely an e2e spec or a `truncation-title` case on the longer wordmark at 375 px.
+
+## HELD — `M251`, `R-e6e340c0`, `R-a3918bf4` and `R-5e9f620f`: what this repository says about the testing box is checked against the box — a read-only probe of its Apache configuration and a judge that rules on the probe's output, the port-80 site sends `X-Robots-Tag` too, and the runbook stops saying what the off-repo checklist contains (m251-testing-box-config) — BUILT AND HELD: PR #640, CI 45525334810 every job green with real step counts
 
 Taken 2026-11-23, from the plan the user approved in chat the same day (`~/.claude/plans/read-claude-md-run-the-curious-nest-of-c59a74b7-149e-4cf2-8ea4-b0ab96bb50ad.md`).
 Branch `m251-testing-box-config`, cut from origin/main at `ddbeb485`, PR into main, held green for a merge point (`D137`) and merged last, after #631. It touches none of the held chain's product files.

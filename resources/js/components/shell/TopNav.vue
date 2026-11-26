@@ -297,7 +297,7 @@ const activeQuery = computed(() => {
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
-    letter-spacing: 0.01em;
+    letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
     /* Truncate rather than force the bar wide (see .topnav__left). */
     overflow: hidden;
@@ -378,11 +378,10 @@ const activeQuery = computed(() => {
     /* Buys back the width the icon costs. At extra_large with OpenDyslexic's wider advances the display-face
        wordmark is the single widest item in the bar, and `min-width: 0` would otherwise resolve the squeeze
        by ellipsising it to "iCon…" — contained, but not a wordmark.
-       M252 (`D236`): one step smaller again, with no letter-spacing. Measured at 375px, "iConnect" at body-lg needs
+       M252 (`D236`): one step smaller again. Measured at 375px, "iConnect" at body-lg needs
        80px and its box was 74px (the old uppercase "MERIDIAN" needed 94, so it was cut off here too). */
     .topnav__wordmark {
         font-size: var(--mds-type-body-md-font-size);
-        letter-spacing: 0;
     }
 
     /* M252 (`D236`): half the gap between the bar's three groups, for the wordmark; with the step above, "iConnect"

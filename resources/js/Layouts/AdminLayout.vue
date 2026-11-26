@@ -122,7 +122,7 @@ function logout(): void {
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
-    letter-spacing: 0.01em;
+    letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
 }
 

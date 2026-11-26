@@ -164,7 +164,7 @@ const pitch = [
     font-size: var(--mds-type-heading-3-font-size);
     font-weight: var(--mds-font-weight-bold);
     /* No `text-transform: uppercase` since M252 (`D236`): the lowercase "i" of "iConnect" is the brand. */
-    letter-spacing: 0.01em;
+    letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
 }
 

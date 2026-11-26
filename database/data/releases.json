@@ -1,5 +1,27 @@
 [
     {
+        "version": "0.30.0",
+        "title": "Meridian is now iConnect Collection",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "The app has a new name: iConnect Collection. You will see it at the top of every page, on the sign-in page, in emails and on the browser tab. Nothing else changes: your forms, answers and sign-in stay exactly as they are."
+            },
+            {
+                "kind": "improved",
+                "text": "A new icon: \"iC\" replaces the \"M\" on the browser tab and on a phone where a form was added to the home screen."
+            },
+            {
+                "kind": "improved",
+                "text": "On a phone, the top bar shows \"iConnect\" so the name fits, and the templates that come with the app are marked \"iConnect\"."
+            },
+            {
+                "kind": "improved",
+                "text": "The link to BHW Connect, in your account menu and at the foot of every page, is now called iConnect Analytics."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

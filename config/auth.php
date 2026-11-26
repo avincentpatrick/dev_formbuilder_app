@@ -51,6 +51,14 @@ return [
             'driver' => 'sanctum',
             'provider' => 'users',
         ],
+
+        // M253 (`D236`): the shared sign-in pass — a second way into `whoami` ALONE (`auth:web,signin-pass`), for
+        // iConnect Analytics on its own host. The driver is registered in FortifyServiceProvider and checks the
+        // pass against the live `sessions` row (App\Support\Auth\SignInPass). Never a guard for anything else.
+        'signin-pass' => [
+            'driver' => 'signin-pass',
+            'provider' => 'users',
+        ],
     ],
 
     /*

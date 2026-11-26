@@ -160,6 +160,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | The Shared Sign-In Pass (M253, D236)
+    |--------------------------------------------------------------------------
+    |
+    | The parent domain of the box's three hosts (`iconnect.com.de`), or null for off. When set, the signed-in
+    | workspace pages also set the `iconnect-signin` cookie for it, so iConnect Analytics on its own host can
+    | still ask `whoami` who is signed in. ⛔ The session cookie itself stays host-only: `domain` above stays
+    | null (runbook §8.2 step 3). See App\Support\Auth\SignInPass.
+    |
+    */
+
+    'signin_pass_domain' => env('SIGNIN_PASS_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTPS Only Cookies
     |--------------------------------------------------------------------------
     |

@@ -105,12 +105,13 @@ it('cannot be reached with a bearer token', function (): void {
         ->assertUnauthorized();
 });
 
-it('sits in Group A, under its own limiter, and outside every Group B filter', function (): void {
+it('runs Group A\'s pipeline, under its own limiter, and outside every Group B filter', function (): void {
     $route = Route::getRoutes()->getByName('api.v1.session.whoami');
     expect($route)->not->toBeNull();
 
     $middleware = $route->gatherMiddleware();
-    expect($middleware)->toContain('web', 'auth', 'verified', EnforceTenantTwoFactor::class, 'throttle:whoami');
+    // M253 (`D236`): its own group since the sign-in pass, with the pass as a second guard and every other gate kept.
+    expect($middleware)->toContain('web', 'auth:web,signin-pass', 'verified', EnforceTenantTwoFactor::class, 'throttle:whoami');
 
     $groupB = array_map(static fn ($r): string => (string) $r->getName(), groupBRoutes());
     expect($groupB)->not->toContain('api.v1.session.whoami')

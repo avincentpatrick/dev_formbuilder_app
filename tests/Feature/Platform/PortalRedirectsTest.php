@@ -45,7 +45,7 @@ function portalRedirectTarget(string $path): ?string
 
 it('is scanning something', function (): void {
     // Anti-vacuity: an empty route table or a broken parse would make every "stays" case pass.
-    expect(portalRedirectRules())->toHaveCount(5)
+    expect(portalRedirectRules())->toHaveCount(6)
         ->and(app(PortalRedirects::class)->collectionPrefixes())->toContain('f', 'login', 'dashboard', 'forms', 'api/v1');
 });
 
@@ -100,7 +100,6 @@ it('leaves the portal\'s own paths and the console alone', function (string $pat
     'the portal' => '/',
     'the console' => '/admin/tenants',
     'Google sign-in' => '/auth/google/redirect',
-    'the retiring worker' => '/sw.js',
     'the portal\'s robots' => '/robots.txt',
     'the portal\'s icon' => '/favicon.ico',
     'the portal\'s own Explore' => '/explore',
@@ -109,6 +108,25 @@ it('leaves the portal\'s own paths and the console alone', function (string $pat
     'BHW\'s assets' => '/_next/static/chunk.js',
     'BHW\'s API' => '/api/feedback',
 ]);
+
+it('answers the old form pages\' service worker with the one that removes itself', function (): void {
+    // An internal rewrite, not a redirect: a browser never follows a redirect to replace a worker.
+    $rule = collect(portalRedirectRules())->first(fn (array $r): bool => str_contains($r[0], 'sw'));
+
+    expect(portalRedirectTarget('/sw.js'))->toBe('/sw-retire.js')
+        ->and($rule[2])->toBe('L')
+        ->and(is_file(public_path('sw-retire.js')))->toBeTrue();
+});
+
+it('hands everything else to the portal app at the root, keeping the retiring worker local', function (): void {
+    $block = app(PortalRedirects::class)->apacheBlock('collection.iconnect.com.de', 'analytics.iconnect.com.de');
+
+    expect($block)->toContain('ProxyPass /sw-retire.js !
+ProxyPass / http://127.0.0.1:3100/ retry=0 timeout=120
+')
+        ->and($block)->toContain('ProxyPassReverse / http://127.0.0.1:3100/')
+        ->and($block)->not->toContain('/bhw-connect retry');
+});
 
 it('refuses a host that is not a bare host name', function (): void {
     $this->artisan('portal:redirects', ['--collection' => 'https://collection.iconnect.com.de/'])

@@ -84,8 +84,15 @@ const STAGING_EXIT_OK = 0;
 const STAGING_EXIT_BLOCKED = 1;
 const STAGING_EXIT_CANNOT_MEASURE = 2;
 
-/** The host the probes are fetched from. Here rather than in `ci.yml` so there is one authority. */
-const STAGING_HOST = 'iconnect.com.de';
+/**
+ * The host the probes are fetched from. Here rather than in `ci.yml` so there is one authority.
+ *
+ * M253 (`D236`): iConnect Collection's host since the switch to three addresses. The probes are this app's own paths
+ * (its `/robots.txt` is the identity anchor below), and they mean the same on `collection.` as they did on the bare
+ * name. The portal (`iconnect.com.de`) and iConnect Analytics (`analytics.iconnect.com.de`) are two more hosts this
+ * judge does not fetch yet: that is its own row, filed by `M253`, for after the switch.
+ */
+const STAGING_HOST = 'collection.iconnect.com.de';
 
 /**
  * Header => the policy every probe's response must satisfy. All tokens lower-cased.

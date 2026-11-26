@@ -26,7 +26,7 @@
        the site down to ship a markdown file.
     3. STAGE, with the site still up on the old release: git worktree prune; check the commit
        out into <AppPath>\.deploy-stage (added on the first run, reused after); copy the live
-       .env into it, because the build reads VITE_APP_NAME and ASSET_URL; then, there,
+       .env into it, because the build reads ASSET_URL (and, until M252, VITE_APP_NAME); then, there,
        composer install --no-dev, npm ci, the design-system tokens and npm run build.
     4. RECOVER a swap an earlier run left half done: when live vendor\ or public\build is
        missing and its .prev copy exists, move the copy back, so artisan can boot. Then delete

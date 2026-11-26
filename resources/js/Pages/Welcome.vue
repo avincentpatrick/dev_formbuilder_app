@@ -102,7 +102,7 @@ const capabilities = [
                     Already a member of a workspace? Go straight to it at
                     <code class="landing__code">your-workspace.{{ centralHost }}</code>
                 </p>
-                <p class="landing__version">Meridian {{ version }}</p>
+                <p class="landing__version">{{ appName }} {{ version }}</p>
             </footer>
         </div>
     </main>

@@ -13,7 +13,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>{{ $form['title'] }} · {{ config('app.name', 'Meridian') }}</title>
+    <title>{{ $form['title'] }} · {{ config('app.name', 'iConnect Collection') }}</title>
     {{-- Increment G8a — installable PWA. Per-form manifest (id/start_url/scope = this form's /f/{slug}), a
          theme colour, and home-screen icons; the service worker itself is registered from main.ts.
 

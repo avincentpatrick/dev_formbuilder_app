@@ -64,7 +64,7 @@ final class GoogleSheetsDirectory implements ProvisionsTabularDestinations
      */
     public function create(Connection $connection, string $title, array $headers): TabularDestination
     {
-        $documentTitle = $this->clamp($title, self::MAX_TITLE, 'Meridian responses');
+        $documentTitle = $this->clamp($title, self::MAX_TITLE, (string) config('app.name').' responses');
 
         // The tab is named for the app rather than for the form. Google's own default is `Sheet1`, which tells
         // a tenant opening the file nothing about where the rows came from; the FORM's title is already the

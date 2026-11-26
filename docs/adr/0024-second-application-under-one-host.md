@@ -1,6 +1,6 @@
 # ADR-0024 — A second application under one host: BHW Connect in this repository, at `/bhw-connect`
 
-- **Status:** Accepted
+- **Status:** Accepted; §D2 and §D5 amended by `M253` (`D236`, 2026-11-26) — three addresses and a sign-in pass
 - **Date:** 2026-10-28
 - **Increment:** M192 (the BHW Connect merge, phase P0 — the import, CI and governance; nothing on the box)
 - **Decisions:** `D172` (the prefix, and one origin accepted) · `D173` (the database home) · `D174` (one repository, one server) · `D175` (today's code only) · `D176` (BHW-only merges on green) · `D177` (review across the boundary only) · `D178` (Meridian's session for BHW admins) · `D179` (the navigation link) · `D180` (pgvector built off the box) · `D181` (data loads) · `D182` (the local stack; staging is BHW's preview) · `D183` (Supabase after the move) · `D184` (Vercel after the move) · `D185` (BHW's dependency advisories warn until cleared)
@@ -53,6 +53,15 @@ BHW page renders on request rather than from a prerendered copy (28 static pages
 images, robots and the sitemap). Rejected: a subdomain, which isolates the origin at the price of DICT DNS
 work and a second certificate.
 
+*(Amended by `M253`, `D236`, 2026-11-26: **the one origin ends at the switch to three addresses.** The portal — BHW's
+home page — is `iconnect.com.de`; BHW Connect is **iConnect Analytics**, at the root of `analytics.iconnect.com.de` with an
+empty `NEXT_PUBLIC_BASE_PATH`; Meridian is **iConnect Collection**, at `collection.iconnect.com.de`. The subdomain rejected
+above is taken after all, and for the reason given there: each application gets its own origin, so a script-injection
+bug in BHW can no longer act as whoever is signed in to Collection, and Collection's `XSRF-TOKEN` is no longer readable
+by BHW's scripts. Its price is smaller than this section said: one `<MDomain>` carrying three names rather than a second
+certificate, and three Cloudflare records the user adds. Old links are redirected by the portal vhost, whose block
+`php artisan portal:redirects` generates from Collection's route table. Runbook §8.5.)*
+
 ### §D3 — A Node service serving a standalone build from a releases directory
 
 Next's standalone output (`output: 'standalone'`, its tracing and Turbopack roots pinned to the app,
@@ -84,6 +93,14 @@ Supabase Auth goes. A small `GET /api/v1/auth/whoami` on Meridian answers who is
 `admin_users` table keeps deciding who administers BHW; nothing about BHW enters Meridian's permission
 tables. Meridian's top menu (signed-in users) and footer link to BHW, and BHW's header links back. Built
 in `bhw-p3-identity`.
+
+*(Amended by `M253`, `D236`, 2026-11-26: across two origins Collection's host-only session cookie never reaches Analytics,
+and it STAYS host-only — widening `SESSION_DOMAIN` was refused again, for the reasons ADR-0009 and ADR-0019 give. Instead
+Collection also sets a **sign-in pass**: the `iconnect-signin` cookie for the parent domain, naming a user, a workspace and
+a live session, issued only on pages every gate admitted, and honoured by `whoami` ALONE, through a second guard
+(`auth:web,signin-pass`, `App\Support\Auth\SignInPass`). It dies with the session, because it is checked against the
+session's own row. BHW reads it in place of `meridian-session` — jongsky25's change, from the message the user sends him.
+Its worst case in another host's hands is the three fields `whoami` answers with.)*
 
 ### §D6 — Two deploys that never share a window (`D176`)
 

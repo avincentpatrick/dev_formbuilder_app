@@ -29,12 +29,15 @@ import { computed } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { MdsIcon } from '@meridian/design-system';
 import { versionLabel } from '@/components/whats-new/version-label';
+import { useAppName } from '@/composables/useAppName';
 
 withDefaults(defineProps<{ title: string; variant?: 'card' | 'split' }>(), { variant: 'card' });
 
 // M181 (`R-c7247dbf`, `D124`): the release, at the card's foot — text only, since What's new is behind sign-in.
 const page = usePage();
 const version = computed(() => versionLabel(page.props.app?.version));
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName } = useAppName();
 
 /**
  * Compressed from `Pages/Welcome.vue`'s `capabilities`, deliberately — the landing page and the front
@@ -80,12 +83,12 @@ const pitch = [
             </aside>
 
             <main class="auth__card">
-                <p class="auth__brand">Meridian</p>
+                <p class="auth__brand">{{ appName }}</p>
                 <h1 class="auth__title">{{ title }}</h1>
                 <div class="auth__body">
                     <slot />
                 </div>
-                <p class="auth__version">Meridian {{ version }}</p>
+                <p class="auth__version">{{ appName }} {{ version }}</p>
             </main>
         </div>
     </div>
@@ -160,7 +163,7 @@ const pitch = [
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-3-font-size);
     font-weight: var(--mds-font-weight-bold);
-    text-transform: uppercase;
+    /* No `text-transform: uppercase` since M252 (`D236`): the lowercase "i" of "iConnect" is the brand. */
     letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
 }

@@ -40,7 +40,7 @@ declare(strict_types=1);
  *
  * A platform support token, issued on the console's Settings page and saved — by the user, never through the
  * chat — in a file OUTSIDE the repository: `%USERPROFILE%\.meridian\feedback-pull.json` (or `$HOME/.meridian/…`),
- * holding `{"url": "https://staging.pitahc.gov.ph", "token": "msp_…"}`. `--config=<file>` reads another. The
+ * holding `{"url": "https://collection.iconnect.com.de", "token": "msp_…"}`. `--config=<file>` reads another. The
  * token is never printed. Screenshots are written only under `--out=<dir>` — the session's scratchpad.
  *
  * Host PHP, no `vendor/`: the curl extension, which on this host carries a CA bundle (`curl.cainfo`) where PHP's

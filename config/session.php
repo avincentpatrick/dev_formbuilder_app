@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     /*
@@ -125,12 +123,14 @@ return [
     | the framework. Typically, you should not need to change this value
     | since doing so does not grant a meaningful security improvement.
     |
+    | ⛔ A LITERAL, NOT THE SLUG OF APP_NAME (M252, D236). The product was renamed iConnect Collection, and
+    | the stock default would have renamed the cookie with it: every session signed out at once, and BHW
+    | Connect's admin sign-in broken, because its server forwards this cookie BY NAME
+    | (apps/bhw-connect/lib/db/meridian-identity-cookie.ts). The name is an identifier nobody sees.
+    |
     */
 
-    'cookie' => env(
-        'SESSION_COOKIE',
-        Str::slug((string) env('APP_NAME', 'laravel')).'-session'
-    ),
+    'cookie' => env('SESSION_COOKIE', 'meridian-session'),
 
     /*
     |--------------------------------------------------------------------------
@@ -157,6 +157,20 @@ return [
     */
 
     'domain' => env('SESSION_DOMAIN'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | The Shared Sign-In Pass (M253, D236)
+    |--------------------------------------------------------------------------
+    |
+    | The parent domain of the box's three hosts (`iconnect.com.de`), or null for off. When set, the signed-in
+    | workspace pages also set the `iconnect-signin` cookie for it, so iConnect Analytics on its own host can
+    | still ask `whoami` who is signed in. ⛔ The session cookie itself stays host-only: `domain` above stays
+    | null (runbook §8.2 step 3). See App\Support\Auth\SignInPass.
+    |
+    */
+
+    'signin_pass_domain' => env('SIGNIN_PASS_DOMAIN'),
 
     /*
     |--------------------------------------------------------------------------

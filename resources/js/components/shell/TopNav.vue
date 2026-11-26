@@ -29,11 +29,13 @@ import ThemeQuickToggle from './ThemeQuickToggle.vue';
 import NotificationBell from './NotificationBell.vue';
 import FeedbackButton from './FeedbackButton.vue';
 import AccountMenu from './AccountMenu.vue';
+import { useAppName } from '@/composables/useAppName';
 
 defineProps<{ scrolled: boolean; drawerOpen: boolean }>();
 const emit = defineEmits<{ 'toggle-drawer': [] }>();
 
 const page = usePage();
+const { name: appName, shortName: appShortName } = useAppName();
 
 /**
  * The query the search RESULTS page is currently showing — and nothing else's.
@@ -93,7 +95,15 @@ const activeQuery = computed(() => {
             >
                 <MdsIcon name="menu" size="md" aria-hidden="true" />
             </button>
-            <span class="topnav__wordmark">Meridian</span>
+            <!--
+                M252 (`D236`): the full name where it fits, "iConnect" alone in §6's phone band — this file's own note
+                above `.topnav__left` records ~31px of headroom at 375px, and the full name is eleven letters longer
+                than the old one. Only one of the two is ever displayed, so a screen reader reads one name.
+            -->
+            <span class="topnav__wordmark" :title="appName">
+                <span class="topnav__wordmark-full">{{ appName }}</span>
+                <span class="topnav__wordmark-short">{{ appShortName }}</span>
+            </span>
         </div>
 
         <!--
@@ -175,11 +185,14 @@ const activeQuery = computed(() => {
 /* The third flex child. `min-width: 0` for the reason recorded above `.topnav__left` and for a second one
    that group does not have: this child is `flex: 1 1 auto`, so without it its automatic minimum size is the
    input's content width and the BAR gets pushed wider than the viewport instead of the field shrinking.
-   `max-width` stops it becoming a 900px runway on a 1440 desktop. */
+   `max-width` stops it becoming a 900px runway on a 1440 desktop.
+   M252 (`D236`): a basis of 0, not `auto`, so the FIELD takes the squeeze and the wordmark keeps its width. With
+   `auto` the shrink was shared in proportion to each basis, the input's being the largest, so at 481px the wordmark
+   got 56px of the 80 "iConnect" needs (and "MERIDIAN" was cut there too). The field still grows to its max-width. */
 .topnav__centre {
     display: flex;
     justify-content: center;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
     max-width: 480px;
 }
@@ -279,17 +292,36 @@ const activeQuery = computed(() => {
     outline-offset: 2px;
 }
 
+/* No `text-transform: uppercase` since M252 (`D236`): the name is "iConnect", and its lowercase "i" is the brand. */
 .topnav__wordmark {
     font-family: var(--mds-font-family-display);
     font-size: var(--mds-type-heading-4-font-size);
     font-weight: var(--mds-font-weight-bold);
-    text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--mds-color-action-primary-fg);
     /* Truncate rather than force the bar wide (see .topnav__left). */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/*
+ * M252 (`D236`): the full name on a wide screen, "iConnect" alone at §6's tablet band and under. Measured at the
+ * default text size: "iConnect Collection" needs 177px; its box is 107px at 481px wide and exactly 177px at 768px,
+ * so any larger text size would cut it there. Only one of the two is ever displayed, so a screen reader reads one.
+ */
+.topnav__wordmark-short {
+    display: none;
+}
+
+@media (max-width: 1024px) {
+    .topnav__wordmark-full {
+        display: none;
+    }
+
+    .topnav__wordmark-short {
+        display: inline;
+    }
 }
 
 .topnav__right {
@@ -345,9 +377,17 @@ const activeQuery = computed(() => {
 
     /* Buys back the width the icon costs. At extra_large with OpenDyslexic's wider advances the display-face
        wordmark is the single widest item in the bar, and `min-width: 0` would otherwise resolve the squeeze
-       by ellipsising it to "MERI…" — contained, but not a wordmark. */
+       by ellipsising it to "iCon…" — contained, but not a wordmark.
+       M252 (`D236`): one step smaller again. Measured at 375px, "iConnect" at body-lg needs
+       80px and its box was 74px (the old uppercase "MERIDIAN" needed 94, so it was cut off here too). */
     .topnav__wordmark {
-        font-size: var(--mds-type-body-lg-font-size);
+        font-size: var(--mds-type-body-md-font-size);
+    }
+
+    /* M252 (`D236`): half the gap between the bar's three groups, for the wordmark; with the step above, "iConnect"
+       fits with room to spare at 375px. The groups stay 8px apart, so nothing touches. */
+    .topnav {
+        gap: var(--mds-space-2);
     }
 }
 </style>

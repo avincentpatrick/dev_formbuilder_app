@@ -36,7 +36,7 @@ CI (test/build) is unchanged (`docs/testing-strategy.md` §6, Linux runners). **
 2. **Action**: the workflow invokes **`deploy.ps1`** (committed at the repo root) against the live application directory. Every native step **fails fast**: a non-zero exit stops the script and turns the run red. It first refuses a host where the worker service named by `MERIDIAN_WORKER_SERVICE` (default `meridian-worker`) is not installed, or where `<app path>\.deploy-stage` exists but is not its own git worktree, then:
    - `git fetch`, then `-Ref`, which defaults to `origin/<branch>` (`main`), resolved to one commit — and **nothing more** when that commit is already live, the site is up and `storage\framework\deployed-sha` names it, so a CI run that changed nothing opens no window,
    - **and no window either when every path changed since the deployed commit is one the site does not load** — `docs/`, `tests/`, `scripts/`, `.github/` and the four top-level markdown files — in which case the checkout is fast-forwarded, `storage\framework\deployed-sha` is rewritten, and the site is never taken down. This is what stops an increment's close-out push, which regenerates `docs/pipeline.md`, from interrupting testers to ship a markdown file. It denies by default: one unrecognised path, one unreadable diff, a live build that is missing or a checkout that is not where `deployed-sha` says, and the full deploy runs. `tests/Feature/Deploy/DeploySkipAllowlistTest.php` pins the list's shape from both sides,
-   - **with the site still up**, `git worktree prune` and that commit checked out into `<app path>\.deploy-stage` (created on the first run, inside the tree), the live `.env` copied in because the build reads `VITE_APP_NAME` and `ASSET_URL`, and there `composer install --no-dev --optimize-autoloader`,
+   - **with the site still up**, `git worktree prune` and that commit checked out into `<app path>\.deploy-stage` (created on the first run, inside the tree), the live `.env` copied in because the build reads `ASSET_URL` (and read `VITE_APP_NAME` until `M252` took the name from the page data), and there `composer install --no-dev --optimize-autoloader`,
    - `npm ci` + design-system deps + `npm run ds:tokens` + `npm run build` (compiled assets), still in the stage, so live traffic keeps the old `vendor\` and `public\build`; then a half-done swap left by an earlier run is moved back and stale `.prev` copies are deleted,
    - `php artisan down --render=deploy-window` (the maintenance window — see §3.1; the page is prerendered, so a browser gets it without PHP loading `vendor\`, and since M99 `public/maintenance-guard.php` answers the requests the framework's stub hands onwards — anything expecting JSON, and Inertia visits — above the autoloader, because those used to fall through and boot the framework mid-swap), then `git reset --hard` to the commit and the renames: live `vendor\` and `public\build` aside to `.prev` and the staged ones in, each retried for about ten seconds while a process holds a file open inside, and — **once the site is down and before anything is replaced — the data guard (M176, `R-a11cc78a`, `D137`):** `php artisan deploy:backup` (a custom-format `pg_dump` with the privileged connection, the password in the child's environment only, into `MERIDIAN_DEPLOY_BACKUP_DIR`, default `storage\app\deploy-backups` in the live checkout, keeping its newest 10) and `php artisan deploy:census --write=…` (every base table's row count). If either fails nothing has changed yet: the site is brought back **up on the old code** and the run stops red with *"Refused to migrate"*,
    - the old `bootstrap\cache` config, services, packages, routes and events caches deleted and `php artisan package:discover`, then `php artisan migrate --force` (backward-compatible / additive-first migrations, so old code tolerates the new schema), then `php artisan psgc:sync` (M186, `R-70c7673a`, `D131`: the committed Philippine places in `database/data/psgc/` copied into `psgc_places` — places added and corrected, none ever deleted, a quarter older than the one loaded refused — BEFORE the count, so the count measures it too; a release older than the command skips it with a warning, and ⚠️ a changed `deploy.ps1` runs one deploy late, so the first copy on the testing server is the deploy after M186's), then `php artisan deploy:census --compare=…`: **a table holding fewer rows than before the migration, or gone, fails the window and the site is LEFT DOWN on purpose** (`D144`), the backup's path printed above it in the run's log — restore from it (§5) before bringing the site up (the tables that empty themselves by design, such as `jobs` and `sessions`, are listed with their reasons in `config/deploy.php`),
@@ -462,6 +462,9 @@ refuse to create an account without a console.
 
 ### 8.3 The testing site as built — Apache, `mod_md`, and the activation task Windows requires
 
+⚠️ **At the switch to three addresses (`D236`) this layout changes: see §8.5.** Until that switch runs, this
+section is what is on the box.
+
 **This is the runbook for the testing site, `iconnect.com.de` since `D216` and `staging.pitahc.gov.ph`
 before it (`D46`, `D49`), and until `M100` none of it was written down anywhere in this repository.** It lived as configuration on the box and as chat history, which is why
 `§8` described a server that does not exist for four increments. Everything below was read off the box or
@@ -730,6 +733,9 @@ testers send it before the switch.
 
 ### 8.4 A second application under the same host — BHW Connect (ADR-0024)
 
+⚠️ **At the switch to three addresses (`D236`) BHW leaves `/bhw-connect` for the root of
+`analytics.iconnect.com.de`: see §8.5.** Until that switch runs, this section is what is on the box.
+
 **MEASURED ON THE BOX.** `M192` wrote this as a design, before anything was on the box. Each part has since
 been built, measured, and rewritten from what was measured, by the phase named in brackets:
 - `bhw-p1-box`: the app and Apache (`M194`), then the wired deploy and the scheduled jobs (`M209`);
@@ -899,6 +905,101 @@ on the box, never from the box itself.
 **What can take which down.** BHW cannot take Meridian down through a deploy: it runs outside the
 checkout, from its own database, behind its own service. Only a bad Apache line can, which `httpd -t`
 prevents. Meridian cannot take BHW down through a deploy either; a PostgreSQL restart affects both.
+
+### 8.5 Three addresses — the portal, iConnect Analytics, iConnect Collection (`D236`, `M253`)
+
+**NOT YET ON THE BOX.** This is the switch the user decided on 2026-11-26 (`D236`), written before it is run.
+It changes §8.3's layout and §8.4's prefix. It runs at a merge point, after `M252` (#644) and `M253` are live,
+between the user's census before and after, one guarded block per step as `D216`'s move did. ⛔ **Rehearse
+the Apache half on the PC's Laragon Apache first**: the three names in the PC's hosts file, this app with
+`CENTRAL_DOMAIN=iconnect.com.de`, and BHW built with an empty base path on 3100. A bad line stops Apache and
+takes all three addresses down.
+
+**The layout after it.**
+
+| Host | Serves | Vhost |
+|---|---|---|
+| `iconnect.com.de` | **the portal**, BHW's home page (`apps/bhw-connect/app/page.tsx`) | public `*:443`: the block `php artisan portal:redirects` prints, then the proxy to 3100 |
+| `analytics.iconnect.com.de` | **iConnect Analytics** (BHW Connect), at the root; `/` goes to the portal | public `*:443`: a proxy to 3100 |
+| `collection.iconnect.com.de` | **iConnect Collection** (this app's workspace) | public `*:443`: today's `iconnect.com.de` vhost, renamed |
+| `iconnect.com.de` (from the box only) | this app's central host: the console `/admin`, sign-in for it | **loopback** `127.0.0.1:443`, reached through the hosts file |
+
+A workspace host is one label plus `CENTRAL_DOMAIN` (`SubdomainLabel`, `PlatformHost`), so Collection on
+`collection.iconnect.com.de` means `CENTRAL_DOMAIN=iconnect.com.de`. The central host is then the portal's
+name. From outside, the public vhost serves no page of this app: every old path of it redirects to
+`collection.`. On the box, the loopback vhost serves this app whole on that name, so the console and its
+sign-in work exactly as `com.de` did. Apache picks the `127.0.0.1:443` vhost for a connection to that
+address before any `*:443` one. `CollectionLayoutTest` pins this app's half.
+
+**The sign-in pass.** Collection's session cookie stays host-only (§8.2 step 3, unchanged). Collection also
+sets `iconnect-signin` for `iconnect.com.de` when `SIGNIN_PASS_DOMAIN` is set, and `whoami` alone honours
+it (ADR-0024 §D5 as amended, `App\Support\Auth\SignInPass`). BHW reads it once jongsky25 changes one cookie
+name (the message the user sends him). Until then, Analytics' admin sign-in is down after the switch; its
+public pages are not affected.
+
+**The steps.** Each runs on the box unless it says otherwise.
+1. **DNS (the user, Cloudflare):** `A analytics` and `A collection` to `121.58.210.233`, **DNS only**
+   (grey), as `D216`'s record. Check each with `nslookup` before going on.
+2. **Hosts file:** add `127.0.0.1 collection.iconnect.com.de`, which BHW's server uses for `whoami`, and
+   keep `127.0.0.1 iconnect.com.de` (the console, through the loopback vhost). `com.de` goes last (step 8).
+3. **The certificate:** one `<MDomain iconnect.com.de analytics.iconnect.com.de collection.iconnect.com.de>`
+   in place of today's. Keep §8.3's three traps: `MDPrivateKeys secp256r1`, no `MDCertificateFile` inside
+   `<MDomain>`, and the vhosts' certificate pair. Then `httpd -t`, restart, wait for `AH10059`, restart,
+   and run the activation task with `-Domain iconnect.com.de` (its default).
+4. **Apache, every vhost with `X-Robots-Tag` and `D54`'s HSTS, as §8.3 has them:**
+   - `collection.iconnect.com.de`: today's `*:443` vhost with its `ServerName` changed and **without**
+     §8.4's `ProxyPass /bhw-connect` lines and `<Location "/bhw-connect">`.
+   - `analytics.iconnect.com.de`: `RewriteEngine On`,
+     `RewriteRule "^/$" "https://iconnect.com.de/" [R=302,L]`, then
+     `RewriteRule "^/login$" "https://collection.iconnect.com.de/login" [R=302,L]` until BHW links to
+     Collection itself. Then the `/maps/` alias in place of `/bhw-connect/maps/` with `ProxyPass /maps !`,
+     `ProxyPreserveHost On`, `ProxyPass / http://127.0.0.1:3100/ retry=0 timeout=120`, `ProxyPassReverse`
+     the same, and `RequestHeader set X-Forwarded-Proto "https"`.
+   - `iconnect.com.de` (public): `DocumentRoot` this app's `public` folder (for `sw-retire.js` alone),
+     then exactly what `php artisan portal:redirects` prints. Run it on the box after this app's deploy,
+     so the route table it reads is the live one.
+   - `iconnect.com.de` (loopback): a copy of today's `*:443` vhost as `<VirtualHost 127.0.0.1:443>`.
+   - `*:80`: one vhost per name, each `Redirect permanent / https://<that name>/` with the header line
+     `M251` added.
+   Then `httpd -t` and one restart.
+5. **The switch window** (`artisan down --render=deploy-window`). Back up `.env`, then set:
+   - `CENTRAL_DOMAIN=iconnect.com.de`
+   - `APP_URL=https://iconnect.com.de`
+   - `APP_NAME="iConnect Collection"`
+   - `SIGNIN_PASS_DOMAIN=iconnect.com.de`
+   - `ANALYTICS_URL=https://analytics.iconnect.com.de/`
+   - `MAIL_EHLO_DOMAIN=iconnect.com.de`
+
+   Change the workspace's `domains` value `iconnect` to `collection`, the way `D216` changed `staging` to
+   `iconnect`. Then `config:cache`, `route:cache`, `view:cache`, `event:cache`, `queue:restart`, and `up`.
+6. **BHW (§8.4):**
+   - In `C:\meridian\bhw\.env`, set `NEXT_PUBLIC_BASE_PATH=` (empty),
+     `NEXT_PUBLIC_SITE_URL=https://analytics.iconnect.com.de`,
+     `MERIDIAN_INTERNAL_URL=https://collection.iconnect.com.de` and
+     `BHW_ANALYSIS_WORKER_URL=http://127.0.0.1:3100/api/analysis/worker`.
+   - Move `deployed-sha` aside: a release already built for a commit is reused, and `NEXT_PUBLIC_` values
+     are compiled in. Then run `deploy-bhw.ps1 -AppPath <app> -HealthUrl http://127.0.0.1:3100/`. The
+     workflows read the base path themselves from now on (`M253`).
+   - Re-register `bhw-connect-precompute` and `bhw-connect-regression-replay` against
+     `http://127.0.0.1:3100`: `register-cron-tasks.ps1` still defaults to the old prefix until jongsky25
+     changes it.
+7. **Check.** `openssl s_client` lists the three names. The headers judge's six probes pass on
+   `collection.` (its host since `M253`).
+   - **The clicks:** the portal; `analytics.iconnect.com.de/ask-the-data`; an old
+     `iconnect.com.de/f/<form>` link and an old `iconnect.com.de/bhw-connect/explore` link, each landing on
+     its new address; signing in on `collection.` and then opening Analytics' admin, once BHW reads the
+     pass; and the console from the box.
+   - Then the census after, which must equal the census before.
+8. **After.** Point `%USERPROFILE%\.meridian\feedback-pull.json` at `https://collection.iconnect.com.de`.
+   Send the tester notice the user approves: the new addresses, sign in again, send any offline answers
+   BEFORE the switch, and reinstall a form added to a home screen. Remove the `com.de` hosts entry last.
+
+**Rollback**, until step 8: restore the `.env` backup and the `domains` value, put §8.3's and §8.4's vhosts
+back from their backups, restore BHW's `.env`, and run `deploy-bhw.ps1 -Rollback`.
+
+**Owed after the switch, filed as rows:** the configuration probe and judge (`M251`, #640) know one site
+name, and the headers judge fetches one host. Each is extended to three from the box's real report, as
+`M251` built its fixtures.
 
 ---
 

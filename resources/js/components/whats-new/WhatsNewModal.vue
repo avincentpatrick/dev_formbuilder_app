@@ -19,6 +19,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { MdsButton, MdsModal } from '@meridian/design-system';
 import type { WhatsNewRelease } from '@/types/inertia';
 import ReleaseNotes from './ReleaseNotes.vue';
+import { currentAppName } from '@/composables/useAppName';
 
 const page = usePage();
 
@@ -40,7 +41,7 @@ watch(
 );
 
 const newest = computed(() => entries.value[0] ?? null);
-const title = computed(() => (newest.value ? `What's new in Meridian ${newest.value.version}` : "What's new"));
+const title = computed(() => (newest.value ? `What's new in ${currentAppName()} ${newest.value.version}` : "What's new"));
 
 function close(then?: () => void): void {
     if (!open.value) {

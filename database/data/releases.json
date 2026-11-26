@@ -1,5 +1,45 @@
 [
     {
+        "version": "0.30.1",
+        "title": "New addresses: iConnect Collection, iConnect Analytics and the iConnect portal",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "iConnect Collection has its own address now: collection.iconnect.com.de. Links and QR codes to the old address still work: they take you to the new one."
+            },
+            {
+                "kind": "improved",
+                "text": "iconnect.com.de is now the iConnect portal, and iConnect Analytics (until now BHW Connect) is at analytics.iconnect.com.de."
+            },
+            {
+                "kind": "improved",
+                "text": "Because the address changed, you sign in once more. A form you added to your phone's home screen should be added again from its new link."
+            }
+        ]
+    },
+    {
+        "version": "0.30.0",
+        "title": "Meridian is now iConnect Collection",
+        "items": [
+            {
+                "kind": "improved",
+                "text": "The app has a new name: iConnect Collection. You will see it at the top of every page, on the sign-in page, in emails and on the browser tab. Nothing else changes: your forms, answers and sign-in stay exactly as they are."
+            },
+            {
+                "kind": "improved",
+                "text": "A new icon: \"iC\" replaces the \"M\" on the browser tab and on a phone where a form was added to the home screen."
+            },
+            {
+                "kind": "improved",
+                "text": "On a phone or a tablet, the top bar shows \"iConnect\" so the name fits, and the templates that come with the app are marked \"iConnect\"."
+            },
+            {
+                "kind": "improved",
+                "text": "The link to BHW Connect, in your account menu and at the foot of every page, is now called iConnect Analytics."
+            }
+        ]
+    },
+    {
         "version": "0.21.0",
         "title": "Copy a whole section, or several questions at once",
         "items": [

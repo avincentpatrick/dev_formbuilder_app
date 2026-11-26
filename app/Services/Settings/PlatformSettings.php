@@ -148,7 +148,8 @@ final class PlatformSettings
 
         return trim($message) !== ''
             ? trim($message)
-            : 'Meridian is temporarily unavailable while we carry out planned maintenance. Please try again shortly.';
+            // M252 (`D236`): the product's name from config, so the box's APP_NAME renames this default too.
+            : (string) config('app.name').' is temporarily unavailable while we carry out planned maintenance. Please try again shortly.';
     }
 
     /** Drop the memo — for tests, and after a console write in the same request. */

@@ -118,6 +118,15 @@ BHW is served under `/bhw-connect`. Links made with `next/link`, `router.push` a
 prefix by themselves. A raw `<a href="/…">`, a `fetch("/…")` or a `window.location` change does not:
 wrap it in `withBasePath()` from `apps/bhw-connect/lib/base-path.ts`. A test fails on the literal ones.
 
+**Changing at the switch to three addresses (`D236`, the user's decision of 2026-11-26).** BHW becomes
+**iConnect Analytics** at the root of `analytics.iconnect.com.de`, with an empty base path. Its home page
+becomes the portal at `iconnect.com.de`. Meridian becomes **iConnect Collection** at
+`collection.iconnect.com.de`. Keep `withBasePath()` everywhere: CI still builds BHW under `/bhw-connect`
+until BHW's own specs stop naming it. On the portal host, `/admin`, `/api/v1`, `/api/platform`, `/oauth`
+and `/auth` stay Collection's. Collection's sign-in reaches BHW through a pass, the cookie
+`iconnect-signin`, which `/api/v1/auth/whoami` accepts as it accepts the session today. The server side
+is avincentpatrick's (Meridian's runbook §8.5). What changes inside `apps/bhw-connect/` is jongsky25's.
+
 ## 9. When the trunk breaks
 
 If `main` is red because of your side, fix it forward or revert within the day. The other person may

@@ -47,7 +47,7 @@ vi.mock('@/components/integrations/RuleFormModal.vue', () => ({
 const Index = (await import('./Index.vue')).default;
 
 const SEVEN_DAY_NOTICE =
-    'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in Meridian.';
+    'Google hasn’t published this app yet, so it treats every connection as a test and expires the sign-in after 7 days. Someone will need to reconnect weekly until then. That’s Google’s policy for apps in testing, not a fault in iConnect Collection.';
 
 function provider(overrides: Partial<ProviderCard> = {}): ProviderCard {
     return {
@@ -142,7 +142,7 @@ describe('the 7-day expiry notice (H16b)', () => {
         expect(text).toContain('Google’s policy');
         // The half that matters most: without it the sentence explains a limitation and still leaves the
         // reader thinking it might be ours.
-        expect(text).toContain('not a fault in Meridian');
+        expect(text).toContain('not a fault in iConnect Collection');
         wrapper.unmount();
     });
 

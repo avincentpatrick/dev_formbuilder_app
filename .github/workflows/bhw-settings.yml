@@ -35,4 +35,10 @@ jobs:
         run: |
           $app = if ($env:MERIDIAN_APP_PATH) { $env:MERIDIAN_APP_PATH } else { 'C:\meridian\app' }
           $changed = & "$app\apps\bhw-connect\ops\write-settings.ps1"
-          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app -RestartIfSkipped:($changed -gt 0)
+          # M253 (`D236`): the health check follows the box's own base path, as in deploy.yml.
+          $base = ''
+          $bhwEnv = 'C:\meridian\bhw\.env'
+          $line = if (Test-Path $bhwEnv) { Select-String -Path $bhwEnv -Pattern '^\s*NEXT_PUBLIC_BASE_PATH\s*=(.*)$' | Select-Object -Last 1 }
+          if ($line) { $base = $line.Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'").Trim('/') }
+          $health = if ($base) { "http://127.0.0.1:3100/$base" } else { 'http://127.0.0.1:3100/' }
+          & "$app\apps\bhw-connect\ops\deploy-bhw.ps1" -AppPath $app -RestartIfSkipped:($changed -gt 0) -HealthUrl $health

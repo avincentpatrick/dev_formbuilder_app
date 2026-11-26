@@ -75,6 +75,7 @@ use App\Http\Middleware\EnforceTenantMaintenance;
 use App\Http\Middleware\EnforceTenantTwoFactor;
 use App\Http\Middleware\EstablishTenantDatabaseContext;
 use App\Http\Middleware\InitializeTenancyByPublicHost;
+use App\Http\Middleware\IssueSignInPass;
 use App\Http\Middleware\PublicRuntimeSecurityHeaders;
 use App\Models\Audit;
 use App\Models\Connection;
@@ -155,6 +156,10 @@ Route::middleware([
     // the ARRIVAL group above: the deadline is written by that request, so a gate reading "no stamp yet"
     // there would end every session in the act of creating it.
     EnforceImpersonationTimeout::class,
+    // IssueSignInPass (M253, `D236`) — the shared sign-in pass that lets iConnect Analytics, on its own host,
+    // ask `whoami` who is signed in. LAST, so it issues only to a request every gate above admitted; it adds a
+    // cookie and nothing else, and none at all unless SIGNIN_PASS_DOMAIN is set (App\Support\Auth\SignInPass).
+    IssueSignInPass::class,
 ])->group(function (): void {
     // The authenticated landing page (H11) — real, visibility-scoped KPI counts from DashboardMetricsService.
     // No `can:` gate: every role lands here after login; the per-role scoping is the service's job.

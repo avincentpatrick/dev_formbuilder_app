@@ -51,6 +51,7 @@ use App\Models\SavedReportView;
 use App\Models\ScopeNode;
 use App\Models\WebhookEndpoint;
 use App\Support\Api\ApiAbilities;
+use App\Support\Auth\SignInPass;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
@@ -120,12 +121,32 @@ Route::prefix('api/v1')
         // otherwise reach the query and 500 on a bad cast instead of a clean 404.
         Route::delete('auth/tokens/{id}', [ApiTokenController::class, 'destroy'])
             ->whereNumber('id')->name('tokens.destroy');
+    });
 
-        // Who is signed in (M207, ADR-0024 §D5) — read by BHW Connect's server, which forwards the browser's
-        // session cookie from /bhw-connect on this same origin. Named `session.*`, not `auth.*`: every
-        // `api.v1.*` name outside `public.` and `tokens.` is read as a Group B route by the route-group tests
-        // (tests/Pest.php groupBRoutes()), and this one carries a session, not a token. Its own limiter is
-        // keyed by the member, because every call arrives from 127.0.0.1 and the `api` limiter keys on IP.
+// ── Who is signed in: Group A's pipeline, with the shared sign-in pass as a second way in ──────────
+// M207 (ADR-0024 §D5): read by BHW Connect's server, which forwards the browser's cookie. M253 (`D236`, §D5 as
+// amended): iConnect Analytics moves to its own host, where Collection's host-only session cookie never arrives,
+// so this route — and ONLY this route — also takes the `iconnect-signin` pass (App\Support\Auth\SignInPass),
+// through a second guard. Everything else in Group A stays session-only, which is why this is its own group
+// rather than a second guard on Group A: a pass must never mint a key.
+//
+// Named `session.*`, not `auth.*`: every `api.v1.*` name outside `public.`, `tokens.` and `session.` is read as a
+// Group B route by the route-group tests (tests/Pest.php groupBRoutes()), and this one carries a session or a
+// pass, never a token. Its own limiter is keyed by the member, because every call arrives from 127.0.0.1 and the
+// `api` limiter keys on IP. `verified` and the workspace's two-factor gate apply to a pass exactly as to a
+// session; a pass is issued only after both, too (IssueSignInPass).
+Route::prefix('api/v1')
+    ->name('api.v1.')
+    ->middleware([
+        'web',
+        InitializeTenancyBySubdomain::class,
+        PreventAccessFromCentralDomains::class,
+        EstablishTenantDatabaseContext::class,
+        'auth:web,'.SignInPass::GUARD,
+        'verified',
+        EnforceTenantTwoFactor::class,
+    ])
+    ->group(function (): void {
         Route::get('auth/whoami', WhoamiController::class)
             ->middleware('throttle:whoami')->name('session.whoami');
     });

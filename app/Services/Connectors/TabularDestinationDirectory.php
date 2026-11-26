@@ -287,7 +287,7 @@ final class TabularDestinationDirectory
      */
     private function cannotCreateMessage(ConnectorProviderKey $provider): string
     {
-        return 'Meridian can’t create a '.$provider->destinationNoun().' in '.$provider->label().
+        return (string) config('app.name').' can’t create a '.$provider->destinationNoun().' in '.$provider->label().
             '. Make one there, then pick it here.';
     }
 

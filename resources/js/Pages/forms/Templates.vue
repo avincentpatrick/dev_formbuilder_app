@@ -10,6 +10,10 @@ import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { MdsBadge, MdsButton, MdsCard, MdsEmptyState } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
+import { useAppName } from '@/composables/useAppName';
+
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName, shortName: appShortName } = useAppName();
 
 type TemplateCard = {
     id: string;
@@ -63,7 +67,7 @@ function useTemplate(template: TemplateCard): void {
                     <template #header>
                         <div class="templates__meta">
                             <MdsBadge v-if="template.category" :label="template.category" variant="neutral" />
-                            <MdsBadge v-if="template.is_platform" label="Meridian" variant="info" />
+                            <MdsBadge v-if="template.is_platform" :label="appShortName" variant="info" />
                         </div>
                         <h2 class="templates__name">{{ template.name }}</h2>
                     </template>
@@ -95,7 +99,7 @@ function useTemplate(template: TemplateCard): void {
         <MdsEmptyState
             v-else
             headline="No templates yet"
-            description="Templates you save from a form will appear here, alongside Meridian's starter gallery."
+            :description="`Templates you save from a form will appear here, alongside ${appName}'s starter gallery.`"
         >
             <template #action>
                 <Link href="/forms">

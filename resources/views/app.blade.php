@@ -48,7 +48,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title inertia>{{ config('app.name', 'Meridian') }}</title>
+    <title inertia>{{ config('app.name', 'iConnect Collection') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
     {{-- The tenant brand ramp, AFTER @vite deliberately — see the partial for why order and selector
          specificity are load-bearing. Shared verbatim with the guest shell since H23b: this template

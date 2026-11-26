@@ -51,7 +51,7 @@ describe('the version outside the app shell', () => {
         const wrapper = mount(AuthLayout, { props: { title: 'Sign in', variant: 'split' }, slots: { default: '<form />' } });
         const foot = wrapper.get('.auth__card .auth__version');
 
-        expect(foot.text()).toBe('Meridian v0.9.0');
+        expect(foot.text()).toBe('iConnect Collection v0.9.0');
         expect(foot.find('a, button').exists()).toBe(false);
         expect(wrapper.get('aside').text()).not.toContain('v0.9.0');
     });
@@ -63,8 +63,8 @@ describe('the version outside the app shell', () => {
     });
 
     it('sits in the landing page footer', () => {
-        const wrapper = mount(Welcome, { props: { appName: 'Meridian', registrationOpen: false, centralHost: 'meridian.test' } });
+        const wrapper = mount(Welcome, { props: { appName: 'iConnect Collection', registrationOpen: false, centralHost: 'meridian.test' } });
 
-        expect(wrapper.get('.landing__footer .landing__version').text()).toBe('Meridian v0.9.0');
+        expect(wrapper.get('.landing__footer .landing__version').text()).toBe('iConnect Collection v0.9.0');
     });
 });

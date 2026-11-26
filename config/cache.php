@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
 
     /*
@@ -116,9 +114,12 @@ return [
     | stores, there might be other applications using the same cache. For
     | that reason, you may prefix every cache key to avoid collisions.
     |
+    | ⛔ A literal, not the slug of APP_NAME (M252): renaming the product must not orphan every key —
+    | rate limiters, locks and `queue:restart`'s signal, which a running worker reads under the old prefix.
+    |
     */
 
-    'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
+    'prefix' => env('CACHE_PREFIX', 'meridian-cache-'),
 
     /*
     |--------------------------------------------------------------------------

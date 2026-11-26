@@ -11,9 +11,28 @@ return [
     | framework needs to place the application's name in a notification or
     | other UI elements where an application name needs to be displayed.
     |
+    | M252 (D236): the product is iConnect Collection. `short_name` is what fits where a few letters do (the
+    | phone-size top bar, a badge). Both are DISPLAY ONLY — the session cookie and the cache prefixes no longer
+    | derive from this value (config/session.php, config/cache.php), so renaming it signs nobody out.
+    |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'iConnect Collection'),
+
+    'short_name' => env('APP_SHORT_NAME', 'iConnect'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | The Link to iConnect Analytics
+    |--------------------------------------------------------------------------
+    |
+    | M252 (D236): where the shell's "iConnect Analytics" links point (BHW Connect, ADR-0024). The default is
+    | today's address on the same origin; the testing box sets the app's own address once it moves to
+    | `analytics.iconnect.com.de` (M253), so this PR changes nothing until then.
+    |
+    */
+
+    'analytics_url' => env('ANALYTICS_URL', '/bhw-connect/'),
 
     /*
     |--------------------------------------------------------------------------

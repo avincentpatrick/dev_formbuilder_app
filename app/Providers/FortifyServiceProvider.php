@@ -14,9 +14,14 @@ use App\Models\User;
 use App\Services\Auth\GoogleSignInGate;
 use App\Services\Settings\RegistrationGate;
 use App\Support\Auth\PasswordPolicy;
+use App\Support\Auth\SignInPass;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -55,6 +60,26 @@ class FortifyServiceProvider extends ServiceProvider
             $app['hash'],
             $config['model'],
         ));
+
+        // M253 (`D236`) — the shared sign-in pass's guard, beside `web` on `whoami` alone (`auth:web,signin-pass`),
+        // so iConnect Analytics on its own host can still ask who is signed in. Users are read through the
+        // `users` provider by name, the RLS-aware one: `auth.defaults` names no provider, so the guard's own
+        // default would be null.
+        Auth::viaRequest(
+            SignInPass::GUARD,
+            static fn (Request $request): ?Authenticatable => app(SignInPass::class)
+                ->userFrom($request, Auth::createUserProvider('users')),
+        );
+
+        // A sign-out ends the pass with the session. The row check alone already refuses it, since signing out
+        // deletes the session row; clearing the cookie as well stops a browser carrying a dead pass.
+        Event::listen(Logout::class, static function (): void {
+            $forget = app(SignInPass::class)->forget();
+
+            if ($forget !== null) {
+                Cookie::queue($forget);
+            }
+        });
 
         // Breached-password check (OWASP ASVS L1) + a 12-char minimum + the four character classes
         // (user decision of record 2026-08-09), inherited by registration, password reset, password

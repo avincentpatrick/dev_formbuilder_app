@@ -142,3 +142,18 @@ it('takes the BHW dev copy on demand, deploying nothing and keeping the upload a
         ->and($text)->not->toContain('deploy-bhw.ps1')
         ->and($text)->not->toContain('write-settings.ps1');
 });
+
+it('checks BHW Connect\'s health at the box\'s own base path, in both workflows that deploy it (M253, D236)', function (): void {
+    // Before the switch to three addresses BHW is served under /bhw-connect; after it, at the root of
+    // analytics.iconnect.com.de. A fixed health URL would roll every deploy back on one side of the switch.
+    $bhw = deployWorkflowSteps()[1];
+    $settings = (string) file_get_contents(base_path('.github/workflows/bhw-settings.yml'));
+
+    // Pest's toContain() takes no message (a second argument is another needle), so each file is its own pass.
+    foreach ([$bhw, $settings] as $text) {
+        expect($text)->toContain("\$bhwEnv = 'C:\meridian\bhw\.env'")
+            ->and($text)->toContain('NEXT_PUBLIC_BASE_PATH')
+            ->and($text)->toContain('-RestartIfSkipped:($changed -gt 0) -HealthUrl $health')
+            ->and($text)->toContain("'http://127.0.0.1:3100/'");
+    }
+});

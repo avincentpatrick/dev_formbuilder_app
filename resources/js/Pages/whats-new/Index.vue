@@ -12,6 +12,10 @@ import { MdsCard, MdsEmptyState } from '@meridian/design-system';
 import PageHeader from '@/components/shell/PageHeader.vue';
 import ReleaseNotes from '@/components/whats-new/ReleaseNotes.vue';
 import type { WhatsNewRelease } from '@/types/inertia';
+import { useAppName } from '@/composables/useAppName';
+
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName } = useAppName();
 
 defineProps<{ releases: WhatsNewRelease[] }>();
 </script>
@@ -28,7 +32,7 @@ defineProps<{ releases: WhatsNewRelease[] }>();
     <MdsEmptyState
         v-else
         headline="No release notes yet"
-        description="When Meridian changes, what changed is listed here, newest first."
+        :description="`When ${appName} changes, what changed is listed here, newest first.`"
     />
 </template>
 

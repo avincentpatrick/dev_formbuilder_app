@@ -134,3 +134,13 @@ it('refuses a host that is not a bare host name', function (): void {
 
     $this->artisan('portal:redirects')->assertSuccessful();
 });
+
+it('never redirects a central route away from the portal host, whatever its path', function (): void {
+    // Today every domain-bound route (the console, the connectors' callbacks) is also named in STAYS, so this is what
+    // keeps the domain rule itself honest: a future central route under a new name must stay where it is.
+    Route::domain('iconnect.com.de')->get('central-only-surface', fn () => 'central');
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(app(PortalRedirects::class)->collectionPrefixes())->not->toContain('central-only-surface')
+        ->and(portalRedirectTarget('/central-only-surface'))->toBeNull();
+});

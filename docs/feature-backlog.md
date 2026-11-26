@@ -16362,3 +16362,8 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M254` (2026-11-26) — `minor` · symfony/routing 8.1.11 carries two advisories published 2026-11-25, so composer audit fails every Meridian CI run.**
+  Found by `M254` (2026-11-26), on #645's run 45776980298, the first to fail on them. #644's run passed the same step hours earlier, so the advisory database changed between the two. `symfony/routing` v8.1.11 is behind CVE-2026-133746 and CVE-2026-133754 (fixed in 8.1.12). Once that was bumped, the audit named the rest of the same Symfony batch: `symfony/http-kernel` v8.1.11 (CVE-2026-133743) and `symfony/mailer` v8.1.1 (CVE-2026-133751, CVE-2026-133755). Every Meridian pull request's static-analysis job is red until the trunk carries the fix, the held ones included. BHW-only pull requests skip that job.
+
+  **Live** — the lock on main holds every affected version today. Filed by `M254`. **Tier: during-testing.** ✅ **CLOSED BY `M254` (2026-11-26):** a lock-only bump of four packages, `composer update symfony/routing symfony/http-kernel symfony/http-foundation symfony/mailer`. `http-kernel` 8.1.12 requires `http-foundation` 8.1.12, and `-W` would have moved 18 packages. Routing, http-kernel and http-foundation are now 8.1.12, and mailer 8.1.1 → 8.1.12. `composer audit`: no advisories.

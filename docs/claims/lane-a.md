@@ -16,7 +16,35 @@ Standing Rule 7(b-bis).
 
 ---
 
-## Status: ACTIVE CLAIM — `M253`, `R-43038865` by `D236`: the portal at `iconnect.com.de`, iConnect Analytics at `analytics.iconnect.com.de` and iConnect Collection at `collection.iconnect.com.de` — the repository half: a shared sign-in pass that only `whoami` honours, the layout pinned by a test, the portal's redirect block generated from the route table, the BHW deploy's health URL taken from the box, a retiring service worker for the old address, ADR-0024 amended, and the runbook (m253-three-addresses)
+## Status: ACTIVE CLAIM — `M254`, `R-ae22eae2`: `symfony/routing` 8.1.11 → 8.1.12, clearing CVE-2026-133746 and CVE-2026-133754, which fail `composer audit` on every Meridian CI run (m254-symfony-routing-advisory)
+
+Taken 2026-11-26. Found by #645's run 45776980298, the first to fail on these advisories. #644's run passed the same step earlier the same day, so the advisory database changed between the two runs.
+Branch `m254-symfony-routing-advisory`, cut from origin/main at `0a11f6bd`, PR into main, held for the next merge point and merged **first** there: every held Meridian PR's static-analysis job is red until the trunk carries this.
+Row, filed and closed by this increment on its branch:
+- `R-ae22eae2`, *"symfony/routing 8.1.11 carries two advisories published 2026-11-25, so composer audit fails every Meridian CI run."*
+
+### Evidence verified
+- `composer.lock` holds `symfony/routing` v8.1.11.
+- Run 45776980298's Composer audit names PKSA-pbtx-4qgh-mmkh (CVE-2026-133746) and PKSA-2vy6-qchn-f13r (CVE-2026-133754), both affecting every version before 8.1.12, reported 2026-11-25T09:12Z.
+
+### Premise verified
+- **It is not any branch's code.** The lock on main is the same, so the trunk's next run fails too.
+- A BHW-only pull request skips Meridian's jobs, so jongsky25's merges are not blocked by it.
+- `M238` (#520) is the precedent: a framework advisory cleared by a lock-only bump, merged first at its merge point.
+
+### Remedy verdict
+**Works, measured by a dry run:** `composer update symfony/routing` moves that one package, v8.1.11 → v8.1.12, and nothing else.
+
+Files: `composer.lock`, `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Shared artefacts taken: `docs/feature-backlog.md`, `docs/pipeline.md`, `PROGRESS.md` (own block).
+Paired files taken: none.
+Namespaces spent: nothing from either namespace. There is no `VERSION` bump: nothing a tester sees changes (`M238`'s precedent).
+Prediction:
+- `composer audit` clean, and every job green.
+- PHPStan cannot move, because the diff is the lock only.
+- **The one I most expect to be wrong:** a routing behaviour change inside the patch release, which Pest's route-group and URL tests would show.
+
+## HELD — `M253`, `R-43038865` by `D236`: the portal at `iconnect.com.de`, iConnect Analytics at `analytics.iconnect.com.de` and iConnect Collection at `collection.iconnect.com.de` — the repository half: a shared sign-in pass that only `whoami` honours, the layout pinned by a test, the portal's redirect block generated from the route table, the BHW deploy's health URL taken from the box, a retiring service worker for the old address, ADR-0024 amended, and the runbook (m253-three-addresses) — BUILT AND HELD: PR #645, CI 45776980298 green but for Composer audit (an external advisory, cleared by `M254`)
 
 Taken 2026-11-26, from the same approved plan as `M252` (Part 2).
 Branch `m253-three-addresses`, **stacked on #644** (cut from `m252-iconnect-rename` at `2d6bcd60`), PR into main, so its diff shows #644 until #644 merges. It is held green for the next merge point (`D137`) and merges straight after #644, in the same sitting as the box switch (the plan, Part 3).
@@ -63,6 +91,22 @@ Prediction:
 - PHPStan on the host at 0.
 - `DeployWorkflowTest` reddens on the literal deploy-bhw call until it is updated with the health URL.
 - **The one I most expect to be wrong:** the second guard. Every `RequestGuard` resolves its user once per request, and the `rls_aware` provider reads `users` on its own connection, so the pass's user lookup may need that provider rather than `User::find()`.
+
+**BUILT AND HELD (2026-11-26): PR #645, stacked on #644 (cut from `m252-iconnect-rename` at `2d6bcd60`), held for the same merge point and merged straight after #644, in the sitting that runs the switch (runbook §8.5).**
+- **CI:** run 45776980298 on `04caa64e`. Every job is green with real step counts except one: BHW Connect 22 · E2E 20 · Contract 16 · Frontend 12 · Pest 11 · axe 11 · Scope 5, and Boundary 45776977939 green (5).
+  - Static analysis (32 steps) is red at **Composer audit alone**: two `symfony/routing` advisories (CVE-2026-133746, CVE-2026-133754, affecting every version before 8.1.12) reached the advisory database between #644's run and this one. They fail every Meridian run from now on, the trunk's included, and none of it is this branch's code.
+  - Filed and taken as `M254`, which merges first at the merge point. Then this branch takes the trunk and re-runs.
+- **Built:**
+  - The sign-in pass (`SignInPass`, `IssueSignInPass`, the `signin-pass` guard on `whoami` alone, cleared at sign-out): `SignInPassTest`, 14 cases, 6 of 6 mutants caught.
+  - `CollectionLayoutTest`; `php artisan portal:redirects` (`PortalRedirectsTest`, 5 of 5 caught, one only after a case for a domain-bound route under a new name was added).
+  - `public/sw-retire.js`; BHW's health URL from the box's base path in both workflows (exercised in Windows PowerShell on four `.env` shapes, and caught as a mutant); the headers judge on `collection.`.
+  - ADR-0024 amended in place; runbook §8.5; the working agreement §8.
+  - Rows: `R-43038865` closed for its repository half. Filed: `R-e4a70045` (the switch), `R-ce9a5f2d` (the configuration judge for three names), `R-93e358f2` (the headers judge for the portal and Analytics).
+- **A design correction while building, recorded in §8.5:** the console stays on the portal's name through a **loopback-only** vhost (`127.0.0.1:443`). The first design would have redirected the console's own `/login` away from it.
+- **How the prediction fared:**
+  - **Right about the guard being the risk, wrong about why.** The `users` provider was right first time, because it is named in the guard's closure. What was wrong was the TEST: Laravel's client sends no cookie with a JSON request without `withCredentials()`, so every refusal case was vacuously green and only the positive case was red. A scratch probe of `userFrom()` found it.
+  - `DeployWorkflowTest` needed its new case rather than a changed one (the literal call still matches as a prefix), and Pest's `toContain()` read a message as a second needle until it was removed.
+  - PHPStan stayed at 0 on the host.
 
 ## HELD — `M252`, `R-54516e0c` by `D236`: Meridian is called iConnect Collection everywhere a person sees it, with an "iC" icon and "iConnect" alone in the phone-size top bar; its two links to BHW Connect read "iConnect Analytics"; the names its session cookie and caches are built from stay exactly as they are (m252-iconnect-rename) — BUILT AND HELD: PR #644, CI 45772526551 every job green with real step counts
 

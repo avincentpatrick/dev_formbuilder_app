@@ -246,7 +246,7 @@ it('refuses to create a destination for a provider that cannot provision', funct
         ->json();
 
     expect($payload['destination'])->toBeNull()
-        ->and($payload['error'])->toBe('Meridian can’t create a table in Airtable. Make one there, then pick it here.');
+        ->and($payload['error'])->toBe(config('app.name').' can’t create a table in Airtable. Make one there, then pick it here.');
 
     // And nothing was attempted — `schema.bases:write` was never requested, so the call would 403 anyway.
     Http::assertNothingSent();

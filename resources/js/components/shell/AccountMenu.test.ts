@@ -9,10 +9,15 @@ import { describe, expect, it, vi } from 'vitest';
  * the mock below renders Link as an <a> too, which is why these cases ask for the COMPONENT, not the tag.
  */
 
+// The page props, replaced per case: M252 (`D236`) takes the link's address from `app.analytics_url`.
+const mocks = vi.hoisted(() => ({
+    props: { auth: { user: { name: 'Demo Owner', email: 'owner@demo.test' } } } as Record<string, unknown>,
+}));
+
 vi.mock('@inertiajs/vue3', () => ({
     Link: { name: 'Link', props: ['href'], template: '<a :href="href"><slot /></a>' },
     router: { post: vi.fn() },
-    usePage: () => ({ props: { auth: { user: { name: 'Demo Owner', email: 'owner@demo.test' } } } }),
+    usePage: () => ({ props: mocks.props }),
 }));
 
 const AccountMenu = (await import('./AccountMenu.vue')).default;
@@ -23,12 +28,12 @@ async function openMenu() {
     return wrapper;
 }
 
-describe('AccountMenu — BHW Connect (M207, D179)', () => {
-    it('lists BHW Connect as a plain link to /bhw-connect/, a menu item like the rest', async () => {
+describe('AccountMenu — iConnect Analytics, formerly BHW Connect (M207, D179; M252, D236)', () => {
+    it('lists iConnect Analytics as a plain link to /bhw-connect/, a menu item like the rest', async () => {
         const wrapper = await openMenu();
-        const item = wrapper.findAll('[role="menuitem"]').find((el) => el.text() === 'BHW Connect');
+        const item = wrapper.findAll('[role="menuitem"]').find((el) => el.text() === 'iConnect Analytics');
 
-        expect(item, 'no BHW Connect item in the account menu').toBeDefined();
+        expect(item, 'no iConnect Analytics item in the account menu').toBeDefined();
         expect(item!.element.tagName).toBe('A');
         expect(item!.attributes('href')).toBe('/bhw-connect/');
         expect(item!.classes()).toContain('mds-menu__item');
@@ -41,5 +46,18 @@ describe('AccountMenu — BHW Connect (M207, D179)', () => {
 
         expect(viaInertia).toEqual(['/settings', '/feedback/mine']);
         wrapper.unmount();
+    });
+
+    it("takes the link's address from the page props once the app has its own (M253)", async () => {
+        const before = mocks.props;
+        mocks.props = { ...before, app: { version: '0.9.0', analytics_url: 'https://analytics.example.test/' } };
+        const wrapper = await openMenu();
+        const item = wrapper.findAll('[role="menuitem"]').find((el) => el.text() === 'iConnect Analytics');
+
+        expect(item!.element.tagName).toBe('A');
+        expect(item!.attributes('href')).toBe('https://analytics.example.test/');
+        expect(wrapper.findAllComponents({ name: 'Link' }).map((link) => link.props('href'))).toEqual(['/settings', '/feedback/mine']);
+        wrapper.unmount();
+        mocks.props = before;
     });
 });

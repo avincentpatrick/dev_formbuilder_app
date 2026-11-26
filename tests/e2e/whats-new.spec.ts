@@ -18,6 +18,8 @@ import { expect, test } from '@playwright/test';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const VERSION = readFileSync(join(process.cwd(), 'VERSION'), 'utf8').trim();
+// M252 (`D236`): the product's name, as `.env.example` sets it for the stack CI runs (APP_NAME).
+const PRODUCT = 'iConnect Collection';
 const NEWEST = (JSON.parse(readFileSync(join(process.cwd(), 'database/data/releases.json'), 'utf8')) as { title: string }[])[0];
 
 test.describe("What's new — the prompt after sign-in", () => {
@@ -27,14 +29,14 @@ test.describe("What's new — the prompt after sign-in", () => {
 
     test('shows the version at sign-in, opens on the page they land on, and stays closed once closed', async ({ page }) => {
         await page.goto('/login', { waitUntil: 'networkidle' });
-        await expect(page.locator('.auth__card .auth__version')).toHaveText(`Meridian v${VERSION}`);
+        await expect(page.locator('.auth__card .auth__version')).toHaveText(`${PRODUCT} v${VERSION}`);
 
         await page.getByLabel('Email', { exact: true }).fill('whatsnew@meridian.test');
         await page.getByLabel('Password', { exact: true }).fill('meridian-e2e-2026');
         await page.getByRole('button', { name: 'Sign in' }).click();
         await page.waitForURL('**/dashboard', { timeout: 30_000 });
 
-        const prompt = page.getByRole('dialog', { name: `What's new in Meridian ${VERSION}` });
+        const prompt = page.getByRole('dialog', { name: `What's new in ${PRODUCT} ${VERSION}` });
         await expect(prompt).toBeVisible({ timeout: 15_000 });
         await expect(prompt.getByRole('heading', { level: 3, name: NEWEST.title })).toBeVisible();
 
@@ -50,7 +52,7 @@ test.describe("What's new — the prompt after sign-in", () => {
 
         await expect(page.locator('.sidebar__foot')).toContainText(`v${VERSION}`);
         const footer = page.locator('footer.app-shell__footer');
-        await expect(footer).toContainText(`Meridian v${VERSION}`);
+        await expect(footer).toContainText(`${PRODUCT} v${VERSION}`);
         await footer.getByRole('link', { name: "What's new" }).click();
         await page.waitForURL('**/whats-new');
 

@@ -27,6 +27,10 @@
 import { computed, ref } from 'vue';
 import { MdsBadge, MdsEmptyState, MdsTextInput } from '@meridian/design-system';
 import type { LibraryItem } from './types';
+import { useAppName } from '@/composables/useAppName';
+
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { shortName: appShortName } = useAppName();
 
 const props = defineProps<{
     items: LibraryItem[];
@@ -75,7 +79,7 @@ function typeLabel(value: string): string {
                         <span class="library__item-name" :title="item.name">{{ item.name }}</span>
                         <span class="library__item-type">{{ typeLabel(item.field_type) }}</span>
                     </span>
-                    <MdsBadge v-if="item.is_platform" label="Meridian" variant="info" />
+                    <MdsBadge v-if="item.is_platform" :label="appShortName" variant="info" />
                 </button>
             </li>
         </ul>

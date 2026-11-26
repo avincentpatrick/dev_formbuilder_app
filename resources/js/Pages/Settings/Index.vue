@@ -32,6 +32,7 @@ import TwoFactorSetup from '@/components/settings/TwoFactorSetup.vue';
 import BrandingCard from '@/components/settings/BrandingCard.vue';
 import NotificationPreferencesCard from '@/components/settings/NotificationPreferencesCard.vue';
 import AccessCard from '@/components/settings/AccessCard.vue';
+import { useAppName } from '@/composables/useAppName';
 import MaintenanceCard from '@/components/settings/MaintenanceCard.vue';
 import ModulesCard from '@/components/settings/ModulesCard.vue';
 import AboutCard from '@/components/settings/AboutCard.vue';
@@ -88,6 +89,8 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
+// M252 (`D236`): the product's name in the hints, from the page props.
+const { name: appName } = useAppName();
 
 // Appearance — all four §2.9 axes. Each control PATCHes only its own field.
 const { mode, setMode, accent, setAccent, fontSize, setFontSize, dyslexiaFont, setDyslexiaFont } =
@@ -223,7 +226,7 @@ function savePassword(): void {
                     <div class="settings-row__text">
                         <p class="settings-row__label">Theme</p>
                         <p class="settings-row__hint">
-                            Choose how Meridian looks. "Match System" follows your device setting.
+                            Choose how {{ appName }} looks. "Match System" follows your device setting.
                         </p>
                     </div>
                     <MdsSegmentedControl
@@ -253,7 +256,7 @@ function savePassword(): void {
                     <div class="settings-row__text">
                         <p class="settings-row__label">Text size</p>
                         <p class="settings-row__hint">
-                            Scales all text across Meridian. Public forms your respondents see are not
+                            Scales all text across {{ appName }}. Public forms your respondents see are not
                             affected.
                         </p>
                     </div>

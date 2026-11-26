@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@inertiajs/vue3', () => ({
+    // M252 (`D236`): the card names the product through `useAppName()`, which reads the page props.
+    usePage: () => ({ props: { app: { version: '0.30.0', name: 'iConnect Collection' } } }),
     useForm: (initial: Record<string, unknown>) => {
         mocks.form = reactive({ ...initial, errors: {}, processing: false, recentlySuccessful: false, patch: mocks.patch });
 

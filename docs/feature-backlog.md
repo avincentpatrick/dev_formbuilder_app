@@ -16362,3 +16362,18 @@ calls silently vanish rather than pass. Measured at 375px: `switchVisible=true f
   The remedy, when taken: read `default_language` as a locale code; take the code from the ODK form `Name (code)`; map a bare name only when it is unambiguous, else keep the workspace's locale and say so in the import's warnings.
 
   **Live** — any form imported from a Kobo or ODK workbook on the testing server today. Filed by `M239`. **Tier: during-testing.**
+
+- ✅ **CLOSED BY `M252` (2026-11-26) — `minor` · The product still calls itself Meridian everywhere a person sees it, though the user renamed it iConnect Collection.**
+  Found by `M252` (2026-11-26), from the user's request in chat, decided as `D236`.
+  - The name came from `APP_NAME` in only some places: the tab titles, email, the Welcome page and the authenticator-app label. It was written out as "Meridian" in 19 places in the pages (the shell's wordmarks, Settings, What's new, the integrations editor) and in 6 PHP strings (the welcome email, the default maintenance message, two connector messages, a Drive title).
+  - ⚠️ `APP_NAME` also named the session cookie and both cache prefixes. Renaming the product by setting alone would have signed everyone out, broken BHW Connect's admin sign-in (its server forwards the cookie by its name, `meridian-session`), and orphaned every cache key.
+  - The identifiers that say `meridian` stay, because something already deployed or already on a tester's device reads each one back: IndexedDB `meridian-offline`, the `meridian:*` storage keys, `X-Meridian-Challenge`, the `#meridian` XLSForm markers, the `_meridian-*` DNS records, the database roles.
+
+  **Live** — every page of the testing server says Meridian today. Filed by `M252`. **Tier: during-testing.** ✅ **CLOSED BY `M252` (2026-11-26):** the cookie and both cache prefixes are literals (`config/session.php`, `config/cache.php`, `config/database.php`), and `ProductNameTest` loads each under a different `APP_NAME` (3 of 3 mutants caught). The name is `config('app.name')` and `app.short_name`, shared with every page and read through `useAppName()`, and the 25 strings read it. The top bar shows "iConnect" alone in the phone band. The icon is an "iC", drawn by `scripts/generate-app-icons.php`. The box's `APP_NAME` changes at the merge point.
+
+- **`minor` · Collection, Analytics and the portal still share one address, though the user gave each its own.**
+  Found by `M252` (2026-11-26), from the user's request in chat, decided as `D236`: the portal (today's BHW home page) at `iconnect.com.de`, iConnect Analytics at `analytics.iconnect.com.de` with no `/bhw-connect`, and iConnect Collection at `collection.iconnect.com.de`.
+  - Collection's session cookie is host-only (`SESSION_DOMAIN=null`, ADR-0009, ADR-0019), so Analytics' admin sign-in, which reads that cookie today, needs the shared sign-in pass `D236` chose.
+  - The remedy, planned in full in the approved plan (`~/.claude/plans/lets-rename-the-following-frolicking-curry-of-c1c815ee-ed31-4db4-acc6-18d73249c3a9.md`, Part 2): the pass; a layout test for `CENTRAL_DOMAIN=iconnect.com.de` with the label `collection`; the portal vhost's routing generated from the route table; the probe and both judges for three names; the BHW deploy's health URL taken from the box's base path; a retiring `/sw.js` on the old address; ADR 0027; the runbook. Then the box switch (Part 3) at the merge point, and the message to jongsky25 (Part 4), whose steps are his (`D210`).
+
+  **Live** — one address serves both apps today. Filed by `M252`. **Tier: during-testing.**

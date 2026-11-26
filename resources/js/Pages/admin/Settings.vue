@@ -19,6 +19,10 @@ import { watch } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SupportTokensCard from '@/components/admin/SupportTokensCard.vue';
 import type { SupportTokenRow } from '@/components/admin/types';
+import { useAppName } from '@/composables/useAppName';
+
+// M252 (`D236`): the product's name from the page props, never a literal.
+const { name: appName } = useAppName();
 
 const props = defineProps<{
     settings: { signup_open: boolean; maintenance_enabled: boolean; maintenance_message: string };
@@ -117,7 +121,7 @@ function save(): void {
 
                 <p v-if="settings.maintenance_enabled" class="platform__notice" role="status">
                     <MdsIcon name="alert" size="sm" aria-hidden="true" />
-                    <span>Meridian is in maintenance for every tenant. This console stays reachable.</span>
+                    <span>{{ appName }} is in maintenance for every tenant. This console stays reachable.</span>
                 </p>
 
                 <div class="platform__row">
@@ -144,7 +148,7 @@ function save(): void {
                         :rows="3"
                         :describedby="describedby"
                         :invalid="invalid"
-                        placeholder="Meridian is down for scheduled maintenance until 03:00 UTC."
+                        :placeholder="`${appName} is down for scheduled maintenance until 03:00 UTC.`"
                     />
                 </MdsFormField>
             </MdsCard>

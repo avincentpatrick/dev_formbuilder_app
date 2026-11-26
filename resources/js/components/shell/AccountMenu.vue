@@ -32,29 +32,32 @@ const user = computed(() => page.props.auth.user);
  *
  * Its item is a plain anchor, because another server answers /bhw-connect and an Inertia visit would get a
  * page that is no Inertia response. Every other item stays Inertia's Link, with `href` a real prop.
+ *
+ * M252 (`D236`): the app is "iConnect Analytics" now, and its address comes from the page props
+ * (`app.analytics_url`, config/app.php) — `/bhw-connect/` today, its own address once it moves (M253).
  */
-const BHW_CONNECT_HREF = '/bhw-connect/';
+const analyticsHref = computed(() => page.props.app?.analytics_url || '/bhw-connect/');
 
 const MenuLink = defineComponent({
     props: { href: { type: String, required: true } },
     setup(props, { slots }) {
         return () =>
-            props.href === BHW_CONNECT_HREF
+            props.href === analyticsHref.value
                 ? h('a', { href: props.href }, slots.default?.())
                 : h(Link, { href: props.href }, slots.default);
     },
 });
 
-const items: MenuItem[] = [
+const items = computed<MenuItem[]>(() => [
     { id: 'settings', label: 'Settings', icon: 'settings', href: '/settings' },
     // M175 (`R-9bfd832e`) — every member's own reports, with the support team's replies. Here rather than in
     // the sidebar: it is about the person, like Settings, and every role may open it.
     // M179: the page now holds the testing-round comments too, and an Owner's sidebar already has "Feedback"
     // (the workspace's list) — so the account menu names this one apart.
     { id: 'my-feedback', label: 'Feedback & testing', icon: 'feedback', href: '/feedback/mine' },
-    { id: 'bhw-connect', label: 'BHW Connect', icon: 'chart-bar', href: BHW_CONNECT_HREF },
+    { id: 'bhw-connect', label: 'iConnect Analytics', icon: 'chart-bar', href: analyticsHref.value },
     { id: 'logout', label: 'Log out', icon: 'logout' },
-];
+]);
 
 function onSelect(id: string): void {
     if (id === 'logout') router.post('/logout');

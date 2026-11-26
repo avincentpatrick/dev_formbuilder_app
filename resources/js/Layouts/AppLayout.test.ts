@@ -187,24 +187,38 @@ describe("AppLayout — the footer and the What's new prompt (M181)", () => {
         return mount(AppLayout, { global: { stubs } });
     }
 
-    it("puts the product, its version, What's new, Help and BHW Connect under every page", () => {
+    it("puts the product, its version, What's new, Help and iConnect Analytics under every page", () => {
         const footer = shellAt('Dashboard').get('.app-shell__content > footer.app-shell__footer');
 
         // Its parts, in order: the gap spaces them on screen, so the markup carries no space between them.
         expect(footer.findAll(':scope > *').map((part) => part.text())).toEqual([
-            'Meridian v0.9.0',
+            'iConnect Collection v0.9.0',
             '·',
             "What's new",
             '·',
             'Help',
             '·',
-            'BHW Connect',
+            'iConnect Analytics',
         ]);
         expect(footer.findAll('a').map((a) => [a.text(), a.attributes('href')])).toEqual([
             ["What's new", '/whats-new'],
             ['Help', '/help'],
-            ['BHW Connect', '/bhw-connect/'],
+            ['iConnect Analytics', '/bhw-connect/'],
         ]);
+    });
+
+    // M252 (`D236`): the name and the other app's address are the page props' — one source, renamed on the box.
+    it('takes the product name and the link to iConnect Analytics from the page props', () => {
+        mocks.page.component = 'Dashboard';
+        mocks.page.url = '/dashboard';
+        mocks.page.props = {
+            app: { version: '0.9.0', name: 'Renamed Product', short_name: 'Renamed', analytics_url: 'https://analytics.example.test/' },
+        };
+        const footer = mount(AppLayout, { global: { stubs } }).get('.app-shell__content > footer.app-shell__footer');
+
+        expect(footer.text()).toContain('Renamed Product v0.9.0');
+        expect(footer.text()).not.toContain('iConnect Collection');
+        expect(footer.get('a[href="https://analytics.example.test/"]').text()).toBe('iConnect Analytics');
     });
 
     it('sits after the page, inside the scroll region, not inside the page column', () => {
@@ -219,7 +233,7 @@ describe("AppLayout — the footer and the What's new prompt (M181)", () => {
     });
 
     it('says a development build is one', () => {
-        expect(shellAt('Dashboard', 'dev').get('footer').text()).toContain('Meridian development build');
+        expect(shellAt('Dashboard', 'dev').get('footer').text()).toContain('iConnect Collection development build');
     });
 
     it("mounts the What's new prompt once, beside the toast host, on every page — the builder included", () => {

@@ -59,6 +59,12 @@ class HandleInertiaRequests extends Middleware
             // file under the APP_VERSION override; never the bundle's `__APP_VERSION__` sha (see BuildInfo).
             'app' => [
                 'version' => app(BuildInfo::class)->version(),
+                // M252 (`D236`) — the product's name, ONE source for every page (`useAppName()`), so the box's
+                // APP_NAME renames the shell, the titles and the badges together, with no rebuild.
+                'name' => (string) config('app.name'),
+                'short_name' => (string) config('app.short_name'),
+                // Where the shell's "iConnect Analytics" links go (BHW Connect; config/app.php).
+                'analytics_url' => (string) config('app.analytics_url'),
             ],
             'auth' => [
                 'user' => $user ? [

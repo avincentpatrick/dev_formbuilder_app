@@ -15,6 +15,7 @@ import ImpersonationBanner from '@/components/shell/ImpersonationBanner.vue';
 import WhatsNewModal from '@/components/whats-new/WhatsNewModal.vue';
 import { versionLabel } from '@/components/whats-new/version-label';
 import { useToast } from '@/composables/useToast';
+import { useAppName } from '@/composables/useAppName';
 
 const drawerOpen = ref(false);
 const scrolled = ref(false);
@@ -36,6 +37,9 @@ const fluid = computed(() => FLUID_PAGES.has(page.component));
 
 // M181 (`R-c7247dbf`, `D124`) — the release, under every page but the builder's (see the footer below).
 const version = computed(() => versionLabel(page.props.app?.version));
+// M252 (`D236`): the product's name, and where the other app lives, both from the page props.
+const { name: appName } = useAppName();
+const analyticsHref = computed(() => page.props.app?.analytics_url || '/bhw-connect/');
 
 // Server flash → toast bridge: any controller that redirects with ->with('toast', {...}) surfaces it
 // here once. Fires on the visit that carries the flash (immediate covers a redirect-then-render).
@@ -90,14 +94,15 @@ watch(() => page.url, () => {
                      one. Not on a fluid page: the builder owns the whole region and its scroll, and its version is in
                      the sidebar's foot. Inside <main>, so it is no `contentinfo` landmark of its own. -->
                 <footer v-if="!fluid" class="app-shell__footer">
-                    <span>Meridian {{ version }}</span>
+                    <span>{{ appName }} {{ version }}</span>
                     <span aria-hidden="true">·</span>
                     <Link href="/whats-new" class="app-shell__footer-link">What's new</Link>
                     <span aria-hidden="true">·</span>
                     <Link href="/help" class="app-shell__footer-link">Help</Link>
-                    <!-- M207 (`D179`): a plain <a>, because /bhw-connect is another application's server. -->
+                    <!-- M207 (`D179`): a plain <a>, because the other app is another application's server.
+                         M252 (`D236`): it is "iConnect Analytics" now, at `app.analytics_url`. -->
                     <span aria-hidden="true">·</span>
-                    <a href="/bhw-connect/" class="app-shell__footer-link">BHW Connect</a>
+                    <a :href="analyticsHref" class="app-shell__footer-link">iConnect Analytics</a>
                 </footer>
             </main>
         </div>
